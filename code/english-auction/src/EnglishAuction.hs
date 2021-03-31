@@ -17,9 +17,9 @@
 
 module EnglishAuction
     ( Auction (..)
-    , StartParams (..)
+    , StartParams (..), BidParams (..), CloseParams (..)
     , AuctionSchema
-    , start
+    , start, bid, close
     , endpoints
     , schemas
     , ensureKnownCurrencies
@@ -126,10 +126,16 @@ data BidParams = BidParams
     , bpBid      :: !Integer
     } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
+data CloseParams = CloseParams
+    { cpCurrency :: !CurrencySymbol
+    , cpToken    :: !TokenName
+    } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
 type AuctionSchema =
     BlockchainActions
         .\/ Endpoint "start" StartParams
         .\/ Endpoint "bid"   BidParams
+        .\/ Endpoint "close" CloseParams
 
 start :: (HasBlockchainActions s, AsContractError e) => StartParams -> Contract w s e ()
 start StartParams{..} = do
@@ -151,8 +157,9 @@ start StartParams{..} = do
 
 bid :: forall w s. HasBlockchainActions s => BidParams -> Contract w s Text ()
 bid BidParams{..} = do
-    (oref, o, d@AuctionDatum{..}) <- findAuction
+    (oref, o, d@AuctionDatum{..}) <- findAuction bpCurrency bpToken
     logInfo @String $ printf "found auction utxo with datum %s" (show d)
+
     when (bpBid < minBid d) $
         throwError $ pack $ printf "bid lower than minimal bid %d" (minBid d)
     pkh <- pubKeyHash <$> ownPubKey
@@ -174,30 +181,65 @@ bid BidParams{..} = do
                                     mustSpendScriptOutput oref r
     ledgerTx <- submitTxConstraintsWith lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String ""
-  where
-    findAuction :: Contract w s Text (TxOutRef, TxOutTx, AuctionDatum)
-    findAuction = do
-        utxos <- utxoAt $ ScriptAddress auctionHash
-        let xs = [ (oref, o)
-                 | (oref, o) <- Map.toList utxos
-                 , Value.valueOf (txOutValue $ txOutTxOut o) bpCurrency bpToken == 1
-                 ]
-        case xs of
-            [(oref, o)] -> case txOutType $ txOutTxOut o of
-                PayToPubKey   -> throwError "unexpected out type"
-                PayToScript h -> case Map.lookup h $ txData $ txOutTxTx o of
-                    Nothing        -> throwError "datum not found"
-                    Just (Datum e) -> case PlutusTx.fromData e of
-                        Nothing -> throwError "datum has wrong type"
-                        Just d  -> return (oref, o, d)
-            _           -> throwError "auction utxo not found"
+    logInfo @String $ printf "made bid of %d lovelace in auction %s for token (%s, %s)"
+        bpBid
+        (show adAuction)
+        (show bpCurrency)
+        (show bpToken)
+
+close :: forall w s. HasBlockchainActions s => CloseParams -> Contract w s Text ()
+close CloseParams{..} = do
+    (oref, o, d@AuctionDatum{..}) <- findAuction cpCurrency cpToken
+    logInfo @String $ printf "found auction utxo with datum %s" (show d)
+
+    let t      = Value.singleton cpCurrency cpToken 1
+        r      = Redeemer $ PlutusTx.toData Close
+        seller = aSeller adAuction
+
+        lookups = Constraints.scriptInstanceLookups auctionInstance <>
+                  Constraints.otherScript auctionValidator          <>
+                  Constraints.unspentOutputs (Map.singleton oref o)
+        tx      = case adHighestBid of
+                    Nothing      -> mustPayToPubKey seller t                          <>
+                                    mustValidateIn (from $ aDeadline adAuction)       <>
+                                    mustSpendScriptOutput oref r
+                    Just Bid{..} -> mustPayToPubKey bBidder t                         <>
+                                    mustPayToPubKey seller (Ada.lovelaceValueOf bBid) <>
+                                    mustValidateIn (from $ aDeadline adAuction)       <>
+                                    mustSpendScriptOutput oref r
+    ledgerTx <- submitTxConstraintsWith lookups tx
+    void $ awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ printf "closed auction %s for token (%s, %s)"
+        (show adAuction)
+        (show cpCurrency)
+        (show cpToken)
+
+findAuction :: HasBlockchainActions s
+            => CurrencySymbol
+            -> TokenName
+            -> Contract w s Text (TxOutRef, TxOutTx, AuctionDatum)
+findAuction cs tn = do
+    utxos <- utxoAt $ ScriptAddress auctionHash
+    let xs = [ (oref, o)
+             | (oref, o) <- Map.toList utxos
+             , Value.valueOf (txOutValue $ txOutTxOut o) cs tn == 1
+             ]
+    case xs of
+        [(oref, o)] -> case txOutType $ txOutTxOut o of
+            PayToPubKey   -> throwError "unexpected out type"
+            PayToScript h -> case Map.lookup h $ txData $ txOutTxTx o of
+                Nothing        -> throwError "datum not found"
+                Just (Datum e) -> case PlutusTx.fromData e of
+                    Nothing -> throwError "datum has wrong type"
+                    Just d  -> return (oref, o, d)
+        _           -> throwError "auction utxo not found"
 
 endpoints :: Contract () AuctionSchema Text ()
-endpoints = (start' `select` bid') >> endpoints
+endpoints = (start' `select` bid' `select` close') >> endpoints
   where
     start' = endpoint @"start" >>= start
     bid'   = endpoint @"bid"   >>= bid
+    close' = endpoint @"close" >>= close
 
 mkSchemaDefinitions ''AuctionSchema
 
