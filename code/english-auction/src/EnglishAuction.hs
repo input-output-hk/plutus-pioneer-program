@@ -115,11 +115,19 @@ mkAuctionValidator ad redeemer ctx =
     traceIfFalse "wrong input value" correctInputValue &&
     case redeemer of
         MkBid b@Bid{..} ->
-            traceIfFalse "bid too low" (sufficientBid bBid)             &&
-            traceIfFalse "wrong output datum" (correctOutputDatum b)    &&
-            traceIfFalse "wrong output value" (correctOutputValue bBid) &&
-            traceIfFalse "wrong refund"       correctRefund
-        Close         -> True
+            traceIfFalse "bid too low" (sufficientBid bBid)                &&
+            traceIfFalse "wrong output datum" (correctBidOutputDatum b)    &&
+            traceIfFalse "wrong output value" (correctBidOutputValue bBid) &&
+            traceIfFalse "wrong refund"       correctBidRefund             &&
+            traceIfFalse "too late"           correctBidSlotRange
+        Close           ->
+            traceIfFalse "too early" correctCloseSlotRange &&
+            case adHighestBid ad of
+                Nothing      ->
+                    traceIfFalse "expected seller to get token" (getsValue (aSeller auction) tokenValue)
+                Just Bid{..} ->
+                    traceIfFalse "expected highest bidder to get token" (getsValue bBidder tokenValue) &&
+                    traceIfFalse "expected seller to get highest bid" (getsValue (aSeller auction) $ Ada.lovelaceValueOf bBid)
 
   where
     info :: TxInfo
@@ -166,16 +174,16 @@ mkAuctionValidator ad redeemer ctx =
                     Nothing  -> traceError "error decoding data"
         _   -> traceError "expected exactly one continuing output"
 
-    correctOutputDatum :: Bid -> Bool
-    correctOutputDatum b = (adAuction outputDatum == auction)   &&
-                           (adHighestBid outputDatum == Just b)
+    correctBidOutputDatum :: Bid -> Bool
+    correctBidOutputDatum b = (adAuction outputDatum == auction)   &&
+                              (adHighestBid outputDatum == Just b)
 
-    correctOutputValue :: Integer -> Bool
-    correctOutputValue amount =
+    correctBidOutputValue :: Integer -> Bool
+    correctBidOutputValue amount =
         txOutValue ownOutput == tokenValue Plutus.<> Ada.lovelaceValueOf amount
 
-    correctRefund :: Bool
-    correctRefund = case adHighestBid ad of
+    correctBidRefund :: Bool
+    correctBidRefund = case adHighestBid ad of
         Nothing      -> True
         Just Bid{..} ->
           let
@@ -187,6 +195,22 @@ mkAuctionValidator ad redeemer ctx =
             case os of
                 [o] -> txOutValue o == Ada.lovelaceValueOf bBid
                 _   -> traceError "expected exactly one refund output"
+
+    correctBidSlotRange :: Bool
+    correctBidSlotRange = to (aDeadline auction) `contains` txInfoValidRange info
+
+    correctCloseSlotRange :: Bool
+    correctCloseSlotRange = from (aDeadline auction) `contains` txInfoValidRange info
+
+    getsValue :: PubKeyHash -> Value -> Bool
+    getsValue h v =
+      let
+        [o] = [ o'
+              | o' <- txInfoOutputs info
+              , txOutValue o' == v
+              ]
+      in
+        txOutAddress o == PubKeyAddress h
 
 auctionInstance :: Scripts.ScriptInstance Auctioning
 auctionInstance = Scripts.validator @Auctioning
