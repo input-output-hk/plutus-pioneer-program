@@ -38,6 +38,7 @@ import           GHC.Generics                     (Generic)
 import           Plutus.Contract                  hiding (when)
 import qualified PlutusTx                         as PlutusTx
 import           PlutusTx.Prelude                 hiding (Semigroup(..), unless)
+import qualified PlutusTx.Prelude                 as Plutus
 import           Ledger                           hiding (singleton)
 import           Ledger.Constraints               as Constraints
 import qualified Ledger.Scripts                   as Scripts
@@ -55,7 +56,17 @@ data Auction = Auction
     { aSeller   :: !PubKeyHash
     , aDeadline :: !Slot
     , aMinBid   :: !Integer
+    , aCurrency :: !CurrencySymbol
+    , aToken    :: !TokenName
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+instance Eq Auction where
+    {-# INLINABLE (==) #-}
+    a == b = (aSeller   a == aSeller   b) &&
+             (aDeadline a == aDeadline b) &&
+             (aMinBid   a == aMinBid   b) &&
+             (aCurrency a == aCurrency b) &&
+             (aToken    a == aToken    b)
 
 PlutusTx.unstableMakeIsData ''Auction
 PlutusTx.makeLift ''Auction
@@ -65,10 +76,15 @@ data Bid = Bid
     , bBid    :: !Integer
     } deriving Show
 
+instance Eq Bid where
+    {-# INLINABLE (==) #-}
+    b == c = (bBidder b == bBidder c) &&
+             (bBid    b == bBid    c)
+
 PlutusTx.unstableMakeIsData ''Bid
 PlutusTx.makeLift ''Bid
 
-data AuctionAction = Start Auction | MkBid Bid | Close
+data AuctionAction = MkBid Bid | Close
     deriving Show
 
 PlutusTx.unstableMakeIsData ''AuctionAction
@@ -95,7 +111,82 @@ minBid AuctionDatum{..} = case adHighestBid of
 
 {-# INLINABLE mkAuctionValidator #-}
 mkAuctionValidator :: AuctionDatum -> AuctionAction -> ValidatorCtx -> Bool
-mkAuctionValidator _ _ _ = True
+mkAuctionValidator ad redeemer ctx =
+    traceIfFalse "wrong input value" correctInputValue &&
+    case redeemer of
+        MkBid b@Bid{..} ->
+            traceIfFalse "bid too low" (sufficientBid bBid)             &&
+            traceIfFalse "wrong output datum" (correctOutputDatum b)    &&
+            traceIfFalse "wrong output value" (correctOutputValue bBid) &&
+            traceIfFalse "wrong refund"       correctRefund
+        Close         -> True
+
+  where
+    info :: TxInfo
+    info = valCtxTxInfo ctx
+
+    input :: TxInInfo
+    input =
+      let
+        isScriptInput i = case txInInfoWitness i of
+            Nothing -> False
+            Just _  -> True
+        xs = [i | i <- txInfoInputs info, isScriptInput i]
+      in
+        case xs of
+            [i] -> i
+            _   -> traceError "expected exactly one script input"
+
+    inVal :: Value
+    inVal = txInInfoValue input
+
+    auction :: Auction
+    auction = adAuction ad
+
+    tokenValue :: Value
+    tokenValue = Value.singleton (aCurrency auction) (aToken auction) 1
+
+    correctInputValue :: Bool
+    correctInputValue = inVal == case adHighestBid ad of
+        Nothing      -> tokenValue
+        Just Bid{..} -> tokenValue Plutus.<> Ada.lovelaceValueOf bBid
+
+    sufficientBid :: Integer -> Bool
+    sufficientBid amount = amount >= minBid ad
+
+    ownOutput   :: TxOutInfo
+    outputDatum :: AuctionDatum
+    (ownOutput, outputDatum) = case getContinuingOutputs ctx of
+        [o] -> case txOutType o of
+            PayToPubKey   -> traceError "wrong output type"
+            PayToScript h -> case findDatum h info of
+                Nothing        -> traceError "datum not found"
+                Just (Datum d) ->  case PlutusTx.fromData d of
+                    Just ad' -> (o, ad')
+                    Nothing  -> traceError "error decoding data"
+        _   -> traceError "expected exactly one continuing output"
+
+    correctOutputDatum :: Bid -> Bool
+    correctOutputDatum b = (adAuction outputDatum == auction)   &&
+                           (adHighestBid outputDatum == Just b)
+
+    correctOutputValue :: Integer -> Bool
+    correctOutputValue amount =
+        txOutValue ownOutput == tokenValue Plutus.<> Ada.lovelaceValueOf amount
+
+    correctRefund :: Bool
+    correctRefund = case adHighestBid ad of
+        Nothing      -> True
+        Just Bid{..} ->
+          let
+            os = [ o
+                 | o <- txInfoOutputs info
+                 , txOutAddress o == PubKeyAddress bBidder
+                 ]
+          in
+            case os of
+                [o] -> txOutValue o == Ada.lovelaceValueOf bBid
+                _   -> traceError "expected exactly one refund output"
 
 auctionInstance :: Scripts.ScriptInstance Auctioning
 auctionInstance = Scripts.validator @Auctioning
@@ -144,6 +235,8 @@ start StartParams{..} = do
                 { aSeller   = pkh
                 , aDeadline = spDeadline
                 , aMinBid   = spMinBid
+                , aCurrency = spCurrency
+                , aToken    = spToken
                 }
         d = AuctionDatum
                 { adAuction    = a
@@ -231,7 +324,9 @@ findAuction cs tn = do
                 Nothing        -> throwError "datum not found"
                 Just (Datum e) -> case PlutusTx.fromData e of
                     Nothing -> throwError "datum has wrong type"
-                    Just d  -> return (oref, o, d)
+                    Just d@AuctionDatum{..}
+                        | aCurrency adAuction == cs && aToken adAuction == tn -> return (oref, o, d)
+                        | otherwise                                           -> throwError "auction token missmatch"
         _           -> throwError "auction utxo not found"
 
 endpoints :: Contract () AuctionSchema Text ()
