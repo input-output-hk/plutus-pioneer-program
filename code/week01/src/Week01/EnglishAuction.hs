@@ -15,7 +15,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
-module EnglishAuction
+module Week01.EnglishAuction
     ( Auction (..)
     , StartParams (..), BidParams (..), CloseParams (..)
     , AuctionSchema
