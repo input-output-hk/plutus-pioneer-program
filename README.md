@@ -16,7 +16,7 @@
 
 - Week #1
 
-  - Build the [English Auction](code/week01) contract with `cabal build`.
+  - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
   - Clone the [The Plutus repository](https://github.com/input-output-hk/plutus), check out the correct commit
     as specified in [cabal.project](code/week01/cabal.project).
   - Enter a `nix-shell`.
