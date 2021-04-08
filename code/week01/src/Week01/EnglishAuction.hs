@@ -29,28 +29,28 @@ module Week01.EnglishAuction
     , stage
     ) where
 
-import           Control.Monad                    hiding (fmap)
-import           Data.Aeson                       (ToJSON, FromJSON)
-import           Data.List.NonEmpty               (NonEmpty (..))
-import           Data.Map                         as Map
-import           Data.Text                        (pack, Text)
-import           GHC.Generics                     (Generic)
-import           Plutus.Contract                  hiding (when)
-import qualified PlutusTx                         as PlutusTx
-import           PlutusTx.Prelude                 hiding (Semigroup(..), unless)
-import qualified PlutusTx.Prelude                 as Plutus
-import           Ledger                           hiding (singleton)
-import           Ledger.Constraints               as Constraints
-import qualified Ledger.Scripts                   as Scripts
-import qualified Ledger.Typed.Scripts             as Scripts
-import           Ledger.Value                     as Value
-import           Ledger.Ada                       as Ada
-import           Playground.Contract              (ensureKnownCurrencies, printSchemas, stage, printJson)
-import           Playground.TH                    (mkKnownCurrencies, mkSchemaDefinitions)
-import           Playground.Types                 (KnownCurrency (..))
-import           Prelude                          (Semigroup (..))
-import           Schema                           (ToSchema)
-import           Text.Printf                      (printf)
+import           Control.Monad        hiding (fmap)
+import           Data.Aeson           (ToJSON, FromJSON)
+import           Data.List.NonEmpty   (NonEmpty (..))
+import           Data.Map             as Map
+import           Data.Text            (pack, Text)
+import           GHC.Generics         (Generic)
+import           Plutus.Contract      hiding (when)
+import qualified PlutusTx             as PlutusTx
+import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import qualified PlutusTx.Prelude     as Plutus
+import           Ledger               hiding (singleton)
+import           Ledger.Constraints   as Constraints
+import qualified Ledger.Scripts       as Scripts
+import qualified Ledger.Typed.Scripts as Scripts
+import           Ledger.Value         as Value
+import           Ledger.Ada           as Ada
+import           Playground.Contract  (ensureKnownCurrencies, printSchemas, stage, printJson)
+import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
+import           Playground.Types     (KnownCurrency (..))
+import           Prelude              (Semigroup (..))
+import           Schema               (ToSchema)
+import           Text.Printf          (printf)
 
 data Auction = Auction
     { aSeller   :: !PubKeyHash
