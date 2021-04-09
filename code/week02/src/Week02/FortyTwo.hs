@@ -39,20 +39,20 @@ import           Playground.Types    (KnownCurrency (..))
 import           Prelude             (Semigroup (..))
 import           Text.Printf         (printf)
 
-{-# INLINABLE mkGiftValidator #-}
-mkGiftValidator :: Data -> Data -> Data -> ()
-mkGiftValidator _ (I n) _
-    | n == 42             = ()
-mkGiftValidator _ _     _ = traceError "UNEXPECTED REDEEMER!"
+{-# INLINABLE mkFortyTwoValidator #-}
+mkFortyTwoValidator :: Data -> Data -> Data -> ()
+mkFortyTwoValidator _ (I n) _
+    | n == 42                 = ()
+mkFortyTwoValidator _ _     _ = traceError "UNEXPECTED REDEEMER!"
 
-giftValidator :: Validator
-giftValidator = mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])
+fortyTwoValidator :: Validator
+fortyTwoValidator = mkValidatorScript $$(PlutusTx.compile [|| mkFortyTwoValidator ||])
 
-giftHash :: Ledger.ValidatorHash
-giftHash = Scripts.validatorHash giftValidator
+fortyTwoHash :: Ledger.ValidatorHash
+fortyTwoHash = Scripts.validatorHash fortyTwoValidator
 
-giftAddress :: Ledger.Address
-giftAddress = ScriptAddress giftHash
+fortyTwoAddress :: Ledger.Address
+fortyTwoAddress = ScriptAddress fortyTwoHash
 
 type FortyTwoSchema =
     BlockchainActions
@@ -61,17 +61,17 @@ type FortyTwoSchema =
 
 give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 give amount = do
-    let tx = mustPayToOtherScript giftHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
+    let tx = mustPayToOtherScript fortyTwoHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
 grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 grab r = do
-    utxos <- utxoAt $ ScriptAddress giftHash
+    utxos <- utxoAt $ ScriptAddress fortyTwoHash
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
-                  Constraints.otherScript giftValidator
+                  Constraints.otherScript fortyTwoValidator
         tx :: TxConstraints Void Void
         tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx

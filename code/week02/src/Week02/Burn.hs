@@ -39,18 +39,18 @@ import           Playground.Types    (KnownCurrency (..))
 import           Prelude             (Semigroup (..))
 import           Text.Printf         (printf)
 
-{-# INLINABLE mkGiftValidator #-}
-mkGiftValidator :: Data -> Data -> Data -> ()
-mkGiftValidator _ _ _ = traceError "NO WAY!"
+{-# INLINABLE mkBurnValidator #-}
+mkBurnValidator :: Data -> Data -> Data -> ()
+mkBurnValidator _ _ _ = traceError "NO WAY!"
 
-giftValidator :: Validator
-giftValidator = mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])
+burnValidator :: Validator
+burnValidator = mkValidatorScript $$(PlutusTx.compile [|| mkBurnValidator ||])
 
-giftHash :: Ledger.ValidatorHash
-giftHash = Scripts.validatorHash giftValidator
+burnHash :: Ledger.ValidatorHash
+burnHash = Scripts.validatorHash burnValidator
 
-giftAddress :: Ledger.Address
-giftAddress = ScriptAddress giftHash
+burnAddress :: Ledger.Address
+burnAddress = ScriptAddress burnHash
 
 type BurnSchema =
     BlockchainActions
@@ -59,17 +59,17 @@ type BurnSchema =
 
 burn :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 burn amount = do
-    let tx = mustPayToOtherScript giftHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
+    let tx = mustPayToOtherScript burnHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "burnt %d lovelace" amount
 
 grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
 grab = do
-    utxos <- utxoAt $ ScriptAddress giftHash
+    utxos <- utxoAt $ ScriptAddress burnHash
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
-                  Constraints.otherScript giftValidator
+                  Constraints.otherScript burnValidator
         tx :: TxConstraints Void Void
         tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I 17 | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
