@@ -19,6 +19,7 @@
   - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
   - Clone the [The Plutus repository](https://github.com/input-output-hk/plutus), check out the correct commit
     as specified in [cabal.project](code/week01/cabal.project).
+  - Set-up IOHK binary caches [How to set up the IOHK binary caches](https://github.com/input-output-hk/plutus#iohk-binary-cache). "If you do not do this, you will end up building GHC, which takes several hours. If you find yourself building GHC, STOP and fix the cache."
   - Enter a `nix-shell`.
   - Go to the `plutus-playground-client` folder.
   - Start the Playground server with `plutus-playground-server`.
