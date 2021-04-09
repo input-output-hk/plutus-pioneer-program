@@ -10,6 +10,7 @@
 module Week02.Gift
     ( give
     , grab
+    , GiftSchema
     , endpoints
     , schemas
     , registeredKnownCurrencies
@@ -57,7 +58,7 @@ type GiftSchema =
 
 give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 give amount = do
-    let tx = mustPayToOtherScript giftHash (Datum $ I 42) $ Ada.lovelaceValueOf amount
+    let tx = mustPayToOtherScript giftHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount

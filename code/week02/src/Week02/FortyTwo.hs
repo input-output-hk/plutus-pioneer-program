@@ -8,10 +8,10 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week02.Burn
-    ( burn
+module Week02.FortyTwo
+    ( give
     , grab
-    , BurnSchema
+    , FortyTwoSchema
     , endpoints
     , schemas
     , registeredKnownCurrencies
@@ -41,7 +41,9 @@ import           Text.Printf         (printf)
 
 {-# INLINABLE mkGiftValidator #-}
 mkGiftValidator :: Data -> Data -> Data -> ()
-mkGiftValidator _ _ _ = traceError "NO WAY!"
+mkGiftValidator _ (I n) _
+    | n == 42             = ()
+mkGiftValidator _ _     _ = traceError "UNEXPECTED REDEEMER!"
 
 giftValidator :: Validator
 giftValidator = mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])
@@ -52,36 +54,36 @@ giftHash = Scripts.validatorHash giftValidator
 giftAddress :: Ledger.Address
 giftAddress = ScriptAddress giftHash
 
-type BurnSchema =
+type FortyTwoSchema =
     BlockchainActions
-        .\/ Endpoint "burn" Integer
-        .\/ Endpoint "grab" ()
+        .\/ Endpoint "give" Integer
+        .\/ Endpoint "grab" Integer
 
-burn :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
-burn amount = do
+give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+give amount = do
     let tx = mustPayToOtherScript giftHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "burnt %d lovelace" amount
+    logInfo @String $ printf "made a gift of %d lovelace" amount
 
-grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
-grab = do
+grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+grab r = do
     utxos <- utxoAt $ ScriptAddress giftHash
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
                   Constraints.otherScript giftValidator
         tx :: TxConstraints Void Void
-        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I 17 | oref <- orefs]
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "collected gifts"
 
-endpoints :: Contract () BurnSchema Text ()
+endpoints :: Contract () FortyTwoSchema Text ()
 endpoints = (give' `select` grab') >> endpoints
   where
-    give' = endpoint @"burn" >>= burn
-    grab' = endpoint @"grab" >>  grab
+    give' = endpoint @"give" >>= give
+    grab' = endpoint @"grab" >>= grab
 
-mkSchemaDefinitions ''BurnSchema
+mkSchemaDefinitions ''FortyTwoSchema
 
 mkKnownCurrencies []
