@@ -28,6 +28,10 @@
   - Compile.
   - Simulate various auction scenarios.
 
+## Some Plutus Modules
+
+- [`PlutusTx.Data`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs), contains the definition of the `Data` type.
+
 ## Additional Resources
 
 - [The Plutus repository](https://github.com/input-output-hk/plutus)
