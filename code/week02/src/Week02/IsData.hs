@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week02.Typed where
+module Week02.IsData where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Map             as Map
@@ -29,23 +29,26 @@ import           Playground.Types     (KnownCurrency (..))
 import           Prelude              (Semigroup (..))
 import           Text.Printf          (printf)
 
+newtype MySillyRedeemer = MySillyRedeemer Integer
+    deriving Show
+
+PlutusTx.unstableMakeIsData ''MySillyRedeemer
+
 {-# INLINABLE mkValidator #-}
-mkValidator :: () -> Integer -> ValidatorCtx -> Bool
-mkValidator () r _
-    | r == 42   = True
-    | otherwise = False
+mkValidator :: () -> MySillyRedeemer -> ValidatorCtx -> Bool
+mkValidator () (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
 
 data Typed
 instance Scripts.ScriptType Typed where
     type instance DatumType Typed = ()
-    type instance RedeemerType Typed = Integer
+    type instance RedeemerType Typed = MySillyRedeemer
 
 inst :: Scripts.ScriptInstance Typed
 inst = Scripts.validator @Typed
     $$(PlutusTx.compile [|| mkValidator ||])
     $$(PlutusTx.compile [|| wrap ||])
   where
-    wrap = Scripts.wrapValidator @() @Integer
+    wrap = Scripts.wrapValidator @() @MySillyRedeemer
 
 validator :: Validator
 validator = Scripts.validatorScript inst
@@ -75,7 +78,7 @@ grab r = do
         lookups = Constraints.unspentOutputs utxos      <>
                   Constraints.otherScript validator
         tx :: TxConstraints Void Void
-        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData $ MySillyRedeemer r | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "collected gifts"

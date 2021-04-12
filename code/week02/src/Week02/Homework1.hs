@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week02.Typed where
+module Week02.Homework1 where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Map             as Map
@@ -30,36 +30,30 @@ import           Prelude              (Semigroup (..))
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
-mkValidator :: () -> Integer -> ValidatorCtx -> Bool
-mkValidator () r _
-    | r == 42   = True
-    | otherwise = False
+-- This should validate if and only if the two Booleans in the redeemer are equal!
+mkValidator :: () -> (Bool, Bool) -> ValidatorCtx -> Bool
+mkValidator _ _ _ = True -- FIX ME!
 
 data Typed
 instance Scripts.ScriptType Typed where
-    type instance DatumType Typed = ()
-    type instance RedeemerType Typed = Integer
+-- Implement the instance!
 
 inst :: Scripts.ScriptInstance Typed
-inst = Scripts.validator @Typed
-    $$(PlutusTx.compile [|| mkValidator ||])
-    $$(PlutusTx.compile [|| wrap ||])
-  where
-    wrap = Scripts.wrapValidator @() @Integer
+inst = undefined -- FIX ME!
 
 validator :: Validator
-validator = Scripts.validatorScript inst
+validator = undefined -- FIX ME!
 
 valHash :: Ledger.ValidatorHash
-valHash = Scripts.validatorHash validator
+valHash = undefined -- FIX ME!
 
 scrAddress :: Ledger.Address
-scrAddress = ScriptAddress valHash
+scrAddress = undefined -- FIX ME!
 
 type GiftSchema =
     BlockchainActions
         .\/ Endpoint "give" Integer
-        .\/ Endpoint "grab" Integer
+        .\/ Endpoint "grab" (Bool, Bool)
 
 give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 give amount = do
@@ -68,14 +62,14 @@ give amount = do
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
-grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
-grab r = do
+grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => (Bool, Bool) -> Contract w s e ()
+grab bs = do
     utxos <- utxoAt scrAddress
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
                   Constraints.otherScript validator
         tx :: TxConstraints Void Void
-        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData bs | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "collected gifts"

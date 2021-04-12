@@ -7,18 +7,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week02.Gift
-    ( give
-    , grab
-    , GiftSchema
-    , endpoints
-    , schemas
-    , registeredKnownCurrencies
-    , printJson
-    , printSchemas
-    , ensureKnownCurrencies
-    , stage
-    ) where
+module Week02.Gift where
 
 import           Control.Monad       hiding (fmap)
 import           Data.Map            as Map
@@ -38,18 +27,18 @@ import           Playground.Types    (KnownCurrency (..))
 import           Prelude             (Semigroup (..))
 import           Text.Printf         (printf)
 
-{-# INLINABLE mkGiftValidator #-}
-mkGiftValidator :: Data -> Data -> Data -> ()
-mkGiftValidator _ _ _ = ()
+{-# INLINABLE mkValidator #-}
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = ()
 
-giftValidator :: Validator
-giftValidator = mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])
+validator :: Validator
+validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 
-giftHash :: Ledger.ValidatorHash
-giftHash = Scripts.validatorHash giftValidator
+valHash :: Ledger.ValidatorHash
+valHash = Scripts.validatorHash validator
 
-giftAddress :: Ledger.Address
-giftAddress = ScriptAddress giftHash
+scrAddress :: Ledger.Address
+scrAddress = ScriptAddress valHash
 
 type GiftSchema =
     BlockchainActions
@@ -58,17 +47,17 @@ type GiftSchema =
 
 give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 give amount = do
-    let tx = mustPayToOtherScript giftHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
+    let tx = mustPayToOtherScript valHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
 grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
 grab = do
-    utxos <- utxoAt $ ScriptAddress giftHash
+    utxos <- utxoAt scrAddress
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
-                  Constraints.otherScript giftValidator
+                  Constraints.otherScript validator
         tx :: TxConstraints Void Void
         tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I 17 | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
