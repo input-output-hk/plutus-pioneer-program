@@ -18,6 +18,7 @@
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
+- Lecture #2: [Simple Validation](code/week02)
 
 ## Exercises
 
@@ -34,6 +35,11 @@
   - Copy-paste the auction contract into the Playground editor - don't forget to remove the module header!
   - Compile.
   - Simulate various auction scenarios.
+
+- Week #2
+
+  - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
 
 ## Some Plutus Modules
 
