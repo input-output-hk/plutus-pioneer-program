@@ -8,6 +8,13 @@
   - The (E)UTxO-model
   - Running an example auction contract on a local Playground
   - Homework
+
+- [Lecture #2](https://youtu.be/E5KRk5y9KjQ)
+
+  - Triggering change.
+  - Low-level, untyped on-chain validation scripts.
+  - High-level, typed on-chain validation scripts.
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
