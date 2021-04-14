@@ -41,6 +41,13 @@
   - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
 
+## Solutions
+
+- Week #2
+
+  - [`Homework1`](code/week02/src/Week02/Solution1.hs)
+  - [`Homework2`](code/week02/src/Week02/Solution2.hs)
+
 ## Some Plutus Modules
 
 - [`PlutusTx.Data`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs), contains the definition of the `Data` type.
