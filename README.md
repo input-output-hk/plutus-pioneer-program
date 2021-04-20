@@ -50,8 +50,8 @@
 
 - Week #3
 
-  - Fix and complete the code in the [Homework1](code/week03/src/Week02/Homework1.hs) module.
-  - Fix and complete the code in the [Homework2](code/week03/src/Week02/Homework2.hs) module.
+  - Fix and complete the code in the [Homework1](code/week03/src/Week03/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week03/src/Week03/Homework2.hs) module.
 
 
 ## Solutions
@@ -60,6 +60,11 @@
 
   - [`Homework1`](code/week02/src/Week02/Solution1.hs)
   - [`Homework2`](code/week02/src/Week02/Solution2.hs)
+
+- Week #3
+
+  - [`Homework1`](code/week03/src/Week03/Solution1.hs)
+  - [`Homework2`](code/week03/src/Week03/Solution2.hs)
 
 ## Some Plutus Modules
 
