@@ -15,10 +15,17 @@
   - Low-level, untyped on-chain validation scripts.
   - High-level, typed on-chain validation scripts.
 
+- [Lecture #3](https://youtu.be/Lk1eIVm_ZTQ)
+
+  - Script context.
+  - Time handling.
+  - Parameterized contracts.
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
 - Lecture #2: [Simple Validation](code/week02)
+- Lecture #3: [Validation Context & Parameterized Contracts](code/week03)
 
 ## Exercises
 
@@ -40,6 +47,12 @@
 
   - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
+
+- Week #3
+
+  - Fix and complete the code in the [Homework1](code/week03/src/Week02/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week03/src/Week02/Homework2.hs) module.
+
 
 ## Solutions
 
