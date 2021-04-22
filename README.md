@@ -69,7 +69,7 @@
 - [`PlutusTx.Data`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs), contains the definition of the `Data` type.
 - [`PlutusTx.IsData.Class`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/Class.hs), defines the `IsData` class.
 
-## Plutus community playgroud
+## Plutus community playground
 
 - [Week 1 Community Playground(Legacy)](https://playground-week1.plutus-community.com/)
 - [Week 2 Community Playground(Legacy)](https://playground-week2.plutus-community.com/)
