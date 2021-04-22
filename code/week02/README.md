@@ -4,7 +4,7 @@ Lecture notes based on the first ever official https://github.com/input-output-h
 [[get-started]]
 ## 1) Get started with the cabal repl
 
-Since we are not installing cabal locally, bacause it is much more convenient to use it from nix-shell (this is included in nix), we will navigate to the plutus-pioneer/week02 git-cloned repo inside a nix environment. However, nix must be started first from the plutus root repo.
+Since we are not installing cabal locally, bacause it is much more convenient to use it from nix-shell (this is included in https://nixos.org/nix/[Nix]), we will navigate to the plutus-pioneer/week02 git-cloned repo inside a nix environment. However, nix must be started first from the plutus root repo.
 
     $ cd Cardano-King/plutus/  
     $ nix-shell
@@ -23,7 +23,8 @@ Some examples seeing the type of Data and create bite-string on the fly (use lit
     
 
 [[first-validator]]
-## 2) Implement our first validator. Start a Haskell module "Week02.Gift" where the script imports all the necessary language extensions that plutus needs. (first 8 lines `{-#...#-}`) and other modules that we refer to (lines 12-28) from the `./week01/EnglishAuction.hs` script.
+## 2) Implement our first validator
+Start a Haskell module "Week02.Gift" where the script imports all the necessary language extensions that plutus needs. (first 8 lines `{-#...#-}`) and other modules that we refer to (lines 12-28) from the `./week01/EnglishAuction.hs` script.
 
 Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell `()`
 
