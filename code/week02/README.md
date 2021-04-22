@@ -6,9 +6,14 @@ Before getting started you should clone the [Plutus repository](https://github.c
     $ mkdir Cardano-King && cd Cardano-King
     $ git clone https://github.com/input-output-hk/plutus.git
     $ git clone https://github.com/input-output-hk/plutus-pioneer-program.git
+    
+    
+## Outline
+1. [Get started with the cabal repl] (<#secc:get-started>)
+2. [Implement our first validator](<#secc:get-validator>)
 
 
-## [1. Item 1 Get started with the cabal repl](<#secc:get-started>)
+## Get started with the cabal repl
 
 Since we are not installing cabal locally, bacause it is much more convenient to use it from nix-shell (this is included in [Nix](https://nixos.org/nix/)), we will navigate to the plutus-pioneer/week02 git-cloned repo inside a nix environment. However, nix must be started first from the plutus root repo.
 
@@ -29,7 +34,7 @@ Some examples seeing the type of Data and create bite-string on the fly (use lit
     
 
 
-## [2. Item 2 Implement our first validator](<#secc:get-validator>)
+## Implement our first validator
 Start a Haskell module "Week02.Gift" where the script imports all the necessary language extensions that plutus needs. (first 8 lines `{-#...#-}`) and other modules that we refer to (lines 12-28) from the `./week01/EnglishAuction.hs` script.
 
 Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell `()`
