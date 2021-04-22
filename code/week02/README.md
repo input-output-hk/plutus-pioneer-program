@@ -9,8 +9,8 @@ Before getting started you should clone the [Plutus repository](https://github.c
     
     
 ## Outline
-1. [Get started with the cabal repl] (<#secc:get-started>)
-2. [Implement our first validator](<#secc:get-validator>)
+1. [Get started with the cabal repl](<#secc:get-started>)
+1. [Implement our first validator](<#secc:get-validator>)
 
 
 ## Get started with the cabal repl
