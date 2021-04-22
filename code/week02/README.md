@@ -45,6 +45,15 @@ Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell 
 We can open Gift.hs in a text editor and see that lines 31-35 contain the implementation of Monoid referring to the [#secc:get-sstarted] section above.
     
 
- ## Explore the first contract, the [`Gift.hs` contract](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs)
- 
- 
+## Explore the first contract, the [`Gift.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs) contract.
+
+We will brakdown some of the sections of the code that give the functionality to the contract. In the `Gift.hs` contract, lines 31-32 contain
+    
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ _ _ = ()
+    
+Which basically is a Haskell function (`mkValidator`), that latter on will be compiled into a Plutus function. It just creates a function that regardless of the inputs proceeds to the reading of the following lines of the code. The first goal is to create a validator (`mkValidatorScript`), this one uses **template Haskell** (34-35) this basically compiles inline (allowed by the `{~#INLINABLE mkValidator#~}` pragma at line 30) everything after the splice (after double dollar sign `$$`) in this case it will invoke the compilation of `PlutusTx.compile` with its input`mkValidator` (this is whatever is inside the double bars, inside the square brakets).
+
+    validator :: Validator
+    validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
+
