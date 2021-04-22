@@ -1,5 +1,5 @@
 # Lecture 2 notes
-Lecture notes based on the first ever official https://github.com/input-output-hk/plutus-pioneer-program/[Plutus-Pioneer program]. This notes follow the https://www.youtube.com/watch?v=E5KRk5y9KjQ/[YouTube lecture 2]
+Lecture notes based on the first ever official https://github.com/input-output-hk/plutus-pioneer-program/[ Plutus-Pioneer program]. This notes follow the https://www.youtube.com/watch?v=E5KRk5y9KjQ/[YouTube lecture 2]
 
 [[get-started]]
 ## 1) Get started with the cabal repl
@@ -15,13 +15,12 @@ Now we are isnide the cabal repl (takes a while the first time). Time to test so
 
     repl$ import PlutusTx
     
-Some examples seeing the type of Data and create bite-string on the fly (use literal strings to create byte strings), and then test it (:t B ...)
+Some examples seeing the type of Data and create bite-string on the fly (use literal strings to create byte strings), and then test it (`:t B ...`)
     
     repl$ :i Data
     repl$ :set -XOverloadedStrings  ## allows to include extremely large strings (literal-string to byte-strings)
     repl$ :t B "Haskellanians"
     
-## ---------------------------------------------------------------------------------------
 
 [[first-validator]]
 ## 2) Implement our first validator. Start a Haskell module "Week02.Gift" where the script imports all the necessary language extensions that plutus needs. (first 8 lines `{-#...#-}`) and other modules that we refer to (lines 12-28) from the `./week01/EnglishAuction.hs` script.
