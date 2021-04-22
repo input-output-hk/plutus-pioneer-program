@@ -45,4 +45,6 @@ Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell 
 We can open Gift.hs in a text editor and see that lines 31-35 contain the implementation of Monoid referring to the [#secc:get-sstarted] section above.
     
 
+ ## Explore the first contract, the [`Gift.hs` contract](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs)
+ 
  
