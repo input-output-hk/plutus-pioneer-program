@@ -34,7 +34,7 @@ Some examples seeing the type of Data and create bite-string on the fly (use lit
     
 
 
-## Implement our first validator
+## [Implement our first validator](<#secc:get-validator>)
 Start a Haskell module "Week02.Gift" where the script imports all the necessary language extensions that plutus needs. (first 8 lines `{-#...#-}`) and other modules that we refer to (lines 12-28) from the `./week01/EnglishAuction.hs` script.
 
 Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell `()`
