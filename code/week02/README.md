@@ -1,10 +1,10 @@
 # Lecture 2 notes
-Lecture notes based on the first ever official https://github.com/input-output-hk/plutus-pioneer-program/[ Plutus-Pioneer program]. This notes follow the https://www.youtube.com/watch?v=E5KRk5y9KjQ/[YouTube lecture 2]
+Lecture notes based on the first ever official [ Plutus-Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program). This notes follow the [YouTube lecture 2](https://www.youtube.com/watch?v=E5KRk5y9KjQ/).
 
 [[get-started]]
 ## 1) Get started with the cabal repl
 
-Since we are not installing cabal locally, bacause it is much more convenient to use it from nix-shell (this is included in https://nixos.org/nix/[Nix]), we will navigate to the plutus-pioneer/week02 git-cloned repo inside a nix environment. However, nix must be started first from the plutus root repo.
+Since we are not installing cabal locally, bacause it is much more convenient to use it from nix-shell (this is included in [Nix](https://nixos.org/nix/)), we will navigate to the plutus-pioneer/week02 git-cloned repo inside a nix environment. However, nix must be started first from the plutus root repo.
 
     $ cd Cardano-King/plutus/  
     $ nix-shell
