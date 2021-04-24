@@ -47,16 +47,22 @@ We can open Gift.hs in a text editor and see that lines 31-35 contain the implem
 
 ## 2. Explore the first contract, the [`Gift.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs) contract.
 
-We will brakdown some of the sections of the code that give the functionality to the contract. In the `Gift.hs` contract
+We will breakdown some of the sections of the code that give the functionality to the contract. In the `Gift.hs` contract
+
+#### 2.1 start the contract void
     
     mkValidator :: Data -> Data -> Data -> ()
     mkValidator _ _ _ = ()
     
-Which basically is a Haskell function (`mkValidator`), that latter on will be compiled into a Plutus function. It just creates a function that regardless of the inputs proceeds to the reading of the following lines of the code. The first goal is to create a validator (`mkValidatorScript`), this one uses **template Haskell**  this basically compiles inline (allowed by the `{~#INLINABLE mkValidator#~}` pragma at line 30) everything after the *splice* (after double dollar sign `$$`) in this case it will invoke the compilation of `PlutusTx.compile` with its input`mkValidator` (this is whatever is inside the double bars, inside the square brakets).
+Which basically is a Haskell function (`mkValidator`), that latter on will be compiled into a Plutus function. It just creates a function that regardless of the inputs proceeds to the reading of the following lines of the code. 
+
+#### 2.2 create a validator
+The next step is to create a validator (`mkValidatorScript`), this one uses **template Haskell**  this basically compiles inline (allowed by the `{~#INLINABLE mkValidator#~}` pragma) everything after the *`$$` splice* (after double dollar sign `$$`) in this case it will invoke the compilation of `PlutusTx.compile` with its input`mkValidator` (this is whatever is inside the double bars, inside the square brakets).
 
     validator :: Validator
     validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
     
+#### 2.3 create a Plutus address
 Next, we create a validator hash to then turn in into an actual address (not a public key address yet, this is a Plutus address)
 
     valHash :: Ledger.ValidatorHash
@@ -64,7 +70,8 @@ Next, we create a validator hash to then turn in into an actual address (not a p
     
     scrAddress :: Ledger.Address
     scrAdress = ScriptAdress valHash
-    
+
+#### 2.4 contract functionalities    
 In order to try this we need wallet code as follows below
 
     typeGiftSchema = 
@@ -91,8 +98,36 @@ In order to try this we need wallet code as follows below
         void $ awaitTxConfirmed $ txId ledgerTx
         logInfo @String $ "collected gifts"
                 
-where we basically create two functionalities: `give` and `grab`.The first one allows one account to put modey on the contract for another actor to grab it. `give` takes an Integer as input and mpas it to a contract. 
+where we basically create two functionalities: `give` and `grab`.The first one allows one account to put tokens on the contract for another actor to grab it. 
 
-## 3. Explore the second contract, the ['Burn.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs)   
+2.4.1 `give` takes an Integer as input and maps it to a contract. It starts by hashing the datum (in this case there is no previous history so the consturctor `Datum` takes non-important inputs `0 []`) and amount of tokens. (in this case the tokens are ADA, we convert the `amount` into ADA with the hyperfunction `Ada.lovelaceValueOf`). Then, the transaction is submitted (`ledgerTx <- submitTx tx`) and a waiting for the logs to be completed follows.
+
+2.4.2 `grab` allows for another actor to go and grab te tokens deposited by the giver. It starts by looking at all the UTXOs that are sitting on the giver plutus address that we cerated (`utxos <- utxoAt scrAddress`). Then we verify the constraints** (to be explained in latter lectures), for now we can say that all they do is to check the availability of funds. Remember that for a transaction to be completed we need a **Datum, Script, Redeemer**, we got the first one, so for the redeemer we embeed it into the transaction `tx`, in particular for this contract the inputs for the redeemer are non-important (`I 17`, where 17 is arbitraty), this means that anyone can grab the tokens. After this, the actions are submitted and will wait for confirmation.
+
+#### 2.5 give options to wallets
+To finalize, the last chunk of code
+
+    endpoints :: Contract () GiftSchema Text ()
+    endpoints = (give' `select` grab') >> endpoints
+      where
+        give' = endpoint @"give" >>= give
+        grab' = endpoint @"grab" >>  grab
+
+gives the options to the wallets to be able to chose which action to take, grab and/or give as manny times they want
+
+#### 2.6 playground interface
+The last chunk just allows the playground display
+
+    mkSchemaDefinitions ''GiftSchema
+
+    mkKnownCurrencies []
+
+
+
+## 3. Explore the second contract, the ['Burn.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs) contract
+This contract makes few modifications to the `Gift.hs` contract, it basically removes the functionality of an actor to grab tokens deposited to a contract, so basically they are lost or burned.
+
+
+
 
 
