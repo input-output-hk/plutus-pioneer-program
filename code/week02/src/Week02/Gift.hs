@@ -42,8 +42,8 @@ scrAddress = ScriptAddress valHash
 
 type GiftSchema =
     BlockchainActions
-        .\/ Endpoint "give" Integer
-        .\/ Endpoint "grab" ()
+        .\/ Endpoint "give" Integer  -- takes an integer as input
+        .\/ Endpoint "grab" ()       -- takes no imput, monoid () allows to keep running code below
 
 give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
 give amount = do

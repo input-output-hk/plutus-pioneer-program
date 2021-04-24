@@ -76,8 +76,8 @@ In order to try this we need wallet code as follows below
 
     typeGiftSchema = 
         BlockchainAction
-            .\/ Endpoint "give" Integer
-            .\/ Endpoint "grab" ()
+            .\/ Endpoint "give" Integer -- takes an integer as input
+            .\/ Endpoint "grab" ()      -- takes no input, monoid () allows to keep running
             
     give :: (HasBlockchainActions s, AsContractError e) = Integer -> Contract w s e ()
     give amount = do
@@ -128,6 +128,42 @@ The last chunk just allows the playground display
 This contract makes few modifications to the `Gift.hs` contract, it basically removes the functionality of an actor to grab tokens deposited to a contract, so basically they are lost or burned.
 
 
+This is done in the void-like function that stops the rest of the code to run because of lack of the monoid `()` and instead it prints an error in the logs.
 
 
+    mkValidator : Data -> Data -> Data -> ()
+    mkValidator _ _ _ = traceError "NO WAY!"
+    
+Also, we can point out that  `traceError` is a Plutus function that takes overloaded-plutus-strings (imported in languages `{-#LANGUAGE OverloadedStrings#-}`) whereas `error` is a Prelude function that takes a normal string as input. In any case, what it does is just include the message into the logs.
 
+
+## 4. [`FortyTwo.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/) contract
+So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens deposited to the contract. Now, we correct this by forcing the redeemer to be the *one who claims only 42 tokens* (redeemer will still grab all the tokens but he has to claim only 42). This is implemented  in the input of the the action
+
+    type GiftSchema = 
+        BlockchainActions
+            .\/ Endpoint "give" Integer  -- takes integer
+            .\/ Endpoint "grab" Integer  -- used to take (), now takes Integer
+    ...
+    ...
+    ...
+    grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+    grab r = do --used to skip inputs, now takes r
+        ...
+        ...
+        ...
+            tx :: TxConstraints Void Void
+            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]        
+            
+and logiaclly now the input of the redeemer constructor is `I r`.
+
+But wait! we also have to modify some other details before deploying this. The void-like function has to be changed, now it can take cases 
+    
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ r _
+        | r == I 42 = ()
+        | otherwise = traceError "wrong redeemer"
+
+this is called **guards** in Haskell, and it is a more readable way of coding cases. 
+
+    	
