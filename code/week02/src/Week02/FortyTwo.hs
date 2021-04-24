@@ -32,7 +32,9 @@ import           Text.Printf         (printf)
 mkValidator :: Data -> Data -> Data -> ()
 mkValidator _ r _
     | r == I 42 = ()
-    | otherwise = traceError "wrong redeemer"
+    | otherwise = traceError "wrong redeemer"  -- `traceError` is a Plutus function that 
+                                               --              takes overloaded-plutus-strings
+
 
 validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
@@ -56,7 +58,7 @@ give amount = do
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
 grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
-grab r = do
+grab r = do  -- used to skip inputs, now takes r
     utxos <- utxoAt scrAddress
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
@@ -71,7 +73,7 @@ endpoints :: Contract () GiftSchema Text ()
 endpoints = (give' `select` grab') >> endpoints
   where
     give' = endpoint @"give" >>= give
-    grab' = endpoint @"grab" >>= grab
+    grab' = endpoint @"grab" >>= grab  -- used to be >> now its >>=
 
 mkSchemaDefinitions ''GiftSchema
 

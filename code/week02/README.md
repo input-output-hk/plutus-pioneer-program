@@ -137,7 +137,7 @@ This is done in the void-like function that stops the rest of the code to run be
 Also, we can point out that  `traceError` is a Plutus function that takes overloaded-plutus-strings (imported in languages `{-#LANGUAGE OverloadedStrings#-}`) whereas `error` is a Prelude function that takes a normal string as input. In any case, what it does is just include the message into the logs.
 
 
-## 4. [`FortyTwo.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/) contract
+## 4. [`FortyTwo.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/FortyTwo.hs) contract
 So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens deposited to the contract. Now, we correct this by forcing the redeemer to be the *one who claims only 42 tokens* (redeemer will still grab all the tokens but he has to claim only 42). This is implemented  in the input of the the action
 
     type GiftSchema = 
@@ -148,7 +148,7 @@ So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens de
     ...
     ...
     grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
-    grab r = do --used to skip inputs, now takes r
+    grab r = do -- used to skip inputs, now takes r
         ...
         ...
         ...
@@ -164,6 +164,46 @@ But wait! we also have to modify some other details before deploying this. The v
         | r == I 42 = ()
         | otherwise = traceError "wrong redeemer"
 
-this is called **guards** in Haskell, and it is a more readable way of coding cases. 
+this is called **guards** in Haskell, and it is a more readable way of coding cases. Lastly we have to change the endpoints
+
+    endpoints :: Contract () GiftSchema Text ()
+    endpoints = (give' `select` grab') >> endpoints
+      where
+        give' = endpoint @"give" >>= give
+        grab' = endpoint @"grab" >>= grab -- used to be >> now its >>=
+
+## 5. [`Typed.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
+This contract introduces a better way of writting the make validator. In all the codes above we have used `()` whereeverything run if the inputs were correct bot for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
+
+    {-#INLINABLE mkValidaor#-}
+    mkValidator :: () -> Integer -ValidatorCtx -> Bool
+    mkValidator () r _
+        | r == 42 = True
+        | otherwise = False
+        
+now the inlinable function of the **template Haskell $$** won't run because it expects a `Data -> Data -> Data` type. This can be corrected using and advanced feature of Haskell named **typed**, this is advance but and often is repeated for the same type of solution.
+
+    data Typed
+    instance Scripts.ScriptType Typed where
+        type instance DatumType Typed = ()
+        type instance RedeemerType Typed = Integer
+        
+    inst :: Scripts.ScriptInstance Typed
+    inst = Scripts.validator @Typed
+        $$(PlutusTx.compile [|| mkValidator ||])
+        $$(PlutusTx.compile [|| wrap ||])
+      where
+        wrap = Scripts.wrapValidator @() @Integer
+        
+    validator :; Validator
+    validator = Scripts.validatorScript inst
+    
+    
+More detail on how Plutus implements these on this advanced Haskell practices to move from typeclass to typeclass, visit the [PlutusTx](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/), more specifially the [`Class.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/Class.hs) file.
+
+## 6. [`IsData.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/IsData.hs)
+The final example of this lecture is a modification of our previous `Typed.hs` contract. Here we will explore more on **custom-data-types**. We can create data types as we wish, do just as an example
+
+
 
     	

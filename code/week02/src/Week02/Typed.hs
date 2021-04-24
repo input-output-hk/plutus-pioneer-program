@@ -39,14 +39,14 @@ data Typed
 instance Scripts.ScriptType Typed where
     type instance DatumType Typed = ()
     type instance RedeemerType Typed = Integer
-
+    
 inst :: Scripts.ScriptInstance Typed
 inst = Scripts.validator @Typed
     $$(PlutusTx.compile [|| mkValidator ||])
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @() @Integer
-
+    
 validator :: Validator
 validator = Scripts.validatorScript inst
 
