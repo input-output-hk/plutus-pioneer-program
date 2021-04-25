@@ -173,7 +173,7 @@ this is called **guards** in Haskell, and it is a more readable way of coding ca
         grab' = endpoint @"grab" >>= grab -- used to be >> now its >>=
 
 ## 5. [`Typed.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
-This contract introduces a better way of writting the make validator. In all the codes above we have used `()` whereeverything run if the inputs were correct bot for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
+This contract introduces a better way of writting the make validator. In all the codes above we have used `()` where everything runs if the input patterns are correct but for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
 
     {-#INLINABLE mkValidaor#-}
     mkValidator :: () -> Integer -ValidatorCtx -> Bool
