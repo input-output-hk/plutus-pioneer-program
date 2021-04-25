@@ -42,7 +42,7 @@ PlutusTx.unstableMakeIsData ''MyRedeemer
 
 {-# INLINABLE mkValidator #-}
 -- This should validate if and only if the two Booleans in the redeemer are equal!
-mkValidator :: () -> MyRedeemer -> ValidatorCtx -> Bool
+mkValidator :: () -> MyRedeemer -> ScriptContext -> Bool
 mkValidator () (MyRedeemer b c) _ = traceIfFalse "wrong redeemer" $ b == c
 
 data Typed
@@ -64,7 +64,7 @@ valHash :: Ledger.ValidatorHash
 valHash = Scripts.validatorHash validator
 
 scrAddress :: Ledger.Address
-scrAddress = ScriptAddress valHash
+scrAddress = scriptHashAddress valHash
 
 type GiftSchema =
     BlockchainActions
