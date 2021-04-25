@@ -1,5 +1,5 @@
 # Lecture 2 notes
-Lecture notes based on the first ever official [ Plutus-Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program). This notes follow the [YouTube lecture 2](https://www.youtube.com/watch?v=E5KRk5y9KjQ/).
+Lecture notes based on the first ever official [Plutus-Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program). This notes follow the [YouTube lecture 2](https://www.youtube.com/watch?v=E5KRk5y9KjQ/).
 
 Before getting started you should clone the [Plutus repository](https://github.com/input-output-hk/plutus#prerequisites) into your local machine. To follow this guide first create a master directory. Inside this directory we will clone both the main Plutus and the Plutus-Pioneer repo.
 
@@ -45,7 +45,7 @@ Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell 
 We can open Gift.hs in a text editor and see that lines 31-35 contain the implementation of Monoid referring to the [#secc:get-sstarted] section above.
     
 
-## 2. Explore the first contract, the ['Gift.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs) contract.
+## 2. Explore the first contract, the [`Gift.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs) contract.
 
 We will breakdown some of the sections of the code that give the functionality to the contract. In the `Gift.hs` contract
 
@@ -124,7 +124,7 @@ The last chunk just allows the playground display
 
 
 
-## 3. Explore the second contract, the ['Burn.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs) contract
+## 3. Explore the second contract, the [`Burn.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs) contract
 This contract makes few modifications to the `Gift.hs` contract, it basically removes the functionality of an actor to grab tokens deposited to a contract, so basically they are lost or burned.
 
 
@@ -137,7 +137,7 @@ This is done in the void-like function that stops the rest of the code to run be
 Also, we can point out that  `traceError` is a Plutus function that takes overloaded-plutus-strings (imported in languages `{-#LANGUAGE OverloadedStrings#-}`) whereas `error` is a Prelude function that takes a normal string as input. In any case, what it does is just include the message into the logs.
 
 
-## 4. ['FortyTwo.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/FortyTwo.hs) contract
+## 4. [`FortyTwo.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/FortyTwo.hs) contract
 So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens deposited to the contract. Now, we correct this by forcing the redeemer to be the *one who claims only 42 tokens* (redeemer will still grab all the tokens but he has to claim only 42). This is implemented  in the input of the the action
 
     type GiftSchema = 
@@ -172,7 +172,7 @@ this is called **guards** in Haskell, and it is a more readable way of coding ca
         give' = endpoint @"give" >>= give
         grab' = endpoint @"grab" >>= grab -- used to be >> now its >>=
 
-## 5. ['Typed.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
+## 5. [`Typed.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
 This contract introduces a better way of writting the make validator. In all the codes above we have used `()` whereeverything run if the inputs were correct bot for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
 
     {-#INLINABLE mkValidaor#-}
@@ -201,7 +201,7 @@ now the inlinable function of the **template Haskell $$** won't run because it e
     
 More detail on how Plutus implements these on this advanced Haskell practices to move from typeclass to typeclass, visit the [PlutusTx](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/), more specifially the [`Class.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/Class.hs) file.
 
-## 6. ['IsData.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/IsData.hs)
+## 6. [`IsData.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/IsData.hs)
 The final example of this lecture is a modification of our previous `Typed.hs` contract. Here we will explore more on **custom-data-types**. We can create data types as we wish, do just as an example
 
 
