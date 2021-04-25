@@ -195,7 +195,7 @@ now the inlinable function of the **template Haskell $$** won't run because it e
       where
         wrap = Scripts.wrapValidator @() @Integer
         
-    validator :; Validator
+    validator :: Validator
     validator = Scripts.validatorScript inst
     
     
