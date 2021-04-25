@@ -45,7 +45,7 @@ Go back to the repl and load Gift.hs. Then we will see what a Monoid in haskell 
 We can open Gift.hs in a text editor and see that lines 31-35 contain the implementation of Monoid referring to the [#secc:get-sstarted] section above.
     
 
-## 2. Explore the first contract, the [`Gift.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs) contract.
+## 2. Explore the first contract, the ['Gift.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Gift.hs) contract.
 
 We will breakdown some of the sections of the code that give the functionality to the contract. In the `Gift.hs` contract
 
@@ -172,7 +172,7 @@ this is called **guards** in Haskell, and it is a more readable way of coding ca
         give' = endpoint @"give" >>= give
         grab' = endpoint @"grab" >>= grab -- used to be >> now its >>=
 
-## 5. [`Typed.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
+## 5. ['Typed.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
 This contract introduces a better way of writting the make validator. In all the codes above we have used `()` whereeverything run if the inputs were correct bot for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
 
     {-#INLINABLE mkValidaor#-}
@@ -201,7 +201,7 @@ now the inlinable function of the **template Haskell $$** won't run because it e
     
 More detail on how Plutus implements these on this advanced Haskell practices to move from typeclass to typeclass, visit the [PlutusTx](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/), more specifially the [`Class.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/Class.hs) file.
 
-## 6. [`IsData.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/IsData.hs)
+## 6. ['IsData.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/IsData.hs)
 The final example of this lecture is a modification of our previous `Typed.hs` contract. Here we will explore more on **custom-data-types**. We can create data types as we wish, do just as an example
 
 
