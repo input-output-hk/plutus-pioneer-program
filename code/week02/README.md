@@ -176,7 +176,7 @@ this is called **guards** in Haskell, and it is a more readable way of coding ca
 This contract introduces a better way of writting the make validator. In all the codes above we have used `()` where everything runs if the input patterns are correct but for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
 
     {-#INLINABLE mkValidaor#-}
-    mkValidator :: () -> Integer -ValidatorCtx -> Bool
+    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
     mkValidator () r _
         | r == 42 = True
         | otherwise = False
