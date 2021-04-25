@@ -124,7 +124,7 @@ The last chunk just allows the playground display
 
 
 
-## 3. Explore the second contract, the ['Burn.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs) contract
+## 3. Explore the second contract, the ['Burn.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs) contract
 This contract makes few modifications to the `Gift.hs` contract, it basically removes the functionality of an actor to grab tokens deposited to a contract, so basically they are lost or burned.
 
 
@@ -137,7 +137,7 @@ This is done in the void-like function that stops the rest of the code to run be
 Also, we can point out that  `traceError` is a Plutus function that takes overloaded-plutus-strings (imported in languages `{-#LANGUAGE OverloadedStrings#-}`) whereas `error` is a Prelude function that takes a normal string as input. In any case, what it does is just include the message into the logs.
 
 
-## 4. [`FortyTwo.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/FortyTwo.hs) contract
+## 4. ['FortyTwo.hs'](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/FortyTwo.hs) contract
 So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens deposited to the contract. Now, we correct this by forcing the redeemer to be the *one who claims only 42 tokens* (redeemer will still grab all the tokens but he has to claim only 42). This is implemented  in the input of the the action
 
     type GiftSchema = 
