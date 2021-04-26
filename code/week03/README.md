@@ -42,3 +42,6 @@ To get the 	Publik key hash we have to go to the repl in a nix-local terminal
 
 
 
+
+
+
