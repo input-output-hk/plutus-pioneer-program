@@ -1,6 +1,7 @@
 module Week04.Either where
 
 import Text.Read (readMaybe)
+import Week04.Monad
 
 readEither :: Read a => String -> Either String a
 readEither s = case readMaybe s of
@@ -25,3 +26,6 @@ foo' x y z = readEither x `bindEither` \k ->
              readEither y `bindEither` \l ->
              readEither z `bindEither` \m ->
              Right (k + l + m)
+
+foo'' :: String -> String -> String -> Either String Int
+foo'' x y z = threeInts (readEither x) (readEither y) (readEither z)

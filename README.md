@@ -21,11 +21,18 @@
   - Time handling.
   - Parameterized contracts.
 
+- [Lecture #4](https://youtu.be/6Reuh0xZDjY)
+
+  - Monads
+  - The `EmulatorTrace` monad.
+  - The `Contract` monad.
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
 - Lecture #2: [Simple Validation](code/week02)
 - Lecture #3: [Validation Context & Parameterized Contracts](code/week03)
+- Lecture #4: [Monads, `EmulatorTrace` & `Contract`](code/week04)
 
 ## Exercises
 
@@ -53,6 +60,10 @@
   - Fix and complete the code in the [Homework1](code/week03/src/Week03/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week03/src/Week03/Homework2.hs) module.
 
+- Week #4
+
+  - Write an appropriate `EmulatorTrace` that uses the `payContract` contract in the [Homework](code/week04/src/Week04/Homework.hs) module.
+  - Catch errors in the `payContract` contract in the same module.
 
 ## Solutions
 
@@ -68,6 +79,7 @@
 
 ## Some Plutus Modules
 
+- [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
 - [`Plutus.V1.Ledger.Contexts`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs), contains the definition of the context-related types.
 - [`Plutus.V1.Ledger.Interval`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Interval.hs), contains the definition of and helper functions for the `Interval` type.
 - [`Plutus.V1.Ledger.Slot`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Slot.hs), contains the definition of the `Slot` type.
