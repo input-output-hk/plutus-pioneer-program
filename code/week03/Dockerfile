@@ -1,4 +1,5 @@
 FROM haskell:8
+RUN apt-get update -y && apt-get install -y pkg-config
 
 COPY . .
 RUN ls
