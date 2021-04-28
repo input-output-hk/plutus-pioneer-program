@@ -1,4 +1,4 @@
-FROM haskell:latest
+FROM haskell:8
 
 COPY . .
 RUN ls
