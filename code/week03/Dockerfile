@@ -1,7 +1,7 @@
 FROM haskell:latest
 
 COPY . .
-
-RUN cd code/week03 && cabal install
+WORKDIR code/week03
+RUN cabal update && cabal install
 
 CMD ["cabal", "repl"]
