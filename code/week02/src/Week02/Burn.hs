@@ -39,7 +39,7 @@ valHash :: Ledger.ValidatorHash
 valHash = Scripts.validatorHash validator
 
 scrAddress :: Ledger.Address
-scrAddress = ScriptAddress valHash
+scrAddress = scriptHashAddress valHash
 
 type GiftSchema =
     BlockchainActions
