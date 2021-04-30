@@ -26,18 +26,85 @@ It is important to make the distinction that, unlike other projects, Scripts in 
 #### 1.3 Time handling in Contexts
 An often required funtionality of smart contracts is programability. This is a conditional based on some pre-defined elapse of time e.g. gift some ADA to your kids with the condition that they can retrieve those tokens wjen they are 18 or older. This is a litle problematic when it comes to Scripts because they will handle a different time being run in the wallet in contrast to when they are actually broadcasted into the blockchain. 
 
-Cardano solves this by introducing time-ranges to give back that deterministic aspect. More details in the [`Contexts.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs) file
+Cardano solves this by introducing time-ranges to give back that deterministic aspect. More details in the [`Contexts.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs) file.
 
 #### 1.4 import public key
 
-To get the 	Publik key hash we have to go to the repl in a nix-local terminal
+To get the 	Public key hash we have to go to the repl in a nix-local terminal
 
     repl$ import Wallet.Emulator
     repl$ import Ledger
     repl$ pubKeyHash $ walletPubKey $ Wallet 2
     
+Now we are able to simulate the transaction in the Plutus-Playground. Note that the address for the Script is the same for any `give` actions from the wallets, this is because we have the same validator. In the `Vesting.hs` contract we have coded the benefitiary and the deadline into the Datum. Other choices a to **parametrize** the script as we will see in the next section.
+    
 
 ## 2. Parametrize Scripts, code [Parametrized.hs](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week03/src/Week03/Parametrized.hs)
+
+Instead of coding the datum as in the previous file:
+
+    data VestingDatum = VestingDatum
+    { beneficiary :: PubKeyHash
+    , deadline    :: Slot
+    } deriving Show
+    
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
+    .
+    .
+    .
+    
+
+    
+Now we will parameterize datum. Instead of using `vestingDatum` in the input for `mkValidator`, now we just use unit datum `()` and add a new argument data. This data is just the renamed data from `data vestingDatum` to `vestingParam`
+
+    data VestingParam = VestingParam
+        { beneficiary :: PubKeyHash
+        , deadline :: Slot
+        } deriving Show
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
