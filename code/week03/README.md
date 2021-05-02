@@ -44,24 +44,51 @@ Now we are able to simulate the transaction in the Plutus-Playground. Note that 
 Instead of coding the datum as in the previous file:
 
     data VestingDatum = VestingDatum
-    { beneficiary :: PubKeyHash
-    , deadline    :: Slot
-    } deriving Show
+        { beneficiary :: PubKeyHash
+        , deadline    :: Slot
+        } deriving Show
     
     {-# INLINABLE mkValidator #-}
     mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
+    mkValidator dat () ctx =
+    .
+    .
+    .
+    inst :: Scripts.ScriptInstance Vesting
+    inst = Scripts.validator @Vesting
+        $$(PlutusTx.compile [|| mkValidator ||])
+        $$(PlutusTx.compile [|| wrap ||])
     .
     .
     .
     
+Now we will parameterize datum. Instead of using `vestingDatum` in the input for `mkValidator`, now we just use unit datum `()` and add a new argument data. This data is just the renamed data from `data VestingDatum` to `data VestingParam`. We also we need to update a few other things in the code, note the instance for the Script in which we used **Template Haskell** to run inline, now this will not work because `mkValidator` takes an additional parameter `inst p` and in Template Haskell variables have to be known at *compilte-time*. However, if we would add the `p` like this: `$$(PlutusTx.compile [|| mkValidator p ||])` it will not work because `inst p` is read at *run-time*.
 
-    
-Now we will parameterize datum. Instead of using `vestingDatum` in the input for `mkValidator`, now we just use unit datum `()` and add a new argument data. This data is just the renamed data from `data vestingDatum` to `vestingParam`
+
+The solution to the above issue is reached using a plutus coded class named **Lift** found in  [`Class`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Lift.hs)
 
     data VestingParam = VestingParam
         { beneficiary :: PubKeyHash
         , deadline :: Slot
         } deriving Show
+        
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: VestingParam -> () -> () -> ScriptContext -> bool
+    mkValidator p () () ctx
+    .
+    .
+    .
+    inst :: VestingParam -> Scripts.ScriptInstance Vesting
+    inst p = Scripts.validator @Vesting
+        ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode p)
+        $$(PlutusTx.compile [|| wrap ||])
+        
+        .
+        .
+        .
+        
+In summary what we have done with the last part is converting the Haskell value `p` into a Plutus-Script value using `PlutusTx.liftCode p` and we applied it into the splice with `PlutusTx.applyCode`. The last missing part is that we need a lift instance. We can add this easily using `PlutusTx.makelift ''VestingParam`. 
+
         
 
 
@@ -75,7 +102,7 @@ Now we will parameterize datum. Instead of using `vestingDatum` in the input for
 
 
 
-
+    
 
 
 
