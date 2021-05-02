@@ -35,7 +35,7 @@ newtype MySillyRedeemer = MySillyRedeemer Integer
 PlutusTx.unstableMakeIsData ''MySillyRedeemer
 
 {-# INLINABLE mkValidator #-}
-mkValidator :: () -> MySillyRedeemer -> ValidatorCtx -> Bool
+mkValidator :: () -> MySillyRedeemer -> ScriptContext -> Bool
 mkValidator () (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
 
 data Typed
@@ -57,7 +57,7 @@ valHash :: Ledger.ValidatorHash
 valHash = Scripts.validatorHash validator
 
 scrAddress :: Ledger.Address
-scrAddress = ScriptAddress valHash
+scrAddress = scriptHashAddress valHash
 
 type GiftSchema =
     BlockchainActions

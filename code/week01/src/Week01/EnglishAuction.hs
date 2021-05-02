@@ -110,7 +110,7 @@ minBid AuctionDatum{..} = case adHighestBid of
     Just Bid{..} -> bBid + 1
 
 {-# INLINABLE mkAuctionValidator #-}
-mkAuctionValidator :: AuctionDatum -> AuctionAction -> ValidatorCtx -> Bool
+mkAuctionValidator :: AuctionDatum -> AuctionAction -> ScriptContext -> Bool
 mkAuctionValidator ad redeemer ctx =
     traceIfFalse "wrong input value" correctInputValue &&
     case redeemer of
@@ -131,12 +131,12 @@ mkAuctionValidator ad redeemer ctx =
 
   where
     info :: TxInfo
-    info = valCtxTxInfo ctx
+    info = scriptContextTxInfo ctx
 
     input :: TxInInfo
     input =
       let
-        isScriptInput i = case txInInfoWitness i of
+        isScriptInput i = case (txOutDatumHash . txInInfoResolved) i of
             Nothing -> False
             Just _  -> True
         xs = [i | i <- txInfoInputs info, isScriptInput i]
@@ -146,7 +146,7 @@ mkAuctionValidator ad redeemer ctx =
             _   -> traceError "expected exactly one script input"
 
     inVal :: Value
-    inVal = txInInfoValue input
+    inVal = txOutValue . txInInfoResolved $ input
 
     auction :: Auction
     auction = adAuction ad
@@ -162,12 +162,12 @@ mkAuctionValidator ad redeemer ctx =
     sufficientBid :: Integer -> Bool
     sufficientBid amount = amount >= minBid ad
 
-    ownOutput   :: TxOutInfo
+    ownOutput   :: TxOut
     outputDatum :: AuctionDatum
     (ownOutput, outputDatum) = case getContinuingOutputs ctx of
-        [o] -> case txOutType o of
-            PayToPubKey   -> traceError "wrong output type"
-            PayToScript h -> case findDatum h info of
+        [o] -> case txOutDatumHash o of
+            Nothing   -> traceError "wrong output type"
+            Just h -> case findDatum h info of
                 Nothing        -> traceError "datum not found"
                 Just (Datum d) ->  case PlutusTx.fromData d of
                     Just ad' -> (o, ad')
@@ -189,7 +189,7 @@ mkAuctionValidator ad redeemer ctx =
           let
             os = [ o
                  | o <- txInfoOutputs info
-                 , txOutAddress o == PubKeyAddress bBidder
+                 , txOutAddress o == pubKeyHashAddress bBidder
                  ]
           in
             case os of
@@ -210,7 +210,7 @@ mkAuctionValidator ad redeemer ctx =
               , txOutValue o' == v
               ]
       in
-        txOutAddress o == PubKeyAddress h
+        txOutAddress o == pubKeyHashAddress h
 
 auctionInstance :: Scripts.ScriptInstance Auctioning
 auctionInstance = Scripts.validator @Auctioning
@@ -226,7 +226,7 @@ auctionHash :: Ledger.ValidatorHash
 auctionHash = Scripts.validatorHash auctionValidator
 
 auctionAddress :: Ledger.Address
-auctionAddress = ScriptAddress auctionHash
+auctionAddress = scriptHashAddress auctionHash
 
 data StartParams = StartParams
     { spDeadline :: !Slot
@@ -336,15 +336,15 @@ findAuction :: HasBlockchainActions s
             -> TokenName
             -> Contract w s Text (TxOutRef, TxOutTx, AuctionDatum)
 findAuction cs tn = do
-    utxos <- utxoAt $ ScriptAddress auctionHash
+    utxos <- utxoAt $ scriptHashAddress auctionHash
     let xs = [ (oref, o)
              | (oref, o) <- Map.toList utxos
              , Value.valueOf (txOutValue $ txOutTxOut o) cs tn == 1
              ]
     case xs of
-        [(oref, o)] -> case txOutType $ txOutTxOut o of
-            PayToPubKey   -> throwError "unexpected out type"
-            PayToScript h -> case Map.lookup h $ txData $ txOutTxTx o of
+        [(oref, o)] -> case txOutDatumHash $ txOutTxOut o of
+            Nothing   -> throwError "unexpected out type"
+            Just h -> case Map.lookup h $ txData $ txOutTxTx o of
                 Nothing        -> throwError "datum not found"
                 Just (Datum e) -> case PlutusTx.fromData e of
                     Nothing -> throwError "datum has wrong type"

@@ -30,7 +30,7 @@ import           Prelude              (Semigroup (..))
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
-mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+mkValidator :: () -> Integer -> ScriptContext -> Bool
 mkValidator () r _
     | r == 42   = True
     | otherwise = False
@@ -54,7 +54,7 @@ valHash :: Ledger.ValidatorHash
 valHash = Scripts.validatorHash validator
 
 scrAddress :: Ledger.Address
-scrAddress = ScriptAddress valHash
+scrAddress = scriptHashAddress valHash
 
 type GiftSchema =
     BlockchainActions
