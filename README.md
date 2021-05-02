@@ -90,7 +90,8 @@
 
 - [Week 1 Community Playground(Legacy)](https://playground-week1.plutus-community.com/)
 - [Week 2 Community Playground(Legacy)](https://playground-week2.plutus-community.com/)
-- [Week 3 Community Playground(Current)](https://playground.plutus-community.com/)
+- [Week 3 Community Playground(Current)](https://playground-week3.plutus-community.com/)
+- [Week 4 Community Playground(Current)](https://playground.plutus-community.com/)
 
 
 ## Additional Resources
