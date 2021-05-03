@@ -51,7 +51,7 @@ type FreeSchema =
     BlockchainActions
         .\/ Endpoint "mint" MintParams
 
-mint :: (HasBlockchainActions s, AsContractError e) => MintParams -> Contract w s e ()
+mint :: MintParams -> Contract w FreeSchema Text ()
 mint mp = do
     let val     = Value.singleton curSymbol (mpTokenName mp) (mpAmount mp)
         lookups = Constraints.monetaryPolicy policy
