@@ -10,13 +10,12 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week05.Free where
+module Week05.Homework2 where
 
 import           Control.Monad          hiding (fmap)
-import           Data.Aeson             (ToJSON, FromJSON)
+import qualified Data.Map               as Map
 import           Data.Text              (Text)
 import           Data.Void              (Void)
-import           GHC.Generics           (Generic)
 import           Plutus.Contract        as Contract hiding (when)
 import           Plutus.Trace.Emulator  as Emulator
 import qualified PlutusTx
@@ -28,62 +27,42 @@ import           Ledger.Value           as Value
 import           Playground.Contract    (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
 import           Playground.TH          (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types       (KnownCurrency (..))
+import           Prelude                (Semigroup (..))
 import           Text.Printf            (printf)
 import           Wallet.Emulator.Wallet
 
 {-# INLINABLE mkPolicy #-}
-mkPolicy :: ScriptContext -> Bool
-mkPolicy _ = True
+-- Minting policy for an NFT, where the minting transaction must consume the given UTxO as input
+-- and where the TokenName will be the empty ByteString.
+mkPolicy :: TxOutRef -> ScriptContext -> Bool
+mkPolicy oref ctx = True -- FIX ME!
 
-policy :: Scripts.MonetaryPolicy
-policy = mkMonetaryPolicyScript $$(PlutusTx.compile [|| Scripts.wrapMonetaryPolicy mkPolicy ||])
+policy :: TxOutRef -> Scripts.MonetaryPolicy
+policy oref = undefined -- IMPLEMENT ME!
 
-curSymbol :: CurrencySymbol
-curSymbol = scriptCurrencySymbol policy
+curSymbol :: TxOutRef -> CurrencySymbol
+curSymbol = undefined -- IMPLEMENT ME!
 
-data MintParams = MintParams
-    { mpTokenName :: !TokenName
-    , mpAmount    :: !Integer
-    } deriving (Generic, ToJSON, FromJSON, ToSchema)
-
-type FreeSchema =
+type NFTSchema =
     BlockchainActions
-        .\/ Endpoint "mint" MintParams
+        .\/ Endpoint "mint" ()
 
-mint :: MintParams -> Contract w FreeSchema Text ()
-mint mp = do
-    let val     = Value.singleton curSymbol (mpTokenName mp) (mpAmount mp)
-        lookups = Constraints.monetaryPolicy policy
-        tx      = Constraints.mustForgeValue val
-    ledgerTx <- submitTxConstraintsWith @Void lookups tx
-    void $ awaitTxConfirmed $ txId ledgerTx
-    Contract.logInfo @String $ printf "forged %s" (show val)
+mint :: Contract w NFTSchema Text ()
+mint = undefined -- IMPLEMENT ME!
 
-endpoints :: Contract () FreeSchema Text ()
+endpoints :: Contract () NFTSchema Text ()
 endpoints = mint' >> endpoints
   where
-    mint' = endpoint @"mint" >>= mint
+    mint' = endpoint @"mint" >> mint
 
-mkSchemaDefinitions ''FreeSchema
+mkSchemaDefinitions ''NFTSchema
 
 mkKnownCurrencies []
 
 test :: IO ()
 test = runEmulatorTraceIO $ do
-    let tn = "ABC"
     h1 <- activateContractWallet (Wallet 1) endpoints
     h2 <- activateContractWallet (Wallet 2) endpoints
-    callEndpoint @"mint" h1 $ MintParams
-        { mpTokenName = tn
-        , mpAmount    = 555
-        }
-    callEndpoint @"mint" h2 $ MintParams
-        { mpTokenName = tn
-        , mpAmount    = 444
-        }
-    void $ Emulator.waitNSlots 1
-    callEndpoint @"mint" h1 $ MintParams
-        { mpTokenName = tn
-        , mpAmount    = -222
-        }
+    callEndpoint @"mint" h1 ()
+    callEndpoint @"mint" h2 ()
     void $ Emulator.waitNSlots 1
