@@ -39,8 +39,8 @@ mkPolicy pkh ctx = txSignedBy (scriptContextTxInfo ctx) pkh
 policy :: PubKeyHash -> Scripts.MonetaryPolicy
 policy pkh = mkMonetaryPolicyScript $
     $$(PlutusTx.compile [|| Scripts.wrapMonetaryPolicy . mkPolicy ||])
-        `PlutusTx.applyCode`
-            PlutusTx.liftCode pkh
+    `PlutusTx.applyCode`
+    PlutusTx.liftCode pkh
 
 curSymbol :: PubKeyHash -> CurrencySymbol
 curSymbol = scriptCurrencySymbol . policy
@@ -54,7 +54,7 @@ type SignedSchema =
     BlockchainActions
         .\/ Endpoint "mint" MintParams
 
-mint :: (HasBlockchainActions s, AsContractError e) => MintParams -> Contract w s e ()
+mint :: MintParams -> Contract w SignedSchema Text ()
 mint mp = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
     let val     = Value.singleton (curSymbol pkh) (mpTokenName mp) (mpAmount mp)
