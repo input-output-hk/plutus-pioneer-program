@@ -27,12 +27,19 @@
   - The `EmulatorTrace` monad.
   - The `Contract` monad.
 
+- [Lecture #5](https://youtu.be/6VbhY162GQA)
+
+  - Values.
+  - Native tokens & minting policies.
+  - NFT's.
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
 - Lecture #2: [Simple Validation](code/week02)
 - Lecture #3: [Validation Context & Parameterized Contracts](code/week03)
 - Lecture #4: [Monads, `EmulatorTrace` & `Contract`](code/week04)
+- Lecture #5: [Minting Policies](code/week05)
 
 ## Exercises
 
@@ -65,6 +72,11 @@
   - Write an appropriate `EmulatorTrace` that uses the `payContract` contract in the [Homework](code/week04/src/Week04/Homework.hs) module.
   - Catch errors in the `payContract` contract in the same module.
 
+- Week #5
+
+  - Add a deadline to the minting policy in the [Homework1](code/week05/src/Week05/Homework1.hs) module.
+  - Fix the token name to the empty `ByteString` in the NFT contract in the [Homework2](code/week05/src/Week05/Homework2.hs) module.
+
 ## Solutions
 
 - Week #2
@@ -77,12 +89,18 @@
   - [`Homework1`](code/week03/src/Week03/Solution1.hs)
   - [`Homework2`](code/week03/src/Week03/Solution2.hs)
 
+- Week #4
+
+  - [`Homework`](code/week04/src/Week04/Solution.hs)
+
 ## Some Plutus Modules
 
 - [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
+- [`Plutus.V1.Ledger.Ada`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs), contains support for the Ada currency.
 - [`Plutus.V1.Ledger.Contexts`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs), contains the definition of the context-related types.
 - [`Plutus.V1.Ledger.Interval`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Interval.hs), contains the definition of and helper functions for the `Interval` type.
 - [`Plutus.V1.Ledger.Slot`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Slot.hs), contains the definition of the `Slot` type.
+- [`Plutus.V1.Ledger.Value`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Value.hs), contains the definition of and helper functions for the `Value` type.
 - [`PlutusTx.Data`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs), contains the definition of the `Data` type.
 - [`PlutusTx.IsData.Class`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/Class.hs), defines the `IsData` class.
 
