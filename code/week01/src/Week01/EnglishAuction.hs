@@ -15,19 +15,6 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
-module Week01.EnglishAuction
-    ( Auction (..)
-    , StartParams (..), BidParams (..), CloseParams (..)
-    , AuctionSchema
-    , start, bid, close
-    , endpoints
-    , schemas
-    , ensureKnownCurrencies
-    , printJson
-    , printSchemas
-    , registeredKnownCurrencies
-    , stage
-    ) where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (ToJSON, FromJSON)
