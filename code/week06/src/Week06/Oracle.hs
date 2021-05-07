@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Week05.Oracle where
+module Week06.Oracle where
 
 import           Control.Monad          hiding (fmap)
 import qualified Data.Map               as Map
