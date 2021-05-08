@@ -13,17 +13,19 @@
 
 module Week06.Oracle.Swap
     ( offerSwap
+    , retrieveSwaps
     ) where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (FromJSON, ToJSON)
 import qualified Data.Map             as Map
+import           Data.Maybe           (mapMaybe)
 import           Data.Monoid          (Last (..))
 import           Data.Text            (Text, pack)
 import           GHC.Generics         (Generic)
 import           Plutus.Contract      as Contract hiding (when)
 import qualified PlutusTx
-import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import           PlutusTx.Prelude     hiding (Semigroup(..), unless, mapMaybe)
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
@@ -112,64 +114,34 @@ offerSwap oracle amt = do
     ledgerTx <- submitTxConstraints (swapInst oracle) tx
     awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "offered " ++ show amt ++ " lovelace for swap"
-{-
 
-startOracle :: forall w s. HasBlockchainActions s => Integer -> Contract w s Text Oracle
-startOracle fees = do
-    pkh <- pubKeyHash <$> Contract.ownPubKey
-    osc <- mapError (pack . show) (forgeContract pkh [(oracleTokenName, 1)] :: Contract w s CurrencyError OneShotCurrency)
-    let cs     = Currency.currencySymbol osc
-        oracle = Oracle
-            { oSymbol   = cs
-            , oOperator = pkh
-            , oFee      = Ada.lovelaceValueOf fees
-            }
-    logInfo @String $ "forged oracle state token for oracle " ++ show oracle
-    return oracle
-
-updateOracle :: forall w s. HasBlockchainActions s => Oracle -> Integer -> Contract w s Text ()
-updateOracle oracle x = do
-    m <- findOracle oracle
-    let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
-    case m of
-        Nothing -> do
-            ledgerTx <- submitTxConstraints (oracleInst oracle) c
-            awaitTxConfirmed $ txId ledgerTx
-            logInfo @String $ "set initial oracle value to " ++ show x
-        Just (oref, o,  _) -> do
-            let lookups = Constraints.unspentOutputs (Map.singleton oref o)     <>
-                          Constraints.scriptInstanceLookups (oracleInst oracle) <>
-                          Constraints.otherScript (oracleValidator oracle)
-                tx      = c <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Update)
-            ledgerTx <- submitTxConstraintsWith @Oracling lookups tx
-            awaitTxConfirmed $ txId ledgerTx
-            logInfo @String $ "updated oracle value to " ++ show x
-
-findOracle :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text (Maybe (TxOutRef, TxOutTx, Integer))
-findOracle oracle = do
-    utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
-    return $ case Map.toList utxos of
-        [(oref, o)] -> do
-            dh        <- txOutDatumHash $ txOutTxOut o
-            (Datum d) <- Map.lookup dh $ txData $ txOutTxTx o
-            x         <- PlutusTx.fromData d
-            return (oref, o, x)
-        _           -> Nothing
+findSwaps :: HasBlockchainActions s => Oracle -> (PubKeyHash -> Bool) -> Contract w s Text [(TxOutRef, TxOutTx, PubKeyHash)]
+findSwaps oracle p = do
+    utxos <- utxoAt $ swapAddress oracle
+    return $ mapMaybe g $ Map.toList utxos
   where
-    f :: TxOutTx -> Bool
-    f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1
+    f :: TxOutTx -> Maybe PubKeyHash
+    f o = do
+        dh        <- txOutDatumHash $ txOutTxOut o
+        (Datum d) <- Map.lookup dh $ txData $ txOutTxTx o
+        PlutusTx.fromData d
 
-type OracleSchema = BlockchainActions .\/ Endpoint "update" Integer
+    g :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, PubKeyHash)
+    g (oref, o) = do
+        pkh <- f o
+        guard $ p pkh
+        return (oref, o, pkh)
 
-runOracle :: Integer -> Contract (Last Oracle) OracleSchema Text ()
-runOracle fees = do
-    oracle <- startOracle fees
-    tell $ Last $ Just oracle
-    go oracle
-  where
-    go :: Oracle -> Contract (Last Oracle) OracleSchema Text a
-    go oracle = do
-        x <- endpoint @"update"
-        updateOracle oracle x
-        go oracle
--}
+retrieveSwaps :: HasBlockchainActions s => Oracle -> Contract w s Text ()
+retrieveSwaps oracle = do
+    pkh <- pubKeyHash <$> ownPubKey
+    xs <- findSwaps oracle (== pkh)
+    case xs of
+        [] -> logInfo @String "no swaps found"
+        _  -> do
+            let lookups = Constraints.unspentOutputs (Map.fromList [(oref, o) | (oref, o, _) <- xs]) <>
+                          Constraints.otherScript (swapValidator oracle)
+                tx      = mconcat [Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | (oref, _, _) <- xs]
+            ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
+            awaitTxConfirmed $ txId ledgerTx
+            logInfo @String $ "retrieved " ++ show (length xs) ++ " swap(s)"

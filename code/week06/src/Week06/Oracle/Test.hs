@@ -51,8 +51,13 @@ myTrace = do
     void $ Emulator.waitNSlots 3
     callEndpoint @"update" h 666
     void $ Emulator.waitNSlots 10
-    h' <- activateContractWallet (Wallet 2) (offerSwap oracle 12000000 :: Contract () BlockchainActions Text ())
+    void $ activateContractWallet (Wallet 2) (offerSwap oracle 12000000 :: Contract () BlockchainActions Text ())
     void $ Emulator.waitNSlots 10
+    void $ activateContractWallet (Wallet 2) (offerSwap oracle 18000000 :: Contract () BlockchainActions Text ())
+    void $ Emulator.waitNSlots 10
+    void $ activateContractWallet (Wallet 2) (retrieveSwaps oracle :: Contract () BlockchainActions Text ())
+    void $ Emulator.waitNSlots 10
+
 
   where
     getOracle :: ContractHandle (Last Oracle) OracleSchema Text -> EmulatorTrace Oracle
