@@ -15,6 +15,7 @@ module Week06.Oracle.Core
     ( Oracle (..)
     , OracleRedeemer (..)
     , oracleTokenName
+    , oracleValue
     , oracleAsset
     , oracleInst
     , oracleValidator
@@ -64,6 +65,13 @@ oracleTokenName = TokenName emptyByteString
 oracleAsset :: Oracle -> AssetClass
 oracleAsset oracle = AssetClass (oSymbol oracle, oracleTokenName)
 
+{-# INLINABLE oracleValue #-}
+oracleValue :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe Integer
+oracleValue o f = do
+    dh      <- txOutDatum o
+    Datum d <- f dh
+    PlutusTx.fromData d
+
 {-# INLINABLE mkOracleValidator #-}
 mkOracleValidator :: Oracle -> Integer -> OracleRedeemer -> ScriptContext -> Bool
 mkOracleValidator _      _ Use    _   = False
@@ -90,13 +98,9 @@ mkOracleValidator oracle _ Update ctx =
     outputHasToken = assetClassValueOf (txOutValue ownOutput) (oracleAsset oracle) == 1
 
     validOutputDatum :: Bool
-    validOutputDatum = case txOutDatum ownOutput of
+    validOutputDatum = case oracleValue ownOutput (`findDatum` info) of
         Nothing -> False
-        Just dh -> case findDatum dh info of
-            Nothing        -> False
-            Just (Datum d) -> case PlutusTx.fromData d of
-                Nothing             -> False
-                Just (_ :: Integer) -> True
+        Just _  -> True
 
 data Oracling
 instance Scripts.ScriptType Oracling where
@@ -159,9 +163,7 @@ findOracle oracle = do
     utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
     return $ case Map.toList utxos of
         [(oref, o)] -> do
-            dh        <- txOutDatumHash $ txOutTxOut o
-            (Datum d) <- Map.lookup dh $ txData $ txOutTxTx o
-            x         <- PlutusTx.fromData d
+            x <- oracleValue (txOutTxOut o) $ \dh -> Map.lookup dh $ txData $ txOutTxTx o
             return (oref, o, x)
         _           -> Nothing
   where

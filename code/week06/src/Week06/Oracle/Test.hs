@@ -13,16 +13,17 @@
 
 module Week06.Oracle.Test where
 
-import           Control.Monad              hiding (fmap)
-import           Control.Monad.Freer.Extras as Extras
-import           Data.Monoid                (Last (..))
-import           Data.Text                  (Text)
-import           Plutus.Contract            as Contract hiding (when)
-import           Plutus.Trace.Emulator      as Emulator
-import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
-import           Wallet.Emulator.Wallet
+import Control.Monad              hiding (fmap)
+import Control.Monad.Freer.Extras as Extras
+import Data.Monoid                (Last (..))
+import Data.Text                  (Text)
+import Plutus.Contract            as Contract hiding (when)
+import Plutus.Trace.Emulator      as Emulator
+import PlutusTx.Prelude           hiding (Semigroup(..), unless)
+import Wallet.Emulator.Wallet
 
 import Week06.Oracle.Core
+import Week06.Oracle.Swap
 
 test :: IO ()
 test = runEmulatorTraceIO myTrace
@@ -49,6 +50,8 @@ myTrace = do
     callEndpoint @"update" h 42
     void $ Emulator.waitNSlots 3
     callEndpoint @"update" h 666
+    void $ Emulator.waitNSlots 10
+    h' <- activateContractWallet (Wallet 2) (offerSwap oracle 12000000 :: Contract () BlockchainActions Text ())
     void $ Emulator.waitNSlots 10
 
   where
