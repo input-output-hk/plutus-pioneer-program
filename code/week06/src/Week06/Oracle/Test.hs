@@ -37,7 +37,12 @@ checkOracle oracle = do
 
 myTrace :: EmulatorTrace ()
 myTrace = do
-    h <- activateContractWallet (Wallet 1) $ runOracle 1000000
+    let op = OracleParams
+                { opFees = 1000000
+                , opSymbol = "ff"
+                , opToken  = "USDT"
+                }
+    h <- activateContractWallet (Wallet 1) $ runOracle op
     void $ Emulator.waitNSlots 1
     oracle <- getOracle h
     void $ activateContractWallet (Wallet 2) $ checkOracle oracle

@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week06.Oracle.Core
+module Week06.Oracle.User
     ( Oracle (..)
     , OracleRedeemer (..)
     , oracleTokenName
@@ -20,7 +20,6 @@ module Week06.Oracle.Core
     , oracleValidator
     , oracleAddress
     , OracleSchema
-    , OracleParams (..)
     , runOracle
     , findOracle
     ) where
@@ -46,7 +45,6 @@ data Oracle = Oracle
     { oSymbol   :: !CurrencySymbol
     , oOperator :: !PubKeyHash
     , oFee      :: !Value
-    , oAsset    :: !AssetClass
     } deriving (Show, Generic, FromJSON, ToJSON)
 
 PlutusTx.makeLift ''Oracle
@@ -116,22 +114,15 @@ oracleValidator = Scripts.validatorScript . oracleInst
 oracleAddress :: Oracle -> Ledger.Address
 oracleAddress = scriptAddress . oracleValidator
 
-data OracleParams = OracleParams
-    { opFees   :: !Integer
-    , opSymbol :: !CurrencySymbol
-    , opToken  :: !TokenName
-    } deriving (Show, Generic, FromJSON, ToJSON)
-
-startOracle :: forall w s. HasBlockchainActions s => OracleParams -> Contract w s Text Oracle
-startOracle op = do
+startOracle :: forall w s. HasBlockchainActions s => Integer -> Contract w s Text Oracle
+startOracle fees = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
     osc <- mapError (pack . show) (forgeContract pkh [(oracleTokenName, 1)] :: Contract w s CurrencyError OneShotCurrency)
     let cs     = Currency.currencySymbol osc
         oracle = Oracle
             { oSymbol   = cs
             , oOperator = pkh
-            , oFee      = Ada.lovelaceValueOf $ opFees op
-            , oAsset    = AssetClass (opSymbol op, opToken op)
+            , oFee      = Ada.lovelaceValueOf fees
             }
     logInfo @String $ "forged oracle state token for oracle " ++ show oracle
     return oracle
@@ -170,9 +161,9 @@ findOracle oracle = do
 
 type OracleSchema = BlockchainActions .\/ Endpoint "update" Integer
 
-runOracle :: OracleParams -> Contract (Last Oracle) OracleSchema Text ()
-runOracle op = do
-    oracle <- startOracle op
+runOracle :: Integer -> Contract (Last Oracle) OracleSchema Text ()
+runOracle fees = do
+    oracle <- startOracle fees
     tell $ Last $ Just oracle
     go oracle
   where
