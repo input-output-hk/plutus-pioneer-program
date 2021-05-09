@@ -14,26 +14,34 @@
 module Week06.Oracle.Swap
     ( offerSwap
     , retrieveSwaps
+    , useSwap
     ) where
 
 import           Control.Monad        hiding (fmap)
-import           Data.Aeson           (FromJSON, ToJSON)
+import           Data.List            (find)
 import qualified Data.Map             as Map
 import           Data.Maybe           (mapMaybe)
 import           Data.Monoid          (Last (..))
-import           Data.Text            (Text, pack)
-import           GHC.Generics         (Generic)
+import           Data.Text            (Text)
 import           Plutus.Contract      as Contract hiding (when)
 import qualified PlutusTx
-import           PlutusTx.Prelude     hiding (Semigroup(..), unless, mapMaybe)
+import           PlutusTx.Prelude     hiding (Semigroup(..), (<$>), unless, mapMaybe, find)
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
-import           Ledger.Ada           as Ada
+import           Ledger.Ada           as Ada hiding (divide)
 import           Ledger.Value         as Value
-import           Prelude              (Semigroup (..))
+import           Prelude              (Semigroup (..), (<$>))
 
 import           Week06.Oracle.Core
+
+{-# INLINABLE price #-}
+price :: Integer -> Integer -> Integer
+price lovelace exchangeRate = (lovelace * exchangeRate) `divide` 1000000
+
+{-# INLINABLE lovelaces #-}
+lovelaces :: Value -> Integer
+lovelaces = Ada.getLovelace . Ada.fromValue
 
 {-# INLINABLE mkSwapValidator #-}
 mkSwapValidator :: Oracle -> Address -> PubKeyHash -> () -> ScriptContext -> Bool
@@ -75,9 +83,9 @@ mkSwapValidator oracle addr pkh () ctx =
       let
         lovelaceIn = case findOwnInput ctx of
             Nothing -> traceError "own input not found"
-            Just i  -> Ada.getLovelace $ Ada.fromValue $ txOutValue $ txInInfoResolved i
+            Just i  -> lovelaces $ txOutValue $ txInInfoResolved i
       in
-        lovelaceIn * oracleValue'
+        price lovelaceIn oracleValue'
 
     sellerPaid :: Bool
     sellerPaid =
@@ -145,3 +153,49 @@ retrieveSwaps oracle = do
             ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
             awaitTxConfirmed $ txId ledgerTx
             logInfo @String $ "retrieved " ++ show (length xs) ++ " swap(s)"
+
+ownFunds :: HasBlockchainActions s => Contract w s Text Value
+ownFunds = do
+    pk    <- ownPubKey
+    utxos <- utxoAt $ pubKeyAddress pk
+    let v = mconcat $ Map.elems $ txOutValue . txOutTxOut <$>  utxos
+    logInfo @String $ "own funds: " ++ show (Value.flattenValue v)
+    return v
+
+useSwap :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text ()
+useSwap oracle = do
+    funds <- ownFunds
+    let amt = assetClassValueOf funds $ oAsset oracle
+    logInfo @String $ "available assets: " ++ show amt
+
+    m <- findOracle oracle
+    case m of
+        Nothing           -> logInfo @String "oracle not found"
+        Just (oref, o, x) -> do
+            logInfo @String $ "found oracle, exchange rate " ++ show x
+            pkh   <- pubKeyHash <$> Contract.ownPubKey
+            swaps <- findSwaps oracle (/= pkh)
+            case find (f amt x) swaps of
+                Nothing                -> logInfo @String "no suitable swap found"
+                Just (oref', o', pkh') -> do
+                    let v       = txOutValue (txOutTxOut o) <> lovelaceValueOf (oFee oracle)
+                        p       = assetClassValue (oAsset oracle) $ price (lovelaces $ txOutValue $ txOutTxOut o') x
+                        lookups = Constraints.otherScript (swapValidator oracle)                     <>
+                                  Constraints.otherScript (oracleValidator oracle)                   <>
+                                  Constraints.unspentOutputs (Map.fromList [(oref, o), (oref', o')])
+                        tx      = Constraints.mustSpendScriptOutput oref  (Redeemer $ PlutusTx.toData Use) <>
+                                  Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ())  <>
+                                  Constraints.mustPayToOtherScript
+                                    (validatorHash $ oracleValidator oracle)
+                                    (Datum $ PlutusTx.toData x)
+                                    v                                                                      <>
+                                  Constraints.mustPayToPubKey pkh' p
+                    ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
+                    awaitTxConfirmed $ txId ledgerTx
+                    logInfo @String $ "made swap with price " ++ show (Value.flattenValue p)
+  where
+    getPrice :: Integer -> TxOutTx -> Integer
+    getPrice x o = price (lovelaces $ txOutValue $ txOutTxOut o) x
+
+    f :: Integer -> Integer -> (TxOutRef, TxOutTx, PubKeyHash) -> Bool
+    f amt x (_, o, _) = getPrice x o <= amt

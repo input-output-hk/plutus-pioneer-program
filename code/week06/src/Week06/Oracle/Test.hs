@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE NumericUnderscores    #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
@@ -13,20 +14,39 @@
 
 module Week06.Oracle.Test where
 
-import Control.Monad              hiding (fmap)
-import Control.Monad.Freer.Extras as Extras
-import Data.Monoid                (Last (..))
-import Data.Text                  (Text)
-import Plutus.Contract            as Contract hiding (when)
-import Plutus.Trace.Emulator      as Emulator
-import PlutusTx.Prelude           hiding (Semigroup(..), unless)
-import Wallet.Emulator.Wallet
+import           Control.Monad              hiding (fmap)
+import           Control.Monad.Freer.Extras as Extras
+import           Data.Default               (Default (..))
+import qualified Data.Map                   as Map
+import           Data.Monoid                (Last (..))
+import           Data.Text                  (Text)
+import           Ledger
+import           Ledger.Value               as Value
+import           Ledger.Ada                 as Ada
+import           Plutus.Contract            as Contract hiding (when)
+import           Plutus.Trace.Emulator      as Emulator
+import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
+import           Prelude                    (Semigroup(..))
+import           Wallet.Emulator.Wallet
 
-import Week06.Oracle.Core
-import Week06.Oracle.Swap
+import           Week06.Oracle.Core
+import           Week06.Oracle.Swap
+
+assetSymbol :: CurrencySymbol
+assetSymbol = "ff"
+
+assetToken :: TokenName
+assetToken = "USDT"
 
 test :: IO ()
-test = runEmulatorTraceIO myTrace
+test = runEmulatorTraceIO' def emCfg myTrace
+  where
+    emCfg :: EmulatorConfig
+    emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
+
+    v :: Value
+    v = Ada.lovelaceValueOf                    100_000_000 <>
+        Value.singleton assetSymbol assetToken 100_000_000
 
 checkOracle :: Oracle -> Contract () BlockchainActions Text a
 checkOracle oracle = do
@@ -39,25 +59,39 @@ checkOracle oracle = do
 myTrace :: EmulatorTrace ()
 myTrace = do
     let op = OracleParams
-                { opFees = 1000000
-                , opSymbol = "ff"
-                , opToken  = "USDT"
+                { opFees = 1_000_000
+                , opSymbol = assetSymbol
+                , opToken  = assetToken
                 }
+
     h <- activateContractWallet (Wallet 1) $ runOracle op
     void $ Emulator.waitNSlots 1
     oracle <- getOracle h
-    void $ activateContractWallet (Wallet 2) $ checkOracle oracle
-    callEndpoint @"update" h 42
-    void $ Emulator.waitNSlots 3
-    callEndpoint @"update" h 666
-    void $ Emulator.waitNSlots 10
-    void $ activateContractWallet (Wallet 2) (offerSwap oracle 12000000 :: Contract () BlockchainActions Text ())
-    void $ Emulator.waitNSlots 10
-    void $ activateContractWallet (Wallet 2) (offerSwap oracle 18000000 :: Contract () BlockchainActions Text ())
-    void $ Emulator.waitNSlots 10
-    void $ activateContractWallet (Wallet 2) (retrieveSwaps oracle :: Contract () BlockchainActions Text ())
-    void $ Emulator.waitNSlots 10
 
+    void $ activateContractWallet (Wallet 2) $ checkOracle oracle
+
+    callEndpoint @"update" h 1_500_000
+    void $ Emulator.waitNSlots 3
+
+    void $ activateContractWallet (Wallet 3) (offerSwap oracle 10_000_000 :: Contract () BlockchainActions Text ())
+    void $ activateContractWallet (Wallet 4) (offerSwap oracle 20_000_000 :: Contract () BlockchainActions Text ())
+    void $ Emulator.waitNSlots 3
+
+    void $ activateContractWallet (Wallet 5) (useSwap oracle :: Contract () BlockchainActions Text ())
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"update" h 1_700_000
+    void $ Emulator.waitNSlots 3
+
+    void $ activateContractWallet (Wallet 5) (useSwap oracle :: Contract () BlockchainActions Text ())
+    void $ Emulator.waitNSlots 3
+
+    callEndpoint @"update" h 1_800_000
+    void $ Emulator.waitNSlots 3
+
+    void $ activateContractWallet (Wallet 3) (retrieveSwaps oracle :: Contract () BlockchainActions Text ())
+    void $ activateContractWallet (Wallet 4) (retrieveSwaps oracle :: Contract () BlockchainActions Text ())
+    void $ Emulator.waitNSlots 3
 
   where
     getOracle :: ContractHandle (Last Oracle) OracleSchema Text -> EmulatorTrace Oracle

@@ -38,7 +38,6 @@ import           PlutusTx.Prelude          hiding (Semigroup(..), unless)
 import           Ledger                    hiding (singleton)
 import           Ledger.Constraints        as Constraints
 import qualified Ledger.Typed.Scripts      as Scripts
-import           Ledger.Ada                as Ada
 import           Ledger.Value              as Value
 import           Plutus.Contracts.Currency as Currency
 import           Prelude                   (Semigroup (..))
@@ -46,7 +45,7 @@ import           Prelude                   (Semigroup (..))
 data Oracle = Oracle
     { oSymbol   :: !CurrencySymbol
     , oOperator :: !PubKeyHash
-    , oFee      :: !Value
+    , oFee      :: !Integer
     , oAsset    :: !AssetClass
     } deriving (Show, Generic, FromJSON, ToJSON)
 
@@ -74,7 +73,7 @@ oracleValue o f = do
 
 {-# INLINABLE mkOracleValidator #-}
 mkOracleValidator :: Oracle -> Integer -> OracleRedeemer -> ScriptContext -> Bool
-mkOracleValidator _      _ Use    _   = False
+mkOracleValidator _      _ Use    _   = True
 mkOracleValidator oracle _ Update ctx =
     traceIfFalse "operator signature missing" (txSignedBy info $ oOperator oracle) &&
     traceIfFalse "token missing from input"   inputHasToken                        &&
@@ -134,7 +133,7 @@ startOracle op = do
         oracle = Oracle
             { oSymbol   = cs
             , oOperator = pkh
-            , oFee      = Ada.lovelaceValueOf $ opFees op
+            , oFee      = opFees op
             , oAsset    = AssetClass (opSymbol op, opToken op)
             }
     logInfo @String $ "forged oracle state token for oracle " ++ show oracle
