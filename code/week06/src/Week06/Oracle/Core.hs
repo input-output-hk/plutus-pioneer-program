@@ -39,6 +39,7 @@ import           Ledger                    hiding (singleton)
 import           Ledger.Constraints        as Constraints
 import qualified Ledger.Typed.Scripts      as Scripts
 import           Ledger.Value              as Value
+import           Ledger.Ada                as Ada
 import           Plutus.Contracts.Currency as Currency
 import           Prelude                   (Semigroup (..))
 
@@ -73,20 +74,25 @@ oracleValue o f = do
 
 {-# INLINABLE mkOracleValidator #-}
 mkOracleValidator :: Oracle -> Integer -> OracleRedeemer -> ScriptContext -> Bool
-mkOracleValidator _      _ Use    _   = True
-mkOracleValidator oracle _ Update ctx =
-    traceIfFalse "operator signature missing" (txSignedBy info $ oOperator oracle) &&
-    traceIfFalse "token missing from input"   inputHasToken                        &&
-    traceIfFalse "token missing from output"  outputHasToken                       &&
-    traceIfFalse "invalid output datum"       validOutputDatum
+mkOracleValidator oracle x r ctx =
+    traceIfFalse "token missing from input"  inputHasToken  &&
+    traceIfFalse "token missing from output" outputHasToken &&
+    case r of
+        Update -> traceIfFalse "operator signature missing" (txSignedBy info $ oOperator oracle) &&
+                  traceIfFalse "invalid output datum"       validOutputDatum
+        Use    -> traceIfFalse "oracle value changed"       (outputDatum == Just x)              &&
+                  traceIfFalse "fees not paid"              feesPaid
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
+    ownInput :: TxOut
+    ownInput = case findOwnInput ctx of
+        Nothing -> traceError "oracle input missing"
+        Just i  -> txInInfoResolved i
+
     inputHasToken :: Bool
-    inputHasToken = case findOwnInput ctx of
-        Nothing -> False
-        Just i  -> assetClassValueOf (txOutValue $ txInInfoResolved i) (oracleAsset oracle) == 1
+    inputHasToken = assetClassValueOf (txOutValue ownInput) (oracleAsset oracle) == 1
 
     ownOutput :: TxOut
     ownOutput = case getContinuingOutputs ctx of
@@ -96,10 +102,19 @@ mkOracleValidator oracle _ Update ctx =
     outputHasToken :: Bool
     outputHasToken = assetClassValueOf (txOutValue ownOutput) (oracleAsset oracle) == 1
 
+    outputDatum :: Maybe Integer
+    outputDatum = oracleValue ownOutput (`findDatum` info)
+
     validOutputDatum :: Bool
-    validOutputDatum = case oracleValue ownOutput (`findDatum` info) of
-        Nothing -> False
-        Just _  -> True
+    validOutputDatum = isJust outputDatum
+
+    feesPaid :: Bool
+    feesPaid =
+      let
+        inVal  = txOutValue ownInput
+        outVal = txOutValue ownOutput
+      in
+        outVal `geq` (inVal <> Ada.lovelaceValueOf (oFee oracle))
 
 data Oracling
 instance Scripts.ScriptType Oracling where
