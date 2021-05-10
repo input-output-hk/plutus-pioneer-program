@@ -12,9 +12,8 @@
 {-# LANGUAGE TypeOperators         #-}
 
 module Week06.Oracle.Swap
-    ( offerSwap
-    , retrieveSwaps
-    , useSwap
+    ( SwapSchema
+    , swap
     ) where
 
 import           Control.Monad        hiding (fmap)
@@ -199,3 +198,37 @@ useSwap oracle = do
 
     f :: Integer -> Integer -> (TxOutRef, TxOutTx, PubKeyHash) -> Bool
     f amt x (_, o, _) = getPrice x o <= amt
+
+type SwapSchema =
+    BlockchainActions
+        .\/ Endpoint "offer"    Integer
+        .\/ Endpoint "retrieve" ()
+        .\/ Endpoint "use"      ()
+        .\/ Endpoint "funds"    ()
+
+swap :: Oracle -> Contract (Last Value) SwapSchema Text ()
+swap oracle = (offer `select` retrieve `select` use `select` funds) >> swap oracle
+  where
+    offer :: Contract (Last Value) SwapSchema Text ()
+    offer = h $ do
+        amt <- endpoint @"offer"
+        offerSwap oracle amt
+
+    retrieve :: Contract (Last Value) SwapSchema Text ()
+    retrieve = h $ do
+        endpoint @"retrieve"
+        retrieveSwaps oracle
+
+    use :: Contract (Last Value) SwapSchema Text ()
+    use = h $ do
+        endpoint @"use"
+        useSwap oracle
+
+    funds :: Contract (Last Value) SwapSchema Text ()
+    funds = h $ do
+        endpoint @"funds"
+        v <- ownFunds
+        tell $ Last $ Just v
+
+    h :: Contract (Last Value) SwapSchema Text () -> Contract (Last Value) SwapSchema Text ()
+    h = handleError logError

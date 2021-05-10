@@ -42,13 +42,14 @@ import           Ledger.Value              as Value
 import           Ledger.Ada                as Ada
 import           Plutus.Contracts.Currency as Currency
 import           Prelude                   (Semigroup (..))
+import qualified Prelude                   as Prelude
 
 data Oracle = Oracle
     { oSymbol   :: !CurrencySymbol
     , oOperator :: !PubKeyHash
     , oFee      :: !Integer
     , oAsset    :: !AssetClass
-    } deriving (Show, Generic, FromJSON, ToJSON)
+    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
 
 PlutusTx.makeLift ''Oracle
 

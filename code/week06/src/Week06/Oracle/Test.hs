@@ -64,35 +64,42 @@ myTrace = do
                 , opToken  = assetToken
                 }
 
-    h <- activateContractWallet (Wallet 1) $ runOracle op
+    h1 <- activateContractWallet (Wallet 1) $ runOracle op
     void $ Emulator.waitNSlots 1
-    oracle <- getOracle h
+    oracle <- getOracle h1
 
     void $ activateContractWallet (Wallet 2) $ checkOracle oracle
 
-    callEndpoint @"update" h 1_500_000
+    callEndpoint @"update" h1 1_500_000
     void $ Emulator.waitNSlots 3
 
-    void $ activateContractWallet (Wallet 3) (offerSwap oracle 10_000_000 :: Contract () BlockchainActions Text ())
-    void $ activateContractWallet (Wallet 4) (offerSwap oracle 20_000_000 :: Contract () BlockchainActions Text ())
+    h3 <- activateContractWallet (Wallet 3) $ swap oracle
+    h4 <- activateContractWallet (Wallet 4) $ swap oracle
+    h5 <- activateContractWallet (Wallet 5) $ swap oracle
+
+    callEndpoint @"offer" h3 10_000_000
+    callEndpoint @"offer" h4 20_000_000
     void $ Emulator.waitNSlots 3
 
-    void $ activateContractWallet (Wallet 5) (useSwap oracle :: Contract () BlockchainActions Text ())
+    callEndpoint @"use" h5 ()
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"update" h 1_700_000
+    callEndpoint @"update" h1 1_700_000
     void $ Emulator.waitNSlots 3
 
-    void $ activateContractWallet (Wallet 5) (useSwap oracle :: Contract () BlockchainActions Text ())
+    callEndpoint @"use" h5 ()
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"update" h 1_800_000
+    callEndpoint @"update" h1 1_800_000
     void $ Emulator.waitNSlots 3
 
-    void $ activateContractWallet (Wallet 3) (retrieveSwaps oracle :: Contract () BlockchainActions Text ())
-    void $ activateContractWallet (Wallet 4) (retrieveSwaps oracle :: Contract () BlockchainActions Text ())
+    callEndpoint @"retrieve" h3 ()
+    callEndpoint @"retrieve" h4 ()
     void $ Emulator.waitNSlots 3
 
+    callEndpoint @"funds" h3 ()
+    callEndpoint @"funds" h4 ()
+    callEndpoint @"funds" h5 ()
   where
     getOracle :: ContractHandle (Last Oracle) OracleSchema Text -> EmulatorTrace Oracle
     getOracle h = do
