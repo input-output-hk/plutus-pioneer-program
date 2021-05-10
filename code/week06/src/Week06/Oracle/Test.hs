@@ -74,6 +74,7 @@ myTrace = do
     callEndpoint @"update" h1 1_500_000
     void $ Emulator.waitNSlots 3
 
+    void $ activateContractWallet (Wallet 1) ownFunds'
     void $ activateContractWallet (Wallet 3) ownFunds'
     void $ activateContractWallet (Wallet 4) ownFunds'
     void $ activateContractWallet (Wallet 5) ownFunds'

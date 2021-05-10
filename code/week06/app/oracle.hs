@@ -39,9 +39,9 @@ import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import qualified Plutus.Contracts.Currency           as Currency
 
 import           Wallet.Emulator.Types               (Wallet (..), walletPubKey)
+import           Wallet.Types                        (ContractInstanceId (..))
 
 import qualified Week06.Oracle.Core                  as Oracle
-import qualified Week06.Oracle.Funds                 as Oracle
 import qualified Week06.Oracle.Swap                  as Oracle
 
 main :: IO ()
@@ -49,14 +49,18 @@ main = void $ Simulator.runSimulationWith handlers $ do
     Simulator.logString @(Builtin OracleContracts) "Starting Oracle PAB webserver. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
-    forM_ wallets $ \w ->
-        void $ Simulator.activateContract w Funds
-
     cidInit <- Simulator.activateContract (Wallet 1) Init
     cs      <- waitForLast cidInit
     _       <- Simulator.waitUntilFinished cidInit
 
     cidOracle <- Simulator.activateContract (Wallet 1) $ Oracle cs
+    liftIO $ writeFile "oracle.cid" $ show $ unContractInstanceId cidOracle
+    oracle <- waitForLast cidOracle
+
+    forM_ wallets $ \w ->
+        when (w /= Wallet 1) $ do
+            cid <- Simulator.activateContract w $ Swap oracle
+            liftIO $ writeFile ('W' : show (getWallet w) ++ ".cid") $ show $ unContractInstanceId cid
 
     void $ liftIO getLine
     shutdown
@@ -67,7 +71,7 @@ waitForLast cid =
         Success (Last (Just x)) -> Just x
         _                       -> Nothing
 
-data OracleContracts = Init | Oracle CurrencySymbol | Funds | Swap Oracle.Oracle
+data OracleContracts = Init | Oracle CurrencySymbol | Swap Oracle.Oracle
     deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON)
 
 instance Pretty OracleContracts where
@@ -96,12 +100,10 @@ handleOracleContracts = handleBuiltin getSchema getContract where
     getSchema = \case
         Init     -> endpointsToSchemas @Empty
         Oracle _ -> endpointsToSchemas @(Oracle.OracleSchema .\\ BlockchainActions)
-        Funds    -> endpointsToSchemas @Empty
         Swap _   -> endpointsToSchemas @(Oracle.SwapSchema   .\\ BlockchainActions)
     getContract = \case
         Init        -> SomeBuiltin   initContract
         Oracle cs   -> SomeBuiltin $ Oracle.runOracle $ oracleParams cs
-        Funds       -> SomeBuiltin $ Oracle.ownFunds'
         Swap oracle -> SomeBuiltin $ Oracle.swap oracle
 
 handlers :: SimulatorEffectHandlers (Builtin OracleContracts)

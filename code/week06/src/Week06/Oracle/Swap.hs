@@ -20,6 +20,7 @@ import           Control.Monad        hiding (fmap)
 import           Data.List            (find)
 import qualified Data.Map             as Map
 import           Data.Maybe           (mapMaybe)
+import           Data.Monoid          (Last (..))
 import           Data.Text            (Text)
 import           Plutus.Contract      as Contract hiding (when)
 import qualified PlutusTx
@@ -196,24 +197,31 @@ type SwapSchema =
         .\/ Endpoint "offer"    Integer
         .\/ Endpoint "retrieve" ()
         .\/ Endpoint "use"      ()
+        .\/ Endpoint "funds"    ()
 
-swap :: Oracle -> Contract () SwapSchema Text ()
-swap oracle = (offer `select` retrieve `select` use) >> swap oracle
+swap :: Oracle -> Contract (Last Value) SwapSchema Text ()
+swap oracle = (offer `select` retrieve `select` use `select` funds) >> swap oracle
   where
-    offer :: Contract () SwapSchema Text ()
+    offer :: Contract (Last Value) SwapSchema Text ()
     offer = h $ do
         amt <- endpoint @"offer"
         offerSwap oracle amt
 
-    retrieve :: Contract () SwapSchema Text ()
+    retrieve :: Contract (Last Value) SwapSchema Text ()
     retrieve = h $ do
         endpoint @"retrieve"
         retrieveSwaps oracle
 
-    use :: Contract () SwapSchema Text ()
+    use :: Contract (Last Value) SwapSchema Text ()
     use = h $ do
         endpoint @"use"
         useSwap oracle
 
-    h :: Contract () SwapSchema Text () -> Contract () SwapSchema Text ()
+    funds :: Contract (Last Value) SwapSchema Text ()
+    funds = h $ do
+        endpoint @"funds"
+        v <- ownFunds
+        tell $ Last $ Just v
+
+    h :: Contract (Last Value) SwapSchema Text () -> Contract (Last Value) SwapSchema Text ()
     h = handleError logError
