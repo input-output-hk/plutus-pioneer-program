@@ -20,7 +20,6 @@ import           Control.Monad        hiding (fmap)
 import           Data.List            (find)
 import qualified Data.Map             as Map
 import           Data.Maybe           (mapMaybe)
-import           Data.Monoid          (Last (..))
 import           Data.Text            (Text)
 import           Plutus.Contract      as Contract hiding (when)
 import qualified PlutusTx
@@ -33,6 +32,7 @@ import           Ledger.Value         as Value
 import           Prelude              (Semigroup (..), (<$>))
 
 import           Week06.Oracle.Core
+import           Week06.Oracle.Funds
 
 {-# INLINABLE price #-}
 price :: Integer -> Integer -> Integer
@@ -153,14 +153,6 @@ retrieveSwaps oracle = do
             awaitTxConfirmed $ txId ledgerTx
             logInfo @String $ "retrieved " ++ show (length xs) ++ " swap(s)"
 
-ownFunds :: HasBlockchainActions s => Contract w s Text Value
-ownFunds = do
-    pk    <- ownPubKey
-    utxos <- utxoAt $ pubKeyAddress pk
-    let v = mconcat $ Map.elems $ txOutValue . txOutTxOut <$>  utxos
-    logInfo @String $ "own funds: " ++ show (Value.flattenValue v)
-    return v
-
 useSwap :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text ()
 useSwap oracle = do
     funds <- ownFunds
@@ -204,31 +196,24 @@ type SwapSchema =
         .\/ Endpoint "offer"    Integer
         .\/ Endpoint "retrieve" ()
         .\/ Endpoint "use"      ()
-        .\/ Endpoint "funds"    ()
 
-swap :: Oracle -> Contract (Last Value) SwapSchema Text ()
-swap oracle = (offer `select` retrieve `select` use `select` funds) >> swap oracle
+swap :: Oracle -> Contract () SwapSchema Text ()
+swap oracle = (offer `select` retrieve `select` use) >> swap oracle
   where
-    offer :: Contract (Last Value) SwapSchema Text ()
+    offer :: Contract () SwapSchema Text ()
     offer = h $ do
         amt <- endpoint @"offer"
         offerSwap oracle amt
 
-    retrieve :: Contract (Last Value) SwapSchema Text ()
+    retrieve :: Contract () SwapSchema Text ()
     retrieve = h $ do
         endpoint @"retrieve"
         retrieveSwaps oracle
 
-    use :: Contract (Last Value) SwapSchema Text ()
+    use :: Contract () SwapSchema Text ()
     use = h $ do
         endpoint @"use"
         useSwap oracle
 
-    funds :: Contract (Last Value) SwapSchema Text ()
-    funds = h $ do
-        endpoint @"funds"
-        v <- ownFunds
-        tell $ Last $ Just v
-
-    h :: Contract (Last Value) SwapSchema Text () -> Contract (Last Value) SwapSchema Text ()
+    h :: Contract () SwapSchema Text () -> Contract () SwapSchema Text ()
     h = handleError logError

@@ -30,6 +30,7 @@ import           Prelude                    (Semigroup(..))
 import           Wallet.Emulator.Wallet
 
 import           Week06.Oracle.Core
+import           Week06.Oracle.Funds
 import           Week06.Oracle.Swap
 
 assetSymbol :: CurrencySymbol
@@ -73,6 +74,10 @@ myTrace = do
     callEndpoint @"update" h1 1_500_000
     void $ Emulator.waitNSlots 3
 
+    void $ activateContractWallet (Wallet 3) ownFunds'
+    void $ activateContractWallet (Wallet 4) ownFunds'
+    void $ activateContractWallet (Wallet 5) ownFunds'
+
     h3 <- activateContractWallet (Wallet 3) $ swap oracle
     h4 <- activateContractWallet (Wallet 4) $ swap oracle
     h5 <- activateContractWallet (Wallet 5) $ swap oracle
@@ -96,10 +101,6 @@ myTrace = do
     callEndpoint @"retrieve" h3 ()
     callEndpoint @"retrieve" h4 ()
     void $ Emulator.waitNSlots 3
-
-    callEndpoint @"funds" h3 ()
-    callEndpoint @"funds" h4 ()
-    callEndpoint @"funds" h5 ()
   where
     getOracle :: ContractHandle (Last Oracle) OracleSchema Text -> EmulatorTrace Oracle
     getOracle h = do

@@ -43,6 +43,8 @@ main = void $ Simulator.runSimulationWith handlers $ do
     Simulator.logString @(Builtin OracleContracts) "Starting Oracle PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
+    cidOracle <- Simulator.activateContract (Wallet 1) Oracle
+
     void $ liftIO getLine
     shutdown
 

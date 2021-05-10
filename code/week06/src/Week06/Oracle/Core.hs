@@ -152,7 +152,7 @@ startOracle op = do
             , oFee      = opFees op
             , oAsset    = AssetClass (opSymbol op, opToken op)
             }
-    logInfo @String $ "forged oracle state token for oracle " ++ show oracle
+    logInfo @String $ "started oracle " ++ show oracle
     return oracle
 
 updateOracle :: forall w s. HasBlockchainActions s => Oracle -> Integer -> Contract w s Text ()
