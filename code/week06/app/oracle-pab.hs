@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE LambdaCase         #-}
@@ -13,6 +12,7 @@
 
 module Main
     ( main
+    , OracleContracts
     ) where
 
 import           Control.Monad                       (forM_, void, when)
@@ -20,11 +20,9 @@ import           Control.Monad.Freer                 (Eff, Member, interpret, ty
 import           Control.Monad.Freer.Error           (Error)
 import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON, ToJSON, Result (..), fromJSON)
+import           Data.Aeson                          (FromJSON, Result (..), fromJSON)
 import           Data.Monoid                         (Last (..))
 import           Data.Text                           (Text, pack)
-import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
-import           GHC.Generics                        (Generic)
 import           Ledger
 import           Ledger.Constraints
 import qualified Ledger.Value                        as Value
@@ -42,6 +40,7 @@ import           Wallet.Emulator.Types               (Wallet (..), walletPubKey)
 import           Wallet.Types                        (ContractInstanceId (..))
 
 import qualified Week06.Oracle.Core                  as Oracle
+import           Week06.Oracle.PAB                   (OracleContracts (..))
 import qualified Week06.Oracle.Swap                  as Oracle
 
 main :: IO ()
@@ -70,12 +69,6 @@ waitForLast cid =
     flip Simulator.waitForState cid $ \json -> case fromJSON json of
         Success (Last (Just x)) -> Just x
         _                       -> Nothing
-
-data OracleContracts = Init | Oracle CurrencySymbol | Swap Oracle.Oracle
-    deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON)
-
-instance Pretty OracleContracts where
-    pretty = viaShow
 
 wallets :: [Wallet]
 wallets = [Wallet i | i <- [1 .. 5]]
