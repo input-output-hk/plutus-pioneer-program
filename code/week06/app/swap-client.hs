@@ -7,7 +7,7 @@ module Main
     ) where
 
 import Control.Concurrent
-import Control.Monad                           (when)
+import Control.Exception
 import Control.Monad.IO.Class                  (MonadIO (..))
 import Data.Aeson                              (Result (..), fromJSON)
 import Data.Monoid                             (Last (..))
@@ -19,18 +19,40 @@ import Network.HTTP.Req
 import Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
 import Plutus.PAB.Webserver.Types
 import System.Environment                      (getArgs)
+import System.IO
+import Text.Read                               (readMaybe)
 
 import Week06.Oracle.PAB                       (OracleContracts)
 
 main :: IO ()
 main = do
-    [(i :: Int)] <- map read <$> getArgs
-    uuid <- read <$> readFile ('W' : show i ++ ".cid")
+    [i :: Int] <- map read <$> getArgs
+    uuid       <- read <$> readFile ('W' : show i ++ ".cid")
+    hSetBuffering stdout NoBuffering
     putStrLn $ "swap contract instance id for Wallet " ++ show i ++ ": " ++ show uuid
-    getFunds uuid
+    go uuid
+  where
+    go :: UUID -> IO a
+    go uuid = do
+        cmd <- readCommand
+        case cmd of
+            Offer amt -> offer uuid amt
+            Retrieve  -> retrieve uuid
+            Use       -> use uuid
+            Funds     -> getFunds uuid
+        go uuid
+
+    readCommand :: IO Command
+    readCommand = do
+        putStr "enter command (Offer amt, Retrieve or Use): "
+        s <- getLine
+        maybe readCommand return $ readMaybe s
+
+data Command = Offer Integer | Retrieve | Use | Funds
+    deriving (Show, Read, Eq, Ord)
 
 getFunds :: UUID -> IO ()
-getFunds uuid = runReq defaultHttpConfig $ do
+getFunds uuid = handle h $ runReq defaultHttpConfig $ do
     v <- req
         POST
         (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "funds")
@@ -47,40 +69,55 @@ getFunds uuid = runReq defaultHttpConfig $ do
                 (Proxy :: Proxy (JsonResponse (ContractInstanceClientState OracleContracts)))
                 (port 8080)
             liftIO $ putStrLn $ case fromJSON $ observableState $ cicCurrentState $ responseBody w of
-                Success (Last (Just f)) -> "fund: " ++ show (flattenValue f)
+                Success (Last (Just f)) -> "funds: " ++ show (flattenValue f)
                 _                       -> "error decoding state"
+  where
+    h :: HttpException -> IO ()
+    h _ = threadDelay 1_000_000 >> getFunds uuid
 
-{-
-    liftIO $ putStrLn $ if responseStatusCode v == 200
-        then "updated oracle to " ++ show x
-        else "error updating oracle"
--}
-
-{-
-updateOracle :: UUID -> Integer -> IO ()
-updateOracle uuid x = runReq defaultHttpConfig $ do
+offer :: UUID -> Integer -> IO ()
+offer uuid amt = handle h $ runReq defaultHttpConfig $ do
     v <- req
         POST
-        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "update")
-        (ReqBodyJson x)
+        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "offer")
+        (ReqBodyJson amt)
         (Proxy :: Proxy (JsonResponse ()))
         (port 8080)
     liftIO $ putStrLn $ if responseStatusCode v == 200
-        then "updated oracle to " ++ show x
-        else "error updating oracle"
+        then "offered swap of " ++ show amt ++ " lovelace"
+        else "error offering swap"
+  where
+    h :: HttpException -> IO ()
+    h _ = threadDelay 1_000_000 >> offer uuid amt
 
-getExchangeRate :: IO Integer
-getExchangeRate = runReq defaultHttpConfig $ do
+retrieve :: UUID -> IO ()
+retrieve uuid = handle h $ runReq defaultHttpConfig $ do
     v <- req
-        GET
-        (https "coinmarketcap.com" /: "currencies" /: "cardano")
-        NoReqBody
-        bsResponse
-        mempty
-    let priceRegex      = "priceValue___11gHJ\">\\$([\\.0-9]*)" :: ByteString
-        (_, _, _, [bs]) = responseBody v =~ priceRegex :: (ByteString, ByteString, ByteString, [ByteString])
-        d               = read $ unpack bs :: Double
-        x               = round $ 1_000_000 * d
-    liftIO $ putStrLn $ "queried exchange rate: " ++ show d
-    return x
--}
+        POST
+        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "retrieve")
+        (ReqBodyJson ())
+        (Proxy :: Proxy (JsonResponse ()))
+        (port 8080)
+    liftIO $ putStrLn $ if responseStatusCode v == 200
+        then "retrieved swaps"
+        else "error retrieving swaps"
+  where
+    h :: HttpException -> IO ()
+    h _ = threadDelay 1_000_000 >> retrieve uuid
+
+use :: UUID -> IO ()
+use uuid = handle h $ runReq defaultHttpConfig $ do
+    v <- req
+        POST
+        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "use")
+        (ReqBodyJson ())
+        (Proxy :: Proxy (JsonResponse ()))
+        (port 8080)
+    liftIO $ putStrLn $ if responseStatusCode v == 200
+        then "used swap"
+        else "error using swap"
+  where
+    h :: HttpException -> IO ()
+    h _ = threadDelay 1_000_000 >> use uuid
+
+
