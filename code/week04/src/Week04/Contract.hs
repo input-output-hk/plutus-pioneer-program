@@ -79,3 +79,4 @@ myTrace4 = do
 
 test4 :: IO ()
 test4 = runEmulatorTraceIO myTrace4
+
