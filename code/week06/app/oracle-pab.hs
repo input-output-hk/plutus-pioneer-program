@@ -12,7 +12,6 @@
 
 module Main
     ( main
-    , OracleContracts
     ) where
 
 import           Control.Monad                       (forM_, void, when)

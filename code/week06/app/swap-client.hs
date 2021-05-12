@@ -44,7 +44,7 @@ main = do
 
     readCommand :: IO Command
     readCommand = do
-        putStr "enter command (Offer amt, Retrieve or Use): "
+        putStr "enter command (Offer amt, Retrieve, Use or Funds): "
         s <- getLine
         maybe readCommand return $ readMaybe s
 
