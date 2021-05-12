@@ -33,6 +33,11 @@
   - Native tokens & minting policies.
   - NFT's.
 
+- [Lecture #6](https://youtu.be/wY7R-PJn66g)
+
+  - Oracles.
+  - Using the PAB.
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
@@ -40,6 +45,7 @@
 - Lecture #3: [Validation Context & Parameterized Contracts](code/week03)
 - Lecture #4: [Monads, `EmulatorTrace` & `Contract`](code/week04)
 - Lecture #5: [Minting Policies](code/week05)
+- Lecture #6: [Oracles](code/week06)
 
 ## Exercises
 
@@ -77,6 +83,10 @@
   - Add a deadline to the minting policy in the [Homework1](code/week05/src/Week05/Homework1.hs) module.
   - Fix the token name to the empty `ByteString` in the NFT contract in the [Homework2](code/week05/src/Week05/Homework2.hs) module.
 
+- Week #6
+
+  - Get the Oracle demo running and extend it in some way.
+
 ## Solutions
 
 - Week #2
@@ -93,8 +103,14 @@
 
   - [`Homework`](code/week04/src/Week04/Solution.hs)
 
+- Week #5
+
+  - [`Homework1`](code/week05/src/Week05/Solution1.hs)
+  - [`Homework2`](code/week05/src/Week05/Solution2.hs)
+
 ## Some Plutus Modules
 
+- [`Plutus.PAB.Webserver.API`](https://github.com/input-output-hk/plutus/blob/master/plutus-pab/src/Plutus/PAB/Webserver/API.hs), contains the HTTP-interface provided by the PAB.
 - [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
 - [`Plutus.V1.Ledger.Ada`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs), contains support for the Ada currency.
 - [`Plutus.V1.Ledger.Contexts`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs), contains the definition of the context-related types.
@@ -117,7 +133,3 @@
 - [The Plutus repository](https://github.com/input-output-hk/plutus)
 - [Learn You a Haskell for Great Good!](http://learnyouahaskell.com/)
 - [Haskell & Cryptocurrencies course Mongolia](https://www.youtube.com/playlist?list=PLJ3w5xyG4JWmBVIigNBytJhvSSfZZzfTm)
-
-
-
-
