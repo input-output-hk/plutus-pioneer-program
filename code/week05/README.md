@@ -58,7 +58,7 @@ This means that whenever a token is to be minted or burned the Script can be rea
 #### 2.1 Refresher on Validation
 Before diving into the example lets refresh our minds on how a validation works.
 
-When instead of having a Public-Key we have a Script-Address and a UTXO that sits at the Script- Address and we also have a transaction that attempts to consume the UTXO as an input then for each Script input the validation Script runs
+When instead of having a Public-Key-address we have a Script-Address and a UTXO that sits at the Script-Address and we also have a transaction that attempts to consume the UTXO as an input then for each Script input the validation Script runs
 
 This validation Script gets i) Datum ii) Redeemer & iii) Context. The latter can be found in [`Context.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs), defined in line 116 which needs the data-types defined in lines 93 & 100 as seen below
 
@@ -87,8 +87,11 @@ This validation Script gets i) Datum ii) Redeemer & iii) Context. The latter can
 
     data ScriptContext = ScriptContext{scriptContextTxInfo :: TxInfo, scriptContextPurpose :: ScriptPurpose } -- line 116
 
+The `ScriptPurpose`as of this lecture always had the purpose of `Spending TxOutRef` with a reference of the UTXO we are trying to consume. Whereas the `TxInfo` has all the information of the context that is being validated`. 
 
+In minting policies the `txInfoForge` is triggered and will have a non-zero value (for different asset classes) in contrast to regular Ada trasactions. 
 
+Each currency symbol is the hash of the Script
 
 
 
