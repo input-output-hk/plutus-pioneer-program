@@ -30,8 +30,7 @@ import           Text.Printf         (printf)
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: Data -> Data -> Data -> ()
-mkValidator _ _ _ = traceError "NO WAY!"  -- `traceError` is a Plutus function that 
-                                          --              takes overloaded-plutus-strings
+mkValidator _ _ _ = traceError "NO WAY!"
 
 validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
