@@ -75,6 +75,13 @@ PlutusTx.unstableMakeIsData ''GameRedeemer
 lovelaces :: Value -> Integer
 lovelaces = Ada.getLovelace . Ada.fromValue
 
+{-# INLINABLE gameDatum #-}
+gameDatum :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe GameDatum
+gameDatum o f = do
+    dh      <- txOutDatum o
+    Datum d <- f dh
+    PlutusTx.fromData d
+
 {-# INLINABLE mkGameValidator #-}
 mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
 mkGameValidator game bsZero' bsOne' dat red ctx = case (dat, red) of
@@ -114,15 +121,9 @@ mkGameValidator game bsZero' bsOne' dat red ctx = case (dat, red) of
         _   -> traceError "expected exactly one game output"
 
     outputDatum :: GameDatum
-    outputDatum = case m of
+    outputDatum = case gameDatum ownOutput (`findDatum` info) of
         Nothing -> traceError "game output datum not found"
         Just d  -> d
-      where
-        m :: Maybe GameDatum
-        m = do
-            dh      <- txOutDatum ownOutput
-            Datum d <- findDatum dh info
-            PlutusTx.fromData d
 
     checkNonce :: ByteString -> ByteString -> GameChoice -> Bool
     checkNonce bs nonce cSecond = sha2_256 (nonce `concatenate` cFirst) == bs
@@ -219,9 +220,7 @@ firstGame fp = do
         f :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, Maybe GameChoice)
         f (oref, o) = do
             guard $ lovelaces (txOutValue $ txOutTxOut o) == 2 * fpStake fp
-            dh      <- txOutDatum $ txOutTxOut o
-            Datum d <- Map.lookup dh $ txData $ txOutTxTx o
-            dat     <- PlutusTx.fromData d
+            dat <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
             case dat of
                 GameDatum bs' mc
                     | bs' == bs && (isNothing mc || mc == Just c) -> return (oref, o, mc)
@@ -292,9 +291,7 @@ secondGame sp = do
         f :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, ByteString)
         f (oref, o) = do
             guard $ lovelaces (txOutValue $ txOutTxOut o) == spStake sp
-            dh      <- txOutDatum $ txOutTxOut o
-            Datum d <- Map.lookup dh $ txData $ txOutTxTx o
-            dat     <- PlutusTx.fromData d
+            dat <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
             case dat of
                 GameDatum bs Nothing -> return (oref, o, bs)
                 _                    -> Nothing
