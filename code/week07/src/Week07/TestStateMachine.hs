@@ -25,7 +25,7 @@ import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
 import           Wallet.Emulator.Wallet
 
-import           Week07.EvenOdd
+import           Week07.StateMachine
 
 test :: IO ()
 test = do
