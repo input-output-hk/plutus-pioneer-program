@@ -32,6 +32,7 @@ import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Ada           as Ada
+import           Ledger.Value
 import           Playground.Contract  (ToSchema)
 import           Prelude              (Semigroup (..))
 import qualified Prelude
@@ -42,6 +43,7 @@ data Game = Game
     , gStake          :: !Integer
     , gPlayDeadline   :: !Slot
     , gRevealDeadline :: !Slot
+    , gToken          :: !AssetClass
     } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
 
 PlutusTx.makeLift ''Game
@@ -84,28 +86,34 @@ gameDatum o f = do
 
 {-# INLINABLE mkGameValidator #-}
 mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
-mkGameValidator game bsZero' bsOne' dat red ctx = case (dat, red) of
-    (GameDatum bs Nothing, Play c) ->
-        traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
-        traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
-        traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))            &&
-        traceIfFalse "wrong output datum"            (outputDatum == GameDatum bs (Just c))                             &&
-        traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)
+mkGameValidator game bsZero' bsOne' dat red ctx =
+    traceIfFalse "token missing from input" (assetClassValueOf (txOutValue ownInput) (gToken game) == 1) &&
+    case (dat, red) of
+        (GameDatum bs Nothing, Play c) ->
+            traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+            traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+            traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))            &&
+            traceIfFalse "wrong output datum"            (outputDatum == GameDatum bs (Just c))                             &&
+            traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)         &&
+            traceIfFalse "token missing from output"     (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)
 
-    (GameDatum bs (Just c), Reveal nonce) ->
-        traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
-        traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
-        traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)
+        (GameDatum bs (Just c), Reveal nonce) ->
+            traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+            traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
+            traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)       &&
+            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))
 
-    (GameDatum _ Nothing, ClaimFirst) ->
-        traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
-        traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)
+        (GameDatum _ Nothing, ClaimFirst) ->
+            traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+            traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)   &&
+            traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)
 
-    (GameDatum _ (Just _), ClaimSecond) ->
-        traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
-        traceIfFalse "to early"                      (from (1 + gRevealDeadline game) `contains` txInfoValidRange info)
+        (GameDatum _ (Just _), ClaimSecond) ->
+            traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+            traceIfFalse "to early"                      (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
+            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))
 
-    _                              -> False
+        _                              -> False
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
@@ -158,12 +166,25 @@ gameValidator = Scripts.validatorScript . gameInst
 gameAddress :: Game -> Ledger.Address
 gameAddress = scriptAddress . gameValidator
 
+findGameOutput :: HasBlockchainActions s => Game -> Contract w s Text (Maybe (TxOutRef, TxOutTx, GameDatum))
+findGameOutput game = do
+    utxos <- utxoAt $ gameAddress game
+    return $ do
+        (oref, o) <- find f $ Map.toList utxos
+        dat       <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
+        return (oref, o, dat)
+  where
+    f :: (TxOutRef, TxOutTx) -> Bool
+    f (_, o) = assetClassValueOf (txOutValue $ txOutTxOut o) (gToken game) == 1
+
 data FirstParams = FirstParams
     { fpSecond         :: !PubKeyHash
     , fpStake          :: !Integer
     , fpPlayDeadline   :: !Slot
     , fpRevealDeadline :: !Slot
     , fpNonce          :: !ByteString
+    , fpCurrency       :: !CurrencySymbol
+    , fpTokenName      :: !TokenName
     , fpChoice         :: !GameChoice
     } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
 
@@ -176,61 +197,50 @@ firstGame fp = do
             , gStake          = fpStake fp
             , gPlayDeadline   = fpPlayDeadline fp
             , gRevealDeadline = fpRevealDeadline fp
+            , gToken          = AssetClass (fpCurrency fp, fpTokenName fp)
             }
-        v  = lovelaceValueOf $ fpStake fp
-        c  = fpChoice fp
-        bs = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
-        tx = Constraints.mustPayToTheScript (GameDatum bs Nothing) v
+        v    = lovelaceValueOf (fpStake fp) <> assetClassValue (gToken game) 1
+        c    = fpChoice fp
+        bs   = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+        tx   = Constraints.mustPayToTheScript (GameDatum bs Nothing) v
     ledgerTx <- submitTxConstraints (gameInst game) tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "made first move: " ++ show (fpChoice fp)
 
     void $ awaitSlot $ 1 + fpPlayDeadline fp
 
-    m <- findOutput game bs c
+    m <- findGameOutput game
     case m of
-        Nothing                 -> logInfo @String "no opportunity to win"
-        Just (oref, o, Nothing) -> do
-            logInfo @String "second player did not play"
-            let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
-                          Constraints.otherScript (gameValidator game)
-                tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData ClaimFirst)
-            ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
-            void $ awaitTxConfirmed $ txId ledgerTx'
-            logInfo @String "reclaimed stake"
-        Just (oref, o, Just _)  -> do
-            logInfo @String "second player played and lost"
-            let lookups = Constraints.unspentOutputs (Map.singleton oref o)                                         <>
-                          Constraints.otherScript (gameValidator game)
-                tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Reveal $ fpNonce fp) <>
-                          Constraints.mustValidateIn (to $ fpRevealDeadline fp)
-            ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
-            void $ awaitTxConfirmed $ txId ledgerTx'
-            logInfo @String "victory"
-  where
-    findOutput :: Game -> ByteString -> GameChoice -> Contract w s Text (Maybe (TxOutRef, TxOutTx, Maybe GameChoice))
-    findOutput game bs c = do
-        utxos <- utxoAt $ gameAddress game
-        return $ case mapMaybe f $ Map.toList utxos of
-            [] -> Nothing
-            xs -> case find (\(_, _, mc) -> isJust mc) xs of
-                Nothing -> Just $ head xs -- we know this list is not empty, because we are in the second case
-                Just x  -> Just x
-      where
-        f :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, Maybe GameChoice)
-        f (oref, o) = do
-            guard $ lovelaces (txOutValue $ txOutTxOut o) == 2 * fpStake fp
-            dat <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
-            case dat of
-                GameDatum bs' mc
-                    | bs' == bs && (isNothing mc || mc == Just c) -> return (oref, o, mc)
-                _                                                 -> Nothing
+        Nothing             -> throwError "game output not found"
+        Just (oref, o, dat) -> case dat of
+            GameDatum _ Nothing -> do
+                logInfo @String "second player did not play"
+                let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
+                              Constraints.otherScript (gameValidator game)
+                    tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData ClaimFirst)
+                ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
+                void $ awaitTxConfirmed $ txId ledgerTx'
+                logInfo @String "reclaimed stake"
+
+            GameDatum _ (Just c') | c' == c -> do
+                logInfo @String "second player played and lost"
+                let lookups = Constraints.unspentOutputs (Map.singleton oref o)                                         <>
+                              Constraints.otherScript (gameValidator game)
+                    tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Reveal $ fpNonce fp) <>
+                              Constraints.mustValidateIn (to $ fpRevealDeadline fp)
+                ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
+                void $ awaitTxConfirmed $ txId ledgerTx'
+                logInfo @String "victory"
+
+            _ -> logInfo @String "second player played and won"
 
 data SecondParams = SecondParams
     { spFirst          :: !PubKeyHash
     , spStake          :: !Integer
     , spPlayDeadline   :: !Slot
     , spRevealDeadline :: !Slot
+    , spCurrency       :: !CurrencySymbol
+    , spTokenName      :: !TokenName
     , spChoice         :: !GameChoice
     } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
 
@@ -243,19 +253,20 @@ secondGame sp = do
             , gStake          = spStake sp
             , gPlayDeadline   = spPlayDeadline sp
             , gRevealDeadline = spRevealDeadline sp
+            , gToken          = AssetClass (spCurrency sp, spTokenName sp)
             }
-    m <- findOutput game
+    m <- findGameOutput game
     case m of
-        Nothing            -> logInfo @String "no running game found"
-        Just (oref, o, bs) -> do
+        Just (oref, o, GameDatum bs Nothing) -> do
             logInfo @String "running game found"
-            let v       = lovelaceValueOf $ spStake sp
+            let token   = assetClassValue (gToken game) 1
+            let v       = let x = lovelaceValueOf (spStake sp) in x <> x <> token
                 c       = spChoice sp
                 lookups = Constraints.unspentOutputs (Map.singleton oref o)                            <>
                           Constraints.otherScript (gameValidator game)                                 <>
                           Constraints.scriptInstanceLookups (gameInst game)
                 tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Play c) <>
-                          Constraints.mustPayToTheScript (GameDatum bs $ Just c) (v <> v)              <>
+                          Constraints.mustPayToTheScript (GameDatum bs $ Just c) v                     <>
                           Constraints.mustValidateIn (to $ spPlayDeadline sp)
             ledgerTx <- submitTxConstraintsWith @Gaming lookups tx
             let tid = txId ledgerTx
@@ -264,42 +275,21 @@ secondGame sp = do
 
             void $ awaitSlot $ 1 + spRevealDeadline sp
 
-            m' <- findOutput' game tid
+            m' <- findGameOutput game
             case m' of
-                Nothing          -> logInfo @String "first player won"
-                Just (oref', o') -> do
+                Nothing             -> logInfo @String "first player won"
+                Just (oref', o', _) -> do
                     logInfo @String "first player didn't reveal"
                     let lookups' = Constraints.unspentOutputs (Map.singleton oref' o')                              <>
                                    Constraints.otherScript (gameValidator game)
                         tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ClaimSecond) <>
-                                   Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)
+                                   Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)                      <>
+                                   Constraints.mustPayToPubKey (spFirst sp) token
                     ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
                     void $ awaitTxConfirmed $ txId ledgerTx'
                     logInfo @String "second player won"
-  where
-    findOutput :: Game -> Contract w s Text (Maybe (TxOutRef, TxOutTx, ByteString))
-    findOutput game = do
-        now   <- currentSlot
-        if now > spPlayDeadline sp
-            then return Nothing
-            else do
-                utxos <- utxoAt $ gameAddress game
-                return $ case mapMaybe f $ Map.toList utxos of
-                    []    -> Nothing
-                    x : _ -> Just x
-      where
-        f :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, ByteString)
-        f (oref, o) = do
-            guard $ lovelaces (txOutValue $ txOutTxOut o) == spStake sp
-            dat <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
-            case dat of
-                GameDatum bs Nothing -> return (oref, o, bs)
-                _                    -> Nothing
 
-    findOutput' :: Game -> TxId -> Contract w s Text (Maybe (TxOutRef, TxOutTx))
-    findOutput' game tid = do
-        utxos <- utxoAt $ gameAddress game
-        return $ find (\(oref, _) -> txOutRefId oref == tid) $ Map.toList utxos
+        _ -> logInfo @String "no running game found"
 
 type GameSchema = BlockchainActions .\/ Endpoint "first" FirstParams .\/ Endpoint "second" SecondParams
 
