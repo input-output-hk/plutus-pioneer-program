@@ -1,9 +1,9 @@
 # Lecture 5 notes
-Lecture notes based on the first ever official [Plutus-Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program). This notes follow the [YouTube lecture 4](https://www.youtube.com/watch?v=6VbhY162GQA).
+Lecture notes based on the first ever official [Plutus-Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program). This notes follow the [YouTube lecture 5](https://www.youtube.com/watch?v=6VbhY162GQA).
 
 ## 1. Native Token Values
 
-To mint or burn Native tokens we first need to discuss about values. The relevant value-types are define in [`Value.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Value.hs) & [`Ada.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs). Inside `Value.hs` we can find 
+To mint or burn Native tokens we first need to discuss about values. The relevant value-types are defined in [`Value.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Value.hs) & [`Ada.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs). Inside `Value.hs` we can find 
 
 it is important to mention that any Native Token, including ADA is identified two things: i) `CurrencySymbol` & ii) `TokenName` as seen below
 
@@ -24,13 +24,13 @@ Lets play a little bit with this in the cabal repl
     repl$ ada
     repl$ adaToken
     
-as we can see `adaSymbol` gives the emptysymbol for ADA & `adaToken` gives us an empty string. So ADA is created with those two pieces. However, to create cyrrency value we need special functions. One of them is `lovelaceValueOf` which can map an integer and map it into a value.
+as we can see `adaSymbol` gives the emptysymbol for ADA & `adaToken` gives us an empty string. So ADA is created with those two pieces. However, to create currency value we need special functions. One of them is `lovelaceValueOf` which can map an integer and map it into a value.
 
 It is possble to combine values (e.g. `x` & `y`) using 
 
     lovelaceValueOf x <> lovelaceValueOf y
     
-this can be cpmbined because **value-class** is an **instance of Monoid** and we have seen in the previous class that Monoids are things that we can combine because they contain a mutual element called **`mempty`** and the combination occurs thanks to **`mappend`** and the operator for this is the `<>`
+this can be combined because **value-class** is an **instance of Monoid** and we have seen in the previous class that Monoids are things that we can combine because they contain a mutual element called **`mempty`** and the combination occurs thanks to **`mappend`** and the operator for this is the `<>`
 
 ## 1.1 First Native Token
 
@@ -46,9 +46,9 @@ In the las line we have defined a combination of different Native Tokens: Ada, U
     repl$ valueOf vv "a8ff" "Uno"    -- gets Uno value
     repl$ valueOf vv "a8ff" "OMEGA"  -- gets OMEGA value
     
-Now the question arises: *Why we need two identifiers? (`CurrencySymbol` & `TokenName`)* and *Why hexadecimal?* this has to do with **Minting policies** 
+Now the question arises: *Why we need two identifiers? (`CurrencySymbol` & `TokenName`)* and *Why hexadecimal?* this has to do with **Minting policies**.   
 
-1) A transaction can't create or delete tokens (convervation of UTXOs - fees)
+1) A transaction can't create or delete tokens (conservation of UTXOs minus fees)
 2) The reason of why the currency symbol-bytestring is in hexadecimal numbers is because it is the hash of a Script and this is called the *Minting Policie*
 
 This means that whenever a token is to be minted or burned the Script can be reached through its hexadecimal hash. So in the case of Ada, since its identifiers are both empty strings `""`, there is no hash to be reached, thus it can not be minted or burned. All the Ada that will ever exist comes from the genesis block. Only custom Native Tokens can be created/minted or burned under certain personalized conditions.
@@ -58,7 +58,7 @@ This means that whenever a token is to be minted or burned the Script can be rea
 #### 2.1 Refresher on Validation
 Before diving into the example lets refresh our minds on how a validation works.
 
-When instead of having a Public-Key-address we have a Script-Address and a UTXO that sits at the Script-Address and we also have a transaction that attempts to consume the UTXO as an input then for each Script input the validation Script runs
+When instead of having a Public-Key-address we have a Script-Address and a UTXO that sits at the Script-Address and we also have a transaction that attempts to consume the UTXO as an input. Then for each Script input the validation Script runs
 
 This validation Script gets i) Datum ii) Redeemer & iii) Context. The latter can be found in [`Context.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Contexts.hs), defined in line 116 which needs the data-types defined in lines 93 & 100 as seen below
 
@@ -91,7 +91,18 @@ The `ScriptPurpose`as of this lecture always had the purpose of `Spending TxOutR
 
 In minting policies the `txInfoForge` is triggered and will have a non-zero value (for different asset classes) in contrast to regular Ada trasactions. 
 
-Each currency symbol is the hash of the Script
+For each `CurrencySymbol` that is fed to `txInfoForge :: Value`, then its correspondig Script (belonging to the `CurrencySymbol`) is executed. Lets also point out that each currency symbol is the hash of the Script.
+
+
+#### 2.2 Basic Minting policy: [`Free.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week05/src/Week05/Free.hs)
+
+This code introduces a basic Minting Policy that does not have any conditions or constraints, so it is guaranteed that it'll succeed. The code contins the following steps:
+
+i) `mkPolicie` invokes 
+
+We define a custom-data `MintParams` that encompases the the token-name and amount of the token being minted.
+
+
 
 
 
