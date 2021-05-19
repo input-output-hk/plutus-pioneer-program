@@ -199,7 +199,7 @@ firstGame fp = do
         v      = lovelaceValueOf (fpStake fp)
         c      = fpChoice fp
         bs     = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
-    void $ mapError @w @s @SMContractError (pack . show) $ runInitialise client (GameDatum bs Nothing) v
+    void $ mapError' $ runInitialise client (GameDatum bs Nothing) v
     logInfo @String $ "made first move: " ++ show (fpChoice fp)
 
     void $ awaitSlot $ 1 + fpPlayDeadline fp

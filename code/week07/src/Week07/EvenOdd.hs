@@ -101,17 +101,20 @@ mkGameValidator game bsZero' bsOne' dat red ctx =
             traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
             traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
             traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)       &&
-            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))
+            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+            traceIfFalse "NFT must go to first player"   nftToFirst
 
         (GameDatum _ Nothing, ClaimFirst) ->
             traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
             traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)   &&
-            traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)
+            traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+            traceIfFalse "NFT must go to first player"   nftToFirst
 
         (GameDatum _ (Just _), ClaimSecond) ->
             traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
-            traceIfFalse "to early"                      (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
-            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))
+            traceIfFalse "too early"                     (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
+            traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+            traceIfFalse "NFT must go to first player"   nftToFirst
 
         _                              -> False
   where
@@ -140,6 +143,9 @@ mkGameValidator game bsZero' bsOne' dat red ctx =
         cFirst = case cSecond of
             Zero -> bsZero'
             One  -> bsOne'
+
+    nftToFirst :: Bool
+    nftToFirst = assetClassValueOf (valuePaidTo info $ gFirst game) (gToken game) == 1
 
 data Gaming
 instance Scripts.ScriptType Gaming where
