@@ -118,6 +118,11 @@
   - [`Homework1`](code/week05/src/Week05/Solution1.hs)
   - [`Homework2`](code/week05/src/Week05/Solution2.hs)
 
+- Week #7
+
+  - [`RockPaperScissors`](code/week07/src/Week07/RockPaperScissors.hs)
+  - [`TestRockPaperScissors`](code/week07/src/Week07/TestRockPaperScissors.hs)
+
 ## Some Plutus Modules
 
 - [`Plutus.Contract.StateMachine`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/StateMachine.hs), contains types and functions for using state machines.
