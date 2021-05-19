@@ -38,6 +38,11 @@
   - Oracles.
   - Using the PAB.
 
+- [Lecture #7](https://youtu.be/oJupInqvJUI)
+
+  - Commit schemes.
+  - State machines.
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
@@ -46,6 +51,7 @@
 - Lecture #4: [Monads, `EmulatorTrace` & `Contract`](code/week04)
 - Lecture #5: [Minting Policies](code/week05)
 - Lecture #6: [Oracles](code/week06)
+- Lecture #7: [State Machines](code/week07)
 
 ## Exercises
 
@@ -87,6 +93,10 @@
 
   - Get the Oracle demo running and extend it in some way.
 
+- Week #7
+
+  - Implement the game of "Rock, Paper, Scissors" using state machines.
+
 ## Solutions
 
 - Week #2
@@ -110,6 +120,7 @@
 
 ## Some Plutus Modules
 
+- [`Plutus.Contract.StateMachine`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/StateMachine.hs), contains types and functions for using state machines.
 - [`Plutus.PAB.Webserver.API`](https://github.com/input-output-hk/plutus/blob/master/plutus-pab/src/Plutus/PAB/Webserver/API.hs), contains the HTTP-interface provided by the PAB.
 - [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
 - [`Plutus.V1.Ledger.Ada`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs), contains support for the Ada currency.
