@@ -56,29 +56,22 @@ token2 = AssetClass (currency2, name2)
 
 myTrace :: EmulatorTrace ()
 myTrace = do
-    h <- activateContractWallet (Wallet 1) startTS'
-    callEndpoint @"start" h (currency1, name1)
+    h1 <- activateContractWallet (Wallet 1) operateTS'
+    callEndpoint @"start" h1 (currency1, name1)
     void $ Emulator.waitNSlots 5
-    Last m <- observableState h
+    Last m <- observableState h1
     case m of
         Nothing -> Extras.logError @String "error starting token sale"
         Just ts -> do
             Extras.logInfo $ "started token sale " ++ show ts
 
-            h1 <- activateContractWallet (Wallet 1) $ useTS ts
             h2 <- activateContractWallet (Wallet 2) $ useTS ts
             h3 <- activateContractWallet (Wallet 3) $ useTS ts
 
             callEndpoint @"set price" h1 1_000_000
             void $ Emulator.waitNSlots 5
 
-            callEndpoint @"set price" h2 2_000_000
-            void $ Emulator.waitNSlots 5
-
             callEndpoint @"add tokens" h1 100
-            void $ Emulator.waitNSlots 5
-
-            callEndpoint @"add tokens" h2 10
             void $ Emulator.waitNSlots 5
 
             callEndpoint @"buy tokens" h2 20
@@ -88,7 +81,4 @@ myTrace = do
             void $ Emulator.waitNSlots 5
 
             callEndpoint @"withdraw" h1 (40, 10_000_000)
-            void $ Emulator.waitNSlots 5
-
-            callEndpoint @"withdraw" h2 (40, 10_000_000)
             void $ Emulator.waitNSlots 5

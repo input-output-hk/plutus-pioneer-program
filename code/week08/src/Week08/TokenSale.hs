@@ -15,11 +15,11 @@ module Week08.TokenSale
     ( TokenSale (..)
     , TSRedeemer (..)
     , nftName
-    , TSStartSchema
-    , TSStartSchema'
+    , TSOperateSchema
+    , TSOperateSchema'
     , TSUseSchema
-    , startTS'
-    , startTS''
+    , operateTS'
+    , operateTS''
     , useTS
     ) where
 
@@ -65,18 +65,19 @@ lovelaces = Ada.getLovelace . Ada.fromValue
 {-# INLINABLE transition #-}
 transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
 transition ts s r = case (stateValue s, stateData s, r) of
-    (v, _, SetPrice p)   -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                 , State p (v <> nft (negate 1))
-                                 )
-    (v, p, AddTokens n)  -> Just ( mempty
-                                 , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) n
-                                 )
-    (v, p, BuyTokens n)  -> Just ( mempty
-                                 , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) (negate n) <> lovelaceValueOf (n * p)
-                                 )
-    (v, p, Withdraw n l) -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                 , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) (negate n) <> lovelaceValueOf (negate l)
-                                 )
+    (v, _, SetPrice p)   | p >= 0           -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                    , State p (v <> nft (negate 1))
+                                                    )
+    (v, p, AddTokens n)  | n > 0            -> Just ( mempty
+                                                    , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) n
+                                                    )
+    (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
+                                                    , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) (negate n) <> lovelaceValueOf (n * p)
+                                                    )
+    (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                    , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) (negate n) <> lovelaceValueOf (negate l)
+                                                    )
+    _                                       -> Nothing
   where
     nft :: Integer -> Value
     nft = assetClassValue (tsNFT ts)
@@ -117,7 +118,7 @@ mapErrorSM = mapError $ pack . show
 nftName :: TokenName
 nftName = "NFT"
 
-startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text ()
+startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text TokenSale
 startTS mcs token = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
     cs  <- case mcs of
@@ -132,12 +133,13 @@ startTS mcs token = do
     void $ mapErrorSM $ runInitialise client 0 mempty
     tell $ Last $ Just ts
     logInfo $ "started token sale " ++ show ts
+    return ts
 
 setPrice :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
 setPrice ts p = void $ mapErrorSM $ runStep (tsClient ts) $ SetPrice p
 
 addTokens :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
-addTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ AddTokens n
+addTokens ts n = void (mapErrorSM $ runStep (tsClient ts) $ AddTokens n)
 
 buyTokens :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
 buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
@@ -145,28 +147,44 @@ buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
 withdraw :: HasBlockchainActions s => TokenSale -> Integer -> Integer -> Contract w s Text ()
 withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
 
-type TSStartSchema  = BlockchainActions .\/ Endpoint "start" (CurrencySymbol, TokenName)
-type TSStartSchema' = BlockchainActions .\/ Endpoint "start" (CurrencySymbol, CurrencySymbol, TokenName)
-type TSUseSchema    = BlockchainActions
+type TSOperateSchema  = BlockchainActions
+    .\/ Endpoint "start"      (CurrencySymbol, TokenName)
     .\/ Endpoint "set price"  Integer
     .\/ Endpoint "add tokens" Integer
-    .\/ Endpoint "buy tokens" Integer
     .\/ Endpoint "withdraw"   (Integer, Integer)
+type TSOperateSchema' = BlockchainActions
+    .\/ Endpoint "start" (CurrencySymbol, CurrencySymbol, TokenName)
+    .\/ Endpoint "set price"  Integer
+    .\/ Endpoint "add tokens" Integer
+    .\/ Endpoint "withdraw"   (Integer, Integer)
+type TSUseSchema    = BlockchainActions .\/ Endpoint "buy tokens" Integer
 
-startTS' :: Contract (Last TokenSale) TSStartSchema Text ()
-startTS' = start >> startTS'
+operateTS :: forall s.
+             ( HasBlockchainActions                        s
+             , HasEndpoint "set price"  Integer            s
+             , HasEndpoint "add tokens" Integer            s
+             , HasEndpoint "withdraw"   (Integer, Integer) s
+             )
+          => Maybe CurrencySymbol
+          -> CurrencySymbol
+          -> TokenName
+          -> Contract (Last TokenSale) s Text ()
+operateTS mcs cs tn = startTS mcs (AssetClass (cs, tn)) >>= go
   where
-    start  = endpoint @"start"  >>= startTS Nothing . AssetClass
+    go :: TokenSale -> Contract (Last TokenSale) s Text ()
+    go ts = (setPrice' `select` addTokens' `select` withdraw') >> go ts
+      where
+        setPrice'  = handleError logError $ endpoint @"set price"  >>= setPrice ts
+        addTokens' = handleError logError $ endpoint @"add tokens" >>= addTokens ts
+        withdraw'  = handleError logError $ endpoint @"withdraw"   >>= uncurry (withdraw ts)
 
-startTS'' :: Contract (Last TokenSale) TSStartSchema' Text ()
-startTS'' = start >> startTS''
-  where
-    start  = endpoint @"start"  >>= \(cs1, cs2, tn) -> startTS (Just cs1) $ AssetClass (cs2, tn)
+operateTS' :: Contract (Last TokenSale) TSOperateSchema Text ()
+operateTS' = endpoint @"start" >>= uncurry (operateTS Nothing)
+
+operateTS'' :: Contract (Last TokenSale) TSOperateSchema' Text ()
+operateTS'' = endpoint @"start" >>= \(cs1, cs2, tn) -> operateTS (Just cs1) cs2 tn
 
 useTS :: TokenSale -> Contract () TSUseSchema Text ()
-useTS ts = (setPrice' `select` addTokens' `select` buyTokens' `select` withdraw') >> useTS ts
+useTS ts = buyTokens' >> useTS ts
   where
-    setPrice'  = handleError logError $ endpoint @"set price"  >>= setPrice ts
-    addTokens' = handleError logError $ endpoint @"add tokens" >>= addTokens ts
     buyTokens' = handleError logError $ endpoint @"buy tokens" >>= buyTokens ts
-    withdraw'  = handleError logError $ endpoint @"withdraw"   >>= uncurry (withdraw ts)
