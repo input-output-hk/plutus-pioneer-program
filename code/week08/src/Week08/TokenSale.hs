@@ -13,9 +13,13 @@
 
 module Week08.TokenSale
     ( TokenSale (..)
+    , TSRedeemer (..)
+    , nftName
     , TSStartSchema
+    , TSStartSchema'
     , TSUseSchema
     , startTS'
+    , startTS''
     , useTS
     ) where
 
@@ -50,7 +54,7 @@ data TSRedeemer =
     | AddTokens Integer
     | BuyTokens Integer
     | Withdraw Integer Integer
-    deriving Show
+    deriving (Show, Prelude.Eq)
 
 PlutusTx.unstableMakeIsData ''TSRedeemer
 
@@ -113,14 +117,16 @@ mapErrorSM = mapError $ pack . show
 nftName :: TokenName
 nftName = "NFT"
 
-startTS :: HasBlockchainActions s => AssetClass -> Contract (Last TokenSale) s Text ()
-startTS token = do
+startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text ()
+startTS mcs token = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
-    osc <- mapErrorC $ C.forgeContract pkh [(nftName, 1)]
+    cs  <- case mcs of
+        Nothing  -> C.currencySymbol <$> mapErrorC (C.forgeContract pkh [(nftName, 1)])
+        Just cs' -> return cs'
     let ts = TokenSale
             { tsSeller = pkh
             , tsToken  = token
-            , tsNFT    = AssetClass (C.currencySymbol osc, nftName)
+            , tsNFT    = AssetClass (cs, nftName)
             }
         client = tsClient ts
     void $ mapErrorSM $ runInitialise client 0 mempty
@@ -139,8 +145,9 @@ buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
 withdraw :: HasBlockchainActions s => TokenSale -> Integer -> Integer -> Contract w s Text ()
 withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
 
-type TSStartSchema = BlockchainActions .\/ Endpoint "start" (CurrencySymbol, TokenName)
-type TSUseSchema = BlockchainActions
+type TSStartSchema  = BlockchainActions .\/ Endpoint "start" (CurrencySymbol, TokenName)
+type TSStartSchema' = BlockchainActions .\/ Endpoint "start" (CurrencySymbol, CurrencySymbol, TokenName)
+type TSUseSchema    = BlockchainActions
     .\/ Endpoint "set price"  Integer
     .\/ Endpoint "add tokens" Integer
     .\/ Endpoint "buy tokens" Integer
@@ -149,7 +156,12 @@ type TSUseSchema = BlockchainActions
 startTS' :: Contract (Last TokenSale) TSStartSchema Text ()
 startTS' = start >> startTS'
   where
-    start  = endpoint @"start"  >>= startTS . AssetClass
+    start  = endpoint @"start"  >>= startTS Nothing . AssetClass
+
+startTS'' :: Contract (Last TokenSale) TSStartSchema' Text ()
+startTS'' = start >> startTS''
+  where
+    start  = endpoint @"start"  >>= \(cs1, cs2, tn) -> startTS (Just cs1) $ AssetClass (cs2, tn)
 
 useTS :: TokenSale -> Contract () TSUseSchema Text ()
 useTS ts = (setPrice' `select` addTokens' `select` buyTokens' `select` withdraw') >> useTS ts
