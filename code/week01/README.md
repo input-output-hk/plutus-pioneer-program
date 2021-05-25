@@ -193,14 +193,7 @@ Click the "Add Wallet" option, the adjust the balances accordingly:
 
 ![alt text](img/playground_4.png "Plutus Playground")
 
-You can see in the playground that the contract has three endpoints: start, bid, and close. These are defined in the script as:
-
-    endpoints :: Contract () AuctionSchema Text ()
-    endpoints = (start' `select` bid' `select` close') >> endpoints
-    where
-        start' = endpoint @"start" >>= start
-        bid'   = endpoint @"bid"   >>= bid
-        close' = endpoint @"close" >>= close
+You can see in the playground that the contract has three endpoints: start, bid, and close.
 
 The "Pay to Wallet" endpoint is always there by default in the playground. It allows a simple transfer of Lovelace from one wallet to another.
 
@@ -261,9 +254,138 @@ Let's say that Wallet 1 invokes the "close" endpoint. We will add this and also 
 
 Now, click the "Evaluate" button - either the one at the bottom or the one at the top of the page.
 
+After a little while, you will see the simulator view.
+
+Towards the top of the page you will see the slots that are relevant to the simulation, that is, the slots where an action occured. Here we see that these are slots 1,2,3,4 and 20.
+
+Slot zero is not caused by our contract, it is the Genesis transaction that sets up the initial balances of the wallets. There are three outputs for this transaction.
+
 ![alt text](img/evaluate1.png "Plutus Playground")
+
+The first transaction has one input and two outputs. The input is the only UTxO that Wallet 1 has. Even though it is two tokens, 10 Lovelace and 1 T, they sit in one UTxO. As mentioned earlier, UTxOs always need to be consumed in their entirety, so the entire UTxO is sent as input.
+
+The output is 10 ADA back to Wallet 1, and 1 T to the contract to hold onto while the bidding takes place. Here you also see the script address.
+
+As we know from the introduction to the UTxO model, there can also be a Datum, and there is a Datum, but this is not visible in this display.
+
 ![alt text](img/evaluate2.png "Plutus Playground")
+
+So now the auction is set up, let's look at the next transaction, where Wallet 2 makes a bid of 3 Lovelace.
+
+There are two inputs - the script UTxO and the UTxO that Wallet 2 owns.
+
+There are also two outputs - one giving change to Wallet 2, and the other locking the bid into the contract.
+
+The script validator here must make sure that Wallet 2 can't just take the token, so it will only validate in a scenario where there is an output where the token ends up in the contract again. Remember that in the (E)UTxO model, all inputs and outputs are visible to the script.
+
 ![alt text](img/evaluate3.png "Plutus Playground")
+
+Now let's look at the next transaction. This is where Wallet 3 bids 4 Lovelace (it is 5 Lovelace in Lars' videos, but I entered it as 4 and I'd rather not take all those screenshots again).
+
+The inputs here are Wallet 3's UTxO and the script address.
+
+The outputs are the change of 6 Lovelace to Wallet 3, the updated script with the new high bid of 4 Lovelace, and the return of Wallet 2's bid of 3 Lovelace to Wallet 2's address.
+
+Again, the logic in the script must make sure that all of this is handled correctly, i.e. that the new bid is higher than the previous bid and that the token T continues to be locked in the contract along with the new bid.
+
 ![alt text](img/evaluate4.png "Plutus Playground")
+
+The last transaction is the "close" action. This one only has the script UTxO as input. Its outputs are the succesful bid of 4 Lovelace to the seller (Wallet 1) and the transfer of the NFT to the succesful bidder, Wallet 3.
+
 ![alt text](img/evaluate5.png "Plutus Playground")
+
+If we scroll down, we can now see the final balances.
+
 ![alt text](img/evaluate6.png "Plutus Playground")
+
+Let's check what happens when something goes wrong.
+
+So, if Wallet 2 makes a bid that is below the minimum bid, and Wallet 3 makes the same error.
+
+In this scenario, both bids should fail and the seller (Wallet 1) should get the token back.
+
+Now we see that we have only three transactions. The Genesis transaction is the same.
+
+![alt text](img/evaluate7.png "Plutus Playground")
+
+But now the biddings don't happen, because there is logic in the Plutus code that determines that the bid is two low.
+
+![alt text](img/evaluate8.png "Plutus Playground")
+
+The last transaction is the close transaction. As this is a failed auction, where there was no successful bid, this transaction returns the NFT to Wallet 1.
+
+![alt text](img/evaluate9.png "Plutus Playground")
+
+And the balances reflect this.
+
+![alt text](img/evaluate10.png "Plutus Playground")
+
+If you scroll down further, you will find error messages, such as this one showing that the bid from Wallet 2 was too low.
+
+![alt text](img/errorlog.png "Plutus Playground")
+
+So there you have it. A relatively realistic and complete auction written as a Plutus smart contract.
+
+When writing a Plutus contract it is important to realise that there are two parts to a contract.
+
+The first is the script that lives on the blockchain, that governs which inputs can be consumed by a transaction and under what conditions.
+
+The other part is the part that allows wallets to create valid transactions that then will be validated by the on-chain script.
+
+The nice thing about Plutus is that everything is written in Haskell and the data types can be shared between the on-chain and the off-chain parts.
+
+For example, in this contract there is a datatype Auction:
+
+    data Auction = Auction
+        { aSeller   :: !PubKeyHash
+        , aDeadline :: !Slot
+        , aMinBid   :: !Integer
+        , aCurrency :: !CurrencySymbol
+        , aToken    :: !TokenName
+        } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+Then later there is the logic that defines the script that lives on the chain - the validation logic of the script.  
+
+    mkAuctionValidator :: AuctionDatum -> AuctionAction -> ValidatorCtx -> Bool
+
+Then, from line 231, is the off-chain (wallet) part.
+
+These three data types define the parameters of the three endpoints:
+
+    data StartParams = StartParams
+        { spDeadline :: !Slot
+        , spMinBid   :: !Integer
+        , spCurrency :: !CurrencySymbol
+        , spToken    :: !TokenName
+        } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+    data BidParams = BidParams
+        { bpCurrency :: !CurrencySymbol
+        , bpToken    :: !TokenName
+        , bpBid      :: !Integer
+        } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+    data CloseParams = CloseParams
+        { cpCurrency :: !CurrencySymbol
+        , cpToken    :: !TokenName
+        } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+Then there is the logic of the three endpoints, defined by the functions:
+
+    start :: (HasBlockchainActions s, AsContractError e) => StartParams -> Contract w s e ()
+
+    bid :: forall w s. HasBlockchainActions s => BidParams -> Contract w s Text ()
+    
+    close :: forall w s. HasBlockchainActions s => CloseParams -> Contract w s Text ()
+
+An example of sharing code between the on-chain part and the off-chain part is the minBid function:
+
+    {-# INLINABLE minBid #-}
+    minBid :: AuctionDatum -> Integer
+    minBid AuctionDatum{..} = case adHighestBid of
+        Nothing      -> aMinBid adAuction
+        Just Bid{..} -> bBid + 1
+
+This is used during the validation both on the wallet side and on the blockchain side. The wallet doesn't have to do this, it could just submit the transaction, which would then fail, but it's neater that it does.
+
+Most of the rest of the script is boilerplate.
