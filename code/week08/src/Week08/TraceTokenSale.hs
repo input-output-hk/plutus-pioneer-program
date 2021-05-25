@@ -24,6 +24,7 @@ import           Ledger.Value
 import           Ledger.Ada                 as Ada
 import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
+import           Prelude                    (IO, String, Show (..))
 import           Wallet.Emulator.Wallet
 
 import           Week08.TokenSale

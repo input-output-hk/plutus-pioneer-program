@@ -38,7 +38,7 @@ import           Ledger.Ada                   as Ada
 import           Ledger.Constraints           as Constraints
 import qualified Ledger.Typed.Scripts         as Scripts
 import           Ledger.Value
-import           Prelude                      (Semigroup (..))
+import           Prelude                      (Semigroup (..), Show (..), uncurry)
 import qualified Prelude
 
 data TokenSale = TokenSale
