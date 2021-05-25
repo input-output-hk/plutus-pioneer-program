@@ -29,22 +29,22 @@ That is not how the UTxO model works.
 
 Unspent transaction outputs are exactly what the name says. They are transaction outputs from previous transactions that have happened on the blockchain that have not yet been spent. Let's look at an example where we have two such UTxOs.
 
-- Alice (100 ADA)
-- Bob (50 ADA)
+    Alice (100 ADA)
+    Bob (50 ADA)
 
 Alice wants to send 10 ADA to Bob, so she creates a transaction. A transaction is something that contains an arbitrary number of inputs and an arbitraty number of outputs.
 
 The important thing is that you can only ever use complete UTxOs as input. Alice cannot simply split her existing 100 ADA into a 90 and a 10, she has to use the full 100 ADA as the input to a transaction.
 
-- Alice (100 ADA) -> Tx 1
-- Bob (50 ADA)
+    Alice (100 ADA) -> Tx 1
+    Bob (50 ADA)
 
 Alice's transaction is no longer a UTxO (an unspent transaction). It has been spent as an input to Tx 1. And now, she can create outputs for her transaction.
 
 She wants to pay 10 ADA to Bob, so one output will be 10 ADA (to Bob), and then she wants her change back so she creates a second output of 90 ADA (to herself). The full UTxO of 100 ADA has been spent, with Bob receiving a new transaction of 10 ADA, and Alice receiving the "change" of 90 ADA. 
 
-- ~~Alice (100 ADA)~~ -> Tx 1 -> Bob (10 ADA), Alice (90 ADA)
-- Bob (50 ADA)
+    ~~Alice (100 ADA)~~ -> Tx 1 -> Bob (10 ADA), Alice (90 ADA)
+    Bob (50 ADA)
 
 In any transaction, the sum of the output values must match the sum of the input values. Although, strictly speaking, this is not true. There are two exceptions.
 
@@ -57,12 +57,14 @@ Let's take a look at a slightly more complicated example.
 
 Alice and Bob's transactions now look like this:
 
-- Alice (90 ADA)
-- Bob (50 ADA), Bob (10 ADA)
+    Alice (90 ADA)
+    Bob (50 ADA), Bob (10 ADA)
 
 Alice and Bob want to transfer 55 ADA each to Charlie. Alice has no choice, as she only has one UTxO. Bob also has no choice as neither of his two UTxOs is large enough to cover the 55 ADA he wishes to send to Charlie. Bob will have to use both his UTxOs as input.
 
-- ~~Alice (90 ADA), Bob (50 ADA), Bob (10 ADA)~~ -> Tx 2 -> Charlie (110 ADA) -> Alice (35 ADA) -> Bob (5 ADA)
+    ~~Alice (90 ADA), Bob (50 ADA), Bob (10 ADA)~~ 
+    -> Tx 2 
+    -> Charlie (110 ADA) -> Alice (35 ADA) -> Bob (5 ADA)
 
 ### When Is Spending Allowed?
 
