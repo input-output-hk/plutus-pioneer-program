@@ -172,9 +172,25 @@ Copy and paste the EnglishAuction.sh file contents into the playground, replacin
 
 When using the original tag for Week 01 (3746610e53654a1167aeb4c6294c6096d16b0502), you will need to remove the "module" header from the script in order to compile it in the playground. This is not required in future iterations of Plutus.
 
+Another thing to note in this version of the playground is that fees are not considered - this also changes in upcoming lectures working with later Plutus commits.
+
 ![alt text](img/playground_2.png "Plutus Playground")
 
 Click the compile button. Once it has compiled, click the Simulate button.
 
 ![alt text](img/playground_3.png "Plutus Playground")
+
+The default wallets are setup with 10 Lovelace and 10 T, where T is a native token simulated by the script in the following lines:
+
+    myToken :: KnownCurrency
+    myToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "T" :| [])
+
+    mkKnownCurrencies ['myToken]
+
+We are going to treat the token T as a non-fungible token (NFT), and simulate this by changing the wallets such that Wallet 1 has 1 T and the other wallets have 0 T.
+
+Click the "Add Wallet" option, the adjust the balances accordingly:
+
+![alt text](img/playground_4.png "Plutus Playground")
+
 
