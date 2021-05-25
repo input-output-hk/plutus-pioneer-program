@@ -193,4 +193,77 @@ Click the "Add Wallet" option, the adjust the balances accordingly:
 
 ![alt text](img/playground_4.png "Plutus Playground")
 
+You can see in the playground that the contract has three endpoints: start, bid, and close. These are defined in the script as:
 
+    endpoints :: Contract () AuctionSchema Text ()
+    endpoints = (start' `select` bid' `select` close') >> endpoints
+    where
+        start' = endpoint @"start" >>= start
+        bid'   = endpoint @"bid"   >>= bid
+        close' = endpoint @"close" >>= close
+
+The "Pay to Wallet" endpoint is always there by default in the playground. It allows a simple transfer of Lovelace from one wallet to another.
+
+Click "start" on wallet 1, to create an action:
+
+![alt text](img/actions.png "Plutus Playground")
+
+This is where the seller is going to set the rules for the auction.
+
+The getSlot field specifies the deadline for the auction. Bidding after this deadline will not be allowed by the contract.
+
+Enter 20 into the getSlot field.
+
+The spMinField specifies the minimum amount of ADA that must be bid. If this minimum is not met by the deadline, no bid will succeed.
+
+Enter 3 into the spMinBid field.
+
+The last two fields - spCurrencySumbol and unTokenName specify the currency of the NFT that is the subject of the auction. In Plutus a native token is defined by a currency symbol and a name.
+
+In this case, the symbol is 66 and the token name, as we have seen is T.
+
+Enter these values into their respective fields.
+
+![alt text](img/actions2.png "Plutus Playground")
+
+We can also insert "wait" actions, to wait for a certain number of slots. We will need to wait for at least one slot in order for the transaction to start the auction to complete.
+
+![alt text](img/actions3.png "Plutus Playground")
+
+Now bidding can start.
+
+Let's say that Wallets 2 and 3 want to bid for this token.
+
+Wallet 2 is faster, and bids 3 Lovelace by invoking the bid endpoint with the parameters as shown below.
+
+![alt text](img/actions4.png "Plutus Playground")
+
+We now insert another wait action, and a bid by Wallet 3.
+
+![alt text](img/actions5.png "Plutus Playground")
+
+Let's say that these two bids are the only bids.
+
+We now add a wait action that will wait until slot 20, the deadline of the auction.
+
+![alt text](img/actions6.png "Plutus Playground")
+
+At this point, anybody can invoke the "close" endpoint. The auction will not settle on its own, it needs to be triggered by an endpoint.
+
+When the "close" endpoint is triggered, the auction will be settled according to the rules.
+
+- If there was at least one bid, the highest bidder will receive the token. This will always be the last bidder as the script will not allow bids that are not higher than the existing highest bid or bids that are lower than the minimum bid level.
+- If there were no bidders, Wallet 1 will get the token back.
+
+Let's say that Wallet 1 invokes the "close" endpoint. We will add this and also add another wait action, which we need at the end in order to see the final transaction when we run the simulation.
+
+![alt text](img/actions7.png "Plutus Playground")
+
+Now, click the "Evaluate" button - either the one at the bottom or the one at the top of the page.
+
+![alt text](img/evaluate1.png "Plutus Playground")
+![alt text](img/evaluate2.png "Plutus Playground")
+![alt text](img/evaluate3.png "Plutus Playground")
+![alt text](img/evaluate4.png "Plutus Playground")
+![alt text](img/evaluate5.png "Plutus Playground")
+![alt text](img/evaluate6.png "Plutus Playground")
