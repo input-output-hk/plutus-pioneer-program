@@ -121,12 +121,48 @@ But if all the inputs are still there that your transaction expects, then you ca
 
 This is not the case with Ethereum. In Ethereum, the time between you constructing a transaction and it being incorporated into the blockchain, a lot of stuff can happen concurrently, and that is unpredictable and can have unpredicatable effects on what will happen when your script finally executes.
 
-In Ethereum it is always possible that you have to pay gas fees for a transaction even if the transaction eventually fails with an error.
+In Ethereum it is always possible that you have to pay gas fees for a transaction even if the transaction eventually fails with an error. And that is guaranteed to never happen with Cardano.
 
 In addition to that, it is also easier to analyse a Plutus script and to check, or even prove, that it is secure, because you don't have to consider the whole state of the blockchain, which is unknowable. You can concentrate on this context that just consists of the spending transaction. So you have a much more limited scope and that makes it much easier to understand what a script is actually doing and what can possibly go wrong.
 
+The (E)UTxO model is not tied to a particular programming language. What we have is Plutus, which is Haskell, but in principal you could use the same model with a completely different programming language, and we intend to write compilers for other programming languages to Plutus Script which is the "assembly" language underlying Plutus.
 
+## Running an example auction contract on a local Playground
 
+Rather than start the traditional way, i.e. starting very simple and doing a crash course on Haskell, followed by some simple Plutus contracts and slowly add more complicated stuff, it will be more interesting, especially for the first lecture, to showcase a more interesting contract and demonstrate what Plutus. We can then use that to look at certain concepts in more detail.
+
+Before compiling the sample contract code, we need to setup Plutus. It is advisable to set up a Nix shell from the main Plutus repository at which can also be used to compile the example contracts.
+
+[There are detailed notes on how to do this here](https://www.evernote.com/shard/s426/client/snv?noteGuid=b34acc67-c94b-fc64-9350-398a8f6fc6ec&noteKey=7e6b84c9501e9949eef2cadf6e35eaff&sn=https%3A%2F%2Fwww.evernote.com%2Fshard%2Fs426%2Fsh%2Fb34acc67-c94b-fc64-9350-398a8f6fc6ec%2F7e6b84c9501e9949eef2cadf6e35eaff&title=Installation).
+
+This will setup your environment with the dependencies necessary to compile the sample contracts.
+
+Once you are inside the Nix shell, you can start the Plutus client and server from the cloned Plutus repository.
+
+#### Server
+
+    cd /path/to/plutus/repo/plutus-playground-client
+    plutus-playground-server
+
+#### Client
+
+    cd /path/to/plutus/repo/plutus-playground-client
+    npm run start
+
+You can then compile the code for Week 01.
+
+    cd /path/to/plutus-pioneer-program/repo/code/week01
+    cabal build all
+
+### The English Auction contract
+
+The code for the English Auction contract is at
+
+    /path/to/plutus-pioneer-program/repo/code/week01/src/Week01/EnglishAuction.hs
+
+It is a reasonably long contract, but not too bad.
+
+We will run this contract in our local Plutus Playground.
 
 
 
