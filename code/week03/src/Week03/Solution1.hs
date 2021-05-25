@@ -88,8 +88,8 @@ give :: (HasBlockchainActions s, AsContractError e) => GiveParams -> Contract w 
 give gp = do
     pkh <- pubKeyHash <$> ownPubKey
     let dat = VestingDatum
-                { beneficiary1 = gpBeneficiary gp
-                , beneficiary2 = pkh
+                { beneficiary1 = pkh
+                , beneficiary2 = gpBeneficiary gp
                 , deadline     = gpDeadline gp
                 }
         tx  = mustPayToTheScript dat $ Ada.lovelaceValueOf $ gpAmount gp
