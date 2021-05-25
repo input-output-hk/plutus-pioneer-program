@@ -1,5 +1,9 @@
 # Plutus Pioneer Program
 
+This is my fork of the Plutus Pioneer Program where I will keep the examples up-to-date with the latest Plutus main branch.
+
+I also use this to add comments to the code.
+
 ## Lectures
 
 - [Lecture #1](https://youtu.be/IEn6jUo-0vU)
