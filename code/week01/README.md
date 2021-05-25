@@ -1,11 +1,10 @@
 # Week 01
 
- [Lecture #1](https://youtu.be/IEn6jUo-0vU)
+ These is a written version of [Lecture #1](https://youtu.be/IEn6jUo-0vU).
 
-  - Welcome
-  - The (E)UTxO-model
-  - Running an example auction contract on a local Playground
-  - Homework
+ It covers an introduction to Plutus, the (E)UTxO model (and how it compares to other models), and concludes with an example English Auction managed with a Plutus smart contract running on the Plutus Playground.
+
+ Please feel free to raise pull requests for typos, poor formatting, poor grammar, or anything else that is poor or inaccurate.
 
 ## Welcome
 
@@ -31,7 +30,7 @@ Unspent transaction outputs are exactly what the name says. They are transaction
 
 ![alt text](img/1.png "Image 1")
 
-Alice wants to send 10 ADA to Bob, so she creates a transaction. A transaction is something that contains an arbitrary number of inputs and an arbitraty number of outputs.
+Alice wants to send 10 ADA to Bob, so she creates a transaction. A transaction is something that contains an arbitrary number of inputs and an arbitray number of outputs.
 
 The important thing is that you can only ever use complete UTxOs as input. Alice cannot simply split her existing 100 ADA into a 90 and a 10, she has to use the full 100 ADA as the input to a transaction.
 
