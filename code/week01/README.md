@@ -139,6 +139,8 @@ This will setup your environment with the dependencies necessary to compile the 
 
 Once you are inside the Nix shell, you can start the Plutus client and server from the cloned Plutus repository.
 
+The lecture videos were recorded at various times and the Plutus code that goes along with them was compiled against specific commits of the Plutus main branch. You can find the commit tag in the cabal.project file. My aim here is to keep this code up-to-date with the latest commits.
+
 #### Server
 
     cd /path/to/plutus/repo/plutus-playground-client
@@ -149,7 +151,7 @@ Once you are inside the Nix shell, you can start the Plutus client and server fr
     cd /path/to/plutus/repo/plutus-playground-client
     npm run start
 
-You can then compile the code for Week 01.
+To check that everything is in order, you can then compile the code for Week 01. This is not  necessary to run the code in the playground, as the playground can compile the code itself.
 
     cd /path/to/plutus-pioneer-program/repo/code/week01
     cabal build all
@@ -160,15 +162,19 @@ The code for the English Auction contract is at
 
     /path/to/plutus-pioneer-program/repo/code/week01/src/Week01/EnglishAuction.hs
 
-It is a reasonably long contract, but not too bad.
-
 We will run this contract in our local Plutus Playground.
 
+If all went well above, you should be able to open the playground at https://localhost:8009. You will likely receive a certificate error, which can be bypassed.
 
+![alt text](img/plutus_playground.png "Plutus Playground")
 
+Copy and paste the EnglishAuction.sh file contents into the playground, replacing the existing demo contract.
 
+When using the original tag for Week 01 (3746610e53654a1167aeb4c6294c6096d16b0502), you will need to remove the "module" header from the script in order to compile it in the playground. This is not required in future iterations of Plutus.
 
+![alt text](img/playground_2.png "Plutus Playground")
 
+Click the compile button. Once it has compiled, click the Simulate button.
 
-
+![alt text](img/playground_3.png "Plutus Playground")
 
