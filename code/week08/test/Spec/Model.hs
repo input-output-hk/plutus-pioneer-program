@@ -14,7 +14,10 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week08.TestTokenSale where
+module Spec.Model
+    ( tests
+    , test
+    )  where
 
 import           Control.Lens                       hiding (elements)
 import           Control.Monad                      (void, when)
@@ -31,6 +34,8 @@ import           Ledger                             hiding (singleton)
 import           Ledger.Ada                         as Ada
 import           Ledger.Value
 import           Test.QuickCheck
+import           Test.Tasty
+import           Test.Tasty.QuickCheck
 
 import           Week08.TokenSale                   (TokenSale (..), TSStartSchema', TSUseSchema, startEndpoint', useEndpoints, nftName)
 
@@ -46,6 +51,9 @@ newtype TSModel = TSModel {_tsModel :: Map Wallet TSState}
     deriving Show
 
 makeLenses ''TSModel
+
+tests :: TestTree
+tests = testProperty "token sale model" prop_TS
 
 instance ContractModel TSModel where
 
@@ -126,8 +134,11 @@ instance ContractModel TSModel where
         (BuyTokens v w n)  -> callEndpoint @"buy tokens" (h $ UseKey v w) n                                                                    >> delay 1
         (Withdraw v w n l) -> callEndpoint @"withdraw"   (h $ UseKey v w) (n, l)                                                               >> delay 1
 
-    precondition s (Start w) = isNothing $ getTSState' s w
-    precondition _ _         = True
+    precondition s (Start w)          = isNothing $ getTSState' s w
+    precondition s (SetPrice v _ _)   = isJust    $ getTSState' s v
+    precondition s (AddTokens v _ _)  = isJust    $ getTSState' s v
+    precondition s (BuyTokens v _ _)  = isJust    $ getTSState' s v
+    precondition s (Withdraw v _ _ _) = isJust    $ getTSState' s v
 
 deriving instance Eq (ContractInstanceKey TSModel w s e)
 deriving instance Show (ContractInstanceKey TSModel w s e)
@@ -193,7 +204,7 @@ tokenAmt :: Integer
 tokenAmt = 1_000
 
 prop_TS :: Actions TSModel -> Property
-prop_TS = withMaxSuccess 1000 . propRunActionsWithOptions
+prop_TS = withMaxSuccess 100 . propRunActionsWithOptions
     (defaultCheckOptions & emulatorConfig .~ EmulatorConfig (Left d))
     instanceSpec
     (const $ pure True)

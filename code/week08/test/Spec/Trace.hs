@@ -12,8 +12,12 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week08.TraceTokenSale where
+module Spec.Trace
+    ( tests
+    , runMyTrace
+    ) where
 
+import           Control.Lens
 import           Control.Monad              hiding (fmap)
 import           Control.Monad.Freer.Extras as Extras
 import           Data.Default               (Default (..))
@@ -22,24 +26,32 @@ import           Data.Monoid                (Last (..))
 import           Ledger
 import           Ledger.Value
 import           Ledger.Ada                 as Ada
+import           Plutus.Contract.Test
 import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
 import           Prelude                    (IO, String, Show (..))
-import           Wallet.Emulator.Wallet
+import           Test.Tasty
 
 import           Week08.TokenSale
 
-test :: IO ()
-test = runEmulatorTraceIO' def emCfg myTrace
-  where
-    emCfg :: EmulatorConfig
-    emCfg = EmulatorConfig $ Left $ Map.fromList
-        [ (Wallet w, v)
-        | w <- [1 .. 3]
-        ]
+tests :: TestTree
+tests = checkPredicateOptions
+    (defaultCheckOptions & emulatorConfig .~ emCfg)
+    "token sale trace"
+    (     walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-60))
+     .&&. walletFundsChange (Wallet 2) (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)
+     .&&. walletFundsChange (Wallet 3) (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
+    )
+    myTrace
 
+runMyTrace :: IO ()
+runMyTrace = runEmulatorTraceIO' def emCfg myTrace
+
+emCfg :: EmulatorConfig
+emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet w, v) | w <- [1 .. 3]]
+  where
     v :: Value
-    v =    Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
+    v = Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
 
 currency :: CurrencySymbol
 currency = "aa"
