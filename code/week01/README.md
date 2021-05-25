@@ -29,42 +29,32 @@ That is not how the UTxO model works.
 
 Unspent transaction outputs are exactly what the name says. They are transaction outputs from previous transactions that have happened on the blockchain that have not yet been spent. Let's look at an example where we have two such UTxOs.
 
-    Alice (100 ADA)
-    Bob (50 ADA)
+![alt text](img/1.png "Image 1")
 
 Alice wants to send 10 ADA to Bob, so she creates a transaction. A transaction is something that contains an arbitrary number of inputs and an arbitraty number of outputs.
 
 The important thing is that you can only ever use complete UTxOs as input. Alice cannot simply split her existing 100 ADA into a 90 and a 10, she has to use the full 100 ADA as the input to a transaction.
 
-    Alice (100 ADA) -> Tx 1
-    Bob (50 ADA)
+![alt text](img/2.png "Image 2")
 
 Alice's transaction is no longer a UTxO (an unspent transaction). It has been spent as an input to Tx 1. And now, she can create outputs for her transaction.
 
 She wants to pay 10 ADA to Bob, so one output will be 10 ADA (to Bob), and then she wants her change back so she creates a second output of 90 ADA (to herself). The full UTxO of 100 ADA has been spent, with Bob receiving a new transaction of 10 ADA, and Alice receiving the "change" of 90 ADA. 
 
-    ~~Alice (100 ADA)~~ -> Tx 1 -> Bob (10 ADA), Alice (90 ADA)
-    Bob (50 ADA)
+![alt text](img/3.png "Image 3")
 
 In any transaction, the sum of the output values must match the sum of the input values. Although, strictly speaking, this is not true. There are two exceptions.
 
 1. Transaction fees. In a real blockchain, you have to pay fees for each transactions.
 2. Native Tokens. It's possible for transactions to create new tokens, or to burn tokens, in which case the inputs will be lower or higher than the outputs, depending on the scenario.
 
-*The purpose of a transaction is to consume inputs and produce new outputs.*
+*The effect of a transaction is to consume inputs and produce new outputs.*
 
 Let's take a look at a slightly more complicated example.
 
-Alice and Bob's transactions now look like this:
-
-    Alice (90 ADA)
-    Bob (50 ADA), Bob (10 ADA)
-
 Alice and Bob want to transfer 55 ADA each to Charlie. Alice has no choice, as she only has one UTxO. Bob also has no choice as neither of his two UTxOs is large enough to cover the 55 ADA he wishes to send to Charlie. Bob will have to use both his UTxOs as input.
 
-    ~~Alice (90 ADA), Bob (50 ADA), Bob (10 ADA)~~ 
-    -> Tx 2 
-    -> Charlie (110 ADA) -> Alice (35 ADA) -> Bob (5 ADA)
+![alt text](img/4.png "Image 4")
 
 ### When Is Spending Allowed?
 
@@ -79,6 +69,8 @@ Everything explained so far is just about the UTxO model, not the (E)UTxO model.
 
 The extended part comes in when we talk about smart contracts, so in order to understand that, let's concentrate on the consumption of Alice's UTxO of 100 ADA by Tx 1.
 
+![alt text](img/5.png "Image 5")
+
 In the UTxO model, the validation that decides whether the transaction that this input belongs to is allowed to consume the UTxO, relies on digital signatures. In this case, that means that Alice has to sign the transaction in order for the consumption of the UTxO to be valid.
 
 The idea of the (E)UTxO model is to make this more general.
@@ -89,7 +81,7 @@ Instead of just having an address that corresponds to a public key that can be v
 
 The input will justify that it is allowed to consume this output with some arbitrary piece of logic that is called the Redeemer.
 
-       Input UTxOs -> Script -O- Redeemer -> Tx 1 -> Output UTxOs
+![alt text](img/6.png "Image 6")
 
 What exactly does that mean?
 
