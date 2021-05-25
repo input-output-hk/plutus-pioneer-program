@@ -93,20 +93,22 @@ So we can see that the `** USER LOG` was printed on screen, this shows that we c
 
 The purpose of the **Contract-Monad** is to define off-chain code that runs in the wallet. Notice that it has four type-parameters `Contraact w s e a` where i) `w` is the type input that allows to write log messages of type w. ii) `s`, describes the blockchain capabilities, iii) `e` describes the type of error messages & iv) `a` . This is illustrated 
 
-    {-#LANGUAGE#-}
-    -- Contract w s e a
-    -- EmulatorTrace a
+```haskell
+{-#LANGUAGE#-}
+-- Contract w s e a
+-- EmulatorTrace a
 
-    myContract1 :: Contract () BlockchainActions Text ()
-    myContract1 = do
-        void $ Contract.throwError "BOOM!"
-        Contract.logInfo @String "Hello from the contract!"
+myContract1 :: Contract () BlockchainActions Text ()
+myContract1 = do
+    void $ Contract.throwError "BOOM!"
+    Contract.logInfo @String "Hello from the contract!"
 
-    myTrace1 :: EmulatorTrace ()
-    myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
+myTrace1 :: EmulatorTrace ()
+myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
 
-    test1 :: IO ()
-    test1 = runEmulatorTraceIO myTrace1
+test1 :: IO ()
+test1 = runEmulatorTraceIO myTrace1
+```
 
 where i) `Contract ()` is a void unit because in this particular case we are not interested in any logs. ii) `BlockchainActions` allows actions like submiting a transaction, waiting slot time... However, an exception is that it doesn't handle is endpoints. iii) for error messages we use `Text ()` that allows overloaded strings.
 
