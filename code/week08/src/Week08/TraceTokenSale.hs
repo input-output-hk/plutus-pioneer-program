@@ -39,35 +39,31 @@ test = runEmulatorTraceIO' def emCfg myTrace
         ]
 
     v :: Value
-    v =    Ada.lovelaceValueOf 1000_000_000
-        <> assetClassValue token1 1000
-        <> assetClassValue token2 1000
+    v =    Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
 
-currency1, currency2 :: CurrencySymbol
-currency1 = "aa"
-currency2 = "bb"
+currency :: CurrencySymbol
+currency = "aa"
 
-name1, name2 :: TokenName
-name1 = "A"
-name2 = "B"
+name :: TokenName
+name = "A"
 
-token1, token2 :: AssetClass
-token1 = AssetClass (currency1, name1)
-token2 = AssetClass (currency2, name2)
+token :: AssetClass
+token = AssetClass (currency, name)
 
 myTrace :: EmulatorTrace ()
 myTrace = do
-    h1 <- activateContractWallet (Wallet 1) operateTS'
-    callEndpoint @"start" h1 (currency1, name1)
+    h <- activateContractWallet (Wallet 1) startEndpoint
+    callEndpoint @"start" h (currency, name)
     void $ Emulator.waitNSlots 5
-    Last m <- observableState h1
+    Last m <- observableState h
     case m of
         Nothing -> Extras.logError @String "error starting token sale"
         Just ts -> do
             Extras.logInfo $ "started token sale " ++ show ts
 
-            h2 <- activateContractWallet (Wallet 2) $ useTS ts
-            h3 <- activateContractWallet (Wallet 3) $ useTS ts
+            h1 <- activateContractWallet (Wallet 1) $ useEndpoints ts
+            h2 <- activateContractWallet (Wallet 2) $ useEndpoints ts
+            h3 <- activateContractWallet (Wallet 3) $ useEndpoints ts
 
             callEndpoint @"set price" h1 1_000_000
             void $ Emulator.waitNSlots 5

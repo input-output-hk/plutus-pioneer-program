@@ -15,12 +15,12 @@ module Week08.TokenSale
     ( TokenSale (..)
     , TSRedeemer (..)
     , nftName
-    , TSOperateSchema
-    , TSOperateSchema'
+    , TSStartSchema
+    , TSStartSchema'
     , TSUseSchema
-    , operateTS'
-    , operateTS''
-    , useTS
+    , startEndpoint
+    , startEndpoint'
+    , useEndpoints
     ) where
 
 import           Control.Monad                hiding (fmap)
@@ -147,44 +147,30 @@ buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
 withdraw :: HasBlockchainActions s => TokenSale -> Integer -> Integer -> Contract w s Text ()
 withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
 
-type TSOperateSchema  = BlockchainActions
+type TSStartSchema = BlockchainActions
     .\/ Endpoint "start"      (CurrencySymbol, TokenName)
+type TSStartSchema' = BlockchainActions
+    .\/ Endpoint "start"      (CurrencySymbol, CurrencySymbol, TokenName)
+type TSUseSchema = BlockchainActions
     .\/ Endpoint "set price"  Integer
     .\/ Endpoint "add tokens" Integer
+    .\/ Endpoint "buy tokens" Integer
     .\/ Endpoint "withdraw"   (Integer, Integer)
-type TSOperateSchema' = BlockchainActions
-    .\/ Endpoint "start" (CurrencySymbol, CurrencySymbol, TokenName)
-    .\/ Endpoint "set price"  Integer
-    .\/ Endpoint "add tokens" Integer
-    .\/ Endpoint "withdraw"   (Integer, Integer)
-type TSUseSchema    = BlockchainActions .\/ Endpoint "buy tokens" Integer
 
-operateTS :: forall s.
-             ( HasBlockchainActions                        s
-             , HasEndpoint "set price"  Integer            s
-             , HasEndpoint "add tokens" Integer            s
-             , HasEndpoint "withdraw"   (Integer, Integer) s
-             )
-          => Maybe CurrencySymbol
-          -> CurrencySymbol
-          -> TokenName
-          -> Contract (Last TokenSale) s Text ()
-operateTS mcs cs tn = startTS mcs (AssetClass (cs, tn)) >>= go
+startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
+startEndpoint = startTS' >> startEndpoint
   where
-    go :: TokenSale -> Contract (Last TokenSale) s Text ()
-    go ts = (setPrice' `select` addTokens' `select` withdraw') >> go ts
-      where
-        setPrice'  = handleError logError $ endpoint @"set price"  >>= setPrice ts
-        addTokens' = handleError logError $ endpoint @"add tokens" >>= addTokens ts
-        withdraw'  = handleError logError $ endpoint @"withdraw"   >>= uncurry (withdraw ts)
+    startTS' = handleError logError $ endpoint @"start"  >>= void . startTS Nothing . AssetClass
 
-operateTS' :: Contract (Last TokenSale) TSOperateSchema Text ()
-operateTS' = endpoint @"start" >>= uncurry (operateTS Nothing)
-
-operateTS'' :: Contract (Last TokenSale) TSOperateSchema' Text ()
-operateTS'' = endpoint @"start" >>= \(cs1, cs2, tn) -> operateTS (Just cs1) cs2 tn
-
-useTS :: TokenSale -> Contract () TSUseSchema Text ()
-useTS ts = buyTokens' >> useTS ts
+startEndpoint' :: Contract (Last TokenSale) TSStartSchema' Text ()
+startEndpoint' = startTS' >> startEndpoint'
   where
+    startTS' = handleError logError $ endpoint @"start"  >>= \(cs1, cs2, tn) ->  void $ startTS (Just cs1) $ AssetClass (cs2, tn)
+
+useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
+useEndpoints ts = (setPrice' `select` addTokens' `select` buyTokens' `select` withdraw') >> useEndpoints ts
+  where
+    setPrice'  = handleError logError $ endpoint @"set price"  >>= setPrice ts
+    addTokens' = handleError logError $ endpoint @"add tokens" >>= addTokens ts
     buyTokens' = handleError logError $ endpoint @"buy tokens" >>= buyTokens ts
+    withdraw'  = handleError logError $ endpoint @"withdraw"   >>= uncurry (withdraw ts)

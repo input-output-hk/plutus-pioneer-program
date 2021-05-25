@@ -22,6 +22,7 @@ import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe                         (isJust, isNothing)
 import           Data.Monoid                        (Last (..))
+import           Data.String                        (IsString (..))
 import           Data.Text                          (Text)
 import           Plutus.Contract.Test
 import           Plutus.Contract.Test.ContractModel
@@ -31,7 +32,7 @@ import           Ledger.Ada                         as Ada
 import           Ledger.Value
 import           Test.QuickCheck
 
-import           Week08.TokenSale                   (TokenSale (..), TSOperateSchema', TSUseSchema, useTS, operateTS'', nftName)
+import           Week08.TokenSale                   (TokenSale (..), TSStartSchema', TSUseSchema, startEndpoint', useEndpoints, nftName)
 
 data TSState = TSState
     { _tssPrice    :: !Integer
@@ -50,22 +51,24 @@ instance ContractModel TSModel where
 
     data Action TSModel =
               Start Wallet
-            | SetPrice Wallet Integer
-            | AddTokens Wallet Integer
-            | Withdraw Wallet Integer Integer
+            | SetPrice Wallet Wallet Integer
+            | AddTokens Wallet Wallet Integer
+            | Withdraw Wallet Wallet Integer Integer
             | BuyTokens Wallet Wallet Integer
         deriving (Show, Eq)
 
     data ContractInstanceKey TSModel w s e where
-        OperateKey :: Wallet           -> ContractInstanceKey TSModel (Last TokenSale) TSOperateSchema' Text
-        UseKey     :: Wallet -> Wallet -> ContractInstanceKey TSModel ()               TSUseSchema      Text
+        StartKey :: Wallet           -> ContractInstanceKey TSModel (Last TokenSale) TSStartSchema' Text
+        UseKey   :: Wallet -> Wallet -> ContractInstanceKey TSModel ()               TSUseSchema    Text
+
+    instanceTag key _ = fromString $ "instance tag for: " ++ show key
 
     arbitraryAction _ = oneof $
-        (Start <$> genSeller) :
-        [ SetPrice  <$> genSeller <*> genNonNeg ]               ++
-        [ AddTokens <$> genSeller <*> genNonNeg ]               ++
-        [ Withdraw  <$> genSeller <*> genNonNeg <*> genNonNeg ] ++
-        [ BuyTokens <$> genSeller <*> genUser <*> genNonNeg ]
+        (Start <$> genWallet) :
+        [ SetPrice  <$> genWallet <*> genWallet <*> genNonNeg ]               ++
+        [ AddTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
+        [ BuyTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
+        [ Withdraw  <$> genWallet <*> genWallet <*> genNonNeg <*> genNonNeg ]
 
     initialState = TSModel Map.empty
 
@@ -74,18 +77,19 @@ instance ContractModel TSModel where
         (tsModel . at w) $= Just (TSState 0 0 0)
         wait 1
 
-    nextState (SetPrice w p) = do
-        (tsModel . ix w . tssPrice) $= p
+    nextState (SetPrice v w p) = do
+        when (v == w) $
+            (tsModel . ix v . tssPrice) $= p
         wait 1
 
-    nextState (AddTokens w n) = do
-        started <- hasStarted w                                     -- has the token sale started?
+    nextState (AddTokens v w n) = do
+        started <- hasStarted v                                     -- has the token sale started?
         when (n > 0 && started) $ do
             bc <- askModelState $ view $ balanceChange w
-            let token = tokens Map.! w
+            let token = tokens Map.! v
             when (tokenAmt + assetClassValueOf bc token >= n) $ do  -- does the wallet have the tokens to give?
                 withdraw w $ assetClassValue token n
-                (tsModel . ix w . tssToken) $~ (+ n)
+                (tsModel . ix v . tssToken) $~ (+ n)
         wait 1
 
     nextState (BuyTokens v w n) = do
@@ -103,23 +107,24 @@ instance ContractModel TSModel where
                 _ -> return ()
         wait 1
 
-    nextState (Withdraw w n l) = do
-        m <- getTSState w
-        case m of
-            Just t
-                | t ^. tssToken >= n && t ^. tssLovelace >= l -> do
-                    deposit w $ lovelaceValueOf l <> assetClassValue (tokens Map.! w) n
-                    (tsModel . ix w . tssLovelace) $~ (+ (- l))
-                    (tsModel . ix w . tssToken) $~ (+ (- n))
-            _ -> return ()
+    nextState (Withdraw v w n l) = do
+        when (v == w) $ do
+            m <- getTSState v
+            case m of
+                Just t
+                    | t ^. tssToken >= n && t ^. tssLovelace >= l -> do
+                        deposit w $ lovelaceValueOf l <> assetClassValue (tokens Map.! w) n
+                        (tsModel . ix v . tssLovelace) $~ (+ (- l))
+                        (tsModel . ix v . tssToken) $~ (+ (- n))
+                _ -> return ()
         wait 1
 
     perform h _ cmd = case cmd of
-        (Start w)         -> callEndpoint @"start"      (h $ OperateKey w) (css Map.! w, tokenCurrency, tokenNames Map.! w) >> delay 1
-        (SetPrice w p)    -> callEndpoint @"set price"  (h $ OperateKey w) p                                                >> delay 1
-        (AddTokens w n)   -> callEndpoint @"add tokens" (h $ OperateKey w) n                                                >> delay 1
-        (Withdraw w n l)  -> callEndpoint @"withdraw"   (h $ OperateKey w) (n, l)                                           >> delay 1
-        (BuyTokens v w n) -> callEndpoint @"buy tokens" (h $ UseKey v w)   n                                                >> delay 1
+        (Start w)          -> callEndpoint @"start"      (h $ StartKey w) (nftCurrencies Map.! w, tokenCurrencies Map.! w, tokenNames Map.! w) >> delay 1
+        (SetPrice v w p)   -> callEndpoint @"set price"  (h $ UseKey v w) p                                                                    >> delay 1
+        (AddTokens v w n)  -> callEndpoint @"add tokens" (h $ UseKey v w) n                                                                    >> delay 1
+        (BuyTokens v w n)  -> callEndpoint @"buy tokens" (h $ UseKey v w) n                                                                    >> delay 1
+        (Withdraw v w n l) -> callEndpoint @"withdraw"   (h $ UseKey v w) (n, l)                                                               >> delay 1
 
     precondition s (Start w) = isNothing $ getTSState' s w
     precondition _ _         = True
@@ -138,34 +143,36 @@ getTSState v = do
 hasStarted :: Wallet -> Spec TSModel Bool
 hasStarted v = isJust <$> getTSState v
 
-w1, w2, w3, w4 :: Wallet
+w1, w2 :: Wallet
 w1 = Wallet 1
 w2 = Wallet 2
-w3 = Wallet 3
-w4 = Wallet 4
-
-tokenCurrency :: CurrencySymbol
-tokenCurrency = "ff"
-
-tokenNames :: Map Wallet TokenName
-tokenNames = Map.fromList [(w1, "A"), (w2, "B")]
-
-tokens :: Map Wallet AssetClass
-tokens = (\tn -> AssetClass (tokenCurrency, tn)) <$> tokenNames
 
 wallets :: [Wallet]
-wallets = [w1, w2, w3, w4]
+wallets = [w1, w2]
 
-css :: Map Wallet CurrencySymbol
-css = Map.fromList [(w1, "01"), (w2, "02")]
+tokenCurrencies, nftCurrencies :: Map Wallet CurrencySymbol
+tokenCurrencies = Map.fromList $ zip wallets ["aa", "bb"]
+nftCurrencies   = Map.fromList $ zip wallets ["01", "02"]
+
+tokenNames :: Map Wallet TokenName
+tokenNames = Map.fromList $ zip wallets ["A", "B"]
+
+tokens :: Map Wallet AssetClass
+tokens = Map.fromList [(w, AssetClass (tokenCurrencies Map.! w, tokenNames Map.! w)) | w <- wallets]
+
+nftAssets :: Map Wallet AssetClass
+nftAssets = Map.fromList [(w, AssetClass (nftCurrencies Map.! w, nftName)) | w <- wallets]
 
 nfts :: Map Wallet Value
-nfts = (\cs -> assetClassValue (AssetClass (cs, nftName)) 1) <$> css
+nfts = Map.fromList [(w, assetClassValue (nftAssets Map.! w) 1) | w <- wallets]
 
 tss :: Map Wallet TokenSale
 tss = Map.fromList
-    [ (w, TokenSale (pubKeyHash $ walletPubKey w) (tokens Map.! w) $ AssetClass (css Map.! w, nftName))
-    | w <- [w1, w2]
+    [ (w, TokenSale { tsSeller =  pubKeyHash $ walletPubKey w
+                    , tsToken  =  tokens Map.! w
+                    , tsNFT    =  nftAssets Map.! w
+                    })
+    | w <- wallets
     ]
 
 delay :: Int -> EmulatorTrace ()
@@ -173,12 +180,11 @@ delay = void . waitNSlots . fromIntegral
 
 instanceSpec :: [ContractInstanceSpec TSModel]
 instanceSpec =
-    [ContractInstanceSpec (OperateKey w) w $ operateTS'' | w <- [w1, w2]] ++
-    [ContractInstanceSpec (UseKey v w) w $ useTS $ tss Map.! v | v <- [w1, w2], w <- [w3, w4]]
+    [ContractInstanceSpec (StartKey w) w startEndpoint' | w <- wallets] ++
+    [ContractInstanceSpec (UseKey v w) w $ useEndpoints $ tss Map.! v | v <- wallets, w <- wallets]
 
-genSeller, genUser :: Gen Wallet
-genSeller = elements [w1, w2]
-genUser   = elements [w3, w4]
+genWallet :: Gen Wallet
+genWallet = elements wallets
 
 genNonNeg :: Gen Integer
 genNonNeg = getNonNegative <$> arbitrary
@@ -197,21 +203,8 @@ prop_TS = withMaxSuccess 1000 . propRunActionsWithOptions
                          , lovelaceValueOf 1000_000_000 <>
                            (nfts Map.! w)               <>
                            mconcat [assetClassValue t tokenAmt | t <- Map.elems tokens])
-                       | w <- [w1, w2]
-                       ] ++
-                       [(w, lovelaceValueOf 1000_000_000) | w <- [w3, w4]]
-
+                       | w <- wallets
+                       ]
 
 test :: IO ()
 test = quickCheck prop_TS
-
-unitTest :: IO ()
-unitTest = quickCheck $ withMaxSuccess 1 $ prop_TS $ Actions
-    [ Start (Wallet 1),
-      SetPrice (Wallet 1) 2,
-      AddTokens (Wallet 1) 4,
-      BuyTokens (Wallet 1) (Wallet 3) 4,
-      AddTokens (Wallet 1) 6,
-      Withdraw (Wallet 1) 2 7
-    ]
-
