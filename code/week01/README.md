@@ -107,7 +107,25 @@ In Plutus, the script cannot see the whole blockchain, but it can see the whole 
 
 There is one last ingredient that Plutus scripts need in order to be as powerful and expressive as Etheruem scripts. That is the so-called Datum. That is a piece of data that can be associated with a UTxO along with the UTxO value.
 
-With this it is possible to prove mathematically that the (E)UTxO model is at least as powerful as the Etheruem model - it can express any logic that can be expressed with Ethereum.
+![alt text](img/7.png "Image 7")
+
+With this it is possible to prove mathematically that Plutus is at least as powerful as the Etheruem model - any logic you can express in Ethereum you can also it can express using the (E)UTxO model.
+
+But it also has a lot of advantages compared to the Ethereum model. For example, in Plutus, it is possible to check whether a transaction will validate in your wallet, before you ever send it to the chain. 
+
+Things can still go wrong with off-chain validation, however. For example in the situation where you submit a transaction that has been validated in the wallet but gets rejected when it attempts to consume an output on-chain that has already been consumed by another transaction.
+
+In this case, your transaction will fail without you having to pay any fees.
+
+But if all the inputs are still there that your transaction expects, then you can be sure that the transaction will validate and will have the predicted effect.
+
+This is not the case with Ethereum. In Ethereum, the time between you constructing a transaction and it being incorporated into the blockchain, a lot of stuff can happen concurrently, and that is unpredictable and can have unpredicatable effects on what will happen when your script finally executes.
+
+In Ethereum it is always possible that you have to pay gas fees for a transaction even if the transaction eventually fails with an error.
+
+In addition to that, it is also easier to analyse a Plutus script and to check, or even prove, that it is secure, because you don't have to consider the whole state of the blockchain, which is unknowable. You can concentrate on this context that just consists of the spending transaction. So you have a much more limited scope and that makes it much easier to understand what a script is actually doing and what can possibly go wrong.
+
+
 
 
 
