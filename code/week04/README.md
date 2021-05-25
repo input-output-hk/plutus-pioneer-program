@@ -76,7 +76,7 @@ we can see that information is printed in a much more controled way. If we would
 ## 3. More Interesting Traces [`Trace.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week04/src/Week04/Trace.hs)
 
 Lets import [`Vesting.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week03/src/Week03/Vesting.hs) code from week03 into a new file named `Trace.hs`. Here we want to add a trace to what we have done in the plyground for the `Vesting.hs` code. We can print the log instances just like in the playground using
-
+    ```Terminal
     repl$ :l ./src/Week04/Trace.hs
     repl$ test
     .
@@ -86,7 +86,7 @@ Lets import [`Vesting.hs`](https://github.com/Igodlab/plutus-pioneer-program/blo
     .
     .
     .
-    
+    ```
 So we can see that the `** USER LOG` was printed on screen, this shows that we can log in both from the contract and from the trace.
     
 ## 4. Contract Monad [`Contract.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week04/src/Week04/Contract.hs)
