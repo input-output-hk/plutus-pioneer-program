@@ -146,7 +146,7 @@ Somewhat surprisingly, the result of the function is (). This is the Haskell Uni
 
 Unit is a built-in type in Haskell and it has just one value, which is written in the same way as the type itself, as we can see from the REPL.
 
-    Prelude Week02.Gift> ()
+    Prelude Week02.Burn> ()
     ()
 
 A function with a return type of () is quite unusual in Haskell. In more mainstream languages, it is quite common for functions or procedures to return no value. In these situations, the functions are only important for their side-effects, such as a Java function that prints something to the console.
@@ -200,5 +200,34 @@ To avoid this, there is one thing we need to do to the mkValidator function, and
     mkValidator _ _ _ = ()
 
 You will see this often in Plutus scripts, and it is usually an indication that a function is meant to be used within a validation script. All the functions on which the Validator depends must be inlinable.
+
+Let's go back to the REPL and take a look at the Validator.
+
+    :l src/Week02/Gift.hs
+    Ok, one module loaded.
+    Prelude Week02.Gift> validator
+    Validator { <script> }
+    Prelude Week02.Gift> :t validator
+    validator
+      :: plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts.Validator
+
+Back to the code, there are two more types that we want the value of - the validator hash and the address. These are easy to define now that we have our validator.
+
+    valHash :: Ledger.ValidatorHash
+    valHash = Scripts.validatorHash validator
+
+    scrAddress :: Ledger.Address
+    scrAddress = ScriptAddress valHash
+
+Now we have a script address represented as *scrAddress*.
+
+With the exception of the *mkValidator* function logic (in our case, one line), the rest of the code we have written so far is boilerplate and will be the same for all Plutus scripts.
+
+
+
+
+
+
+
 
 
