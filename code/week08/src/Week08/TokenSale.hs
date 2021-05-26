@@ -127,7 +127,6 @@ mapErrorC = mapError $ pack . show
 mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
 mapErrorSM = mapError $ pack . show
 
-
 nftName :: TokenName
 nftName = "NFT"
 
