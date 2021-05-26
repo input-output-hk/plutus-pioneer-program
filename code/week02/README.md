@@ -38,3 +38,16 @@ In a concrete implementation like Plutus, these pieces of information need to be
 
 We will look at that first, but in real life noboby would actually use this low-level. There are more convenient ways to use more suitable data types for these things, and we will come to that later in this lecture.
 
+## PlutusTx.Data
+
+As mentioned, the Datum, Redeemer and Context share a data type. That data type is defined in the package *plutus-tx*, in the module [*PlutusTx.Data*](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs). It is called, simply, *Data*.
+
+    data Data =
+        Constr Integer [Data]
+        | Map [(Data, Data)]
+        | List [Data]
+        | I Integer
+        | B BS.ByteString
+        deriving stock (Show, Eq, Ord, Generic)
+        deriving anyclass (Serialise, NFData)
+
