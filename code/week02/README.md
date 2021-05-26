@@ -123,7 +123,7 @@ Now we are ready to implement our very first Validator.
 
 As we know, a validator is a script that takes three pieces of input - the Datum, the Redeemer and the Context, which, at the lowest level are represented by the *Data* data type.
 
-### The Gift Contract (Gift.hs)
+### Example 1 - The Gift Contract
 
 We start the script by copy pasting a list of GHC language extensions, plus some dependency imports.
 
@@ -324,24 +324,24 @@ And, by scrolling down, we see the final wallet balances.
 
 As mentioned, this script uses the simplest validator possible, one that always succeeds. But this stupid little validator may be useful in a situation where someone wants to donate some Lovelace to the community and leave it up for grabs!
 
-## The Burn Module (Burn.hs)
+## Example 2 - Burn
 
 Let's look at the second example of validation, using the Burn module. We will start with the Burn.hs code being identical to the Gift.hs script.
 
 Recall that the way a validator indicates failure is by throwing an error. 
 
-        mkValidator :: Data -> Data -> Data -> ()
-        mkValidator _ _ _ = error ()
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ _ _ = error ()
 
 If we load the module in the REPL and look at *error*
 
-        Prelude Week02.Burn> :t error
-        error :: [Char] -> a
+    Prelude Week02.Burn> :t error
+    error :: [Char] -> a
 
 We see the definition for the standard Haskell error function. However, the one in scope in our code is in fact the following *error* function.
 
-        Prelude Week02.Burn> :t PlutusTx.Prelude.error
-        PlutusTx.Prelude.error :: () -> a
+    Prelude Week02.Burn> :t PlutusTx.Prelude.error
+    PlutusTx.Prelude.error :: () -> a
 
 In regular Haskell, you have the *error* function which takes an error message string and triggers an error.
 
@@ -351,22 +351,22 @@ We mentioned earlier that we use the INLINABLE pragma on the *mkValidator* funct
 
 The way that the Plutus Predule is able to take precedence over the Haskell Prelude, which is normally in scope by default, is by using the following LANGUAGE pragma in the code.
 
-        {-# LANGUAGE NoImplicitPrelude   #-}
+    {-# LANGUAGE NoImplicitPrelude   #-}
 
 Then, by importing PlutusTx.Prelude, its functions are used in place of the standard Prelude functions.
 
-        import PlutusTx.Prelude hiding (Semigroup(..), unless)
+    import PlutusTx.Prelude hiding (Semigroup(..), unless)
 
 You may also notice that the standard Prelude is also imported. However, it is only in order to bring in *Semigroup*, which we explicity hid in the PlutusTx.Prelude import. But this is not important right now.
 
-        import Prelude (Semigroup (..))
+    import Prelude (Semigroup (..))
 
 Just remember that when you are using something in a Plutus script that looks like a function from the standard Prelude, what you are actually using is a function from the Plutus Prelude. Often they will have the same signature, but, as we can see in the case of *error*, they are not always identical.
 
 Looking again at our new validator, we now have a validator that will always fail.
 
-        mkValidator :: Data -> Data -> Data -> ()
-        mkValidator _ _ _ = error ()
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ _ _ = error ()
 
 We will leave everything else as it was and check the effect in the playground.
 
@@ -380,10 +380,81 @@ We also notice that the *grab* transaction did not work, and if we scroll down t
 
 So, in our first example we had a validator that would always succeed and would allow anyone to grab the UTxOs from it. In the second example, we have a validator that always fails and any UTxOs sent to this script address can never be retrieved. This is basically a way to burn funds, which may be useful under some circumstances.
 
+When we look at the logs, we see that validation fails, but we have no clue why it fails. here's a way to change that by using a variant of error - *traceError*. 
 
+    mkValidator _ _ _ = traceError "NO WAY!"
 
+The function takes a string, but not a Haskell string. It is a Plutus string. In order for this to compile, we need to use the OverloadedStrings GHC extension.    
 
+    {-# LANGUAGE OverloadedStrings   #-}
 
+If we now run the same scenario in the playground with the new code, we will see the custom error message that we added.
+
+![alt text](img/playground_week2_11.png)
+
+## Example 3 - Forty Two
+
+Now let's write a validator that looks at at least one of the arguments. Let's write a simple one that expects a simple Redeemer.
+
+Now that we care about the redeemer, we need to be able to reference it.
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ r _
+
+We can now reference the redeemer as *r* in the code.
+
+Let's say that we expect the redeemer to be I 42. If so, validation passes. If not, we fail with an error message.
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ r _
+        | r == I 42 = ()
+        | otherwise = traceError "wrong redeemer"
+
+If we were to run this now in the playground, validation would always fail. We need to add an input to the *grab* endpoint so that Wallet 3 can pass in the redeemer which will be used by the *mkValidator* function.
+
+    type GiftSchema =
+        BlockchainActions
+            .\/ Endpoint "give" Integer
+            .\/ Endpoint "grab" Integer
+
+And now, the redeemer is no longer to be ignored in the *grab* part of the code. Instead we will pass in the value of the redeemer given to the endpoint.
+
+We add the redeemer argument to the *grab* declaration. Note the addition of the Integer in the function signature, as well as the new *r* parameter which is used to reference it.
+
+    grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+    grab r = do
+
+And then pass it to the *mustSpendScriptOutput* instead of the throw-away value we used earlier.
+
+    tx = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
+
+One more change, we need to change the ">>" to ">>=" in the following code, now that *grab* has an argument. You can use the REPL to look at the types ">>" and ">>=" to see why the second one is now needed. Basically, they both sequence actions, but >> ignores any wrapped values, whereas >>= accesses the wrapped value and passes it to the next action.
+
+    grab' = endpoint @"grab" >>= grab
+
+Now we can try it out in the playground. After adding the new code and clicking *Simulate* you will notice that the old scenario has gone. That is because the schema has changed and the old scenario is no longer valid.
+
+Let's set up a scenario that doesn't require a third wallet.
+
+![alt text](img/playground_week2_12.png)
+
+Here wallet one is going to put 3 lovelace into the contract, and wallet two is going to try to grab them, but this time, wallet 2 will need to pass in a value which will be used to construct the redeemer.
+
+If we pass in 100 as the value for the grab endpoint, and click *Evaluate*, we see in the logs that validation has failed.
+
+![alt text](img/playground_week2_13.png)
+
+If we go back to scenario and change the value to 42, we should see that validation succeeds.
+
+![alt text](img/playground_week2_14.png)
+
+And indeed, wallet 2 now manages to unlock the UTxO held at the script address and grab it.
+
+We see that the final balances are as we expect, and also the logs show that validation did not throw an error, which means that validation succeeded.
+
+## Example 4 - Typed
 
 
 
