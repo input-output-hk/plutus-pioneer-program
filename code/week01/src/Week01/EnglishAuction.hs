@@ -352,8 +352,18 @@ myToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "T" :| [])
 
 mkKnownCurrencies ['myToken]
 
+
 test :: IO ()
-test = runEmulatorTraceIO' def emCfg myTrace
+test = do
+    putStrLn "** TEST ONE"
+    test' testOne
+    putStrLn "** TEST TWO"
+    test' testTwo
+    putStrLn "** TEST THREE"
+    test' testThree
+
+test' :: EmulatorTrace ()  -> IO ()
+test' = runEmulatorTraceIO' def emCfg
   where
     emCfg :: EmulatorConfig
     emCfg = EmulatorConfig $ Left $ Map.fromList
@@ -365,8 +375,9 @@ test = runEmulatorTraceIO' def emCfg myTrace
     v :: Value
     v = Ada.lovelaceValueOf 1000_000_000
 
-myTrace :: EmulatorTrace ()
-myTrace = do
+-- Wallet 2 bid too low, Wallet 3 bids on time and wins
+testOne :: EmulatorTrace ()
+testOne = do
     h1 <- activateContractWallet (Wallet 1) endpoints
     h2 <- activateContractWallet (Wallet 2) endpoints
     h3 <- activateContractWallet (Wallet 3) endpoints
@@ -389,6 +400,52 @@ myTrace = do
         , bpBid      = 1_000_000
     }
     void $ Emulator.waitUntilSlot 10
+    callEndpoint @"close" h1 CloseParams {  
+        cpCurrency = currencySymbol "T"
+        , cpToken   = TokenName "Token"
+    }
+
+-- Wallet 2 bids last minute and wins
+testTwo :: EmulatorTrace ()
+testTwo = do
+    h1 <- activateContractWallet (Wallet 1) endpoints
+    h2 <- activateContractWallet (Wallet 2) endpoints
+    callEndpoint @"start" h1 StartParams {
+        spDeadline = 10
+        , spMinBid = 1_000_000
+        , spCurrency = currencySymbol "T"
+        , spToken    = TokenName "Token"
+        }
+    void $ Emulator.waitUntilSlot 10
+    callEndpoint @"bid" h2 BidParams {  
+         bpCurrency = currencySymbol "T"
+        , bpToken   = TokenName "Token"
+        , bpBid      = 1_100_000
+    }
+    void $ Emulator.waitNSlots 1
+    callEndpoint @"close" h1 CloseParams {  
+        cpCurrency = currencySymbol "T"
+        , cpToken   = TokenName "Token"
+    }
+
+-- Wallet 2 bids enough, but too late, NFT back to Wallet 1
+testThree :: EmulatorTrace ()
+testThree = do
+    h1 <- activateContractWallet (Wallet 1) endpoints
+    h2 <- activateContractWallet (Wallet 2) endpoints
+    callEndpoint @"start" h1 StartParams {
+        spDeadline = 10
+        , spMinBid = 1_000_000
+        , spCurrency = currencySymbol "T"
+        , spToken    = TokenName "Token"
+        }
+    void $ Emulator.waitUntilSlot 15
+    callEndpoint @"bid" h2 BidParams {  
+         bpCurrency = currencySymbol "T"
+        , bpToken   = TokenName "Token"
+        , bpBid      = 1_100_000
+    }
+    void $ Emulator.waitNSlots 1
     callEndpoint @"close" h1 CloseParams {  
         cpCurrency = currencySymbol "T"
         , cpToken   = TokenName "Token"
