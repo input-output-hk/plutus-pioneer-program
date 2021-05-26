@@ -456,10 +456,264 @@ We see that the final balances are as we expect, and also the logs show that val
 
 ## Example 4 - Typed
 
+It was mentioned at the beginning of the lecture, this is low-level Plutus and in reality, noone will write validation functions like this.
 
+Now we will see how it is actuall done.
 
+Even though the *Data* type is powerful and you can encode all sorts of data into it, it doesn't really feel like Haskell. It is almost like you are writing in an untyped language like Javascript or Python. It is just a like a blob of data, it can contain anything so you don't really have any type safety. You will always need to check, for example, if you are expecting an integer that you are indeed given an integer.
 
+We would rather use more specific data types that are tailored to the business logic.
 
+This is indeed possible with so-called Typed Validators. What this means is that we can replace the occurences of *Data* in the mkValidator signature with more suitable types.
 
+    mkValidator :: Data -> Data -> Data -> ()
 
+In our silly little example, we completely ignore the Datum, so a more suitable type would be just the Unit type - ().
 
+    mkValidator :: () -> Data -> Data -> ()
+
+For the redeemer, in this example, we are only dealing with integers, so it would probably make more sense to use Integer instead.
+
+    mkValidator :: () -> Integer -> Data -> ()
+
+We haven't talked yet about what the Context actually looks like, but you can imagine that its translation into the *Data* type is quite akward and it wouldn't be pleasant to work with.
+
+There is a much nicer type called *ValidatorCtx* that's made exactly for this purpose.
+
+Note: this type gets replaced with ScriptContext in later Plutus builds and will be used from Lecture 3 onwards.
+
+    mkValidator :: () -> Integer -> ValidatorCtx -> ()
+
+Finally, we have already mentioned that it is a bit unusual to use Unit as a return type. Much more natural would be to use Bool to indicate successful or failed validation.
+
+    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+
+So, this is a better way to write validation code. The last two types *ValidatorCtx* and *Bool* will always be the same (but see note above), but the first two types can be different depending on the situation.
+
+In this case, let's now rewrite the function accordingly using these new types. The parameter *r* is now no longer of type *Data* - it is an *Integer*, so we can simply check that it is equal to 42 rather than against a constructed *Data* type.
+
+And, we no longer want to return Unit - we will return True or False.
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+    mkValidator () r _
+        | r == 42   = True
+        | otherwise = False
+
+This will not yet compile as other parts of the code are not yet type correct.
+
+Remember that the mkValidatorScript expected code of type *Data -> Data -> Data -> ()* but we now have something of type *() -> Integer -> ValidatorCtx -> Bool*.
+
+In order for this to work we first need one more import.
+
+    import qualified Ledger.Typed.Scripts as Scripts
+
+In this example, it is being imported qualified and using the Scripts prefix, but this is arbitrary and you could pick some other way of referencing the module.
+
+Now we need some boilerplate, the purpose of which is to tell the compiler which types we have picked for Datum and Redeemer.
+
+    data Typed
+    instance Scripts.ScriptType Typed where
+        type instance DatumType Typed = ()
+        type instance RedeemerType Typed = Integer
+
+This is quite advanced Haskell, so-called type-level programming, but just like the Template Haskell we have already encountered, you don't really need a deep understanding of it as all scripts will follow the same schema.
+
+We these changes, the Haskell code will compile, and we now need to change the Template Haskell boilerplate that creates the *validator* function from the *mkValidator* function.
+
+Again, this pattern will be the same for all scripts that use typed validators.
+
+    inst :: Scripts.ScriptInstance Typed
+    inst = Scripts.validator @Typed
+        $$(PlutusTx.compile [|| mkValidator ||])
+        $$(PlutusTx.compile [|| wrap ||])
+    where
+        wrap = Scripts.wrapValidator @() @Integer
+
+    validator :: Validator
+    validator = Scripts.validatorScript inst
+
+We have now turned our untyped version into a typed version.
+
+In this extremely simply example, it probably doesn't seem worth the effort, but for realistic contracts, it is much nicer to do it like this.
+
+At this point the code will run as before in the simulator. However, we can make the *give* endpoint slightly simpler.
+
+Although we have not yet gone over this part of the code in detail, the following changes can be made.
+
+    let tx = mustPayToTheScript () $ Ada.lovelaceValueOf amount
+    ledgerTx <- submitTxConstraints inst tx
+
+The *mustPayToOtherScript* function has been replaced with *mustPayToTheScript*. We can pass in just () as we longer need to constuct a value of type *Data*. And we also no longer need to pass in the script hash.
+
+Also, *submitTx* has been replaced with *submitTxConstraints* and take the *inst* as one of its arguments.
+
+## How Plutus Does It
+
+Now we will explain how that actually work. How does Plutus convert these custom data types to the actual low-lever implementation - the *Data* type.
+
+We can look at the code in the *PlutusTx.IsData.Class* module.
+
+Here we see that there is a quite simple type class defined, called *IsData*. The code here is taken directly from the Plutus code at commit 3746610e53654a1167aeb4c6294c6096d16b0502.
+
+    -- | A typeclass for types that can be converted to and from 'Data'.
+    class IsData (a :: Type) where
+        toData :: a -> Data
+        -- TODO: this should probably provide some kind of diagnostics
+        fromData :: Data -> Maybe a
+
+This class allows us to translate between the *Data* type and types that are instances of the class.
+
+It provides two functions
+
+- toData - takes a value and converts it to *Data*
+- fromData - takes a value of type *Data* and attempts to convert it to an instance of type *IsData*. This can fail because not all values of type *Data* will be convertable to the target type.
+
+Let's try this out in the REPL.
+
+    Prelude Week02.Burn> :l src/Week02/Typed.hs 
+    Ok, one module loaded.
+    Prelude Week02.Typed> import PlutusTx.IsData
+    Prelude PlutusTx.IsData Week02.Typed>
+
+We know that *Unit* and *Integer* are both instances of *IsData* because they worked in our example.
+
+Let's convert an *Integer* to *Data*
+
+    Prelude PlutusTx.IsData Week02.Typed> toData (42 :: Integer)
+    I 42
+
+We see that this has been converted to an instance of type *Data* using the *I* constructor, which we did manually before we used typed validation.    
+
+Now let's do it the other way around
+
+First we need to import PlutusTx to make the *Data* type available to us.    
+
+    Prelude PlutusTx.IsData Week02.Typed> import PlutusTx
+
+Then we will convert from *Data* to *Integer*.
+
+    Prelude PlutusTx.IsData PlutusTx Week02.Typed> fromData (I 42) :: Maybe Integer
+    Just 42
+
+We get a *Just 42* back - *Just* being the Maybe constructor when Maybe is not Nothing.
+
+And when it fails, when it can't convert to the target type, we will get back Nothing.
+
+    Prelude PlutusTx.IsData PlutusTx Week02.Typed> fromData (List []) :: Maybe Integer
+    Nothing
+
+If we examine *IsData* we can see all the types that this pattern will work for - all the types that have an *IsData* instance defined.
+
+If we examine *IsData*
+
+    Prelude PlutusTx.IsData Week02.Typed> :i IsData
+    type IsData :: * -> Constraint
+    class IsData a where
+    toData :: a -> PlutusTx.Data.Data
+    fromData :: PlutusTx.Data.Data -> Maybe a
+    {-# MINIMAL toData, fromData #-}
+        -- Defined in ‘PlutusTx.IsData.Class’
+    instance IsData a => IsData (Maybe a)
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance (IsData a, IsData b) => IsData (Either a b)
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance IsData Bool
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance (IsData a, IsData b, IsData c, IsData d) =>
+            IsData (a, b, c, d)
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance (IsData a, IsData b, IsData c) => IsData (a, b, c)
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance (IsData a, IsData b) => IsData (a, b)
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance IsData ()
+    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+    instance IsData a => IsData [a]
+    -- Defined in ‘PlutusTx.IsData.Class’
+    instance IsData Integer -- Defined in ‘PlutusTx.IsData.Class’
+
+This is still quite a short list of possible types. We would like to use many more types than this for our Datum and Redeemer.
+
+In order to do this, we would normally need to define an *IsData* instance for any type that we wish to use. This will allow us to tell the compiler how to do the back and forth conversions.
+
+However, this again would be tedious as it is such a mechanical process. So, there is a mechanism in Plutus that does this for us.
+
+## Example 5 - Custom IsData types
+
+Before we look at that mechanism, let's rewrite the validation function.
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+    mkValidator () r _ = r == 42
+
+This does the same job, but is now a one-liner. However, we no longer have our error message. To solve this, there is a function called *traceIfFalse* that takes a *String* and a *Bool*. If the *Bool* is true, the string will be ignored, otherwise it will be logged. The result of the function will be the value of the *Bool*.
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+    mkValidator () r_ = traceIfFalse "wrong redeemer" $ r == 42
+
+Now let's talk about custom data types. Let's define a silly one and use it in our validator function.
+
+    newtype MySillyRedeemer = MySillyRedeemer Integer
+        deriving Show
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: () -> MySillyRedeemer -> ValidatorCtx -> Bool
+    mkValidator () (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
+
+And we need to change some of the boilerplate.
+
+    data Typed
+    instance Scripts.ScriptType Typed where
+    ...
+        type instance RedeemerType Typed = MySillyRedeemer
+
+    inst :: Scripts.ScriptInstance Typed
+    ...
+    where
+        wrap = Scripts.wrapValidator @() @MySillyRedeemer
+
+If we try to compile the code now, either on the command line or in the playground, we will get an error because Plutus doesn't know how to convert back and forth between *IsData* and *MySillyRedeemer*.
+
+We could write an instance of *IsData* for *MySillyRedeemer* by hand. But, we don't need to.
+
+Instead we can use another bit of Template Haskell magic.
+
+    PlutusTx.unstableMakeIsData ''MySillyRedeemer
+
+At compile time, the compiler will use the Template Haskell to write an *IsData* instance for us. And now, it will compile. 
+
+Let's check it in the REPL.
+
+    Prelude PlutusTx.IsData PlutusTx> :l src/Week02/IsData.hs 
+    Ok, one module loaded.
+
+Converting to *IsData*.
+
+    Prelude PlutusTx.IsData PlutusTx Week02.IsData> toData (MySillyRedeemer 17)
+    Constr 0 [I 17]
+    Prelude PlutusTx.IsData PlutusTx Week02.IsData>
+
+And converting back again.
+
+    Prelude PlutusTx.IsData PlutusTx Week02.IsData> fromData (Constr 0 [I 3]) :: Maybe MySillyRedeemer
+    Just (MySillyRedeemer 3)
+
+Note that in order to run this conversion back to Maybe MySillyRedeemer in the REPL, it relies on MySillyRedeemer deriving Show, so that the REPL knows how to display the result.
+
+So far, so good.
+
+That is the on-chain part and now we need to do something in the off-chain part where we produce the Redeemer.
+
+    grab r = do
+    ...
+        tx = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData $ MySillyRedeemer r | oref <- orefs]
+ 
+If you try this code (in IsData.hs) in the playground, you should see that it behaves in the same way as before. 
+
+We have seen a couple of examples of simple validators and we have seen both the low-level approach and the higher-level typed approach where we can use custom type.
+
+We completely ignore the third argument, the validation context, which allows us to inspect the spending transaction which we haven't done so far.
+
+We will look at that in the next lecture.
