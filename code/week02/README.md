@@ -120,6 +120,54 @@ We can also use more complicated constructors, like Map and List:
 
 Now we are ready to implement our very first Validator.
 
+As we know, a validator is a script that takes three pieces of input - the Datum, the Redeemer and the Context, which, at the lowest level are represented by the *Data* data type.
+
+### The Gift Contract (Gift.hs)
+
+We start the script by copy pasting a list of GHC language extensions, plus some dependency imports.
+
+    {-# LANGUAGE DataKinds           #-}
+    {-# LANGUAGE FlexibleContexts    #-}
+    ...
+
+    module Week02.Gift where
+
+    import           Control.Monad       hiding (fmap)
+    import           Data.Map            as Map
+    ...
+    import           Text.Printf         (printf)
+
+Then, we write the Validator. It is a Haskell function that takes three arguments, all of type *Data*.
+
+    mkValidator :: Data -> Data -> Data -> ()
+
+Somewhat surprisingly, the result of the function is (). This is the Haskell Unit type, similar to *void* in some other languages, like C++ or C# or Java - it's the type that carrys no information.
+
+Unit is a built-in type in Haskell and it has just one value, which is written in the same way as the type itself, as we can see from the REPL.
+
+    Prelude Week02.Gift> ()
+    ()
+
+A function with a return type of () is quite unusual in Haskell. In more mainstream languages, it is quite common for functions or procedures to return no value. In these situations, the functions are only important for their side-effects, such as a Java function that prints something to the console.
+
+But Haskell is a pure language. If you want side-effects, this will be shown by the type system. For example if the mkValidator were to perform any IO, it would have a type signature of:
+
+    mkValidator :: Data -> Data -> Data -> IO ()
+
+This would indicate a function that performs IO side-effects but has no interesting return value.    
+
+But, as we know that the real mkValidator function performs no side-effects and returns no value, there is really nothing useful that it can do.
+
+However, there is something that the function can do as well as returning (), namely it can throw an exception or have an error. And that's what Plutus uses.
+
+The idea is that if the mkValidator function does not run into an error or throw an exception, then validation succeeds. If it throws an error then validation fails and the transaction is rejected.
+
+Let's go back into the REPL and load the Gift module.
+
+    Prelude Week02.Burn> :l src/Week02/Gift.hs 
+    Ok, one module loaded.
+
+
 
 
 
