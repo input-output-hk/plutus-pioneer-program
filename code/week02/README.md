@@ -63,12 +63,63 @@ For those familiar with the JSON format, this is very similar. The constructors 
 
 We can also explore this type in the REPL.
 
-From the plutus-pioneers-program repository:
+From the plutus-pioneers-program repository. Remember that you may need to start a nix-shell from the Plutus repository before changing into the week02 directory.
 
     cd code/week02
     cabal repl
 
-    
+You should get a response like the following:
+
+    Ok, 9 modules loaded.
+
+
+From with the REPL:
+
+    import PlutusTx
+    :i Data
+
+This will give information about the type *Data*.
+
+    Prelude Week02.Burn> import PlutusTx.Data
+    Prelude PlutusTx.Data Week02.Burn> :i Data
+    type Data :: *
+    data Data
+      = Constr Integer [Data]
+      | Map [(Data, Data)]
+      | List [Data]
+      | I Integer
+      | B bytestring-0.10.12.0:Data.ByteString.Internal.ByteString
+        -- Defined in ‘PlutusTx.Data’
+    instance Eq Data -- Defined in ‘PlutusTx.Data’
+    instance Ord Data -- Defined in ‘PlutusTx.Data’
+    instance Show Data -- Defined in ‘PlutusTx.Data’
+    Prelude PlutusTx.Data Week02.Burn> 
+
+Now we can play with it. We can use the *I* constructor to create a value of type *Data*.
+
+    Prelude PlutusTx.Data Week02.Burn> I 7
+    I 7
+
+We can ask for its type, and confirm that it is indeed of type *Data*:
+
+    Prelude PlutusTx.Data Week02.Burn> :t I 7
+    I 7 :: Data
+
+The easiest way to create a value of type *Data* using the *B* constructor is to use the GHC Extension *OverloadedStrings*. This allows literal strings to be used in place of string-like data types and the compiler will interpret them as their intended type.
+
+    Prelude PlutusTx.Data Week02.Burn> :set -XOverloadedStrings
+    Prelude PlutusTx.Data Week02.Burn> :t B "Haskell"
+    B "Haskell" :: Data
+
+We can also use more complicated constructors, like Map and List:
+
+    Prelude PlutusTx.Data Week02.Burn> :t Map [(I 7, B "Haskell"), (List [I 0], I 1000)]
+    Map [(I 7, B "Haskell"), (List [I 0], I 1000)] :: Data
+
+## Plutus Validator
+
+Now we are ready to implement our very first Validator.
+
 
 
 
