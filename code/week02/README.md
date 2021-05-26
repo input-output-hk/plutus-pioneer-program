@@ -40,14 +40,38 @@ We will look at that first, but in real life noboby would actually use this low-
 
 ## PlutusTx.Data
 
-As mentioned, the Datum, Redeemer and Context share a data type. That data type is defined in the package *plutus-tx*, in the module [*PlutusTx.Data*](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs). It is called, simply, *Data*.
+As mentioned, the Datum, Redeemer and Context share a data type. That data type is defined in the package *plutus-tx*, in the module [*PlutusTx.Data*](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs). It is called, simply, *Data*. 
 
     data Data =
-        Constr Integer [Data]
+          Constr Integer [Data]
         | Map [(Data, Data)]
         | List [Data]
         | I Integer
         | B BS.ByteString
         deriving stock (Show, Eq, Ord, Generic)
         deriving anyclass (Serialise, NFData)
+
+It has five constructors.
+
+- *Constr* takes an Integer and, recursively, a list of *Data*
+- *Map* takes a list of pairs of *Data*. You can think of this as a lookup table of key-value pairs where both the key and the value are of type *Data*
+- *List* takes a list of *Data*
+- *I* takes a single Integer
+- *B* takes a Bytestring
+
+For those familiar with the JSON format, this is very similar. The constructors are not exactly the same, but, like JSON, you can represent numbers, strings, lists of data and key-value pairs. It can represent arbitrary data, which makes it very suitable for our purpose.
+
+We can also explore this type in the REPL.
+
+From the plutus-pioneers-program repository:
+
+    cd code/week02
+    cabal repl
+
+    
+
+
+
+
+
 
