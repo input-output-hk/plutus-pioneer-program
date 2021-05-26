@@ -72,6 +72,7 @@ You should get a response like the following:
 
     Ok, 9 modules loaded.
 
+You may also see a whole bunch of warning messages regarding unused imports, which you can ignore.
 
 From with the REPL:
 
@@ -162,15 +163,42 @@ However, there is something that the function can do as well as returning (), na
 
 The idea is that if the mkValidator function does not run into an error or throw an exception, then validation succeeds. If it throws an error then validation fails and the transaction is rejected.
 
-Let's go back into the REPL and load the Gift module.
+Let's write the simplest Validator that we can.
 
-    Prelude Week02.Burn> :l src/Week02/Gift.hs 
-    Ok, one module loaded.
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ _ _ = ()
 
+The first argument is the Datum, the second argument is the Redeemer and the third argument is the Context, and the most simple thing we can do is to completely ignore all three arguments and immediately return Unit.
 
+What this means is that this script address that corresponds to this Validator doesn't care about the Datum, it doesn't care about the Redeemer, and it doesn't care about the Context. It will always succeed, and this means that any transaction can consume the script at this address as an input.
 
+This function is not yet Plutus code, it is just a Haskell function. In order to turn it into a Plutus script, we need to compile it.
 
+The result of our compilation to Plutus will be of type *Validator*. Below the function in Gift.hs, we add the following code.
 
+    validator :: Validator
+    validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 
+The mkValidatorScript function takes the type *CompiledCode (Data -> Data -> Data -> ()) -> Validator*. In order to create this type, we must compile the mkValidator script using something called Template Haskell. 
+
+Template Haskell is an advanced feature of Haskell that solves a similar problem as macro systems in other languages. A macro being something that gets expanded at compile time. Code generating code.
+
+So, with this code
+
+    $$(PlutusTx.compile [|| mkValidator ||])
+
+We are asking the compiler to write the code for the *validator* function at compile time based on our mkValidator function, and then proceed with the normal compilation.
+
+You do not need to understand very much about Template Haskell to write Plutus as it is always the same pattern. Once you have seen a couple of examples, you can more or less just copy and paste.
+
+Template Haskell expects all the code to be available within the Oxford Brackets (|| ||). With more complicated Validators you will likely be relying on multiple helper functions, and you do not want to have to add them within the Oxford Brackets.
+
+To avoid this, there is one thing we need to do to the mkValidator function, and that is to make it inlinable by adding the INLINABLE pragma.
+
+    {-# INLINABLE mkValidator #-}
+    mkValidator :: Data -> Data -> Data -> ()
+    mkValidator _ _ _ = ()
+
+You will see this often in Plutus scripts, and it is usually an indication that a function is meant to be used within a validation script. All the functions on which the Validator depends must be inlinable.
 
 
