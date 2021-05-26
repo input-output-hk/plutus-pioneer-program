@@ -66,16 +66,29 @@ lovelaces = Ada.getLovelace . Ada.fromValue
 transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
 transition ts s r = case (stateValue s, stateData s, r) of
     (v, _, SetPrice p)   | p >= 0           -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                                    , State p (v <> nft (negate 1))
+                                                    , State p $
+                                                      v <>
+                                                      nft (negate 1)
                                                     )
     (v, p, AddTokens n)  | n > 0            -> Just ( mempty
-                                                    , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) n
+                                                    , State p $
+                                                      v              <>
+                                                      nft (negate 1) <>
+                                                      assetClassValue (tsToken ts) n
                                                     )
     (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
-                                                    , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) (negate n) <> lovelaceValueOf (n * p)
+                                                    , State p $
+                                                      v                                       <>
+                                                      nft (negate 1)                          <>
+                                                      assetClassValue (tsToken ts) (negate n) <>
+                                                      lovelaceValueOf (n * p)
                                                     )
     (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                                    , State p $ v <> nft (negate 1) <> assetClassValue (tsToken ts) (negate n) <> lovelaceValueOf (negate l)
+                                                    , State p $
+                                                      v                                       <>
+                                                      nft (negate 1)                          <>
+                                                      assetClassValue (tsToken ts) (negate n) <>
+                                                      lovelaceValueOf (negate l)
                                                     )
     _                                       -> Nothing
   where
