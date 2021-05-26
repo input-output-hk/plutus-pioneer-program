@@ -128,7 +128,7 @@ The (E)UTxO model is not tied to a particular programming language. What we have
 
 ## Running an example auction contract on a local Playground
 
-Rather than start the traditional way, i.e. starting very simple and doing a crash course on Haskell, followed by some simple Plutus contracts and slowly add more complicated stuff, it will be more interesting, especially for the first lecture, to showcase a more interesting contract and demonstrate what Plutus. We can then use that to look at certain concepts in more detail.
+Rather than start the traditional way, i.e. starting very simple and doing a crash course on Haskell, followed by some simple Plutus contracts and slowly add more complicated stuff, it will be more interesting, especially for the first lecture, to showcase a more interesting contract and demonstrate what Plutus can do. We can then use that to look at certain concepts in more detail.
 
 Before compiling the sample contract code, we need to setup Plutus. It is advisable to set up a Nix shell from the main Plutus repository at which can also be used to compile the example contracts.
 
@@ -138,7 +138,7 @@ This will setup your environment with the dependencies necessary to compile the 
 
 Once you are inside the Nix shell, you can start the Plutus client and server from the cloned Plutus repository.
 
-The lecture videos were recorded at various times and the Plutus code that goes along with them was compiled against specific commits of the Plutus main branch. You can find the commit tag in the cabal.project file. My aim here is to keep this code up-to-date with the latest commits.
+The lecture videos were recorded at various times and the Plutus code that goes along with them was compiled against specific commits of the Plutus main branch. You can find the commit tag in the cabal.project file.
 
 #### Server
 

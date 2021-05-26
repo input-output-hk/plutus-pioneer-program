@@ -221,7 +221,168 @@ Back to the code, there are two more types that we want the value of - the valid
 
 Now we have a script address represented as *scrAddress*.
 
-With the exception of the *mkValidator* function logic (in our case, one line), the rest of the code we have written so far is boilerplate and will be the same for all Plutus scripts.
+With the exception of the *mkValidator* function logic (in our case, one line), the rest of the code we have written so far is boilerplate and will be very similar for all Plutus scripts.
+
+In order to actually try this script, we need wallet code. The focus of this lecture is validation and not wallet code, but briefly, here is the rest of the code. 
+
+Two endpoints are defined. The *give* endpoint will take an Integer argument to specify the number of Lovelace that will be depostied to the contract.  The *grab* endpoint will take no argument and will simply look for UTxOs at this script address and consume them.
+
+    type GiftSchema =
+        BlockchainActions
+            .\/ Endpoint "give" Integer
+            .\/ Endpoint "grab" ()
+
+
+*Give* takes the Integer argument and uses the helper function *mustPayToOtherScript* which takes the *valHash* and a Datum that, in this example, is completely ignored. It uses the *Datum* constructor to turn a *Data* into a *Datum*. In this case the *Data* is created using the *Constr* construtor taking a 0 and an empty list. Finally the amount to send to the address is specified using the helper function *Ada.lovelaceValueOf*.
+
+The transaction is then submitted, the script waits for it to be confirmed and then prints a log message.
+
+    give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+    give amount = do
+        let tx = mustPayToOtherScript valHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
+        ledgerTx <- submitTx tx
+        void $ awaitTxConfirmed $ txId ledgerTx
+        logInfo @String $ printf "made a gift of %d lovelace" amount
+
+The *grab* endpoint is a little bit more complicated. We use *utxoAt* with our shiny new Plutus script address *scrAddress* to lookup all the UTxOs sitting at that address. We then need lookups which will be explained in a later lecture.
+
+We then define the transaction by using *mustSpendScriptOutput* for each UTxO found. We also pass a Redeemer which is completely ignored in our example, so we can put anything there - in this case a Redeemer created using the *I* constructor of type *Data* will a value of 17.
+
+Again, we submit, wait for confirmation, and then write a log message.
+
+    grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
+    grab = do
+        utxos <- utxoAt scrAddress
+        let orefs   = fst <$> Map.toList utxos
+            lookups = Constraints.unspentOutputs utxos      <>
+                      Constraints.otherScript validator
+            tx :: TxConstraints Void Void
+            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I 17 | oref <- orefs]
+        ledgerTx <- submitTxConstraintsWith @Void lookups tx
+        void $ awaitTxConfirmed $ txId ledgerTx
+        logInfo @String $ "collected gifts"
+
+We then have some boilerplate.
+
+    endpoints :: Contract () GiftSchema Text ()
+    endpoints = (give' `select` grab') >> endpoints
+      where
+        give' = endpoint @"give" >>= give
+        grab' = endpoint @"grab" >>  grab
+
+And these last two lines are just for the playground. As we saw in lecture 1, for example, the *mkKnownCurrencies* list is used to define tokens for the playground.
+
+    mkSchemaDefinitions ''GiftSchema
+
+    mkKnownCurrencies []
+
+## In the Playground
+
+We will now test the Validator in the playground.
+
+Again we are using commit 3746610e53654a1167aeb4c6294c6096d16b0502 of the Plutus repository. This requires us to remove the *module* part of the code before pasting it into the playground editor.
+
+Remove this line
+
+    module Week02.Gift where
+
+Then, compile the script in the playground and press the *Simulate* button.    
+
+ ![alt text](img/playground_week2_1.png)
+
+ And let's add a third wallet.
+
+ ![alt text](img/playground_week2_2.png)
+
+We will create a scenario where wallets 1 and 2 give Lovelace, and wallet 3 grabs all of it.
+
+ ![alt text](img/playground_week2_3.png)
+
+And now click *Evaluate*. We see that there have been four transactions. The first one is the Genesis transaction that distributes the initial funds to the wallets.
+
+ ![alt text](img/playground_week2_4.png)
+
+And there are two transactions which occur at Slot 1. They are the two *give* transactions.
+
+The first one, Tx 0, is from Wallet 2. We see the two outputs - one putting 6 Lovelace into the script address (the script address is a hash of the script), and the other returning the 4 Lovelace change to Wallet 2.
+
+ ![alt text](img/playground_week2_5.png)
+
+And the second, Tx 1, is from Wallet 1. Again, with similar output UTxOs.
+
+ ![alt text](img/playground_week2_6.png)
+
+We now have two UTxOs sitting at the script address.
+
+Then we have the *grab* at Slot 2 triggered by Wallet 3. We see the two UTxOs from the script as inputs, and the single output of 10 Lovelace to Wallet 3.
+
+![alt text](img/playground_week2_7.png)
+
+And, by scrolling down, we see the final wallet balances.
+
+![alt text](img/playground_week2_8.png)
+
+As mentioned, this script uses the simplest validator possible, one that always succeeds. But this stupid little validator may be useful in a situation where someone wants to donate some Lovelace to the community and leave it up for grabs!
+
+## The Burn Module (Burn.hs)
+
+Let's look at the second example of validation, using the Burn module. We will start with the Burn.hs code being identical to the Gift.hs script.
+
+Recall that the way a validator indicates failure is by throwing an error. 
+
+        mkValidator :: Data -> Data -> Data -> ()
+        mkValidator _ _ _ = error ()
+
+If we load the module in the REPL and look at *error*
+
+        Prelude Week02.Burn> :t error
+        error :: [Char] -> a
+
+We see the definition for the standard Haskell error function. However, the one in scope in our code is in fact the following *error* function.
+
+        Prelude Week02.Burn> :t PlutusTx.Prelude.error
+        PlutusTx.Prelude.error :: () -> a
+
+In regular Haskell, you have the *error* function which takes an error message string and triggers an error.
+
+In Plutus, the *error* function does not take a string - it just takes Unit. And that takes us to an important point.
+
+We mentioned earlier that we use the INLINABLE pragma on the *mkValidator* function in order to allow it to be used by the Template Haskell code. In Haskell there are many functions available via the *Prelude* module, but these will not be usable in Plutus as they are not inlinable. So, the Plutus team have provided an alternative *Prelude* that can be used in validation.
+
+The way that the Plutus Predule is able to take precedence over the Haskell Prelude, which is normally in scope by default, is by using the following LANGUAGE pragma in the code.
+
+        {-# LANGUAGE NoImplicitPrelude   #-}
+
+Then, by importing PlutusTx.Prelude, its functions are used in place of the standard Prelude functions.
+
+        import PlutusTx.Prelude hiding (Semigroup(..), unless)
+
+You may also notice that the standard Prelude is also imported. However, it is only in order to bring in *Semigroup*, which we explicity hid in the PlutusTx.Prelude import. But this is not important right now.
+
+        import Prelude (Semigroup (..))
+
+Just remember that when you are using something in a Plutus script that looks like a function from the standard Prelude, what you are actually using is a function from the Plutus Prelude. Often they will have the same signature, but, as we can see in the case of *error*, they are not always identical.
+
+Looking again at our new validator, we now have a validator that will always fail.
+
+        mkValidator :: Data -> Data -> Data -> ()
+        mkValidator _ _ _ = error ()
+
+We will leave everything else as it was and check the effect in the playground.
+
+![alt text](img/playground_week2_10.png)
+
+Here, the script address is different. The script is different an so has a different hash.
+
+We also notice that the *grab* transaction did not work, and if we scroll down to look at the logs, we see that it was not validated.
+
+![alt text](img/playground_week2_9.png)
+
+So, in our first example we had a validator that would always succeed and would allow anyone to grab the UTxOs from it. In the second example, we have a validator that always fails and any UTxOs sent to this script address can never be retrieved. This is basically a way to burn funds, which may be useful under some circumstances.
+
+
+
+
 
 
 
