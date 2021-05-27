@@ -36,7 +36,7 @@ So, there are three pieces of data that a Plutus script gets. The Datum, sitting
 
 In a concrete implementation like Plutus, these pieces of information need to be represented by a concrete data type - a Haskell data type. As it happens, the choice was made to use the same data type for all three of them. At least at the low-level implementation.
 
-We will look at that first, but in real life noboby would actually use this low-level. There are more convenient ways to use more suitable data types for these things, and we will come to that later in this lecture.
+We will look at that first, but in real life nobody would actually use this low-level. There are more convenient ways to use more suitable data types for these things, and we will come to that later in this lecture.
 
 ## PlutusTx.Data
 
@@ -158,7 +158,7 @@ Then, we write the Validator. It is a Haskell function that takes three argument
 mkValidator :: Data -> Data -> Data -> ()
 ```
 
-Somewhat surprisingly, the result of the function is (). This is the Haskell Unit type, similar to *void* in some other languages, like C++ or C# or Java - it's the type that carrys no information.
+Somewhat surprisingly, the result of the function is (). This is the Haskell Unit type, similar to *void* in some other languages, like C++ or C# or Java - it's the type that carries no information.
 
 Unit is a built-in type in Haskell and it has just one value, which is written in the same way as the type itself, as we can see from the REPL.
 
@@ -257,7 +257,7 @@ With the exception of the *mkValidator* function logic (in our case, one line), 
 
 In order to actually try this script, we need wallet code. The focus of this lecture is validation and not wallet code, but briefly, here is the rest of the code. 
 
-Two endpoints are defined. The *give* endpoint will take an Integer argument to specify the number of Lovelace that will be depostied to the contract.  The *grab* endpoint will take no argument and will simply look for UTxOs at this script address and consume them.
+Two endpoints are defined. The *give* endpoint will take an Integer argument to specify the number of Lovelace that will be deposited to the contract.  The *grab* endpoint will take no argument and will simply look for UTxOs at this script address and consume them.
 
 ```haskell
 type GiftSchema =
@@ -266,7 +266,7 @@ type GiftSchema =
         .\/ Endpoint "grab" ()
 ```
 
-*Give* takes the Integer argument and uses the helper function *mustPayToOtherScript* which takes the *valHash* and a Datum that, in this example, is completely ignored. It uses the *Datum* constructor to turn a *Data* into a *Datum*. In this case the *Data* is created using the *Constr* construtor taking a 0 and an empty list. Finally the amount to send to the address is specified using the helper function *Ada.lovelaceValueOf*.
+*Give* takes the Integer argument and uses the helper function *mustPayToOtherScript* which takes the *valHash* and a Datum that, in this example, is completely ignored. It uses the *Datum* constructor to turn a *Data* into a *Datum*. In this case the *Data* is created using the *Constr* constructor taking a 0 and an empty list. Finally the amount to send to the address is specified using the helper function *Ada.lovelaceValueOf*.
 
 The transaction is then submitted, the script waits for it to be confirmed and then prints a log message.
 
@@ -398,7 +398,7 @@ In Plutus, the *error* function does not take a string - it just takes Unit. And
 
 We mentioned earlier that we use the INLINABLE pragma on the *mkValidator* function in order to allow it to be used by the Template Haskell code. In Haskell there are many functions available via the *Prelude* module, but these will not be usable in Plutus as they are not inlinable. So, the Plutus team have provided an alternative *Prelude* that can be used in validation.
 
-The way that the Plutus Predule is able to take precedence over the Haskell Prelude, which is normally in scope by default, is by using the following LANGUAGE pragma in the code.
+The way that the Plutus Prelude is able to take precedence over the Haskell Prelude, which is normally in scope by default, is by using the following LANGUAGE pragma in the code.
 
 ```haskell
 {-# LANGUAGE NoImplicitPrelude   #-}
@@ -410,7 +410,7 @@ Then, by importing PlutusTx.Prelude, its functions are used in place of the stan
 import PlutusTx.Prelude hiding (Semigroup(..), unless)
 ```
 
-You may also notice that the standard Prelude is also imported. However, it is only in order to bring in *Semigroup*, which we explicity hid in the PlutusTx.Prelude import. But this is not important right now.
+You may also notice that the standard Prelude is also imported. However, it is only in order to bring in *Semigroup*, which we explicitly hid in the PlutusTx.Prelude import. But this is not important right now.
 
 ```haskell
 import Prelude (Semigroup (..))
@@ -529,15 +529,15 @@ We see that the final balances are as we expect, and also the logs show that val
 
 ## Example 4 - Typed
 
-It was mentioned at the beginning of the lecture, this is low-level Plutus and in reality, noone will write validation functions like this.
+It was mentioned at the beginning of the lecture, this is low-level Plutus and in reality, no-one will write validation functions like this.
 
-Now we will see how it is actuall done.
+Now we will see how it is actually done.
 
 Even though the *Data* type is powerful and you can encode all sorts of data into it, it doesn't really feel like Haskell. It is almost like you are writing in an untyped language like Javascript or Python. It is just a like a blob of data, it can contain anything so you don't really have any type safety. You will always need to check, for example, if you are expecting an integer that you are indeed given an integer.
 
 We would rather use more specific data types that are tailored to the business logic.
 
-This is indeed possible with so-called Typed Validators. What this means is that we can replace the occurences of *Data* in the mkValidator signature with more suitable types.
+This is indeed possible with so-called Typed Validators. What this means is that we can replace the occurrences of *Data* in the mkValidator signature with more suitable types.
 
 ```haskell
 mkValidator :: Data -> Data -> Data -> ()
@@ -555,7 +555,7 @@ For the redeemer, in this example, we are only dealing with integers, so it woul
 mkValidator :: () -> Integer -> Data -> ()
 ```
 
-We haven't talked yet about what the Context actually looks like, but you can imagine that its translation into the *Data* type is quite akward and it wouldn't be pleasant to work with.
+We haven't talked yet about what the Context actually looks like, but you can imagine that its translation into the *Data* type is quite awkward and it wouldn't be pleasant to work with.
 
 There is a much nicer type called *ValidatorCtx* that's made exactly for this purpose.
 
@@ -637,7 +637,7 @@ let tx = mustPayToTheScript () $ Ada.lovelaceValueOf amount
 ledgerTx <- submitTxConstraints inst tx
 ```
 
-The *mustPayToOtherScript* function has been replaced with *mustPayToTheScript*. We can pass in just () as we longer need to constuct a value of type *Data*. And we also no longer need to pass in the script hash.
+The *mustPayToOtherScript* function has been replaced with *mustPayToTheScript*. We can pass in just () as we longer need to construct a value of type *Data*. And we also no longer need to pass in the script hash.
 
 Also, *submitTx* has been replaced with *submitTxConstraints* and take the *inst* as one of its arguments.
 
@@ -662,7 +662,7 @@ This class allows us to translate between the *Data* type and types that are ins
 It provides two functions
 
 - toData - takes a value and converts it to *Data*
-- fromData - takes a value of type *Data* and attempts to convert it to an instance of type *IsData*. This can fail because not all values of type *Data* will be convertable to the target type.
+- fromData - takes a value of type *Data* and attempts to convert it to an instance of type *IsData*. This can fail because not all values of type *Data* will be convertible to the target type.
 
 Let's try this out in the REPL.
 

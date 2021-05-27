@@ -1,6 +1,6 @@
 # Week 01
 
- These is a written version of [Lecture #1](https://youtu.be/IEn6jUo-0vU).
+ This is a written version of [Lecture #1](https://youtu.be/IEn6jUo-0vU).
 
  It covers an introduction to Plutus, the (E)UTxO model (and how it compares to other models), and concludes with an example English Auction managed with a Plutus smart contract running on the Plutus Playground.
 
@@ -30,7 +30,7 @@ Unspent transaction outputs are exactly what the name says. They are transaction
 
 ![alt text](img/1.png "Image 1")
 
-Alice wants to send 10 ADA to Bob, so she creates a transaction. A transaction is something that contains an arbitrary number of inputs and an arbitray number of outputs.
+Alice wants to send 10 ADA to Bob, so she creates a transaction. A transaction is something that contains an arbitrary number of inputs and an arbitrary number of outputs.
 
 The important thing is that you can only ever use complete UTxOs as input. Alice cannot simply split her existing 100 ADA into a 90 and a 10, she has to use the full 100 ADA as the input to a transaction.
 
@@ -76,7 +76,7 @@ The idea of the (E)UTxO model is to make this more general.
 
 Instead of having just one condition, namely that the appropriate signature is present in the transaction, we replace this with arbitrary logic. This is where Plutus comes in.
 
-Instead of just having an address that corresponds to a public key that can be verified by a signature that is added to the transaction, we have more general logic, not based on public keys or the hashes of public keys, but instead arbitray logic which decides under which conditions a particular UTxO can be spent by particular transaction.
+Instead of just having an address that corresponds to a public key that can be verified by a signature that is added to the transaction, we have more general logic, not based on public keys or the hashes of public keys, but instead arbitrary logic which decides under which conditions a particular UTxO can be spent by particular transaction.
 
 The input will justify that it is allowed to consume this output with some arbitrary piece of logic that is called the Redeemer.
 
@@ -94,7 +94,7 @@ But this is not the only option. We can decide to give more information to the s
 
 ### The Ethereum approach
 
-Ethereum uses a different concept. In Etheruem, the script can see everything - the whole blockchain - the opposite extreme of Bitcoin. In Bitcoin, the script has very little context, all it can see is the redeemer. In Ethereum, the Solidity scripts can see the complete state of the blockchain.
+Ethereum uses a different concept. In Ethereum, the script can see everything - the whole blockchain - the opposite extreme of Bitcoin. In Bitcoin, the script has very little context, all it can see is the redeemer. In Ethereum, the Solidity scripts can see the complete state of the blockchain.
 
 This makes Ethereum scripts more powerful, but it also comes with problems. Because the scripts are so powerful it is difficult to predict what a given script will do and that opens the door to all sorts of security issues and dangers. It is very hard for the developers of an Ethereum smart contract to predict everything that can happen.
 
@@ -104,11 +104,11 @@ What Cardano does is something in the middle.
 
 In Plutus, the script cannot see the whole blockchain, but it can see the whole transaction that is being validated. In contrast to Bitcoin, it can't see only the redeemer of the one input, but it can also see all the inputs and outputs of the transaction, and the transaction itself. The Plutus script can use this information to decide whether it is ok to consume the output.
 
-There is one last ingredient that Plutus scripts need in order to be as powerful and expressive as Etheruem scripts. That is the so-called Datum. That is a piece of data that can be associated with a UTxO along with the UTxO value.
+There is one last ingredient that Plutus scripts need in order to be as powerful and expressive as Ethereum scripts. That is the so-called Datum. That is a piece of data that can be associated with a UTxO along with the UTxO value.
 
 ![alt text](img/7.png "Image 7")
 
-With this it is possible to prove mathematically that Plutus is at least as powerful as the Etheruem model - any logic you can express in Ethereum you can also it can express using the (E)UTxO model.
+With this it is possible to prove mathematically that Plutus is at least as powerful as the Ethereum model - any logic you can express in Ethereum you can also it can express using the (E)UTxO model.
 
 But it also has a lot of advantages compared to the Ethereum model. For example, in Plutus, it is possible to check whether a transaction will validate in your wallet, before you ever send it to the chain. 
 
@@ -118,7 +118,7 @@ In this case, your transaction will fail without you having to pay any fees.
 
 But if all the inputs are still there that your transaction expects, then you can be sure that the transaction will validate and will have the predicted effect.
 
-This is not the case with Ethereum. In Ethereum, the time between you constructing a transaction and it being incorporated into the blockchain, a lot of stuff can happen concurrently, and that is unpredictable and can have unpredicatable effects on what will happen when your script finally executes.
+This is not the case with Ethereum. In Ethereum, the time between you constructing a transaction and it being incorporated into the blockchain, a lot of stuff can happen concurrently, and that is unpredictable and can have unpredictable effects on what will happen when your script finally executes.
 
 In Ethereum it is always possible that you have to pay gas fees for a transaction even if the transaction eventually fails with an error. And that is guaranteed to never happen with Cardano.
 
@@ -212,7 +212,7 @@ The spMinField specifies the minimum amount of ADA that must be bid. If this min
 
 Enter 3 into the spMinBid field.
 
-The last two fields - spCurrencySumbol and unTokenName specify the currency of the NFT that is the subject of the auction. In Plutus a native token is defined by a currency symbol and a name.
+The last two fields - spCurrencySymbol and unTokenName specify the currency of the NFT that is the subject of the auction. In Plutus a native token is defined by a currency symbol and a name.
 
 In this case, the symbol is 66 and the token name, as we have seen is T.
 
@@ -257,7 +257,7 @@ Now, click the "Evaluate" button - either the one at the bottom or the one at th
 
 After a little while, you will see the simulator view.
 
-Towards the top of the page you will see the slots that are relevant to the simulation, that is, the slots where an action occured. Here we see that these are slots 1,2,3,4 and 20.
+Towards the top of the page you will see the slots that are relevant to the simulation, that is, the slots where an action occurred. Here we see that these are slots 1,2,3,4 and 20.
 
 Slot zero is not caused by our contract, it is the Genesis transaction that sets up the initial balances of the wallets. There are three outputs for this transaction.
 
@@ -291,7 +291,7 @@ Again, the logic in the script must make sure that all of this is handled correc
 
 ![alt text](img/evaluate4.png "Plutus Playground")
 
-The last transaction is the "close" action. This one only has the script UTxO as input. Its outputs are the succesful bid of 4 Lovelace to the seller (Wallet 1) and the transfer of the NFT to the succesful bidder, Wallet 3.
+The last transaction is the "close" action. This one only has the script UTxO as input. Its outputs are the successful bid of 4 Lovelace to the seller (Wallet 1) and the transfer of the NFT to the successful bidder, Wallet 3.
 
 ![alt text](img/evaluate5.png "Plutus Playground")
 

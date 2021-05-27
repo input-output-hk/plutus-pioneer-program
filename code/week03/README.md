@@ -108,7 +108,7 @@ data ScriptPurpose
 
 For us, the most important is *Spending*. This is what we have talked about so far in the context of the (E)UTxO model. This is when a script is run in order to validate a spending input for a transaction.
 
-The *Minting* purpose comes into play when you want to define a native token. Its purpose us to describe under which cirumstances the native token can be minted or burned.
+The *Minting* purpose comes into play when you want to define a native token. Its purpose us to describe under which circumstances the native token can be minted or burned.
 
 There are also two new brand new purposes - *Rewarding* - related to staking and *Certifying* - related to stake delegation.
 
@@ -156,7 +156,7 @@ So that is a very nice feature, but it is not obvious how to manage time in that
 
 We saw an example of this in lecture one - the auction example, where bids are only allowed until the deadline has been reached, and the *close* endpoint can only be called after the deadline has passed.
 
-That seems to be a contractiction, because time is obviously flowing. So, when you try to validate a transaction that you are constructing in your wallet, the time that you are doing that can, of course, be different than the time that the transaction arrives at a node for validation. So, it's not clear how to bring these two together so that validation is deterministic, and to guaranteee that if, and only if, validation succeeds in the wallet, it will also succeeed at the node.
+That seems to be a contradiction, because time is obviously flowing. So, when you try to validate a transaction that you are constructing in your wallet, the time that you are doing that can, of course, be different than the time that the transaction arrives at a node for validation. So, it's not clear how to bring these two together so that validation is deterministic, and to guarantee that if, and only if, validation succeeds in the wallet, it will also succeed at the node.
 
 The way Cardano solves that, is by adding the slot range field *txInfoValidRange* to a transaction, which essentially says "This transaction is valid between *this* and *that* slot". 
 
@@ -442,7 +442,7 @@ mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
 
 We need to check two conditions.
 
-1. That only the correct beneficiary can unlock a UTxO sitting at this address. This we can validate by checking that the benficiary's signature is included in the transaction.
+1. That only the correct beneficiary can unlock a UTxO sitting at this address. This we can validate by checking that the beneficiary's signature is included in the transaction.
 2. That this transaction is only executed after the deadline is reached.
 
 We could probably just write this in one go, but we will write it in a more top-down fashion and delegate to some helper functions.
@@ -485,9 +485,9 @@ where
     ...
 ```
 
-For the first helper function, *checkSig*, we must check that the benficiary has signed the transaction.
+For the first helper function, *checkSig*, we must check that the beneficiary has signed the transaction.
 
-Here we use the `elem` function here from the Plutus Prelude, which is a copy of the same function from the standard Prelude. You will recall that this is because it is not possible to make functions in standard Prelude INLINEABLE, which is required for our validation scripts to compile.
+Here we use the `elem` function here from the Plutus Prelude, which is a copy of the same function from the standard Prelude. You will recall that this is because it is not possible to make functions in standard Prelude INLINABLE, which is required for our validation scripts to compile.
 
 ```haskell
 checkSig = beneficiary dat `elem` txInfoSignatories info
@@ -644,7 +644,7 @@ Now let's look at the case where the grab happens too early. We'll change the wa
 
 ![](img/week03__00010.png)
 
-Now we see just two transactions - the Genensis transaction, and the give.
+Now we see just two transactions - the Genesis transaction, and the give.
     
 ![](img/week03__00012.png)
 
@@ -702,7 +702,7 @@ A parameterized script is like a family of scripts. You can instantiate it with 
 
 We start by making a copy of Vesting.hs and creating a new module - Week03.Parameterized.
 
-Now, instead of using the *VestedDatum*, we are going to paramterize the script with it. It makes sense to first change its name.
+Now, instead of using the *VestedDatum*, we are going to parameterize the script with it. It makes sense to first change its name.
 
 ```haskell
 data VestingParam = VestingParam
@@ -860,7 +860,7 @@ Changes are also necessary in the wallet part.
 
 The *GiveParams* stay the same, but the endpoints are slightly different, because in the *grab* endpoint earlier we only had the Unit argument, but now we need the slot.
 
-This is because, in order to construct the address that we grab from, we need the params - the benficiary and the deadline. We already now the beneficiary, as it will be the address of the wallet that is doing the grabbing, but we need to pass in the slot value for the deadline.
+This is because, in order to construct the address that we grab from, we need the params - the beneficiary and the deadline. We already now the beneficiary, as it will be the address of the wallet that is doing the grabbing, but we need to pass in the slot value for the deadline.
 
 In the *give* endpoint, there are also some differences.
 
