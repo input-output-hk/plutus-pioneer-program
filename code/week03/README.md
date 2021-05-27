@@ -346,6 +346,34 @@ And now, we can look, for the first time, at a contract that actually looks at t
 
 ## Example - Vesting
 
-Imagine you want to give a gift of Ada to a child, but you only want the child to have access to the Ada when he or she turns eighteen.
+Imagine you want to give a gift of Ada to a child. You want the child to own the Ada, but you only want the child to have access to it he or she turns eighteen.
 
+Using Plutus, it is very easy to implement a vesting scheme like that.
+
+We start by copying the IsData function, the one we modified at the start of the lecture, into a new module called Vesting.
+
+The first step is to think about the *Datum* and *Redeemer*.
+
+For *Datum* it makes sense to have two pieces of information:
+
+- The beneficiary
+- The deadline
+
+So, let's define this type:
+
+    data VestingDatum = VestingDatum
+        { beneficiary :: PubKeyHash
+        , deadline    :: Slot
+        } deriving Show
+
+    PlutusTx.unstableMakeIsData ''VestingDatum
+
+In this case, we don't need any information in the *Redeemer*, because all the information we need about the entity that can claim the Ada and the time is contained in the *Context*.
+
+    mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
+
+We need to check two conditions.
+
+1. That only the correct beneficiary can unlock a UTxO sitting at this address. This we can validate by checking that the benficiary's signature is included in the transaction.
+2. That this transaction is only executed after the deadline is reached.
 
