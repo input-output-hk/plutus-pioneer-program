@@ -44,7 +44,7 @@ As mentioned, the Datum, Redeemer and Context share a data type. That data type 
 
 ```haskell
 data Data =
-        Constr Integer [Data]
+      Constr Integer [Data]
     | Map [(Data, Data)]
     | List [Data]
     | I Integer

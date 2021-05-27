@@ -181,10 +181,12 @@ Click the compile button. Once it has compiled, click the Simulate button.
 
 The default wallets are setup with 10 Lovelace and 10 T, where T is a native token simulated by the script in the following lines:
 
-    myToken :: KnownCurrency
-    myToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "T" :| [])
+```haskell
+myToken :: KnownCurrency
+myToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "T" :| [])
 
-    mkKnownCurrencies ['myToken]
+mkKnownCurrencies ['myToken]
+```
 
 We are going to treat the token T as a non-fungible token (NFT), and simulate this by changing the wallets such that Wallet 1 has 1 T and the other wallets have 0 T.
 
@@ -335,13 +337,15 @@ The nice thing about Plutus is that everything is written in Haskell and the dat
 
 For example, in this contract there is a datatype Auction:
 
-    data Auction = Auction
-        { aSeller   :: !PubKeyHash
-        , aDeadline :: !Slot
-        , aMinBid   :: !Integer
-        , aCurrency :: !CurrencySymbol
-        , aToken    :: !TokenName
-        } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+```haskell
+data Auction = Auction
+    { aSeller   :: !PubKeyHash
+    , aDeadline :: !Slot
+    , aMinBid   :: !Integer
+    , aCurrency :: !CurrencySymbol
+    , aToken    :: !TokenName
+    } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+```
 
 Then later there is the logic that defines the script that lives on the chain - the validation logic of the script.  
 
@@ -351,39 +355,45 @@ Then, from line 231, is the off-chain (wallet) part.
 
 These three data types define the parameters of the three endpoints:
 
-    data StartParams = StartParams
-        { spDeadline :: !Slot
-        , spMinBid   :: !Integer
-        , spCurrency :: !CurrencySymbol
-        , spToken    :: !TokenName
-        } deriving (Generic, ToJSON, FromJSON, ToSchema)
+```haskell
+data StartParams = StartParams
+    { spDeadline :: !Slot
+    , spMinBid   :: !Integer
+    , spCurrency :: !CurrencySymbol
+    , spToken    :: !TokenName
+    } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
-    data BidParams = BidParams
-        { bpCurrency :: !CurrencySymbol
-        , bpToken    :: !TokenName
-        , bpBid      :: !Integer
-        } deriving (Generic, ToJSON, FromJSON, ToSchema)
+data BidParams = BidParams
+    { bpCurrency :: !CurrencySymbol
+    , bpToken    :: !TokenName
+    , bpBid      :: !Integer
+    } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
-    data CloseParams = CloseParams
-        { cpCurrency :: !CurrencySymbol
-        , cpToken    :: !TokenName
-        } deriving (Generic, ToJSON, FromJSON, ToSchema)
+data CloseParams = CloseParams
+    { cpCurrency :: !CurrencySymbol
+    , cpToken    :: !TokenName
+    } deriving (Generic, ToJSON, FromJSON, ToSchema)
+```
 
 Then there is the logic of the three endpoints, defined by the functions:
 
-    start :: (HasBlockchainActions s, AsContractError e) => StartParams -> Contract w s e ()
+```haskell
+start :: (HasBlockchainActions s, AsContractError e) => StartParams -> Contract w s e ()
 
-    bid :: forall w s. HasBlockchainActions s => BidParams -> Contract w s Text ()
-    
-    close :: forall w s. HasBlockchainActions s => CloseParams -> Contract w s Text ()
+bid :: forall w s. HasBlockchainActions s => BidParams -> Contract w s Text ()
+
+close :: forall w s. HasBlockchainActions s => CloseParams -> Contract w s Text ()
+```
 
 An example of sharing code between the on-chain part and the off-chain part is the minBid function:
 
-    {-# INLINABLE minBid #-}
-    minBid :: AuctionDatum -> Integer
-    minBid AuctionDatum{..} = case adHighestBid of
-        Nothing      -> aMinBid adAuction
-        Just Bid{..} -> bBid + 1
+```haskell
+{-# INLINABLE minBid #-}
+minBid :: AuctionDatum -> Integer
+minBid AuctionDatum{..} = case adHighestBid of
+    Nothing      -> aMinBid adAuction
+    Just Bid{..} -> bBid + 1
+```
 
 This is used during the validation both on the wallet side and on the blockchain side. The wallet doesn't have to do this, it could just submit the transaction, which would then fail, but it's neater that it does.
 
