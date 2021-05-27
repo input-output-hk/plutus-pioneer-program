@@ -521,5 +521,52 @@ Another thing to note is that, if there is no suitable UTxO available, we don't 
 
 ### In the playground
 
+First, let's get Wallet 1 to send some lovelace.
+
+![](img/week03__00004.png)
+
+Here we run into a technical problem. We need to supply the beneficiary address, but there is no way in the playground to get the public key hash of a wallet.
+
+But we can get it from the REPL.
+
+    Prelude Week03.IsData> import Wallet.Emulator
+    Prelude Wallet.Emulator Week03.IsData> import Ledger
+    Prelude Wallet.Emulator Ledger Week03.IsData> pubKeyHash $ walletPubKey $ Wallet 2
+    39f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f
+
+Let's create a scenario where validation passes. Wallet 1 gives 500 lovelace with a deadline of slot 15. We wait for 15 slots, and then Wallet 2 grabs.
+
+![](img/week03__00005.png)
+
+After evaluation, we see the Genesis transaction, plus the give and the grab transactions.
+
+![](img/week03__00006.png)
+
+![](img/week03__00007.png)
+
+![](img/week03__00008.png)
+
+And the final balances.
+
+![](img/week03__00009.png)
+
+Now let's look at the case where the grab happens too early. We'll change the wait time to 14 slots.
+
+![](img/week03__00010.png)
+
+Now we see just two transactions - the Genensis transaction, and the give.
+
+![](img/week03__00012.png)
+
+The grab transaction has failed validation.
+
+![](img/week03__00013.png)
+
+
+## Example 2 - Parameterized Contract
+
+Our next example will be parameterized contracts, but let's start with an observation about our existing contract.
+
+
 
 
