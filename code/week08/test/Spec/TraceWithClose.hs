@@ -38,7 +38,7 @@ tests :: TestTree
 tests = checkPredicateOptions
     (defaultCheckOptions & emulatorConfig .~ emCfg)
     "token sale trace"
-    (     walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-60))
+    (     walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   25_000_000  <> assetClassValue token (-25))
      .&&. walletFundsChange (Wallet 2) (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)
      .&&. walletFundsChange (Wallet 3) (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
     )
@@ -48,24 +48,31 @@ runMyTrace :: IO ()
 runMyTrace = runEmulatorTraceIO' def emCfg myTrace
 
 emCfg :: EmulatorConfig
-emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet w, v) | w <- [1 .. 3]]
+emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet w, v' w) | w <- [1 .. 3]]
   where
     v :: Value
     v = Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
 
-currency :: CurrencySymbol
-currency = "aa"
+    v' :: Integer -> Value
+    v' w
+        | w == 1    = v <> assetClassValue nft 1
+        | otherwise = v
 
-name :: TokenName
-name = "A"
+tokenCurrency, nftCurrency :: CurrencySymbol
+tokenCurrency = "aa"
+nftCurrency   = "01"
 
-token :: AssetClass
-token = AssetClass (currency, name)
+tokenName' :: TokenName
+tokenName' = "A"
+
+token, nft :: AssetClass
+token = AssetClass (tokenCurrency, tokenName')
+nft   = AssetClass (nftCurrency, nftName)
 
 myTrace :: EmulatorTrace ()
 myTrace = do
-    h <- activateContractWallet (Wallet 1) startEndpoint
-    callEndpoint @"start" h (currency, name)
+    h <- activateContractWallet (Wallet 1) startEndpoint'
+    callEndpoint @"start" h (nftCurrency, tokenCurrency, tokenName')
     void $ Emulator.waitNSlots 5
     Last m <- observableState h
     case m of
@@ -89,5 +96,6 @@ myTrace = do
             callEndpoint @"buy tokens" h3 5
             void $ Emulator.waitNSlots 5
 
-            callEndpoint @"withdraw" h1 (40, 10_000_000)
+            callEndpoint @"close" h1 ()
+--          callEndpoint @"withdraw" h1 (40, 10_000_000)
             void $ Emulator.waitNSlots 5
