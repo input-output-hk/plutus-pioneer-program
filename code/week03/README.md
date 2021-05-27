@@ -45,5 +45,13 @@ Another interesting change is that fees are now considered in the playground. Th
 
 But, in any case, as there is now a fee of 10 lovelace, it no longer makes sense to have examples with such small balances in the wallets. So, instead of starting with 10 lovelace in each wallet, we should choose a bigger number, for example 1000.
 
+Let's look at the changes in the playground.
+
+![](img/week03__00000.png)
+![](img/week03__00001.png)
+![](img/week03__00002.png)
+![](img/week03__00003.png)
+
+
 
 

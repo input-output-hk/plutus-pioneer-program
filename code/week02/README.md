@@ -18,7 +18,7 @@ Both are important topics. We have to master both in order to write smart contra
 
 Let's recall the Extended UTxO model where the idea is that we introduce a new type of address. 
 
- ![alt text](img/1.png "Image 1")
+![](img/1.png)
 
 In the simple UTxO model are so-called public key addresses, where the address is given by the hash of the public key. If a UTxO sits at such a public key address, then a transaction can consume that UTxO as an input if the signature belonging to that public key is included in the transaction.
 
