@@ -72,8 +72,8 @@ transition ts s r = case (stateValue s, stateData s, r) of
                                                     )
     (v, p, AddTokens n)  | n > 0            -> Just ( mempty
                                                     , State p $
-                                                      v              <>
-                                                      nft (negate 1) <>
+                                                      v                                       <>
+                                                      nft (negate 1)                          <>
                                                       assetClassValue (tsToken ts) n
                                                     )
     (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
