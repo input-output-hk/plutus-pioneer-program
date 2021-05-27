@@ -645,7 +645,7 @@ Now let's look at the case where the grab happens too early. We'll change the wa
 ![](img/week03__00010.png)
 
 Now we see just two transactions - the Genensis transaction, and the give.
-
+    
 ![](img/week03__00012.png)
 
 The grab transaction has failed validation.

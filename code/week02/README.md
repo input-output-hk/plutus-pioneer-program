@@ -42,14 +42,16 @@ We will look at that first, but in real life noboby would actually use this low-
 
 As mentioned, the Datum, Redeemer and Context share a data type. That data type is defined in the package *plutus-tx*, in the module [*PlutusTx.Data*](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/Data.hs). It is called, simply, *Data*. 
 
-    data Data =
-          Constr Integer [Data]
-        | Map [(Data, Data)]
-        | List [Data]
-        | I Integer
-        | B BS.ByteString
-        deriving stock (Show, Eq, Ord, Generic)
-        deriving anyclass (Serialise, NFData)
+```haskell
+data Data =
+        Constr Integer [Data]
+    | Map [(Data, Data)]
+    | List [Data]
+    | I Integer
+    | B BS.ByteString
+    deriving stock (Show, Eq, Ord, Generic)
+    deriving anyclass (Serialise, NFData)
+```
 
 It has five constructors.
 
@@ -81,41 +83,51 @@ From with the REPL:
 
 This will give information about the type *Data*.
 
-    Prelude Week02.Burn> import PlutusTx.Data
-    Prelude PlutusTx.Data Week02.Burn> :i Data
-    type Data :: *
-    data Data
-      = Constr Integer [Data]
-      | Map [(Data, Data)]
-      | List [Data]
-      | I Integer
-      | B bytestring-0.10.12.0:Data.ByteString.Internal.ByteString
-        -- Defined in ‘PlutusTx.Data’
-    instance Eq Data -- Defined in ‘PlutusTx.Data’
-    instance Ord Data -- Defined in ‘PlutusTx.Data’
-    instance Show Data -- Defined in ‘PlutusTx.Data’
-    Prelude PlutusTx.Data Week02.Burn> 
+```haskell
+Prelude Week02.Burn> import PlutusTx.Data
+Prelude PlutusTx.Data Week02.Burn> :i Data
+type Data :: *
+data Data
+    = Constr Integer [Data]
+    | Map [(Data, Data)]
+    | List [Data]
+    | I Integer
+    | B bytestring-0.10.12.0:Data.ByteString.Internal.ByteString
+    -- Defined in ‘PlutusTx.Data’
+instance Eq Data -- Defined in ‘PlutusTx.Data’
+instance Ord Data -- Defined in ‘PlutusTx.Data’
+instance Show Data -- Defined in ‘PlutusTx.Data’
+Prelude PlutusTx.Data Week02.Burn> 
+```
 
 Now we can play with it. We can use the *I* constructor to create a value of type *Data*.
 
-    Prelude PlutusTx.Data Week02.Burn> I 7
-    I 7
+```haskell
+Prelude PlutusTx.Data Week02.Burn> I 7
+I 7
+```
 
 We can ask for its type, and confirm that it is indeed of type *Data*:
 
-    Prelude PlutusTx.Data Week02.Burn> :t I 7
-    I 7 :: Data
+```haskell
+Prelude PlutusTx.Data Week02.Burn> :t I 7
+I 7 :: Data
+```
 
 The easiest way to create a value of type *Data* using the *B* constructor is to use the GHC Extension *OverloadedStrings*. This allows literal strings to be used in place of string-like data types and the compiler will interpret them as their intended type.
 
-    Prelude PlutusTx.Data Week02.Burn> :set -XOverloadedStrings
-    Prelude PlutusTx.Data Week02.Burn> :t B "Haskell"
-    B "Haskell" :: Data
+```haskell
+Prelude PlutusTx.Data Week02.Burn> :set -XOverloadedStrings
+Prelude PlutusTx.Data Week02.Burn> :t B "Haskell"
+B "Haskell" :: Data
+```
 
 We can also use more complicated constructors, like Map and List:
 
-    Prelude PlutusTx.Data Week02.Burn> :t Map [(I 7, B "Haskell"), (List [I 0], I 1000)]
-    Map [(I 7, B "Haskell"), (List [I 0], I 1000)] :: Data
+```haskell
+Prelude PlutusTx.Data Week02.Burn> :t Map [(I 7, B "Haskell"), (List [I 0], I 1000)]
+Map [(I 7, B "Haskell"), (List [I 0], I 1000)] :: Data
+```
 
 ## Plutus Validator
 
@@ -127,33 +139,41 @@ As we know, a validator is a script that takes three pieces of input - the Datum
 
 We start the script by copy pasting a list of GHC language extensions, plus some dependency imports.
 
-    {-# LANGUAGE DataKinds           #-}
-    {-# LANGUAGE FlexibleContexts    #-}
-    ...
+```haskell
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE FlexibleContexts    #-}
+...
 
-    module Week02.Gift where
+module Week02.Gift where
 
-    import           Control.Monad       hiding (fmap)
-    import           Data.Map            as Map
-    ...
-    import           Text.Printf         (printf)
+import           Control.Monad       hiding (fmap)
+import           Data.Map            as Map
+...
+import           Text.Printf         (printf)
+```
 
 Then, we write the Validator. It is a Haskell function that takes three arguments, all of type *Data*.
 
-    mkValidator :: Data -> Data -> Data -> ()
+```haskell
+mkValidator :: Data -> Data -> Data -> ()
+```
 
 Somewhat surprisingly, the result of the function is (). This is the Haskell Unit type, similar to *void* in some other languages, like C++ or C# or Java - it's the type that carrys no information.
 
 Unit is a built-in type in Haskell and it has just one value, which is written in the same way as the type itself, as we can see from the REPL.
 
-    Prelude Week02.Burn> ()
-    ()
+```haskell
+Prelude Week02.Burn> ()
+()
+```
 
 A function with a return type of () is quite unusual in Haskell. In more mainstream languages, it is quite common for functions or procedures to return no value. In these situations, the functions are only important for their side-effects, such as a Java function that prints something to the console.
 
 But Haskell is a pure language. If you want side-effects, this will be shown by the type system. For example if the mkValidator were to perform any IO, it would have a type signature of:
 
-    mkValidator :: Data -> Data -> Data -> IO ()
+```haskell
+mkValidator :: Data -> Data -> Data -> IO ()
+```
 
 This would indicate a function that performs IO side-effects but has no interesting return value.    
 
@@ -165,8 +185,10 @@ The idea is that if the mkValidator function does not run into an error or throw
 
 Let's write the simplest Validator that we can.
 
-    mkValidator :: Data -> Data -> Data -> ()
-    mkValidator _ _ _ = ()
+```haskell
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = ()
+```
 
 The first argument is the Datum, the second argument is the Redeemer and the third argument is the Context, and the most simple thing we can do is to completely ignore all three arguments and immediately return Unit.
 
@@ -176,8 +198,10 @@ This function is not yet Plutus code, it is just a Haskell function. In order to
 
 The result of our compilation to Plutus will be of type *Validator*. Below the function in Gift.hs, we add the following code.
 
-    validator :: Validator
-    validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
+```haskell
+validator :: Validator
+validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
+```
 
 The mkValidatorScript function takes the type *CompiledCode (Data -> Data -> Data -> ()) -> Validator*. In order to create this type, we must compile the mkValidator script using something called Template Haskell. 
 
@@ -185,7 +209,9 @@ Template Haskell is an advanced feature of Haskell that solves a similar problem
 
 So, with this code
 
-    $$(PlutusTx.compile [|| mkValidator ||])
+```haskell
+$$(PlutusTx.compile [|| mkValidator ||])
+```
 
 We are asking the compiler to write the code for the *validator* function at compile time based on our mkValidator function, and then proceed with the normal compilation.
 
@@ -195,29 +221,35 @@ Template Haskell expects all the code to be available within the Oxford Brackets
 
 To avoid this, there is one thing we need to do to the mkValidator function, and that is to make it inlinable by adding the INLINABLE pragma.
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: Data -> Data -> Data -> ()
-    mkValidator _ _ _ = ()
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = ()
+```
 
 You will see this often in Plutus scripts, and it is usually an indication that a function is meant to be used within a validation script. All the functions on which the Validator depends must be inlinable.
 
 Let's go back to the REPL and take a look at the Validator.
 
-    :l src/Week02/Gift.hs
-    Ok, one module loaded.
-    Prelude Week02.Gift> validator
-    Validator { <script> }
-    Prelude Week02.Gift> :t validator
-    validator
-      :: plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts.Validator
+```haskell
+:l src/Week02/Gift.hs
+Ok, one module loaded.
+Prelude Week02.Gift> validator
+Validator { <script> }
+Prelude Week02.Gift> :t validator
+validator
+    :: plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts.Validator
+```
 
 Back to the code, there are two more types that we want the value of - the validator hash and the address. These are easy to define now that we have our validator.
 
-    valHash :: Ledger.ValidatorHash
-    valHash = Scripts.validatorHash validator
+```haskell
+valHash :: Ledger.ValidatorHash
+valHash = Scripts.validatorHash validator
 
-    scrAddress :: Ledger.Address
-    scrAddress = ScriptAddress valHash
+scrAddress :: Ledger.Address
+scrAddress = ScriptAddress valHash
+```
 
 Now we have a script address represented as *scrAddress*.
 
@@ -227,22 +259,25 @@ In order to actually try this script, we need wallet code. The focus of this lec
 
 Two endpoints are defined. The *give* endpoint will take an Integer argument to specify the number of Lovelace that will be depostied to the contract.  The *grab* endpoint will take no argument and will simply look for UTxOs at this script address and consume them.
 
-    type GiftSchema =
-        BlockchainActions
-            .\/ Endpoint "give" Integer
-            .\/ Endpoint "grab" ()
-
+```haskell
+type GiftSchema =
+    BlockchainActions
+        .\/ Endpoint "give" Integer
+        .\/ Endpoint "grab" ()
+```
 
 *Give* takes the Integer argument and uses the helper function *mustPayToOtherScript* which takes the *valHash* and a Datum that, in this example, is completely ignored. It uses the *Datum* constructor to turn a *Data* into a *Datum*. In this case the *Data* is created using the *Constr* construtor taking a 0 and an empty list. Finally the amount to send to the address is specified using the helper function *Ada.lovelaceValueOf*.
 
 The transaction is then submitted, the script waits for it to be confirmed and then prints a log message.
 
-    give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
-    give amount = do
-        let tx = mustPayToOtherScript valHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
-        ledgerTx <- submitTx tx
-        void $ awaitTxConfirmed $ txId ledgerTx
-        logInfo @String $ printf "made a gift of %d lovelace" amount
+```haskell
+give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+give amount = do
+    let tx = mustPayToOtherScript valHash (Datum $ Constr 0 []) $ Ada.lovelaceValueOf amount
+    ledgerTx <- submitTx tx
+    void $ awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ printf "made a gift of %d lovelace" amount
+```
 
 The *grab* endpoint is a little bit more complicated. We use *utxoAt* with our shiny new Plutus script address *scrAddress* to lookup all the UTxOs sitting at that address. We then need lookups which will be explained in a later lecture.
 
@@ -250,31 +285,37 @@ We then define the transaction by using *mustSpendScriptOutput* for each UTxO fo
 
 Again, we submit, wait for confirmation, and then write a log message.
 
-    grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
-    grab = do
-        utxos <- utxoAt scrAddress
-        let orefs   = fst <$> Map.toList utxos
-            lookups = Constraints.unspentOutputs utxos      <>
-                      Constraints.otherScript validator
-            tx :: TxConstraints Void Void
-            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I 17 | oref <- orefs]
-        ledgerTx <- submitTxConstraintsWith @Void lookups tx
-        void $ awaitTxConfirmed $ txId ledgerTx
-        logInfo @String $ "collected gifts"
+```haskell
+grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Contract w s e ()
+grab = do
+    utxos <- utxoAt scrAddress
+    let orefs   = fst <$> Map.toList utxos
+        lookups = Constraints.unspentOutputs utxos      <>
+                    Constraints.otherScript validator
+        tx :: TxConstraints Void Void
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I 17 | oref <- orefs]
+    ledgerTx <- submitTxConstraintsWith @Void lookups tx
+    void $ awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "collected gifts"
+```
 
 We then have some boilerplate.
 
-    endpoints :: Contract () GiftSchema Text ()
-    endpoints = (give' `select` grab') >> endpoints
-      where
-        give' = endpoint @"give" >>= give
-        grab' = endpoint @"grab" >>  grab
+```haskell
+endpoints :: Contract () GiftSchema Text ()
+endpoints = (give' `select` grab') >> endpoints
+    where
+    give' = endpoint @"give" >>= give
+    grab' = endpoint @"grab" >>  grab
+```
 
 And these last two lines are just for the playground. As we saw in lecture 1, for example, the *mkKnownCurrencies* list is used to define tokens for the playground.
 
+```haskell
     mkSchemaDefinitions ''GiftSchema
 
     mkKnownCurrencies []
+```
 
 ## In the Playground
 
@@ -284,7 +325,9 @@ Again we are using commit 3746610e53654a1167aeb4c6294c6096d16b0502 of the Plutus
 
 Remove this line
 
-    module Week02.Gift where
+```haskell
+module Week02.Gift where
+```
 
 Then, compile the script in the playground and press the *Simulate* button.    
 
@@ -330,18 +373,24 @@ Let's look at the second example of validation, using the Burn module. We will s
 
 Recall that the way a validator indicates failure is by throwing an error. 
 
-    mkValidator :: Data -> Data -> Data -> ()
-    mkValidator _ _ _ = error ()
+```haskell
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = error ()
+```
 
 If we load the module in the REPL and look at *error*
 
-    Prelude Week02.Burn> :t error
-    error :: [Char] -> a
+```haskell
+Prelude Week02.Burn> :t error
+error :: [Char] -> a
+```
 
 We see the definition for the standard Haskell error function. However, the one in scope in our code is in fact the following *error* function.
 
-    Prelude Week02.Burn> :t PlutusTx.Prelude.error
-    PlutusTx.Prelude.error :: () -> a
+```haskell
+Prelude Week02.Burn> :t PlutusTx.Prelude.error
+PlutusTx.Prelude.error :: () -> a
+```
 
 In regular Haskell, you have the *error* function which takes an error message string and triggers an error.
 
@@ -351,22 +400,30 @@ We mentioned earlier that we use the INLINABLE pragma on the *mkValidator* funct
 
 The way that the Plutus Predule is able to take precedence over the Haskell Prelude, which is normally in scope by default, is by using the following LANGUAGE pragma in the code.
 
-    {-# LANGUAGE NoImplicitPrelude   #-}
+```haskell
+{-# LANGUAGE NoImplicitPrelude   #-}
+```
 
 Then, by importing PlutusTx.Prelude, its functions are used in place of the standard Prelude functions.
 
-    import PlutusTx.Prelude hiding (Semigroup(..), unless)
+```haskell
+import PlutusTx.Prelude hiding (Semigroup(..), unless)
+```
 
 You may also notice that the standard Prelude is also imported. However, it is only in order to bring in *Semigroup*, which we explicity hid in the PlutusTx.Prelude import. But this is not important right now.
 
-    import Prelude (Semigroup (..))
+```haskell
+import Prelude (Semigroup (..))
+```
 
 Just remember that when you are using something in a Plutus script that looks like a function from the standard Prelude, what you are actually using is a function from the Plutus Prelude. Often they will have the same signature, but, as we can see in the case of *error*, they are not always identical.
 
 Looking again at our new validator, we now have a validator that will always fail.
 
-    mkValidator :: Data -> Data -> Data -> ()
-    mkValidator _ _ _ = error ()
+```haskell
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = error ()
+```
 
 We will leave everything else as it was and check the effect in the playground.
 
@@ -382,11 +439,15 @@ So, in our first example we had a validator that would always succeed and would 
 
 When we look at the logs, we see that validation fails, but we have no clue why it fails. here's a way to change that by using a variant of error - *traceError*. 
 
-    mkValidator _ _ _ = traceError "NO WAY!"
+```haskell
+mkValidator _ _ _ = traceError "NO WAY!"
+```
 
 The function takes a string, but not a Haskell string. It is a Plutus string. In order for this to compile, we need to use the OverloadedStrings GHC extension.    
 
-    {-# LANGUAGE OverloadedStrings   #-}
+```haskell
+{-# LANGUAGE OverloadedStrings   #-}
+```
 
 If we now run the same scenario in the playground with the new code, we will see the custom error message that we added.
 
@@ -398,41 +459,53 @@ Now let's write a validator that looks at at least one of the arguments. Let's w
 
 Now that we care about the redeemer, we need to be able to reference it.
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: Data -> Data -> Data -> ()
-    mkValidator _ r _
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ r _
+```
 
 We can now reference the redeemer as *r* in the code.
 
 Let's say that we expect the redeemer to be I 42. If so, validation passes. If not, we fail with an error message.
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: Data -> Data -> Data -> ()
-    mkValidator _ r _
-        | r == I 42 = ()
-        | otherwise = traceError "wrong redeemer"
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ r _
+    | r == I 42 = ()
+    | otherwise = traceError "wrong redeemer"
+```
 
 If we were to run this now in the playground, validation would always fail. We need to add an input to the *grab* endpoint so that Wallet 3 can pass in the redeemer which will be used by the *mkValidator* function.
 
-    type GiftSchema =
-        BlockchainActions
-            .\/ Endpoint "give" Integer
-            .\/ Endpoint "grab" Integer
+```haskell
+type GiftSchema =
+    BlockchainActions
+        .\/ Endpoint "give" Integer
+        .\/ Endpoint "grab" Integer
+```
 
 And now, the redeemer is no longer to be ignored in the *grab* part of the code. Instead we will pass in the value of the redeemer given to the endpoint.
 
 We add the redeemer argument to the *grab* declaration. Note the addition of the Integer in the function signature, as well as the new *r* parameter which is used to reference it.
 
-    grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
-    grab r = do
+```haskell
+grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+grab r = do
+```
 
 And then pass it to the *mustSpendScriptOutput* instead of the throw-away value we used earlier.
 
-    tx = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
+```haskell
+tx = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
+```
 
 One more change, we need to change the ">>" to ">>=" in the following code, now that *grab* has an argument. You can use the REPL to look at the types ">>" and ">>=" to see why the second one is now needed. Basically, they both sequence actions, but >> ignores any wrapped values, whereas >>= accesses the wrapped value and passes it to the next action.
 
-    grab' = endpoint @"grab" >>= grab
+```haskell
+grab' = endpoint @"grab" >>= grab
+```
 
 Now we can try it out in the playground. After adding the new code and clicking *Simulate* you will notice that the old scenario has gone. That is because the schema has changed and the old scenario is no longer valid.
 
@@ -466,15 +539,21 @@ We would rather use more specific data types that are tailored to the business l
 
 This is indeed possible with so-called Typed Validators. What this means is that we can replace the occurences of *Data* in the mkValidator signature with more suitable types.
 
-    mkValidator :: Data -> Data -> Data -> ()
+```haskell
+mkValidator :: Data -> Data -> Data -> ()
+```
 
 In our silly little example, we completely ignore the Datum, so a more suitable type would be just the Unit type - ().
 
-    mkValidator :: () -> Data -> Data -> ()
+```haskell
+mkValidator :: () -> Data -> Data -> ()
+```
 
 For the redeemer, in this example, we are only dealing with integers, so it would probably make more sense to use Integer instead.
 
-    mkValidator :: () -> Integer -> Data -> ()
+```haskell
+mkValidator :: () -> Integer -> Data -> ()
+```
 
 We haven't talked yet about what the Context actually looks like, but you can imagine that its translation into the *Data* type is quite akward and it wouldn't be pleasant to work with.
 
@@ -482,11 +561,15 @@ There is a much nicer type called *ValidatorCtx* that's made exactly for this pu
 
 Note: this type gets replaced with ScriptContext in later Plutus builds and will be used from Lecture 3 onwards.
 
-    mkValidator :: () -> Integer -> ValidatorCtx -> ()
+```haskell
+mkValidator :: () -> Integer -> ValidatorCtx -> ()
+```
 
 Finally, we have already mentioned that it is a bit unusual to use Unit as a return type. Much more natural would be to use Bool to indicate successful or failed validation.
 
-    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+```haskell
+mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+```
 
 So, this is a better way to write validation code. The last two types *ValidatorCtx* and *Bool* will always be the same (but see note above), but the first two types can be different depending on the situation.
 
@@ -494,11 +577,13 @@ In this case, let's now rewrite the function accordingly using these new types. 
 
 And, we no longer want to return Unit - we will return True or False.
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
-    mkValidator () r _
-        | r == 42   = True
-        | otherwise = False
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+mkValidator () r _
+    | r == 42   = True
+    | otherwise = False
+```
 
 This will not yet compile as other parts of the code are not yet type correct.
 
@@ -506,16 +591,20 @@ Remember that the mkValidatorScript expected code of type *Data -> Data -> Data 
 
 In order for this to work we first need one more import.
 
-    import qualified Ledger.Typed.Scripts as Scripts
+```haskell
+import qualified Ledger.Typed.Scripts as Scripts
+```
 
 In this example, it is being imported qualified and using the Scripts prefix, but this is arbitrary and you could pick some other way of referencing the module.
 
 Now we need some boilerplate, the purpose of which is to tell the compiler which types we have picked for Datum and Redeemer.
 
-    data Typed
-    instance Scripts.ScriptType Typed where
-        type instance DatumType Typed = ()
-        type instance RedeemerType Typed = Integer
+```haskell
+data Typed
+instance Scripts.ScriptType Typed where
+    type instance DatumType Typed = ()
+    type instance RedeemerType Typed = Integer
+```
 
 This is quite advanced Haskell, so-called type-level programming, but just like the Template Haskell we have already encountered, you don't really need a deep understanding of it as all scripts will follow the same schema.
 
@@ -523,15 +612,17 @@ We these changes, the Haskell code will compile, and we now need to change the T
 
 Again, this pattern will be the same for all scripts that use typed validators.
 
-    inst :: Scripts.ScriptInstance Typed
-    inst = Scripts.validator @Typed
-        $$(PlutusTx.compile [|| mkValidator ||])
-        $$(PlutusTx.compile [|| wrap ||])
-    where
-        wrap = Scripts.wrapValidator @() @Integer
+```haskell
+inst :: Scripts.ScriptInstance Typed
+inst = Scripts.validator @Typed
+    $$(PlutusTx.compile [|| mkValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
+where
+    wrap = Scripts.wrapValidator @() @Integer
 
-    validator :: Validator
-    validator = Scripts.validatorScript inst
+validator :: Validator
+validator = Scripts.validatorScript inst
+```
 
 We have now turned our untyped version into a typed version.
 
@@ -541,8 +632,10 @@ At this point the code will run as before in the simulator. However, we can make
 
 Although we have not yet gone over this part of the code in detail, the following changes can be made.
 
-    let tx = mustPayToTheScript () $ Ada.lovelaceValueOf amount
-    ledgerTx <- submitTxConstraints inst tx
+```haskell
+let tx = mustPayToTheScript () $ Ada.lovelaceValueOf amount
+ledgerTx <- submitTxConstraints inst tx
+```
 
 The *mustPayToOtherScript* function has been replaced with *mustPayToTheScript*. We can pass in just () as we longer need to constuct a value of type *Data*. And we also no longer need to pass in the script hash.
 
@@ -556,11 +649,13 @@ We can look at the code in the *PlutusTx.IsData.Class* module.
 
 Here we see that there is a quite simple type class defined, called *IsData*. The code here is taken directly from the Plutus code at commit 3746610e53654a1167aeb4c6294c6096d16b0502.
 
-    -- | A typeclass for types that can be converted to and from 'Data'.
-    class IsData (a :: Type) where
-        toData :: a -> Data
-        -- TODO: this should probably provide some kind of diagnostics
-        fromData :: Data -> Maybe a
+```haskell
+-- | A typeclass for types that can be converted to and from 'Data'.
+class IsData (a :: Type) where
+    toData :: a -> Data
+    -- TODO: this should probably provide some kind of diagnostics
+    fromData :: Data -> Maybe a
+```
 
 This class allows us to translate between the *Data* type and types that are instances of the class.
 
@@ -571,17 +666,21 @@ It provides two functions
 
 Let's try this out in the REPL.
 
-    Prelude Week02.Burn> :l src/Week02/Typed.hs 
-    Ok, one module loaded.
-    Prelude Week02.Typed> import PlutusTx.IsData
-    Prelude PlutusTx.IsData Week02.Typed>
+```haskell
+Prelude Week02.Burn> :l src/Week02/Typed.hs 
+Ok, one module loaded.
+Prelude Week02.Typed> import PlutusTx.IsData
+Prelude PlutusTx.IsData Week02.Typed>
+```
 
 We know that *Unit* and *Integer* are both instances of *IsData* because they worked in our example.
 
 Let's convert an *Integer* to *Data*
 
-    Prelude PlutusTx.IsData Week02.Typed> toData (42 :: Integer)
-    I 42
+```haskell
+Prelude PlutusTx.IsData Week02.Typed> toData (42 :: Integer)
+I 42
+```
 
 We see that this has been converted to an instance of type *Data* using the *I* constructor, which we did manually before we used typed validation.    
 
@@ -589,49 +688,57 @@ Now let's do it the other way around
 
 First we need to import PlutusTx to make the *Data* type available to us.    
 
-    Prelude PlutusTx.IsData Week02.Typed> import PlutusTx
+```haskell
+Prelude PlutusTx.IsData Week02.Typed> import PlutusTx
+```
 
 Then we will convert from *Data* to *Integer*.
 
-    Prelude PlutusTx.IsData PlutusTx Week02.Typed> fromData (I 42) :: Maybe Integer
-    Just 42
+```haskell
+Prelude PlutusTx.IsData PlutusTx Week02.Typed> fromData (I 42) :: Maybe Integer
+Just 42
+```
 
 We get a *Just 42* back - *Just* being the Maybe constructor when Maybe is not Nothing.
 
 And when it fails, when it can't convert to the target type, we will get back Nothing.
 
-    Prelude PlutusTx.IsData PlutusTx Week02.Typed> fromData (List []) :: Maybe Integer
-    Nothing
+```haskell
+Prelude PlutusTx.IsData PlutusTx Week02.Typed> fromData (List []) :: Maybe Integer
+Nothing
+```
 
 If we examine *IsData* we can see all the types that this pattern will work for - all the types that have an *IsData* instance defined.
 
 If we examine *IsData*
 
-    Prelude PlutusTx.IsData Week02.Typed> :i IsData
-    type IsData :: * -> Constraint
-    class IsData a where
-    toData :: a -> PlutusTx.Data.Data
-    fromData :: PlutusTx.Data.Data -> Maybe a
-    {-# MINIMAL toData, fromData #-}
-        -- Defined in ‘PlutusTx.IsData.Class’
-    instance IsData a => IsData (Maybe a)
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance (IsData a, IsData b) => IsData (Either a b)
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance IsData Bool
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance (IsData a, IsData b, IsData c, IsData d) =>
-            IsData (a, b, c, d)
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance (IsData a, IsData b, IsData c) => IsData (a, b, c)
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance (IsData a, IsData b) => IsData (a, b)
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance IsData ()
-    -- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
-    instance IsData a => IsData [a]
+```haskell
+Prelude PlutusTx.IsData Week02.Typed> :i IsData
+type IsData :: * -> Constraint
+class IsData a where
+toData :: a -> PlutusTx.Data.Data
+fromData :: PlutusTx.Data.Data -> Maybe a
+{-# MINIMAL toData, fromData #-}
     -- Defined in ‘PlutusTx.IsData.Class’
-    instance IsData Integer -- Defined in ‘PlutusTx.IsData.Class’
+instance IsData a => IsData (Maybe a)
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance (IsData a, IsData b) => IsData (Either a b)
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance IsData Bool
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance (IsData a, IsData b, IsData c, IsData d) =>
+        IsData (a, b, c, d)
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance (IsData a, IsData b, IsData c) => IsData (a, b, c)
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance (IsData a, IsData b) => IsData (a, b)
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance IsData ()
+-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’
+instance IsData a => IsData [a]
+-- Defined in ‘PlutusTx.IsData.Class’
+instance IsData Integer -- Defined in ‘PlutusTx.IsData.Class’
+```
 
 This is still quite a short list of possible types. We would like to use many more types than this for our Datum and Redeemer.
 
@@ -643,36 +750,44 @@ However, this again would be tedious as it is such a mechanical process. So, the
 
 Before we look at that mechanism, let's rewrite the validation function.
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
-    mkValidator () r _ = r == 42
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+mkValidator () r _ = r == 42
+```
 
 This does the same job, but is now a one-liner. However, we no longer have our error message. To solve this, there is a function called *traceIfFalse* that takes a *String* and a *Bool*. If the *Bool* is true, the string will be ignored, otherwise it will be logged. The result of the function will be the value of the *Bool*.
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: () -> Integer -> ValidatorCtx -> Bool
-    mkValidator () r_ = traceIfFalse "wrong redeemer" $ r == 42
+```haskell
+{-# INLINABLE mkValidator #-}
+mkValidator :: () -> Integer -> ValidatorCtx -> Bool
+mkValidator () r_ = traceIfFalse "wrong redeemer" $ r == 42
+```
 
 Now let's talk about custom data types. Let's define a silly one and use it in our validator function.
 
-    newtype MySillyRedeemer = MySillyRedeemer Integer
-        deriving Show
+```haskell
+newtype MySillyRedeemer = MySillyRedeemer Integer
+    deriving Show
 
-    {-# INLINABLE mkValidator #-}
-    mkValidator :: () -> MySillyRedeemer -> ValidatorCtx -> Bool
-    mkValidator () (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
+{-# INLINABLE mkValidator #-}
+mkValidator :: () -> MySillyRedeemer -> ValidatorCtx -> Bool
+mkValidator () (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
+```
 
 And we need to change some of the boilerplate.
 
-    data Typed
-    instance Scripts.ScriptType Typed where
-    ...
-        type instance RedeemerType Typed = MySillyRedeemer
+```haskell
+data Typed
+instance Scripts.ScriptType Typed where
+...
+    type instance RedeemerType Typed = MySillyRedeemer
 
-    inst :: Scripts.ScriptInstance Typed
-    ...
-    where
-        wrap = Scripts.wrapValidator @() @MySillyRedeemer
+inst :: Scripts.ScriptInstance Typed
+...
+where
+    wrap = Scripts.wrapValidator @() @MySillyRedeemer
+```
 
 If we try to compile the code now, either on the command line or in the playground, we will get an error because Plutus doesn't know how to convert back and forth between *IsData* and *MySillyRedeemer*.
 
@@ -680,25 +795,33 @@ We could write an instance of *IsData* for *MySillyRedeemer* by hand. But, we do
 
 Instead we can use another bit of Template Haskell magic.
 
-    PlutusTx.unstableMakeIsData ''MySillyRedeemer
+```haskell
+PlutusTx.unstableMakeIsData ''MySillyRedeemer
+```
 
 At compile time, the compiler will use the Template Haskell to write an *IsData* instance for us. And now, it will compile. 
 
 Let's check it in the REPL.
 
-    Prelude PlutusTx.IsData PlutusTx> :l src/Week02/IsData.hs 
-    Ok, one module loaded.
+```haskell
+Prelude PlutusTx.IsData PlutusTx> :l src/Week02/IsData.hs 
+Ok, one module loaded.
+```
 
 Converting to *IsData*.
 
-    Prelude PlutusTx.IsData PlutusTx Week02.IsData> toData (MySillyRedeemer 17)
-    Constr 0 [I 17]
-    Prelude PlutusTx.IsData PlutusTx Week02.IsData>
+```haskell
+Prelude PlutusTx.IsData PlutusTx Week02.IsData> toData (MySillyRedeemer 17)
+Constr 0 [I 17]
+Prelude PlutusTx.IsData PlutusTx Week02.IsData>
+```
 
 And converting back again.
 
-    Prelude PlutusTx.IsData PlutusTx Week02.IsData> fromData (Constr 0 [I 3]) :: Maybe MySillyRedeemer
-    Just (MySillyRedeemer 3)
+```haskell
+Prelude PlutusTx.IsData PlutusTx Week02.IsData> fromData (Constr 0 [I 3]) :: Maybe MySillyRedeemer
+Just (MySillyRedeemer 3)
+```
 
 Note that in order to run this conversion back to Maybe MySillyRedeemer in the REPL, it relies on MySillyRedeemer deriving Show, so that the REPL knows how to display the result.
 
@@ -706,10 +829,12 @@ So far, so good.
 
 That is the on-chain part and now we need to do something in the off-chain part where we produce the Redeemer.
 
-    grab r = do
-    ...
-        tx = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData $ MySillyRedeemer r | oref <- orefs]
- 
+```haskell
+grab r = do
+...
+    tx = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData $ MySillyRedeemer r | oref <- orefs]
+```
+
 If you try this code (in IsData.hs) in the playground, you should see that it behaves in the same way as before. 
 
 We have seen a couple of examples of simple validators and we have seen both the low-level approach and the higher-level typed approach where we can use custom type.
