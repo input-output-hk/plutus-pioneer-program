@@ -562,10 +562,11 @@ The grab transaction has failed validation.
 
 ![](img/week03__00013.png)
 
-
 ## Example 2 - Parameterized Contract
 
 Our next example will be parameterized contracts, but let's start with an observation about our existing contract.
+
+### An Observation
 
 We will set up a scenario where both wallets give and both wallets grab.
 
@@ -599,5 +600,174 @@ Now, what we want to focus on here is the script addresses for the give of Walle
 
 And this is not surprising. Recall that the address of the script is calculated by taken the hash of the compiled Plutus code of the validator. Since the same validator is being used in both those transactions, the script address is the same.
 
+Keep this in mind for what we are about to cover in the following section.
 
+### Another Way of Doing It
+
+In our example, we have put the beneficiary and the deadline into the datum. But there are other choices.
+
+You could also parameterize the whole script on those two pieces of data - the beneficiary and the deadline.
+
+A parameterized script is like a family of scripts. You can instantiate it with different parameters, and you get different scripts. They all behave the same, but they have these different parameters.
+
+We start by making a copy of Vesting.hs and creating a new module - Week03.Parameterized.
+
+Now, instead of using the *VestedDatum*, we are going to paramterize the script with it. It makes sense to first change its name.
+
+    data VestingParam = VestingParam
+        { beneficiary :: PubKeyHash
+        , deadline    :: Slot
+        } deriving Show
+
+Next, we will return to using Unit as our datum type, but we will add a new validation argument, before the other arguments, of our new type *VestingParam*.
+
+    mkValidator :: VestingParam -> () -> () -> ScriptContext -> Bool
+
+The idea is that mkValidator is now a function that takes a VestingParam and returns a custom validator based on those params.
+
+We don't need to change much, just the function header and the parts that previously accessed the datum.
+
+    mkValidator :: VestingParam -> () -> () -> ScriptContext -> Bool
+    mkValidator p () () ctx =
+        traceIfFalse "beneficiary's signature missing" checkSig      &&
+        traceIfFalse "deadline not reached"            checkDeadline
+    where
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+
+        checkSig :: Bool
+        checkSig = beneficiary p `elem` txInfoSignatories info
+
+        checkDeadline :: Bool
+        checkDeadline = from (deadline p) `contains` txInfoValidRange info
+
+And, we need to change another piece of code that previously referenced the datum.
+
+    data Vesting
+    instance Scripts.ScriptType Vesting where
+        type instance DatumType Vesting = ()
+        type instance RedeemerType Vesting = ()
+
+And now we come to an interesting question. What do we do here?
+
+    inst :: Scripts.ScriptInstance Vesting
+    inst = Scripts.validator @Vesting
+        $$(PlutusTx.compile [|| mkValidator ||])
+        $$(PlutusTx.compile [|| wrap ||])
+    where
+        wrap = Scripts.wrapValidator @VestingDatum @()
+
+As is, this won't work because now *mkValidator* has the wrong type. Remember that it must be a function that takes three arguments and returns a boolean. But now, it has four arguments.
+
+Also, we won't always get the same instance, so this must now become a function that takes *VestingParam* as an argument.
+
+    inst :: VestingParam -> Scripts.ScriptInstance Vesting
+    inst p = Scripts.validator @Vesting
+
+The first idea would be to simply do something like this - adding the *p* as a parameter, which would make the type correct again.
+
+    -- this won't work
+    $$(PlutusTx.compile [|| mkValidator p ||])
+
+But the problem is that, as we have seen before, in Template Haskell, the things inside the Oxford Brackets must be known at compile time, but the value of *p* here will not be known until runtime.
+
+Luckily, there is a way around this.
+
+We have something called applyCode, which takes two Plutus scripts, and, assuming that the first one is a function, it applies this function to the second argument.
+
+   ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` -- partial code
+
+So, now, this...
+
+    ($$(PlutusTx.compile [|| mkValidator ||])
+
+Is now a Plutus script for a function that takes such a parameter. So, now, we must write a Plutus script for that parameter. Then *applyCode* will apply the function to the script for the parameter, and we will get a script of the right type out of that.
+
+But this looks like it still doesn't solve the problem because what do we write after *applyCode*? How do we get the parameter there. We can't use PlutusTx.compile, as we have already seen.
+
+This is where another important class comes in - the so-called *Lift* class.
+
+#### The Lift Class
+
+The *Lift* class is defined in package *plutus-tx*.
+
+    module PlutusTx.Lift.Class
+
+It only has one function, *Lift*. However, we won't use this function directly.
+
+The importance of the class is that it allows us to, at runtime, lift Haskell values into corresponding Plutus script values. And this is exactly what we need to convert our parameter *p* into code.
+
+We will use a different function, defined in the same package but in a different module.
+
+    module PlutusTx.Lift
+
+The function we will use is called *liftCode*
+
+    -- | Get a Plutus Core program corresponding to the given value as a 'CompiledCodeIn', throwing any errors that occur as exceptions and ignoring fresh names.
+    liftCode
+        :: (Lift.Lift uni a, Throwable uni fun, PLC.ToBuiltinMeaning uni fun)
+        => a -> CompiledCodeIn uni fun a
+    liftCode x = unsafely $ safeLiftCode x
+
+It takes a Haskell value of type *a*, provided *a* is an instance of the *Lift* class, and turns it into a piece of Plutus script code corresponding to the same type.
+
+So, let's use that.
+
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode p)
+
+There is still a problem, however. We need a *Lift* instance for *p*.
+
+Luckily, similar to how we got an instance for *IsData* there is also a Template Haskell function for *Lift*.
+
+    PlutusTx.makeLift ''VestingParam
+
+But, it still won't compile. We need another GHC extension.
+
+    {-# LANGUAGE MultiParamTypeClasses #-}
+
+Now we have to some more little modifications.
+
+    validator :: VestingParam -> Validator
+    validator = Scripts.validatorScript . inst
+
+    scrAddress :: VestingParam -> Ledger.Address
+    scrAddress = scriptAddress . validator
+
+Changes are also necessary in the wallet part.
+
+The *GiveParams* stay the same, but the endpoints are slightly different, because in the *grab* endpoint earlier we only had the Unit argument, but now we need the slot.
+
+This is because, in order to construct the address that we grab from, we need the params - the benficiary and the deadline. We already now the beneficiary, as it will be the address of the wallet that is doing the grabbing, but we need to pass in the slot value for the deadline.
+
+In the *give* endpoint, there are also some differences.
+
+Whenever we need an *inst* we must pass in the params.
+
+    ledgerTx <- submitTxConstraints (inst p) tx
+
+And in the *grab* endpoint, we have the additional parameter.
+
+    grab d = do
+
+And we can use that to construct the parameters, along with our own public key hash.
+
+    let p = VestingParam
+                { beneficiary = pkh
+                , deadline    = d
+                }
+
+And again, when we use something like *scrAddress*, we need to pass in the parameters.
+
+    utxos <- utxoAt $ scrAddress p
+
+Now, the good thing with this is that we don't need the filter helper function *isSuitable* anymore. Previously, we got all the UTxOs sitting at the script address and filtered them based on beneficiary and deadline. But now, it's much easier because the script is already parameterized by beneficiary, so we know that this script will only hold UTxOs that are for us.
+
+So, all we need to do is to check that *now* is not earlier than the deadline.
+
+    if now < d
+        then logInfo @String $ "too early"
+        else do
+        ...
+
+        
 
