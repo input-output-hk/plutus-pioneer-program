@@ -132,7 +132,23 @@ While there is a lot of information contained in this *txInfo* type, for our fir
 
 This brings us to an interesting dilemma. We have stressed several times that the big advantage that Cardano has over something like Ethereum is that validation can happen in the wallet. But we have also noted that a transaction can still fail on-chain following  validation if, when the transaction arrives on the blockchain, it has been consumed already by someone else. In this case, the transaction fails without having to pay fees.
 
-What should never happen under normal circumstances is that a validation script runs and then fails. This is because you can always run the validation under the same conditions in the wallet.
+What should never happen under normal circumstances is that a validation script runs and then fails. This is because you can always run the validation under exactly the same conditions in the wallet, so it would fail before you ever submit it.
+
+So that is a very nice feature, but it is not obvious how to manage time in that context. Time is important, because we want to be able to express that a certain transaction is only valid before or only valid after a certain time has been reached.
+
+We saw an example of this in lecture one - the auction example, where bids are only allowed until the deadline has been reached, and the *close* endpoint can only be called after the deadline has passed.
+
+That seems to be a contractiction, because time is obviously flowing. So, when you try to validate a transaction that you are constructing in your wallet, the time that you are doing that can, of course, be different than the time that the transaction arrives at a node for validation. So, it's not clear how to bring these two together so that validation is deterministic, and to guaranteee that if, and only if, validation succeeds in the wallet, it will also succeeed at the node.
+
+The way Cardano solves that, is by adding the slot range field *txInfoValidRange* to a transaction, which essentially says "This transaction is valid between *this* and *that* slot". 
+
+When a transaction gets submitted to the blockchain and validated by a node, then before any scripts are run, some general checks are made, for example that all inputs are present and that the balances add up, that the fees are included and so on. One of those checks is to check that the slot range is valid.
+
+This means that we are completely deterministic again because if the script is run, we know that we are within the valid slot range - we do not need to check the time in the script.
+
+
+
+
 
 
 
