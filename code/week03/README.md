@@ -167,19 +167,6 @@ When we look at the file in which *Slot* is defined, we see that it is a type wr
         
 In order to construct a value of type *Slot*, we can use the *Slot* constructor, but it's even easier if you look at the implemented type classes, where we can see that it also implements the *Num* type class, which means that we can use numeric literals, so we can simply write 17, for example, rather than "Slot 17", or "Slot {getSlot=17}".
 
-An example from the REPL:
-
-    Prelude Week03.IsData> import Plutus.V1.Ledger.Slot 
-
-    Prelude Plutus.V1.Ledger.Slot Week03.IsData> Slot 17
-    Slot {getSlot = 17}
-
-    Prelude Plutus.V1.Ledger.Slot Week03.IsData> Slot {getSlot=17}
-    Slot {getSlot = 17}
-
-    Prelude Plutus.V1.Ledger.Slot Week03.IsData> 17 :: Slot
-    Slot {getSlot = 17}
-
 The definition of *SlotRange* is
 
     -- | An 'Interval' of 'Slot's.
@@ -265,3 +252,85 @@ And we have the *before* and *after* functions to determine if a given *Slot* is
 
 Let's have a play in the REPL.
 
+    Prelude Week03.IsData> import Plutus.V1.Ledger.Slot 
+    Prelude Plutus.V1.Ledger.Slot Week03.IsData> import Plutus.V1.Ledger.Interval 
+
+There are two ways to define a slot. First, you can use the *Slot* constructor.
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> Slot 3
+    Slot {getSlot = 3}
+
+Secondly, you can just write it as an *Integer*, but in this case you need to tell the compiler what type it is.
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> 3 :: Slot
+    Slot {getSlot = 3}
+
+Let's use some of the helper functions for constructing intervals. This will give us slots 3,4,5,6,7,8,9,10:
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> interval (Slot 3) 10
+    Interval {ivFrom = LowerBound (Finite (Slot {getSlot = 3})) True, ivTo = UpperBound (Finite (Slot {getSlot = 10})) True}
+
+You see that there are two finite slots defined as the lower and upper bounds, and that they both have the value *True*, which indicates that they are both inclusive bounds.
+
+We can check whether a slot is a member of an interval:
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 5 $ interval (Slot 3) 10
+    True
+    
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 3 $ interval (Slot 3) 10
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 10 $ interval (Slot 3) 10
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 11 $ interval (Slot 3) 10
+    False
+
+We can use the *from* constructor. Here we see that the lower bound is again a finite slot, but that the upper bound is positive infinity.
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> from (Slot 20)
+    Interval {ivFrom = LowerBound (Finite (Slot {getSlot = 20})) True, ivTo = UpperBound PosInf True}
+
+And we can check slots for membership of this interval:
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 20 $ from (Slot 20)
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 19 $ from (Slot 20)
+    False
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 1000000 $ from (Slot 20)
+    True
+
+And the *to* constructor. Here we see that now the lower bound is negative infinity, while the upper bound is a finite slot number.
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> to (Slot 100)
+    Interval {ivFrom = LowerBound NegInf True, ivTo = UpperBound (Finite (Slot {getSlot = 100})) True}
+
+And let's check various slots for membership:
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 7 $ to (Slot 100)
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 100 $ to (Slot 100)
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> member 101 $ to (Slot 100)
+    False
+
+Now, let's try the *contains* function:
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> contains (to $ Slot 100) $ interval 30 50
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> contains (to $ Slot 100) $ interval 30 110
+    False
+
+And *overlaps*:
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> overlaps (to $ Slot 100) $ interval 30 110
+    True
+
+    Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> overlaps (to $ Slot 100) $ interval 101 110
+    False
+    
