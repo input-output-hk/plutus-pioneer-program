@@ -144,13 +144,124 @@ The way Cardano solves that, is by adding the slot range field *txInfoValidRange
 
 When a transaction gets submitted to the blockchain and validated by a node, then before any scripts are run, some general checks are made, for example that all inputs are present and that the balances add up, that the fees are included and so on. One of those checks is to check that the slot range is valid.
 
-This means that we are completely deterministic again because if the script is run, we know that we are within the valid slot range - we do not need to check the time in the script.
+This means that we are completely deterministic again because if the script is run, we know that we are within the valid slot range.
 
+By default, a script will use the infinite slot range, one that covers all slots until the end of time, but we do have the option to set a different slot range, and that is what we have to do if we deal with time-critical smart contracts, like in the auction example.
 
+So, let's look at this slot range type in more detail.
 
+### Slot
 
+One relevant module, found in package *plutus-ledger-api* is:
 
+    Plutus.V1.Ledger.Slot
 
+When we look at the file in which *Slot* is defined, we see that it is a type wrapper around *Integer*.
 
+    -- | The slot number. This is a good proxy for time, since on the Cardano blockchain
+    -- slots pass at a constant rate.
+    newtype Slot = Slot { getSlot :: Integer }
+        deriving stock (Haskell.Eq, Haskell.Ord, Show, Generic)
+        deriving anyclass (FromJSON, FromJSONKey, ToJSON, ToJSONKey, NFData)
+        deriving newtype (Haskell.Num, AdditiveSemigroup, AdditiveMonoid, AdditiveGroup, Enum, Eq, Ord, Real, Integral, Serialise, Hashable, PlutusTx.IsData)
+        
+In order to construct a value of type *Slot*, we can use the *Slot* constructor, but it's even easier if you look at the implemented type classes, where we can see that it also implements the *Num* type class, which means that we can use numeric literals, so we can simply write 17, for example, rather than "Slot 17", or "Slot {getSlot=17}".
 
+An example from the REPL:
+
+    Prelude Week03.IsData> import Plutus.V1.Ledger.Slot 
+
+    Prelude Plutus.V1.Ledger.Slot Week03.IsData> Slot 17
+    Slot {getSlot = 17}
+
+    Prelude Plutus.V1.Ledger.Slot Week03.IsData> Slot {getSlot=17}
+    Slot {getSlot = 17}
+
+    Prelude Plutus.V1.Ledger.Slot Week03.IsData> 17 :: Slot
+    Slot {getSlot = 17}
+
+The definition of *SlotRange* is
+
+    -- | An 'Interval' of 'Slot's.
+    type SlotRange = Interval Slot
+
+So *SlotRange* is an *Interval Slot* - so what is *Interval*? That is defined in a module in the same package - *plutus-ledger-api*.
+
+This is more general and is not necessarily for *Slot*s. Here, we are only concerned with the case where the type variable *a* is *Slot*.
+
+    --   The interval can also be unbounded on either side.
+    data Interval a = Interval { ivFrom :: LowerBound a, ivTo :: UpperBound a }
+        deriving stock (Haskell.Eq, Haskell.Ord, Show, Generic)
+        deriving anyclass (FromJSON, ToJSON, Serialise, Hashable, NFData)
+
+There are some slight complications. For example, you can specify whether one or both of the bounds are inclusive, and you have the special case where the upper bound is infinity and the case where the lower bound is the beginning of time.
+
+Normally, we don't have to deal with types directly because we have nice helper functions. The most general of these helper functions is probably the *interval* function, which takes an inclusive lower bound and an inclusive upper bound and constructs an interval from those values.
+
+The comment on this function in the commit we are working with in this lecture is incorrect - it claims that the upper bound is not inclusive, but it actually is.
+
+    interval :: a -> a -> Interval a
+    interval s s' = Interval (lowerBound s) (upperBound s')
+
+There is also the *singleton* helper, which constructs an interval which consists of just one slot.
+
+    singleton :: a -> Interval a
+    singleton s = interval s s
+
+We have *from* which constructs an *Interval* starting from a given slot and extending to the end of time.
+
+    from :: a -> Interval a
+    from s = Interval (lowerBound s) (UpperBound PosInf True)
+
+And we have *to*, which is the opposite. It constructs an *Interval* starting from the genesis block up to, and including, the given slot. Again, the comments in the code for the commit we are working with claims that it is not inclusive, but it is.
+
+    to :: a -> Interval a
+    to s = Interval (LowerBound NegInf True) (upperBound s)
+
+We have *always* which contains all slots from the beginning of time until the end of eternity. This is the default.
+
+    always :: Interval a
+    always = Interval (LowerBound NegInf True) (UpperBound PosInf True)
+
+And we have the opposite, *never*, which contains no slots.
+
+    never :: Interval a
+    never = Interval (LowerBound PosInf True) (UpperBound NegInf True)
+
+In addition to these helper functions for constructing values of type *Interval*, we have various helpers for working with *Interval*s.
+
+The *member* function checks whether a value is contained within an *Interval*.
+
+    member :: Ord a => a -> Interval a -> Bool
+    member a i = i `contains` singleton a
+
+The *overlaps* function checks whether two intervals overlap, that is, whether there is a value that is a member of both intervals.
+
+    overlaps :: Ord a => Interval a -> Interval a -> Bool
+    overlaps l r = isEmpty (l `intersection` r)
+
+The *intersection* function determines the largest interval that is contained in both the given intervals. This is an *Interval* that starts from the largest lower bound of the two intervals and extends until the smallest upper bound.
+
+    intersection :: Ord a => Interval a -> Interval a -> Interval a
+    intersection (Interval l1 h1) (Interval l2 h2) = Interval (max l1 l2) (min h1 h2)
+
+The function *hull* gives the smallest interval containing both the given intervals.
+
+    hull :: Ord a => Interval a -> Interval a -> Interval a
+    hull (Interval l1 h1) (Interval l2 h2) = Interval (min l1 l2) (max h1 h2)
+
+The *contains* function takes two intervals and determines if the second interval is completely contained within the first one.
+
+    contains :: Ord a => Interval a -> Interval a -> Bool
+    contains (Interval l1 h1) (Interval l2 h2) = l1 <= l2 && h2 <= h1
+
+And we have the *before* and *after* functions to determine if a given *Slot* is before or after a given *Interval*, respectively.
+
+    before :: Ord a => a -> Interval a -> Bool
+    before h (Interval f _) = lowerBound h < f
+
+    after :: Ord a => a -> Interval a -> Bool
+    after h (Interval _ t) = upperBound h > t
+
+Let's have a play in the REPL.
 
