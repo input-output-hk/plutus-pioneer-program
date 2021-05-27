@@ -790,7 +790,7 @@ So, now, this...
 ($$(PlutusTx.compile [|| mkValidator ||])
 ```
 
-Is now a Plutus script for a function that takes such a parameter. So, now, we must write a Plutus script for that parameter. Then *applyCode* will apply the function to the script for the parameter, and we will get a script of the right type out of that.
+...is now a Plutus script for a function that takes such a parameter. So, now, we must write a Plutus script for that parameter. Then *applyCode* will apply the function to the script for the parameter, and we will get a script of the right type out of that.
 
 But this looks like it still doesn't solve the problem because what do we write after *applyCode*? How do we get the parameter there. We can't use PlutusTx.compile, as we have already seen.
 
