@@ -769,5 +769,24 @@ So, all we need to do is to check that *now* is not earlier than the deadline.
         else do
         ...
 
-        
+### Back to the playground
 
+If we copy paste this new contract into the playground and setup the same scenario as before...
+
+![](img/week03__00020.png)
+
+We can see that now, one of the disadvantages to doing it this way is that the wallets now need to know the deadline in order to construct the script address.
+
+If you evaluate this, you will see that it succeeds.
+
+![](img/week03__00021.png)
+
+But now, compare the script address that Wallet 1 sends to with the script address that Wallet 2 sends to.
+
+![](img/week03__00022.png)
+
+They are now different. The UTxOs are being held at different addresses.
+
+This is because of the parameters. The same script but with different parameters will have a different hash.
+
+Whether this is a good thing or a bad thing will depend on the use case.
