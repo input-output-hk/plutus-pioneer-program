@@ -17,6 +17,7 @@
 module Spec.Model
     ( tests
     , test
+    , TSModel (..)
     )  where
 
 import           Control.Lens                       hiding (elements)
