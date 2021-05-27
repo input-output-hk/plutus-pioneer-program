@@ -1,5 +1,13 @@
 # Week 03
 
+These is a written version of [Lecture #3](https://youtu.be/Lk1eIVm_ZTQ).
+
+In this lecture we learn about the script context (the third validation argument), handling time, and parameterized contracts.
+
+Please feel free to raise pull requests for typos, poor formatting, poor grammar, or anything else that is poor or inaccurate.
+
+## Housekeeping
+
 For this lecture we will be working with a later commit of Plutus than in previous lectures. You will find the commit in the cabal.project file for Week03.
 
     cd /path/to/Plutus
@@ -15,9 +23,9 @@ But, luckily, the changes are not that bad.
 
 Let's take the last example from Week 02 and port it to the new Plutus version to see what has changed.
 
-## Porting IsData
+### Porting IsData
 
-### Code Changes
+#### Code Changes
 
 The first difference is in the *mkValidator* function.
 
@@ -35,7 +43,7 @@ Previously, *scrAddress* was created using *ScriptAddress* (capital S), passing 
 
 We don't need the validator hash anymore. It still exists and we could compute it, but we don't need it.
 
-### Playground Changes
+#### Playground Changes
 
 There have also been some changes in the playground.
 
@@ -333,4 +341,11 @@ And *overlaps*:
 
     Prelude Plutus.V1.Ledger.Slot Plutus.V1.Ledger.Interval Week03.IsData> overlaps (to $ Slot 100) $ interval 101 110
     False
-    
+
+And now, we can look, for the first time, at a contract that actually looks at the third validation argument, the *Context*, and does something interesting with it.
+
+## Example - Vesting
+
+Imagine you want to give a gift of Ada to a child, but you only want the child to have access to the Ada when he or she turns eighteen.
+
+
