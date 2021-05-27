@@ -567,6 +567,37 @@ The grab transaction has failed validation.
 
 Our next example will be parameterized contracts, but let's start with an observation about our existing contract.
 
+We will set up a scenario where both wallets give and both wallets grab.
+
+Again, in this example, the public key hash of Wallet 1's address was obtained from the REPL in the same way as with the Wallet 2 example above.
+
+![](img/week03__00014.png)
+
+After evaluation...
+
+The Genesis transaction, as always.
+
+![](img/week03__00015.png)
+
+The give of Wallet 2...
+
+![](img/week03__00016.png)
+
+The give of Wallet 1...
+
+![](img/week03__00017.png)
+
+The grab of Wallet 2...
+
+![](img/week03__00018.png)
+
+And, the grab of Wallet 1...
+
+![](img/week03__00019.png)
+
+Now, what we want to focus on here is the script addresses for the give of Wallet 1 and the give of Wallet 2. If you look back at those screenshots, you will notice that the script address in both cases is the same.
+
+And this is not surprising. Recall that the address of the script is calculated by taken the hash of the compiled Plutus code of the validator. Since the same validator is being used in both those transactions, the script address is the same.
 
 
 
