@@ -223,7 +223,8 @@ firstGame fp = do
                 logInfo @String "second player did not play"
                 let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
                               Constraints.otherScript (gameValidator game)
-                    tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData ClaimFirst)
+                    tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData ClaimFirst) <>
+                              Constraints.mustValidateIn (from $ 1 + fpPlayDeadline fp)
                 ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                 void $ awaitTxConfirmed $ txId ledgerTx'
                 logInfo @String "reclaimed stake"
