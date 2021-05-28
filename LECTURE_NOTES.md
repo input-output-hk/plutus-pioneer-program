@@ -6,7 +6,7 @@ This is a written version of the Plutus Pioneer Program YouTube lectures by Lars
 
 - [Week 01](#week-01)
   * [Welcome](#welcome)
-  * [The (E)UTxO Model](#the--e-utxo-model)
+  * [The (E)UTxO Model](#the-eutxo-model)
     + [Overview](#overview)
     + [When Is Spending Allowed?](#when-is-spending-allowed-)
     + [Script Context](#script-context)
