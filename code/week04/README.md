@@ -96,8 +96,28 @@ Now, if we have a situation where we call *foo* twice, even though we don't know
 let a = foo
 let b = foo
 
-a == b -- we know this to be true
+if a == b
+  then ... -- we know this to be true
+  else ... -- the compiler could tell you here not to waste your typing
 ```
+
+This is a very important feature that is called *referential transparency*. There are, in fact, some escape hatches to get around this, but we can ignore this.
+
+This makes tasks such as refactoring and testing much easier.
+
+This is all very well, but you need side-effects in order to have an effect on the world. Otherwise, all your program does is heat up the processor.
+
+You need input and output. You must be able to write output to the screen, or read input from the keyboard, or a network connection, or a file, for example.
+
+There is a famous [video by Simon Peyton-Jones called Haskell Is Useless](https://www.youtube.com/watch?v=iSmkqocn0oQ) which explains that it is beautiful mathematically to have a pure, side effect-free language, but in the end you do need side effects to make anything happen.
+
+And Haskell does have a way to handle side effects and that is the IO Monad. But, don't worry about the monad part just yet.
+
+
+
+
+
+
 
 
 
