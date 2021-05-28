@@ -256,6 +256,56 @@ The truly important method here is *fmap*. The second function *(<$)* is a conve
 fmap :: (a -> b) -> f a -> f b
 ```
 
+This function, *fmap*, that all *Functor*s have tells us that, if we give it has access to a function that can turn an *a* into a *b*, then it can turn an *f a* into an *f b* for us. Here, we are interested in the case where *f* is *IO*.
+
+If we specialized the function for *IO*, we would have a function like:
+
+```haskell
+fmap' :: (a -> b) -> IO a -> IO b
+```
+
+How does that work. Well, *IO a* is a recipe that has side effects and produces an *a*. So, how do we get a *b* out of that? We perform the recipe, but, before return the *a*, we apply the *(a -> b)* function to to *a* and return the result, which is the *b*.
+
+In the REPL, let's look at the *toUpper* function.
+
+```haskell
+Prelude Week04.Contract> import Data.Char
+Prelude Data.Char Week04.Contract> :t toUpper
+toUpper :: Char -> Char
+Prelude Data.Char Week04.Contract> toUpper 'q'
+'Q'
+```
+
+If we want to apply that to a *String* rather than a *Char* we can use the *map* function. *String*s in Haskell are just lists of *Char*s.
+
+```haskell
+Prelude Data.Char Week04.Contract> map toUpper "Haskell"
+"HASKELL"
+```
+
+The *map toUpper* function is a function from *String* to *String*.
+
+```haskell
+Prelude Data.Char Week04.Contract> :t map toUpper
+map toUpper :: [Char] -> [Char]
+```
+
+And we can use this in combination with *fmap*. If we use *map toUpper* as our function to convert an *a* to a *b*, we can see what the type of output of *fmap* would be when applied to an *IO a*.
+
+```haskell
+Prelude Data.Char Week04.Contract> :t fmap (map toUpper) getLine
+fmap (map toUpper) getLine :: IO [Char]
+```
+
+Let's see it in action.
+
+```haskell
+Prelude Data.Char Week04.Contract> fmap (map toUpper) getLine
+haskell
+"HASKELL"
+```
+
+
 
 
 
