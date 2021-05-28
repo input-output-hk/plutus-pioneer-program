@@ -2,7 +2,7 @@
 
 This is a written version of the Plutus Pioneer Program YouTube lectures by Lars Brünjes.
 
-## Contents
+#
 
 - [Week 01](#week-01)
   * [Welcome](#welcome)
@@ -2233,8 +2233,6 @@ These is a written version of [Lecture #4](https://youtu.be/6Reuh0xZDjY).
 
 In this lecture we learn about Monads. In particular the EmulatorTrace and Contract monads.
 
-Please feel free to raise pull requests for typos, poor formatting, poor grammar, or anything else that is poor or inaccurate.
-
 ## Overview
 
 We have spent the last two lectures talking about the on-chain part of Plutus - the validation logic that is compiled to Plutus script and actually lives on the blockchain and is executed by nodes that validate a transaction.
@@ -2595,5 +2593,34 @@ Prelude Week04.Contract> :t return "Haskell"
 return "Haskell" :: Monad m => m [Char]
 ```
 
-If we now go back to our *main* program, we can now write relatively complex *IO* actions.
+If we now go back to our *main* program, we can now write relatively complex *IO* actions. For example, we can define an *IO* action that will ask for two strings and print result of concatenating those two strings to the console.
+
+```haskell
+main :: IO ()
+main = bar
+
+bar :: IO ()
+bar = getLine >>= \s ->
+      getLine >>= \t ->
+      putStrLn (s ++ t)
+```
+
+And then, when we run it, the program will wait for two inputs and then output the concatenated result.
+
+```bash
+cabal run hello
+one
+two
+onetwo
+```
+
+This is enough now for our purposes, although we won't need the *IO* Monad until perhaps later in the course when we talk about actually deploying Plutus contracts. However, the *IO* Monad is an important example, and a good one to start with.
+
+So, for now, let's completely forget about *IO* and just write pure, functional Haskell.
+
+
+
+
+
+
 
