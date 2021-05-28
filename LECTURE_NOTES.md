@@ -2618,6 +2618,8 @@ This is enough now for our purposes, although we won't need the *IO* Monad until
 
 So, for now, let's completely forget about *IO* and just write pure, functional Haskell, using the *Maybe* type.
 
+### Maybe
+
 The *Maybe* type is one of the most useful types in Haskell.
 
 ```haskell
@@ -2642,8 +2644,63 @@ instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 
 It is often called something like *Optional* in other programming languages.
 
-It has two constructors - *Nothing* and *Just*.
+It has two constructors - *Nothing*, which takes no arguments, and *Just*, which takes one argument.
 
+```haskell
+data Maybe a = Nothing | Just a
+```
 
+Let's look at an example.
 
+In Haskell, if you want to pass a *String* to a value that has a *read* instance, you will normally do this with the *read* function.
 
+```haskell
+Week04.Maybe> read "42" :: Int
+42
+```
+
+But, *read* is a bit unpleasant, because if we have something that can't be parsed as an *Int*, then we get an error.
+
+```haskell
+Week04.Maybe> read "42+u" :: Int
+*** Exception: Prelude.read: no parse
+```
+
+Let's import *readMaybe* to do it in a better way.
+
+```haskell
+Prelude Week04.Maybe> import Text.Read (readMaybe)
+Prelude Text.Read Week04.Contract>
+```
+
+The function *readMaybe* does the same as *read*, but it returns a *Maybe*, and in the case where it cannot parse, it will return a *Maybe* created with the *Nothing* constructor.
+
+```haskell
+Prelude Text.Read Week04.Contract> readMaybe "42" :: Maybe Int
+Just 42
+
+Prelude Text.Read Week04.Contract> readMaybe "42+u" :: Maybe Int
+Nothing
+```
+
+Let's say we want to create a new function that returns a *Maybe*.
+
+```
+foo :: String -> String -> String -> Maybe Int
+```
+
+The idea is that the function should try to parse all three *String*s as *Int*s. If all the *String*s can be successfully parsed as *Int*s, then we want to add those three *Int*s to get a sum. If one of the parses fails, we want to return *Nothing*.
+
+One way to do that would be:
+
+```haskell
+foo :: String -> String -> String -> Maybe Int
+foo x y z = case readMaybe x of
+    Nothing -> Nothing
+    Just k  -> case readMaybe y of
+        Nothing -> Nothing
+        Just l  -> case readMaybe z of
+            Nothing -> Nothing
+            Just m  -> Just (k + l + m)
+```
+            
