@@ -126,6 +126,8 @@ It is important to notice that referential transparency is not broken here. The 
 
 The only way to actually execute such a recipe in a Haskell program is from the main entry point of the program - the *main* function. You can also execute *IO* actions in the REPL.
 
+### Hello World - putStrLn
+
 Hello World in Haskell looks like this:
 
 ```haskell
@@ -173,26 +175,86 @@ executable hello
 
 This specifies the source directory and which file holds the main function. Normally the file name must match the module name, but the *main* is an exception.
 
+Rather than just asking for the type of *putStrLn*, we can run it in the REPL. As mentioned, the REPL allows us to execute IO actions.
 
+```haskell
+Prelude Week04.Contract> putStrLn "Hello, world!"
+Hello, world!
+```
 
+### getLine
 
+Let's look at *getLine*
 
+```haskell
+Prelude Week04.Contract> :t getLine
+getLine :: IO String
+```
 
+This shows that it is a recipe, possibly producing side-effects, that, when executed will produce a *String*. In the case of *getLine*, the side-effect in question is that it will wait for user input from the keyboard.
 
+If we execute *getLine* in the REPL.
 
+```haskell
+Prelude Week04.Contract> getLine
+```
 
+It waits for keyboard input. Then, if we enter something, it returns the result.
 
+```haskell
+Haskell
+"Haskell"
+```
 
+There are a variety of IO actions defined in Haskell to do all sorts of things like reading files, writing files, reading from and writing to sockets.
 
+But no matter how many predefined actions you have, that will never be enough to achieve something complex, so there must be a way to combine these primitive, provided IO actions into bigger, more complex recipes.
 
+One thing we can do is make use of the *Functor* type instance of IO. Let's look at the type instances of *IO* in the REPL.
 
+```haskell
+Prelude Week04.Contract> :i IO
+type IO :: * -> *
+newtype IO a
+  = ghc-prim-0.6.1:GHC.Types.IO (ghc-prim-0.6.1:GHC.Prim.State#
+                                   ghc-prim-0.6.1:GHC.Prim.RealWorld
+                                 -> (# ghc-prim-0.6.1:GHC.Prim.State#
+                                         ghc-prim-0.6.1:GHC.Prim.RealWorld,
+                                       a #))
+  	-- Defined in ‘ghc-prim-0.6.1:GHC.Types’
+instance Applicative IO -- Defined in ‘GHC.Base’
+instance Functor IO -- Defined in ‘GHC.Base’
+instance Monad IO -- Defined in ‘GHC.Base’
+instance Monoid a => Monoid (IO a) -- Defined in ‘GHC.Base’
+instance Semigroup a => Semigroup (IO a) -- Defined in ‘GHC.Base’
+instance MonadFail IO -- Defined in ‘Control.Monad.Fail’
+```
 
+We see the dreaded *Monad* instance, but we also see a *Functor* instance. *Functor* is a very important type class in Haskell. If we look at it in the REPL:
 
+```haskell
+Prelude Week04.Contract> :i Functor
+type Functor :: (* -> *) -> Constraint
+class Functor f where
+  fmap :: (a -> b) -> f a -> f b
+  (<$) :: a -> f b -> f a
+  {-# MINIMAL fmap #-}
+  	-- Defined in ‘GHC.Base’
+instance Functor (Either a) -- Defined in ‘Data.Either’
+instance Functor [] -- Defined in ‘GHC.Base’
+instance Functor Maybe -- Defined in ‘GHC.Base’
+instance Functor IO -- Defined in ‘GHC.Base’
+instance Functor ((->) r) -- Defined in ‘GHC.Base’
+instance Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
+instance Functor ((,,) a b) -- Defined in ‘GHC.Base’
+instance Functor ((,) a) -- Defined in ‘GHC.Base’
+```
 
+The truly important method here is *fmap*. The second function *(<$)* is a convenience function.
 
-
-
-
+```haskell
+fmap :: (a -> b) -> f a -> f b
+```
 
 
 
