@@ -250,7 +250,7 @@ instance Functor ((,,) a b) -- Defined in ‘GHC.Base’
 instance Functor ((,) a) -- Defined in ‘GHC.Base’
 ```
 
-The truly important method here is *fmap*. The second function *(<$)* is a convenience function.
+The important method here is *fmap*. The second function *(<$)* is a convenience function.
 
 ```haskell
 fmap :: (a -> b) -> f a -> f b
@@ -304,6 +304,85 @@ Prelude Data.Char Week04.Contract> fmap (map toUpper) getLine
 haskell
 "HASKELL"
 ```
+
+We can also use the *>>* operator. This chains two *IO* actions together, ignoring the result of the first. In the following example, both actions will be performed in sequence.
+
+```haskell
+Prelude Week04.Contract> putStrLn "Hello" >> putStrLn "World"
+Hello
+World
+```
+
+Here, there is no result from *putStrLn*, but if there were, it would have been ignored. Its side effects would have been performed, its result ignored, then the second *putStrLn* side effects would been performed before returning the result of the second call.
+
+Then, there is an important operator that does not ignore the result of the first *IO* action, and that is called *bind*. It is written as the *>>=* symbol.
+
+```haskell
+Prelude Week04.Contract> :t (>>=)
+(>>=) :: Monad m => m a -> (a -> m b) -> m b
+```
+
+We see the *Monad* constraint, but we can ignore that for now and just think of *IO*.
+
+What this says is that if I have a recipe that performs side effects then gives me a result *a*, and given that I have a function that takes an *a* and gives me back a recipe that returns a *b*, then I can combine the recipe *m a* with the recipe *m b* by taking the value *a* and using it in the recipe that results in the value *b*.
+
+An example will make this clear.
+
+```haskell
+Prelude Week04.Contract> getLine >>= putStrLn
+Haskell
+Haskell
+```
+
+Here, the function *getLine* is of type *IO String*. The return value *a* is passed to the function *(a -> m b)* which then generates a recipe *putStrLn* with an input value of *a* and an output of type *IO ()*. Then, *putStrLn* performs its side effects and returns *Unit*.
+
+There is another, very important, way to create *IO* actions, and that is to create recipes that immediately return results without performing any side effects.
+
+That is done with a function called *return*.
+
+```haskell
+Prelude Week04.Contract> :t return
+return :: Monad m => a -> m a
+````
+
+Again, it is general for any Monad, we only need to think about *IO* right now.
+
+It takes a value *a* and returns a recipe that produces the value *a*. In the case of *return*, the recipe does not actually create any side effects.
+
+For example:
+
+```haskell
+Prelude Week04.Contract> return "Haskell" :: IO String
+"Haskell"
+```
+
+We needed to specify the return type so that the REPL knows which Monad we are using:
+
+```haskell
+Prelude Week04.Contract> :t return "Haskell" :: IO String
+return "Haskell" :: IO String :: IO String
+
+Prelude Week04.Contract> :t return "Haskell"
+return "Haskell" :: Monad m => m [Char]
+```
+
+If we now go back to our *main* program, we can now write relatively complex *IO* actions.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
