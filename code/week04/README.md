@@ -52,8 +52,6 @@ Monads are infamous in the Haskell world. It is normally the first stumbling blo
 
 There are a lot of tutorials out there that try to explain Monads. Monads get compared to burritos, and all sorts of metaphors are employed to try to explain the concept. But here, let's at least try to give a crash course in monads for those who are new to Haskell.
 
-### Introduction to Monads
-
 Before we get to general monads, we will start with *IO*, which is how IO side-effects are handled in Haskell. But, before we get to Haskell, let's look at a mainstream language like Java.
 
 Let's look at the following Java method.
@@ -112,6 +110,73 @@ You need input and output. You must be able to write output to the screen, or re
 There is a famous [video by Simon Peyton-Jones called Haskell Is Useless](https://www.youtube.com/watch?v=iSmkqocn0oQ) which explains that it is beautiful mathematically to have a pure, side effect-free language, but in the end you do need side effects to make anything happen.
 
 And Haskell does have a way to handle side effects and that is the IO Monad. But, don't worry about the monad part just yet.
+
+Here is how we do it in Haskell.
+
+```haskell
+foo :: IO Int
+foo = ...
+```
+
+*IO* is a type constructor that takes one argument, like some other examples of type constructors such as *Maybe* and *List*. However, unlike those examples, *IO* is special, in the sense that you can't implement it in the language itself. It is a built-in primitive.
+
+The return value *IO Int* tells us that this is a recipe to compute an *Int*, and this recipe can cause side effects. A list of instructions telling the computer what to do in order to end up with an *Int*.
+
+It is important to notice that referential transparency is not broken here. The result of the evaluation of *foo* is the recipe itself, not the *Int* value. And as the recipe is always the same, referential transparency is maintained.
+
+The only way to actually execute such a recipe in a Haskell program is from the main entry point of the program - the *main* function. You can also execute *IO* actions in the REPL.
+
+Hello World in Haskell looks like this:
+
+```haskell
+main :: IO ()
+main = putStrLn "Hello, world!"
+```
+
+Here, *main* is a recipe that performs some side effects and returns Unit - nothing of interest.
+
+Let's look at *putStrLn* in the REPL. We see that it is an IO action that takes a *String* and returns no interesting result.
+
+```haskell
+Prelude Week04.Contract> :t putStrLn
+putStrLn :: String -> IO ()
+
+Prelude Week04.Contract> :t putStrLn "Hello, world!"
+putStrLn "Hello, world!" :: IO ()
+```
+
+We can also run this. Open up the app/Main.sh file and edit the *main* function so it reads:
+
+```haskell
+main :: IO ()
+main = putStrLn "Hello, world!"
+```
+
+Then run
+
+```bash
+cabal run hello
+```
+
+We will take a quick look at the cabal file now.
+
+In previous lectures we only needed the *library* section in the *plutus-pioneer-program-week04.cabal* file as we were dealing only with library functions. Now, we need to add an *executable* stanza.
+
+```cabal
+executable hello
+  hs-source-dirs:      app
+  main-is:             hello.hs
+  build-depends:       base ^>=4.14.1.0
+  default-language:    Haskell2010
+  ghc-options:         -Wall -O2
+```
+
+This specifies the source directory and which file holds the main function. Normally the file name must match the module name, but the *main* is an exception.
+
+
+
+
+
 
 
 
