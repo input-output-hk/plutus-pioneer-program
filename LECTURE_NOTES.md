@@ -2616,10 +2616,33 @@ onetwo
 
 This is enough now for our purposes, although we won't need the *IO* Monad until perhaps later in the course when we talk about actually deploying Plutus contracts. However, the *IO* Monad is an important example, and a good one to start with.
 
-So, for now, let's completely forget about *IO* and just write pure, functional Haskell.
+So, for now, let's completely forget about *IO* and just write pure, functional Haskell, using the *Maybe* type.
 
+The *Maybe* type is one of the most useful types in Haskell.
 
+```haskell
+Prelude Week04.Contract> :i Maybe
+type Maybe :: * -> *
+data Maybe a = Nothing | Just a
+  	-- Defined in ‘GHC.Maybe’
+instance Applicative Maybe -- Defined in ‘GHC.Base’
+instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Maybe’
+instance Functor Maybe -- Defined in ‘GHC.Base’
+instance Monad Maybe -- Defined in ‘GHC.Base’
+instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
+instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Maybe’
+instance Semigroup a => Semigroup (Maybe a)
+  -- Defined in ‘GHC.Base’
+instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
+instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
+instance Foldable Maybe -- Defined in ‘Data.Foldable’
+instance Traversable Maybe -- Defined in ‘Data.Traversable’
+instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
+```
 
+It is often called something like *Optional* in other programming languages.
+
+It has two constructors - *Nothing* and *Just*.
 
 
 
