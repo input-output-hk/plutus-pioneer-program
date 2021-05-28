@@ -217,7 +217,7 @@ We are asking the compiler to write the code for the *validator* function at com
 
 You do not need to understand very much about Template Haskell to write Plutus as it is always the same pattern. Once you have seen a couple of examples, you can more or less just copy and paste.
 
-Template Haskell expects all the code to be available within the Oxford Brackets (|| ||). With more complicated Validators you will likely be relying on multiple helper functions, and you do not want to have to add them within the Oxford Brackets.
+Template Haskell expects all the code to be available within the Oxford Brackets - [[ ]]. With more complicated Validators you will likely be relying on multiple helper functions, and you do not want to have to add them within the Oxford Brackets.
 
 To avoid this, there is one thing we need to do to the mkValidator function, and that is to make it inlinable by adding the INLINABLE pragma.
 
