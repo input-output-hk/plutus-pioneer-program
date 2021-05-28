@@ -76,10 +76,34 @@ final int b = foo();
 Now, we note that, so long as we don't know what is going on inside the foo() function, the return value of the following expression is unknown.
 
 ```java
-a == b; // true or false? we don't know
+a == b; // true or false? at compile time, we don't know
 ```
 
 We do not know if *a* is the same as *b* because, in Java, it is perfectly possible that some IO happens inside *foo()*. For example, there code be code that asks the user to enter input on the console and uses this to compute the return value.
+
+This means that, in order to reason about the code, we need to look inside *foo()*, which makes testing, for example, more difficult. And it means that, it the first call to *foo()* returns, for example, 13 - we cannot just replace all other calls to *foo()* with the known return value of 13.
+
+In Haskell the situation is very different because Haskell is a pure functional language. The equivalent signature in Haskell would be something like:
+
+```haskell
+foo :: Int
+foo = ...
+```
+
+Now, if we have a situation where we call *foo* twice, even though we don't know what the value of *foo* is, we know for sure that the two return values will be the same.
+
+```haskell
+let a = foo
+let b = foo
+
+a == b -- we know this to be true
+```
+
+
+
+
+
+
 
 
 
