@@ -59,22 +59,22 @@ Which basically is a Haskell function (`mkValidator`), that latter on will be co
 
 #### 2.2 create a validator
 The next step is to create a validator (`mkValidatorScript`), this one uses **template Haskell**  this basically compiles inline (allowed by the `{~#INLINABLE mkValidator#~}` pragma) everything after the *`$$` splice* (after double dollar sign `$$`) in this case it will invoke the compilation of `PlutusTx.compile` with its input`mkValidator` (this is whatever is inside the double bars, inside the square brakets).
-
+```haskell
     validator :: Validator
     validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
-    
+```
 #### 2.3 create a Plutus address
 Next, we create a validator hash to then turn in into an actual address (not a public key address yet, this is a Plutus address)
-
+```haskell
     valHash :: Ledger.ValidatorHash
     valHash = Scripts.validatorHash validator
     
     scrAddress :: Ledger.Address
     scrAdress = ScriptAdress valHash
-
+```
 #### 2.4 contract functionalities    
 In order to try this we need wallet code as follows below
-
+```haskell
     typeGiftSchema = 
         BlockchainAction
             .\/ Endpoint "give" Integer -- takes an integer as input
@@ -98,7 +98,7 @@ In order to try this we need wallet code as follows below
         ledgerTx <- submitTxConstraintsWith @Void lookups tx
         void $ awaitTxConfirmed $ txId ledgerTx
         logInfo @String $ "collected gifts"
-                
+```
 where we basically create two functionalities: `give` and `grab`.The first one allows one account to put tokens on the contract for another actor to grab it. 
 
 2.4.1 `give` takes an Integer as input and maps it to a contract. It starts by hashing the datum (in this case there is no previous history so the consturctor `Datum` takes non-important inputs `0 []`) and amount of tokens. (in this case the tokens are ADA, we convert the `amount` into ADA with the hyperfunction `Ada.lovelaceValueOf`). Then, the transaction is submitted (`ledgerTx <- submitTx tx`) and a waiting for the logs to be completed follows.
@@ -107,23 +107,22 @@ where we basically create two functionalities: `give` and `grab`.The first one a
 
 #### 2.5 give options to wallets
 To finalize, the last chunk of code
-
+```haskell
     endpoints :: Contract () GiftSchema Text ()
     endpoints = (give' `select` grab') >> endpoints
       where
         give' = endpoint @"give" >>= give
         grab' = endpoint @"grab" >>  grab
-
+```
 gives the options to the wallets to be able to chose which action to take, grab and/or give as manny times they want
 
 #### 2.6 playground interface
 The last chunk just allows the playground display
-
+```haskell
     mkSchemaDefinitions ''GiftSchema
 
     mkKnownCurrencies []
-
-
+```
 
 ## 3. Explore the second contract, the [`Burn.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Burn.hs) contract
 This contract makes few modifications to the `Gift.hs` contract, it basically removes the functionality of an actor to grab tokens deposited to a contract, so basically they are lost or burned.
@@ -131,16 +130,16 @@ This contract makes few modifications to the `Gift.hs` contract, it basically re
 
 This is done in the void-like function that stops the rest of the code to run because of lack of the monoid `()` and instead it prints an error in the logs.
 
-
+```haskell
     mkValidator : Data -> Data -> Data -> ()
     mkValidator _ _ _ = traceError "NO WAY!"
-    
+```
 Also, we can point out that  `traceError` is a Plutus function that takes overloaded-plutus-strings (imported in languages `{-#LANGUAGE OverloadedStrings#-}`) whereas `error` is a Prelude function that takes a normal string as input. In any case, what it does is just include the message into the logs.
 
 
 ## 4. [`FortyTwo.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/FortyTwo.hs) contract
 So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens deposited to the contract. Now, we correct this by forcing the redeemer to be the *one who claims only 42 tokens* (redeemer will still grab all the tokens but he has to claim only 42). This is implemented  in the input of the the action
-
+```haskell
     type GiftSchema = 
         BlockchainActions
             .\/ Endpoint "give" Integer  -- takes integer
@@ -155,35 +154,35 @@ So far our `Gift.hs` contract allowed anyone to be the redeemer of the tokens de
         ...
             tx :: TxConstraints Void Void
             tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]        
-            
+```
 and logiaclly now the input of the redeemer constructor is `I r`.
 
 But wait! we also have to modify some other details before deploying this. The void-like function has to be changed, now it can take cases 
-    
+```haskell
     mkValidator :: Data -> Data -> Data -> ()
     mkValidator _ r _
         | r == I 42 = ()
         | otherwise = traceError "wrong redeemer"
-
+```
 this is called **guards** in Haskell, and it is a more readable way of coding cases. Lastly we have to change the endpoints
-
+```haskell
     endpoints :: Contract () GiftSchema Text ()
     endpoints = (give' `select` grab') >> endpoints
       where
         give' = endpoint @"give" >>= give
         grab' = endpoint @"grab" >>= grab -- used to be >> now its >>=
-
+```
 ## 5. [`Typed.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week02/src/Week02/Typed.hs)
 This contract introduces a better way of writting the make validator. In all the codes above we have used `()` where everything runs if the input patterns are correct but for the contract to burn tokens (ommint underneath code) we rely on `()` to break! We can substancially improve this by using a Plutus function validator-context `ValidatorCtx` that returns a boolean instead.
-
+```haskell
     {-#INLINABLE mkValidaor#-}
     mkValidator :: () -> Integer -> ValidatorCtx -> Bool
     mkValidator () r _
         | r == 42 = True
         | otherwise = False
-        
+```        
 now the inlinable function of the **template Haskell $$** won't run because it expects a `Data -> Data -> Data` type. This can be corrected using and advanced feature of Haskell named **typed**, this is advance but and often is repeated for the same type of solution.
-
+```haskell
     data Typed
     instance Scripts.ScriptType Typed where
         type instance DatumType Typed = ()
@@ -198,7 +197,7 @@ now the inlinable function of the **template Haskell $$** won't run because it e
         
     validator :: Validator
     validator = Scripts.validatorScript inst
-    
+```
     
 More detail on how Plutus implements these on this advanced Haskell practices to move from typeclass to typeclass, visit the [PlutusTx](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/), more specifially the [`Class.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-tx/src/PlutusTx/IsData/Class.hs) file.
 
