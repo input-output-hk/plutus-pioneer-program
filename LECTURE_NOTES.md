@@ -2704,10 +2704,71 @@ foo x y z = case readMaybe x of
             Just m  -> Just (k + l + m)
 ```
             
-Let's see if it works.
+Let's see if it works. First, the case where is succeeds:
 
 ```haskell
 Prelude Week04.Contract> :l Week04.Maybe 
 Prelude Week04.Maybe> foo "1" "2" "3"
 Just 6
 ```
+
+But, if one of the values can't be parsed, we get *Nothing*:
+
+```haskell
+Prelude Week04.Maybe> foo "" "2" "3"
+Nothing
+```
+
+The code is not ideal because we repeat the same pattern three times. Each time we have to consider the two cases - whether the result of the read is a *Just* or a *Nothing*.
+
+Ask Haskellers, we hate repetition like this.
+
+The thing we want to do is very simple. We want to pass the three *String*s and add the result, but with all those cases it is very noisy and very ugly. We want to abstract away this pattern.
+
+One way to do that would be to define something like:
+
+```haskell
+bindMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+bindMaybe Nothing = Nothing
+bindMaybe (Just x) f = f x
+```
+
+Let's write the same function again using *bindMaybe*.
+
+```haskell
+foo' :: String -> String -> String -> Maybe Int
+foo' x y z = readMaybe x `bindMaybe` \k ->
+             readMaybe y `bindMaybe` \l ->
+             readMaybe z `bindMaybe` \m ->
+             Just (k + l + m)
+```
+
+And then, in the REPL, we get the same results for *foo'* as we got for *foo*.
+
+```haskell
+Prelude Week04.Maybe> foo "1" "2" "3"
+Just 6
+
+Prelude Week04.Maybe> foo "" "2" "3"
+Nothing
+```
+
+This does exactly the same as *foo*, but it is much more compact, there is far less noise, and the business logic is much clearer.
+
+```haskell
+foo' :: String -> String -> String -> Maybe Int
+foo' x y z = bindMaybe (bindMaybe (bindMaybe (readMaybe x \k ->
+             readMaybe y) \l -> readMaybe z) \m -> Just (k + l + m)
+```
+
+In some ways *Nothing* is a bit like an exception in other languages. If any of the computations returns *Nothing*, the remainder of the computations in the block are not performed and *Nothing* is returned.
+
+### Either
+
+Another very useful type in Haskell is the *Either* type.
+
+
+
+
+
+
