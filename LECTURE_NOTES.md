@@ -2767,7 +2767,28 @@ In some ways *Nothing* is a bit like an exception in other languages. If any of 
 
 Another very useful type in Haskell is the *Either* type.
 
+```haskell
+Prelude Week04.Contract> :i Either
+type Either :: * -> * -> *
+data Either a b = Left a | Right b
+  	-- Defined in ‘Data.Either’
+instance Applicative (Either e) -- Defined in ‘Data.Either’
+instance (Eq a, Eq b) => Eq (Either a b)
+  -- Defined in ‘Data.Either’
+instance Functor (Either a) -- Defined in ‘Data.Either’
+instance Monad (Either e) -- Defined in ‘Data.Either’
+instance (Ord a, Ord b) => Ord (Either a b)
+  -- Defined in ‘Data.Either’
+instance Semigroup (Either a b) -- Defined in ‘Data.Either’
+instance (Show a, Show b) => Show (Either a b)
+  -- Defined in ‘Data.Either’
+instance (Read a, Read b) => Read (Either a b)
+  -- Defined in ‘Data.Either’
+instance Foldable (Either a) -- Defined in ‘Data.Foldable’
+instance Traversable (Either a) -- Defined in ‘Data.Traversable’
+```
 
+*Either* takes two parameters, *a* and *b*. Like *Maybe* it has two constructors, but unlike *Maybe* both take a value. It can *Either* be an *a* or a *b*. The two constructors are *Left* and *Right*.
 
 
 
