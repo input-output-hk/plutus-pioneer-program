@@ -2790,6 +2790,20 @@ instance Traversable (Either a) -- Defined in ‘Data.Traversable’
 
 *Either* takes two parameters, *a* and *b*. Like *Maybe* it has two constructors, but unlike *Maybe* both take a value. It can *Either* be an *a* or a *b*. The two constructors are *Left* and *Right*.
 
+For example:
+
+```haskell
+Prelude Week04.Contract> Left "Haskell" :: Either String Int
+Left "Haskell"
+```
+
+Or
+
+```haskell
+Prelude Week04.Contract> Right 7 :: Either String Int
+Right 7
+```
+
 
 
 
