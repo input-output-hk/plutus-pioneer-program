@@ -50,10 +50,10 @@ We can open Gift.hs in a text editor and see that lines 31-35 contain the implem
 We will breakdown some of the sections of the code that give the functionality to the contract. In the `Gift.hs` contract
 
 #### 2.1 start the contract void
-    ```haskell
+```haskell
     mkValidator :: Data -> Data -> Data -> ()
     mkValidator _ _ _ = ()
-    ```
+```
     
 Which basically is a Haskell function (`mkValidator`), that latter on will be compiled into a Plutus function. It just creates a function that regardless of the inputs proceeds to the reading of the following lines of the code. 
 
