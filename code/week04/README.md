@@ -26,16 +26,16 @@ A very important monad in Plutus is the **Contract Monad** ([]()) which defines 
         $ runEmulatorStream cfg trace
         
 Where `runEmulatorTrace` allows the wallet to trace some logs. It is a pure function. The `EmulatorConfig` data-type is defined in a different directory: [`Stream.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Wallet/Emulator/Stream.hs) (lines 135-140)
-
+```haskell
     data EmulatorConfig =
         EmulatorConfig
             { _initialChainState      :: InitialChainState -- ^ State of the blockchain at the beginning of the simulation. Can be given as a map of funds to wallets, or as a block of transactions.
             } deriving (Eq, Show)
 
     type InitialChainState = Either InitialDistribution Block -- line 140
-
+```
 As we can see    the `EmulatorConfig` is a single **record-type** named `InitialChainState`, which is either an `InitialDistribution` or `Block` (line 140) defined in another module [`Trace.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Trace.hs) as shown below (line 115):
-
+```haskell
     type InitialDistribution = Map Wallet Value  -- line 115
     .
     .
@@ -45,7 +45,7 @@ As we can see    the `EmulatorConfig` is a single **record-type** named `Initial
 
     defaultDistFor :: [EM.Wallet] -> InitialDistribution
     defaultDistFor wallets = Map.fromList $ zip wallets (repeat (Ada.lovelaceValueOf 100_000_000))
-
+```
 which maps a wallet to a value as we would expect. It is importntn to note that a value is not limited to ADA value but also NFTs and Native Tokens.
 
 ## 2. Trace Logs 
@@ -86,71 +86,32 @@ Lets import [`Vesting.hs`](https://github.com/Igodlab/plutus-pioneer-program/blo
     .
     .
     .
-    
+
 So we can see that the `** USER LOG` was printed on screen, this shows that we can log in both from the contract and from the trace.
     
 ## 4. Contract Monad [`Contract.hs`](https://github.com/Igodlab/plutus-pioneer-program/blob/main/code/week04/src/Week04/Contract.hs)
 
 The purpose of the **Contract-Monad** is to define off-chain code that runs in the wallet. Notice that it has four type-parameters `Contraact w s e a` where i) `w` is the type input that allows to write log messages of type w. ii) `s`, describes the blockchain capabilities, iii) `e` describes the type of error messages & iv) `a` . This is illustrated 
 
-    {-#LANGUAGE#-}
-    -- Contract w s e a
-    -- EmulatorTrace a
+```haskell
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE TypeOperators     #-}
+-- Contract w s e a
+-- EmulatorTrace a
 
-    myContract1 :: Contract () BlockchainActions Text ()
-    myContract1 = do
-        void $ Contract.throwError "BOOM!"
-        Contract.logInfo @String "Hello from the contract!"
+myContract1 :: Contract () BlockchainActions Text ()
+myContract1 = do
+    void $ Contract.throwError "BOOM!"
+    Contract.logInfo @String "Hello from the contract!"
 
-    myTrace1 :: EmulatorTrace ()
-    myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
+myTrace1 :: EmulatorTrace ()
+myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
 
-    test1 :: IO ()
-    test1 = runEmulatorTraceIO myTrace1
+test1 :: IO ()
+test1 = runEmulatorTraceIO myTrace1
+```
 
 where i) `Contract ()` is a void unit because in this particular case we are not interested in any logs. ii) `BlockchainActions` allows actions like submiting a transaction, waiting slot time... However, an exception is that it doesn't handle is endpoints. iii) for error messages we use `Text ()` that allows overloaded strings.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- 
-
-
 
