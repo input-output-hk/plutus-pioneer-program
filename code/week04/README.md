@@ -26,16 +26,16 @@ A very important monad in Plutus is the **Contract Monad** ([]()) which defines 
         $ runEmulatorStream cfg trace
         
 Where `runEmulatorTrace` allows the wallet to trace some logs. It is a pure function. The `EmulatorConfig` data-type is defined in a different directory: [`Stream.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Wallet/Emulator/Stream.hs) (lines 135-140)
-
+```haskell
     data EmulatorConfig =
         EmulatorConfig
             { _initialChainState      :: InitialChainState -- ^ State of the blockchain at the beginning of the simulation. Can be given as a map of funds to wallets, or as a block of transactions.
             } deriving (Eq, Show)
 
     type InitialChainState = Either InitialDistribution Block -- line 140
-
+```
 As we can see    the `EmulatorConfig` is a single **record-type** named `InitialChainState`, which is either an `InitialDistribution` or `Block` (line 140) defined in another module [`Trace.hs`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Trace.hs) as shown below (line 115):
-
+```haskell
     type InitialDistribution = Map Wallet Value  -- line 115
     .
     .
@@ -45,7 +45,7 @@ As we can see    the `EmulatorConfig` is a single **record-type** named `Initial
 
     defaultDistFor :: [EM.Wallet] -> InitialDistribution
     defaultDistFor wallets = Map.fromList $ zip wallets (repeat (Ada.lovelaceValueOf 100_000_000))
-
+```
 which maps a wallet to a value as we would expect. It is importntn to note that a value is not limited to ADA value but also NFTs and Native Tokens.
 
 ## 2. Trace Logs 
