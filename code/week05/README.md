@@ -46,7 +46,7 @@ In the las line we have defined a combination of different Native Tokens: Ada, U
     repl$ valueOf vv "a8ff" "Uno"    -- gets Uno value
     repl$ valueOf vv "a8ff" "OMEGA"  -- gets OMEGA value
     
-Now the question arises: *Why we need two identifiers? (`CurrencySymbol` & `TokenName`)* and *Why hexadecimal?* this has to do with **Minting policies**.   
+Now the question arises: *Why we need two identifiers? (`CurrencySymbol` & `TokenName`)* and *Why hexadecimal?* this has to do with **Minting policies**. 
 
 1) A transaction can't create or delete tokens (conservation of UTXOs minus fees)
 2) The reason of why the currency symbol-bytestring is in hexadecimal numbers is because it is the hash of a Script and this is called the *Minting Policie*
