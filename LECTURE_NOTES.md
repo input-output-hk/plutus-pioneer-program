@@ -2755,10 +2755,20 @@ Nothing
 
 This does exactly the same as *foo*, but it is much more compact, there is far less noise, and the business logic is much clearer.
 
+It may, or may not, help to view the function with it not being used with infix notation:
+
 ```haskell
-foo' :: String -> String -> String -> Maybe Int
-foo' x y z = bindMaybe (bindMaybe (bindMaybe (readMaybe x \k ->
-             readMaybe y) \l -> readMaybe z) \m -> Just (k + l + m)
+Prelude Text.Read Week04.Maybe> bindMaybe (readMaybe "42" :: Maybe Int) (\x -> Just x)
+Just 42
+```
+
+Here you can see the function clearly taking the *Maybe* and then the function that takes the *a* from the *Maybe* and uses it as the input to a function that returns a new *Maybe*.
+
+This produces nothing useful, until we add the second *readMaybe*
+
+```haskell
+Prelude Text.Read Week04.Maybe> bindMaybe (readMaybe "42" :: Maybe Int) (\x -> bindMaybe (readMaybe "5" :: Maybe Int) (\y -> Just (y + x)))
+Just 47
 ```
 
 In some ways *Nothing* is a bit like an exception in other languages. If any of the computations returns *Nothing*, the remainder of the computations in the block are not performed and *Nothing* is returned.
@@ -2804,6 +2814,9 @@ Prelude Week04.Contract> Right 7 :: Either String Int
 Right 7
 ```
 
+If we take the exception analogy a little further, then one issue with *Maybe* is that if we return *Nothing*, there is no error message. But, if we want something that gives a message, we can replace *Maybe* with an *Either* type.
+
+In that case, *Right* can correspond to *Just* and *Left* can correspond to an error, as *Nothing* did. But, depending on what type we choose for *a*, we can give appropriate error messages.
 
 
 
