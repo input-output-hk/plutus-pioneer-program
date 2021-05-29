@@ -8,7 +8,7 @@ This is a written version of the Plutus Pioneer Program YouTube lectures by Lars
   * [Welcome](#welcome)
   * [The (E)UTxO Model](#the-eutxo-model)
     + [Overview](#overview)
-    + [When Is Spending Allowed?](#when-is-spending-allowed-)
+    + [When Is Spending Allowed?](#when-is-spending-allowed)
     + [Script Context](#script-context)
       - [The Bitcoin approach](#the-bitcoin-approach)
       - [The Ethereum approach](#the-ethereum-approach)
@@ -2704,3 +2704,10 @@ foo x y z = case readMaybe x of
             Just m  -> Just (k + l + m)
 ```
             
+Let's see if it works.
+
+```haskell
+Prelude Week04.Contract> :l Week04.Maybe 
+Prelude Week04.Maybe> foo "1" "2" "3"
+Just 6
+```
