@@ -3,6 +3,11 @@ module Week04.Maybe where
 import Text.Read (readMaybe)
 import Week04.Monad
 
+readEither :: Read a => String -> Either String a
+readEither s = case readMaybe s of
+    Nothing -> Left $ "can't parse: " ++ s
+    Just a  -> Right a
+
 foo :: String -> String -> String -> Maybe Int
 foo x y z = case readMaybe x of
     Nothing -> Nothing

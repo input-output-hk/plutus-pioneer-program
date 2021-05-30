@@ -2818,5 +2818,22 @@ If we take the exception analogy a little further, then one issue with *Maybe* i
 
 In that case, *Right* can correspond to *Just* and *Left* can correspond to an error, as *Nothing* did. But, depending on what type we choose for *a*, we can give appropriate error messages.
 
+Let's define something called *readEither* and see what it does when it can and when it cannot parse its input.
 
+```haskell
+readEither :: Read a => String -> Either String a
+readEither s case readMaybe s of
+    Nothing -> Left $ "can't parse: " ++ s
+    Just a  -> Right a
+```
+
+```haskell
+Prelude Week04.Either> readEither "42" :: Either String Int
+Right 42
+```
+
+```haskell
+Prelude Week04.Either> readEither "42+u" :: Either String Int
+Left "can't parse: 42+u"
+```
 
