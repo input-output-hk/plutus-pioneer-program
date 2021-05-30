@@ -8,6 +8,7 @@
    :caption: Contents:
    :numbered:
 
+   overview.rst
    week1.rst
    week2.rst
    week3.rst
