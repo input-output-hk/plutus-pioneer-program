@@ -53,6 +53,7 @@ If this is useful, and you fancy helping out a small Cardano Stake Pool, please 
     + [Writer](#writer)
     + [What is a Monad?](#what-is-a-monad)
     + [Why Is This useful?](#why-is-this-useful)
+    + ['do' notation](#do-notation)
 
 
 # Week 01
@@ -3212,9 +3213,39 @@ One way to think about a Monad is as a computation with a super power.
 
 In the case of *IO*, the super power would be having real-world side-effects. In the case of *Maybe*, the super power is being able to fail. The super power of *Either* is to fail with an error message. And in the case of *Writer*, the super power is to log messages.
 
+There is a saying in the Haskell community that Haskell has an overloaded semi-colon. The explanation for this is that in many imperative programming languages, you have semi-colons that end with a semi-colon - each statement is executed one after the other, each separated by a semi-colon. But, what exactly the semi-colon means depends on the language. For example, there could be an exception, in which case computation would stop and wouldn't continue with the next lines.
 
+In a sense, *bind* is like a semi-colon. And the cool thing about Haskell is that it is a programmable semi-colon. We get to say what the logic is for combining two computations together.
 
+Each Monad comes with its own "semi-colon".
 
+### 'do' notation
+
+Because this pattern is so common and monadic computations are all over the place, there is a special notation for this in Haskell, called *do* notation.
+
+It is syntactic sugar. Let's rewrite *threeInts* using *do* notation.
+
+```haskell
+threeInts' :: Monad m => m Int -> m Int -> m Int -> m Int
+threeInts' mx my mz = do
+    k <- mx
+    l <- my
+    m <- mz
+    let s = k + l + m
+    return s
+```
+
+This does exactly the same thing as the non-*do* version, but it has less noise.
+
+Note that the *let* statement does not use an *in* part. It does not need to inside a *do* block.
+
+And that's Monads. There is a lot more to say about them but hopefully you now have an idea of what Monads are and how they work.
+
+Often you are in a situation where you want several effects at once - for example you may want optional failure *and* log messages. There are ways to do that in Haskell. For example there are Monad Transformers where one can basically build custom Monads with the features that you want.
+
+There are other approaches. One is called Effect Systems, which has a similar objective. And this is incidentally what Plutus uses for important Monads. In particular the Contact Monad in the wallet, and the Trace Monad which is used to test Plutus code.
+
+The good news is that you don't need to understand Effect Systems to work with these Monads. You just need to know that you are working with a Monad, and what super powers it has.
 
 
 

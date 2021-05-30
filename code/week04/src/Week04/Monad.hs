@@ -22,5 +22,4 @@ threeInts' mx my mz = do
     k <- mx
     l <- my
     m <- mz
-    let s = k + l + m
-    return s
+    let s = k + l + m in return s
