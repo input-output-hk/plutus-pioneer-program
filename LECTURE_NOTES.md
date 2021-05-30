@@ -2979,7 +2979,7 @@ foo' x y z = x `bindWriter` \k ->
                 Writer s []
 ```
 
-What we did witt *foo* before, we can now do with *foo'*, and we get the same result.
+What we did with *foo* before, we can now do with *foo'*, and we get the same result.
 
 ```haskell
 Prelude Week04.Writer> foo' (number 1) (number 2) (number 3)
@@ -2987,6 +2987,31 @@ Writer 6 ["number: 1","number: 2","number: 3","sum: 6"]
 ```
 
 Admittedly, it is longer than it was before, but it is much nicer. We no longer need to do the pattern matching to extract the messages. We don't have to explicitly combine the log messages, where we could make a mistake and forget one, or get the order wrong. Instead, we abstract all that away and can just concentrate on the business logic.
+
+Although the pattern is the same as with *Maybe* and *Either*, note that the special aspect of these computations is completely different. With *Maybe* and *Either* we dealt with the notion of failure, whereas here, with the *Writer*, there is no failure, but we instead have additional output.
+
+### What is a Monad?
+
+Now, we are in a position to explain what a Monad is.
+
+Looking back at the four examples, what did they have in common? In all four cases, We had a type constructor with one type parameter - *IO*, *Maybe*, *Either String* and *Writer* all take a type parameter.
+
+And, for all four of these examples, we had a bind function. For *IO*, we had the *>>=* function and for the others we had then bind functions that we wrote ourselves.
+
+
+```haskell
+(>>=) :: Monad m => m a -> (a -> m b) -> m b
+bindWriter :: Writer a -> (a -> Writer b) -> Writer b
+bindEither :: Either String a -> (a -> Either String b) -> Either String b
+bindMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+```
+
+How the bind works depends on the case. In the case of *IO* it is built-in magic, but you can think of it as just combining the two plans describing the actions to take during computation. For *bindMaybe* and *bindEither* the logic is for the whole plan to fail if any part of it fails, and for *bindWriter*, the logic was to combine the list of log messages.
+
+
+
+
+
 
 
 
