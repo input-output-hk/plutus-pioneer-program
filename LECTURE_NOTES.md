@@ -4,8 +4,6 @@ This is a written version of the Plutus Pioneer Program YouTube lectures by Lars
 
 If this is useful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, or any of the many other small pools run by single stake pool operators.
 
-#
-
 - [Week 01](#week-01)
   * [Welcome](#welcome)
   * [The (E)UTxO Model](#the-eutxo-model)
@@ -48,8 +46,14 @@ If this is useful, and you fancy helping out a small Cardano Stake Pool, please 
 - [Week 04](#week-04)
   * [Overview](#overview-2)
   * [Monads](#monads)
-    + [Hello World - putStrLn](#hello-world---putstrln)
+    + [Hello World](#hello-world)
     + [getLine](#getline)
+    + [Maybe](#maybe)
+    + [Either](#either)
+    + [Writer](#writer)
+    + [What is a Monad?](#what-is-a-monad)
+    + [Why Is This useful?](#why-is-this-useful)
+
 
 # Week 01
 
@@ -2355,7 +2359,7 @@ It is important to notice that referential transparency is not broken here. The 
 
 The only way to actually execute such a recipe in a Haskell program is from the main entry point of the program - the *main* function. You can also execute *IO* actions in the REPL.
 
-### Hello World - putStrLn
+### Hello World
 
 Hello World in Haskell looks like this:
 
@@ -3202,8 +3206,11 @@ foo'' x y z = do
     return s
 ```
 
+If you look into the Control.Monad module in the standard Haskell Prelude, you will see that there are many useful functions that you can use for all Monads.
 
+One way to think about a Monad is as a computation with a super power.
 
+In the case of *IO*, the super power would be having real-world side-effects. In the case of *Maybe*, the super power is being able to fail. The super power of *Either* is to fail with an error message. And in the case of *Writer*, the super power is to log messages.
 
 
 
