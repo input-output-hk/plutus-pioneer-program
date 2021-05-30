@@ -1,0 +1,1137 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4. Week 04 &#8212; Plutus Pioneer Program  documentation</title>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="3. Week 03" href="week3.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="week-04">
+<h1><span class="section-number">4. </span>Week 04<a class="headerlink" href="#week-04" title="Permalink to this headline">¶</a></h1>
+<p>These is a written version of <a class="reference external" href="https://youtu.be/6Reuh0xZDjY">Lecture
+#4</a>.</p>
+<p>In this lecture we learn about Monads. In particular the EmulatorTrace
+and Contract monads.</p>
+<div class="section" id="overview">
+<h2><span class="section-number">4.1. </span>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>We have spent the last two lectures talking about the on-chain part of
+Plutus - the validation logic that is compiled to Plutus script and
+actually lives on the blockchain and is executed by nodes that validate
+a transaction.</p>
+<p>There is a lot more to say about that on-chain part.</p>
+<p>We haven’t looked at more complex examples of validation yet that make
+more sophisticated use of the context, and we haven’t see how native
+tokens work, yet (Plutus script is also used to validate the minting and
+burning of native tokens).</p>
+<p>We will definitely have to talk about those topics, and come back to
+that.</p>
+<p>However, before we go into too many sophisticated topics of on-chain
+validation, we mustn’t neglect the off-chain part, because it is equally
+important.</p>
+<p>The on-chain part takes care of validation but, in order for there to be
+something to be validated, we must build a transaction and submit it to
+the blockchain. And, that is what the off-chain part does.</p>
+<p>So, we will start talking about how to write off-chain Plutus code.</p>
+<p>Unfortunately there is a slight problem concerning the Haskell features
+needed.</p>
+<p>The on-chain part that we have seen so far is somewhat alien and takes a
+little getting used to, due to the fact that we have the additional
+complication of the compilation to Plutus script. But, we don’t really
+have to worry about that if we use the Template Haskell magic. In that
+case the validator function is just a plain function.</p>
+<p>And it is actually a very simple Haskell function from the technical
+point of view. We don’t use any fancy Haskell features to write this
+function.</p>
+<p>One of the reasons for that is the way Plutus compilation works. We have
+seen how, in order for the compilation to Plutus to succeed, all the
+code used by the validation function must be available within the Oxford
+Brackets. This means that all the functions relied on by the
+<em>mkValidator</em> function must use the INLINABLE pragma.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="nb">()</span>
+
+<span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>And recall, that because the standard Haskell functions don’t have this
+INLINABLE pragma, there is a new Plutus Prelude module that is similar
+to the standard Haskell Prelude, but with the functions defined with the
+INLINABLE pragma.</p>
+<p>But, of course, there are hundreds of Haskell libraries out there and
+most of them weren’t written with Plutus in mind, so we can’t use them
+inside validation. And, that has the effect that the Haskell inside
+validation will be relatively simple and won’t have many dependencies.</p>
+</div>
+<div class="section" id="monads">
+<h2><span class="section-number">4.2. </span>Monads<a class="headerlink" href="#monads" title="Permalink to this headline">¶</a></h2>
+<p>In the off-chain part of Plutus, the situation is reversed. We don’t
+have to worry about compilation to Plutus script - it is just plain
+Haskell. But, the flip side is that, the way this is implemented, it
+uses much more sophisticated Haskell features - e.g. so-called effect
+systems, streaming and, in particular, monads.</p>
+<p>All the off-chain code (the wallet code), is written in a special monad
+- the Contract Monad.</p>
+<p>Monads are infamous in the Haskell world. It is normally the first
+stumbling block for beginning Haskell coders.</p>
+<p>There are a lot of tutorials out there that try to explain Monads.
+Monads get compared to burritos, and all sorts of metaphors are employed
+to try to explain the concept. But here, let’s at least try to give a
+crash course in monads for those who are new to Haskell.</p>
+<p>Before we get to general monads, we will start with <em>IO</em>, which is how
+IO side-effects are handled in Haskell. But, before we get to Haskell,
+let’s look at a mainstream language like Java.</p>
+<p>Let’s look at the following Java method.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span> <span class="kd">static</span> <span class="kt">int</span> <span class="nf">foo</span><span class="p">()</span> <span class="p">{</span>
+   <span class="p">...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This function takes no arguments, and it returns an <em>int</em>. Let’s imagine
+it gets called twice in the code.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="p">...</span>
+<span class="kd">final</span> <span class="kt">int</span> <span class="n">a</span> <span class="o">=</span> <span class="n">foo</span><span class="p">();</span>
+<span class="p">...</span>
+<span class="kd">final</span> <span class="kt">int</span> <span class="n">b</span> <span class="o">=</span> <span class="n">foo</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Now, we note that, so long as we don’t know what is going on inside the
+foo() function, the return value of the following expression is unknown.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">a</span> <span class="o">==</span> <span class="n">b</span><span class="p">;</span> <span class="c1">// true or false? at compile time, we don&#39;t know</span>
+</pre></div>
+</div>
+<p>We do not know if <em>a</em> is the same as <em>b</em> because, in Java, it is
+perfectly possible that some IO happens inside <em>foo()</em>. For example,
+there code be code that asks the user to enter input on the console and
+uses this to compute the return value.</p>
+<p>This means that, in order to reason about the code, we need to look
+inside <em>foo()</em>, which makes testing, for example, more difficult. And it
+means that, it the first call to <em>foo()</em> returns, for example, 13 - we
+cannot just replace all other calls to <em>foo()</em> with the known return
+value of 13.</p>
+<p>In Haskell the situation is very different because Haskell is a pure
+functional language. The equivalent signature in Haskell would be
+something like:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo</span> <span class="ow">::</span> <span class="kt">Int</span>
+<span class="nf">foo</span> <span class="ow">=</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>Now, if we have a situation where we call <em>foo</em> twice, even though we
+don’t know what the value of <em>foo</em> is, we know for sure that the two
+return values will be the same.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">let</span> <span class="n">a</span> <span class="ow">=</span> <span class="n">foo</span>
+<span class="kr">let</span> <span class="n">b</span> <span class="ow">=</span> <span class="n">foo</span>
+
+<span class="kr">if</span> <span class="n">a</span> <span class="o">==</span> <span class="n">b</span>
+<span class="kr">then</span> <span class="o">...</span> <span class="c1">-- we know this to be true</span>
+<span class="kr">else</span> <span class="o">...</span> <span class="c1">-- the compiler could tell you here not to waste your typing</span>
+</pre></div>
+</div>
+<p>This is a very important feature that is called <em>referential
+transparency</em>. There are, in fact, some escape hatches to get around
+this, but we can ignore this.</p>
+<p>This makes tasks such as refactoring and testing much easier.</p>
+<p>This is all very well, but you need side-effects in order to have an
+effect on the world. Otherwise, all your program does is heat up the
+processor.</p>
+<p>You need input and output. You must be able to write output to the
+screen, or read input from the keyboard, or a network connection, or a
+file, for example.</p>
+<p>There is a famous <a class="reference external" href="https://www.youtube.com/watch?v=iSmkqocn0oQ">video by Simon Peyton-Jones called Haskell Is
+Useless</a> which explains
+that it is beautiful mathematically to have a pure, side effect-free
+language, but in the end you do need side effects to make anything
+happen.</p>
+<p>And Haskell does have a way to handle side effects and that is the IO
+Monad. But, don’t worry about the monad part just yet.</p>
+<p>Here is how we do it in Haskell.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">Int</span>
+<span class="nf">foo</span> <span class="ow">=</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p><em>IO</em> is a type constructor that takes one argument, like some other
+examples of type constructors such as <em>Maybe</em> and <em>List</em>. However,
+unlike those examples, <em>IO</em> is special, in the sense that you can’t
+implement it in the language itself. It is a built-in primitive.</p>
+<p>The return value <em>IO Int</em> tells us that this is a recipe to compute an
+<em>Int</em>, and this recipe can cause side effects. A list of instructions
+telling the computer what to do in order to end up with an <em>Int</em>.</p>
+<p>It is important to notice that referential transparency is not broken
+here. The result of the evaluation of <em>foo</em> is the recipe itself, not
+the <em>Int</em> value. And as the recipe is always the same, referential
+transparency is maintained.</p>
+<p>The only way to actually execute such a recipe in a Haskell program is
+from the main entry point of the program - the <em>main</em> function. You can
+also execute <em>IO</em> actions in the REPL.</p>
+<div class="section" id="hello-world">
+<h3><span class="section-number">4.2.1. </span>Hello World<a class="headerlink" href="#hello-world" title="Permalink to this headline">¶</a></h3>
+<p>Hello World in Haskell looks like this:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">main</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">putStrLn</span> <span class="s">&quot;Hello, world!&quot;</span>
+</pre></div>
+</div>
+<p>Here, <em>main</em> is a recipe that performs some side effects and returns
+Unit - nothing of interest.</p>
+<p>Let’s look at <em>putStrLn</em> in the REPL. We see that it is an IO action
+that takes a <em>String</em> and returns no interesting result.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">putStrLn</span>
+<span class="nf">putStrLn</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+
+<span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">putStrLn</span> <span class="s">&quot;Hello, world!&quot;</span>
+<span class="nf">putStrLn</span> <span class="s">&quot;Hello, world!&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>We can also run this. Open up the app/Main.sh file and edit the <em>main</em>
+function so it reads:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">main</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">putStrLn</span> <span class="s">&quot;Hello, world!&quot;</span>
+</pre></div>
+</div>
+<p>Then run</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cabal run hello
+</pre></div>
+</div>
+<p>We will take a quick look at the cabal file now.</p>
+<p>In previous lectures we only needed the <em>library</em> section in the
+<em>plutus-pioneer-program-week04.cabal</em> file as we were dealing only with
+library functions. Now, we need to add an <em>executable</em> stanza.</p>
+<div class="highlight-cabal notranslate"><div class="highlight"><pre><span></span>executable hello
+hs-source-dirs:      app
+main-is:             hello.hs
+build-depends:       base ^&gt;=4.14.1.0
+default-language:    Haskell2010
+ghc-options:         -Wall -O2
+</pre></div>
+</div>
+<p>This specifies the source directory and which file holds the main
+function. Normally the file name must match the module name, but the
+<em>main</em> is an exception.</p>
+<p>Rather than just asking for the type of <em>putStrLn</em>, we can run it in the
+REPL. As mentioned, the REPL allows us to execute IO actions.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Hello, world!&quot;</span>
+<span class="kt">Hello</span><span class="p">,</span> <span class="n">world</span><span class="o">!</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="getline">
+<h3><span class="section-number">4.2.2. </span>getLine<a class="headerlink" href="#getline" title="Permalink to this headline">¶</a></h3>
+<p>Let’s look at <em>getLine</em></p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">getLine</span>
+<span class="nf">getLine</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+</pre></div>
+</div>
+<p>This shows that it is a recipe, possibly producing side-effects, that,
+when executed will produce a <em>String</em>. In the case of <em>getLine</em>, the
+side-effect in question is that it will wait for user input from the
+keyboard.</p>
+<p>If we execute <em>getLine</em> in the REPL.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">getLine</span>
+</pre></div>
+</div>
+<p>It waits for keyboard input. Then, if we enter something, it returns the
+result.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Haskell</span>
+<span class="s">&quot;Haskell&quot;</span>
+</pre></div>
+</div>
+<p>There are a variety of IO actions defined in Haskell to do all sorts of
+things like reading files, writing files, reading from and writing to
+sockets.</p>
+<p>But no matter how many predefined actions you have, that will never be
+enough to achieve something complex, so there must be a way to combine
+these primitive, provided IO actions into bigger, more complex recipes.</p>
+<p>One thing we can do is make use of the <em>Functor</em> type instance of IO.
+Let’s look at the type instances of <em>IO</em> in the REPL.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">IO</span>
+<span class="kr">type</span> <span class="kt">IO</span> <span class="ow">::</span> <span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span>
+<span class="kr">newtype</span> <span class="kt">IO</span> <span class="n">a</span>
+<span class="ow">=</span> <span class="n">ghc</span><span class="o">-</span><span class="n">prim</span><span class="o">-</span><span class="mf">0.6</span><span class="o">.</span><span class="mi">1</span><span class="kt">:GHC</span><span class="o">.</span><span class="kt">Types</span><span class="o">.</span><span class="kt">IO</span> <span class="p">(</span><span class="n">ghc</span><span class="o">-</span><span class="n">prim</span><span class="o">-</span><span class="mf">0.6</span><span class="o">.</span><span class="mi">1</span><span class="kt">:GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="kt">State</span><span class="o">#</span>
+                                 <span class="n">ghc</span><span class="o">-</span><span class="n">prim</span><span class="o">-</span><span class="mf">0.6</span><span class="o">.</span><span class="mi">1</span><span class="kt">:GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="kt">RealWorld</span>
+                                 <span class="ow">-&gt;</span> <span class="p">(</span><span class="o">#</span> <span class="n">ghc</span><span class="o">-</span><span class="n">prim</span><span class="o">-</span><span class="mf">0.6</span><span class="o">.</span><span class="mi">1</span><span class="kt">:GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="kt">State</span><span class="o">#</span>
+                                       <span class="n">ghc</span><span class="o">-</span><span class="n">prim</span><span class="o">-</span><span class="mf">0.6</span><span class="o">.</span><span class="mi">1</span><span class="kt">:GHC</span><span class="o">.</span><span class="kt">Prim</span><span class="o">.</span><span class="kt">RealWorld</span><span class="p">,</span>
+                                       <span class="n">a</span> <span class="o">#</span><span class="p">))</span>
+   <span class="c1">-- Defined in ‘ghc-prim-0.6.1:GHC.Types’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Monoid</span> <span class="p">(</span><span class="kt">IO</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Semigroup</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Semigroup</span> <span class="p">(</span><span class="kt">IO</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">MonadFail</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘Control.Monad.Fail’</span>
+</pre></div>
+</div>
+<p>We see the dreaded <em>Monad</em> instance, but we also see a <em>Functor</em>
+instance. <em>Functor</em> is a very important type class in Haskell. If we
+look at it in the REPL:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Functor</span>
+<span class="kr">type</span> <span class="kt">Functor</span> <span class="ow">::</span> <span class="p">(</span><span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Constraint</span>
+<span class="kr">class</span> <span class="kt">Functor</span> <span class="n">f</span> <span class="kr">where</span>
+<span class="nf">fmap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+<span class="p">(</span><span class="o">&lt;$</span><span class="p">)</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span>
+<span class="cm">{-# MINIMAL fmap #-}</span>
+   <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">[]</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((</span><span class="ow">-&gt;</span><span class="p">)</span> <span class="n">r</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((,,,)</span> <span class="n">a</span> <span class="n">b</span> <span class="n">c</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((,,)</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((,)</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+</pre></div>
+</div>
+<p>The important method here is <em>fmap</em>. The second function <em>(&lt;$)</em> is a
+convenience function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">fmap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>This function, <em>fmap</em>, that all <em>Functor</em>s have tells us that, if we
+give it has access to a function that can turn an <em>a</em> into a <em>b</em>, then
+it can turn an <em>f a</em> into an <em>f b</em> for us. Here, we are interested in
+the case where <em>f</em> is <em>IO</em>.</p>
+<p>If we specialized the function for <em>IO</em>, we would have a function like:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">fmap&#39;</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>How does that work. Well, <em>IO a</em> is a recipe that has side effects and
+produces an <em>a</em>. So, how do we get a <em>b</em> out of that? We perform the
+recipe, but, before return the <em>a</em>, we apply the <em>(a -&gt; b)</em> function to
+to <em>a</em> and return the result, which is the <em>b</em>.</p>
+<p>In the REPL, let’s look at the <em>toUpper</em> function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Data.Char</span>
+<span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">toUpper</span>
+<span class="nf">toUpper</span> <span class="ow">::</span> <span class="kt">Char</span> <span class="ow">-&gt;</span> <span class="kt">Char</span>
+<span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">toUpper</span> <span class="sc">&#39;q&#39;</span>
+<span class="sc">&#39;Q&#39;</span>
+</pre></div>
+</div>
+<p>If we want to apply that to a <em>String</em> rather than a <em>Char</em> we can use
+the <em>map</em> function. <em>String</em>s in Haskell are just lists of <em>Char</em>s.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">map</span> <span class="n">toUpper</span> <span class="s">&quot;Haskell&quot;</span>
+<span class="s">&quot;HASKELL&quot;</span>
+</pre></div>
+</div>
+<p>The <em>map toUpper</em> function is a function from <em>String</em> to <em>String</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">map</span> <span class="n">toUpper</span>
+<span class="nf">map</span> <span class="n">toUpper</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>And we can use this in combination with <em>fmap</em>. If we use <em>map toUpper</em>
+as our function to convert an <em>a</em> to a <em>b</em>, we can see what the type of
+output of <em>fmap</em> would be when applied to an <em>IO a</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">fmap</span> <span class="p">(</span><span class="n">map</span> <span class="n">toUpper</span><span class="p">)</span> <span class="n">getLine</span>
+<span class="nf">fmap</span> <span class="p">(</span><span class="n">map</span> <span class="n">toUpper</span><span class="p">)</span> <span class="n">getLine</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Let’s see it in action.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Char</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">fmap</span> <span class="p">(</span><span class="n">map</span> <span class="n">toUpper</span><span class="p">)</span> <span class="n">getLine</span>
+<span class="nf">haskell</span>
+<span class="s">&quot;HASKELL&quot;</span>
+</pre></div>
+</div>
+<p>We can also use the <em>&gt;&gt;</em> operator. This chains two <em>IO</em> actions
+together, ignoring the result of the first. In the following example,
+both actions will be performed in sequence.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;Hello&quot;</span> <span class="o">&gt;&gt;</span> <span class="n">putStrLn</span> <span class="s">&quot;World&quot;</span>
+<span class="kt">Hello</span>
+<span class="kt">World</span>
+</pre></div>
+</div>
+<p>Here, there is no result from <em>putStrLn</em>, but if there were, it would
+have been ignored. Its side effects would have been performed, its
+result ignored, then the second <em>putStrLn</em> side effects would been
+performed before returning the result of the second call.</p>
+<p>Then, there is an important operator that does not ignore the result of
+the first <em>IO</em> action, and that is called <em>bind</em>. It is written as the
+<em>&gt;&gt;=</em> symbol.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="p">(</span><span class="o">&gt;&gt;=</span><span class="p">)</span>
+<span class="p">(</span><span class="o">&gt;&gt;=</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>We see the <em>Monad</em> constraint, but we can ignore that for now and just
+think of <em>IO</em>.</p>
+<p>What this says is that if I have a recipe that performs side effects
+then gives me a result <em>a</em>, and given that I have a function that takes
+an <em>a</em> and gives me back a recipe that returns a <em>b</em>, then I can combine
+the recipe <em>m a</em> with the recipe <em>m b</em> by taking the value <em>a</em> and using
+it in the recipe that results in the value <em>b</em>.</p>
+<p>An example will make this clear.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">getLine</span> <span class="o">&gt;&gt;=</span> <span class="n">putStrLn</span>
+<span class="kt">Haskell</span>
+<span class="kt">Haskell</span>
+</pre></div>
+</div>
+<p>Here, the function <em>getLine</em> is of type <em>IO String</em>. The return value
+<em>a</em> is passed to the function <em>(a -&gt; m b)</em> which then generates a recipe
+<em>putStrLn</em> with an input value of <em>a</em> and an output of type <em>IO ()</em>.
+Then, <em>putStrLn</em> performs its side effects and returns <em>Unit</em>.</p>
+<p>There is another, very important, way to create <em>IO</em> actions, and that
+is to create recipes that immediately return results without performing
+any side effects.</p>
+<p>That is done with a function called <em>return</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">return</span>
+<span class="nf">return</span> <span class="ow">::</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>Again, it is general for any Monad, we only need to think about <em>IO</em>
+right now.</p>
+<p>It takes a value <em>a</em> and returns a recipe that produces the value <em>a</em>.
+In the case of <em>return</em>, the recipe does not actually create any side
+effects.</p>
+<p>For example:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">return</span> <span class="s">&quot;Haskell&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+<span class="s">&quot;Haskell&quot;</span>
+</pre></div>
+</div>
+<p>We needed to specify the return type so that the REPL knows which Monad
+we are using:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">return</span> <span class="s">&quot;Haskell&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+<span class="nf">return</span> <span class="s">&quot;Haskell&quot;</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="kt">String</span>
+
+<span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">return</span> <span class="s">&quot;Haskell&quot;</span>
+<span class="nf">return</span> <span class="s">&quot;Haskell&quot;</span> <span class="ow">::</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>If we now go back to our <em>main</em> program, we can now write relatively
+complex <em>IO</em> actions. For example, we can define an <em>IO</em> action that
+will ask for two strings and print result of concatenating those two
+strings to the console.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">main</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">main</span> <span class="ow">=</span> <span class="n">bar</span>
+
+<span class="nf">bar</span> <span class="ow">::</span> <span class="kt">IO</span> <span class="nb">()</span>
+<span class="nf">bar</span> <span class="ow">=</span> <span class="n">getLine</span> <span class="o">&gt;&gt;=</span> <span class="nf">\</span><span class="n">s</span> <span class="ow">-&gt;</span>
+      <span class="n">getLine</span> <span class="o">&gt;&gt;=</span> <span class="nf">\</span><span class="n">t</span> <span class="ow">-&gt;</span>
+      <span class="n">putStrLn</span> <span class="p">(</span><span class="n">s</span> <span class="o">++</span> <span class="n">t</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And then, when we run it, the program will wait for two inputs and then
+output the concatenated result.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cabal run hello
+one
+two
+onetwo
+</pre></div>
+</div>
+<p>This is enough now for our purposes, although we won’t need the <em>IO</em>
+Monad until perhaps later in the course when we talk about actually
+deploying Plutus contracts. However, the <em>IO</em> Monad is an important
+example, and a good one to start with.</p>
+<p>So, for now, let’s completely forget about <em>IO</em> and just write pure,
+functional Haskell, using the <em>Maybe</em> type.</p>
+</div>
+<div class="section" id="maybe">
+<h3><span class="section-number">4.2.3. </span>Maybe<a class="headerlink" href="#maybe" title="Permalink to this headline">¶</a></h3>
+<p>The <em>Maybe</em> type is one of the most useful types in Haskell.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Maybe</span>
+<span class="kr">type</span> <span class="kt">Maybe</span> <span class="ow">::</span> <span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span>
+<span class="kr">data</span> <span class="kt">Maybe</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Nothing</span> <span class="o">|</span> <span class="kt">Just</span> <span class="n">a</span>
+   <span class="c1">-- Defined in ‘GHC.Maybe’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Eq</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Eq</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Maybe’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Semigroup</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Monoid</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Ord</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Ord</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Maybe’</span>
+<span class="kr">instance</span> <span class="kt">Semigroup</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Semigroup</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Show</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Show’</span>
+<span class="kr">instance</span> <span class="kt">Read</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Read</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Read’</span>
+<span class="kr">instance</span> <span class="kt">Foldable</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘Data.Foldable’</span>
+<span class="kr">instance</span> <span class="kt">Traversable</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘Data.Traversable’</span>
+<span class="kr">instance</span> <span class="kt">MonadFail</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘Control.Monad.Fail’</span>
+</pre></div>
+</div>
+<p>It is often called something like <em>Optional</em> in other programming
+languages.</p>
+<p>It has two constructors - <em>Nothing</em>, which takes no arguments, and
+<em>Just</em>, which takes one argument.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Maybe</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Nothing</span> <span class="o">|</span> <span class="kt">Just</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>Let’s look at an example.</p>
+<p>In Haskell, if you want to pass a <em>String</em> to a value that has a <em>read</em>
+instance, you will normally do this with the <em>read</em> function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">read</span> <span class="s">&quot;42&quot;</span> <span class="ow">::</span> <span class="kt">Int</span>
+<span class="mi">42</span>
+</pre></div>
+</div>
+<p>But, <em>read</em> is a bit unpleasant, because if we have something that can’t
+be parsed as an <em>Int</em>, then we get an error.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">read</span> <span class="s">&quot;42+u&quot;</span> <span class="ow">::</span> <span class="kt">Int</span>
+<span class="o">***</span> <span class="kt">Exception:</span> <span class="kt">Prelude</span><span class="o">.</span><span class="n">read</span><span class="kt">:</span> <span class="n">no</span> <span class="n">parse</span>
+</pre></div>
+</div>
+<p>Let’s import <em>readMaybe</em> to do it in a better way.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Text.Read</span> <span class="p">(</span><span class="nf">readMaybe</span><span class="p">)</span>
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">Read</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>The function <em>readMaybe</em> does the same as <em>read</em>, but it returns a
+<em>Maybe</em>, and in the case where it cannot parse, it will return a <em>Maybe</em>
+created with the <em>Nothing</em> constructor.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">Read</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">readMaybe</span> <span class="s">&quot;42&quot;</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Int</span>
+<span class="kt">Just</span> <span class="mi">42</span>
+
+<span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">Read</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="n">readMaybe</span> <span class="s">&quot;42+u&quot;</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Int</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>Let’s say we want to create a new function that returns a <em>Maybe</em>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">foo</span> <span class="p">::</span> <span class="n">String</span> <span class="o">-&gt;</span> <span class="n">String</span> <span class="o">-&gt;</span> <span class="n">String</span> <span class="o">-&gt;</span> <span class="n">Maybe</span> <span class="n">Int</span>
+</pre></div>
+</div>
+<p>The idea is that the function should try to parse all three <em>String</em>s
+as <em>Int</em>s. If all the <em>String</em>s can be successfully parsed as
+<em>Int</em>s, then we want to add those three <em>Int</em>s to get a sum. If one
+of the parses fails, we want to return <em>Nothing</em>.</p>
+<p>One way to do that would be:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Int</span>
+<span class="nf">foo</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">readMaybe</span> <span class="n">x</span> <span class="kr">of</span>
+   <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+   <span class="kt">Just</span> <span class="n">k</span>  <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="n">readMaybe</span> <span class="n">y</span> <span class="kr">of</span>
+      <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+      <span class="kt">Just</span> <span class="n">l</span>  <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="n">readMaybe</span> <span class="n">z</span> <span class="kr">of</span>
+            <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+            <span class="kt">Just</span> <span class="n">m</span>  <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Let’s see if it works. First, the case where is succeeds:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">l</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span>
+<span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="s">&quot;1&quot;</span> <span class="s">&quot;2&quot;</span> <span class="s">&quot;3&quot;</span>
+<span class="kt">Just</span> <span class="mi">6</span>
+</pre></div>
+</div>
+<p>But, if one of the values can’t be parsed, we get <em>Nothing</em>:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;2&quot;</span> <span class="s">&quot;3&quot;</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>The code is not ideal because we repeat the same pattern three times.
+Each time we have to consider the two cases - whether the result of the
+read is a <em>Just</em> or a <em>Nothing</em>.</p>
+<p>Ask Haskellers, we hate repetition like this.</p>
+<p>The thing we want to do is very simple. We want to pass the three
+<em>String</em>s and add the result, but with all those cases it is very
+noisy and very ugly. We want to abstract away this pattern.</p>
+<p>One way to do that would be to define something like:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">bindMaybe</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span>
+<span class="nf">bindMaybe</span> <span class="kt">Nothing</span> <span class="ow">=</span> <span class="kt">Nothing</span>
+<span class="nf">bindMaybe</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">x</span><span class="p">)</span> <span class="n">f</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">x</span>
+</pre></div>
+</div>
+<p>Let’s write the same function again using <em>bindMaybe</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo&#39;</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">readMaybe</span> <span class="n">x</span> <span class="p">`</span><span class="n">bindMaybe</span><span class="p">`</span> <span class="nf">\</span><span class="n">k</span> <span class="ow">-&gt;</span>
+            <span class="n">readMaybe</span> <span class="n">y</span> <span class="p">`</span><span class="n">bindMaybe</span><span class="p">`</span> <span class="nf">\</span><span class="n">l</span> <span class="ow">-&gt;</span>
+            <span class="n">readMaybe</span> <span class="n">z</span> <span class="p">`</span><span class="n">bindMaybe</span><span class="p">`</span> <span class="nf">\</span><span class="n">m</span> <span class="ow">-&gt;</span>
+            <span class="kt">Just</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And then, in the REPL, we get the same results for <em>foo’</em> as we got for
+<em>foo</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="s">&quot;1&quot;</span> <span class="s">&quot;2&quot;</span> <span class="s">&quot;3&quot;</span>
+<span class="kt">Just</span> <span class="mi">6</span>
+
+<span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="s">&quot;&quot;</span> <span class="s">&quot;2&quot;</span> <span class="s">&quot;3&quot;</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>This does exactly the same as <em>foo</em>, but it is much more compact, there
+is far less noise, and the business logic is much clearer.</p>
+<p>It may, or may not, help to view the function with it not being used
+with infix notation:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">Read</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">bindMaybe</span> <span class="p">(</span><span class="n">readMaybe</span> <span class="s">&quot;42&quot;</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Int</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="n">x</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="n">x</span><span class="p">)</span>
+<span class="kt">Just</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<p>Here you can see the function clearly taking the <em>Maybe</em> and then the
+function that takes the <em>a</em> from the <em>Maybe</em> and uses it as the input to
+a function that returns a new <em>Maybe</em>.</p>
+<p>This produces nothing useful, until we add the second <em>readMaybe</em></p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Text</span><span class="o">.</span><span class="kt">Read</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Maybe</span><span class="o">&gt;</span> <span class="n">bindMaybe</span> <span class="p">(</span><span class="n">readMaybe</span> <span class="s">&quot;42&quot;</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Int</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="n">x</span> <span class="ow">-&gt;</span> <span class="n">bindMaybe</span> <span class="p">(</span><span class="n">readMaybe</span> <span class="s">&quot;5&quot;</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Int</span><span class="p">)</span> <span class="p">(</span><span class="nf">\</span><span class="n">y</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="n">x</span><span class="p">)))</span>
+<span class="kt">Just</span> <span class="mi">47</span>
+</pre></div>
+</div>
+<p>In some ways <em>Nothing</em> is a bit like an exception in other languages. If
+any of the computations returns <em>Nothing</em>, the remainder of the
+computations in the block are not performed and <em>Nothing</em> is returned.</p>
+</div>
+<div class="section" id="either">
+<h3><span class="section-number">4.2.4. </span>Either<a class="headerlink" href="#either" title="Permalink to this headline">¶</a></h3>
+<p>Another very useful type in Haskell is the <em>Either</em> type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Either</span>
+<span class="kr">type</span> <span class="kt">Either</span> <span class="ow">::</span> <span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span>
+<span class="kr">data</span> <span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span> <span class="ow">=</span> <span class="kt">Left</span> <span class="n">a</span> <span class="o">|</span> <span class="kt">Right</span> <span class="n">b</span>
+   <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">e</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Eq</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Eq</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Eq</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">e</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Ord</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Ord</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Ord</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Semigroup</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Show</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Show</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Show</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Read</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Read</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Read</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Foldable</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Foldable’</span>
+<span class="kr">instance</span> <span class="kt">Traversable</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Traversable’</span>
+</pre></div>
+</div>
+<p><em>Either</em> takes two parameters, <em>a</em> and <em>b</em>. Like <em>Maybe</em> it has two
+constructors, but unlike <em>Maybe</em> both take a value. It can <em>Either</em> be
+an <em>a</em> or a <em>b</em>. The two constructors are <em>Left</em> and <em>Right</em>.</p>
+<p>For example:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">Left</span> <span class="s">&quot;Haskell&quot;</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="kt">Left</span> <span class="s">&quot;Haskell&quot;</span>
+</pre></div>
+</div>
+<p>Or</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">Right</span> <span class="mi">7</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="kt">Right</span> <span class="mi">7</span>
+</pre></div>
+</div>
+<p>If we take the exception analogy a little further, then one issue with
+<em>Maybe</em> is that if we return <em>Nothing</em>, there is no error message. But,
+if we want something that gives a message, we can replace <em>Maybe</em> with
+an <em>Either</em> type.</p>
+<p>In that case, <em>Right</em> can correspond to <em>Just</em> and <em>Left</em> can correspond
+to an error, as <em>Nothing</em> did. But, depending on what type we choose for
+<em>a</em>, we can give appropriate error messages.</p>
+<p>Let’s define something called <em>readEither</em> and see what it does when it
+can and when it cannot parse its input.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">readEither</span> <span class="ow">::</span> <span class="kt">Read</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">a</span>
+<span class="nf">readEither</span> <span class="n">s</span> <span class="kr">case</span> <span class="n">readMaybe</span> <span class="n">s</span> <span class="kr">of</span>
+   <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="o">$</span> <span class="s">&quot;can&#39;t parse: &quot;</span> <span class="o">++</span> <span class="n">s</span>
+   <span class="kt">Just</span> <span class="n">a</span>  <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="n">a</span>
+</pre></div>
+</div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Either</span><span class="o">&gt;</span> <span class="n">readEither</span> <span class="s">&quot;42&quot;</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="kt">Right</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Either</span><span class="o">&gt;</span> <span class="n">readEither</span> <span class="s">&quot;42+u&quot;</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="kt">Left</span> <span class="s">&quot;can&#39;t parse: 42+u&quot;</span>
+</pre></div>
+</div>
+<p>Using this, we can now rewrite <em>foo</em> in terms of <em>Either</em>. First, using
+the long-winded method:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="nf">foo</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">readEither</span> <span class="n">x</span> <span class="kr">of</span>
+   <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="n">err</span>
+   <span class="kt">Right</span> <span class="n">k</span>  <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="n">readEither</span> <span class="n">y</span> <span class="kr">of</span>
+      <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="n">err</span>
+      <span class="kt">Right</span> <span class="n">l</span>  <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="n">readEither</span> <span class="n">z</span> <span class="kr">of</span>
+            <span class="kt">Left</span> <span class="n">err</span> <span class="ow">-&gt;</span> <span class="kt">Left</span> <span class="n">err</span>
+            <span class="kt">Right</span> <span class="n">m</span>  <span class="ow">-&gt;</span> <span class="kt">Right</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Let’s try it. First, the happy path:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Either</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="s">&quot;1&quot;</span> <span class="s">&quot;2&quot;</span> <span class="s">&quot;3&quot;</span>
+<span class="kt">Right</span> <span class="mi">6</span>
+</pre></div>
+</div>
+<p>Then, when we have a problem:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Either</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="s">&quot;ays&quot;</span> <span class="s">&quot;2&quot;</span> <span class="s">&quot;3&quot;</span>
+<span class="kt">Left</span> <span class="s">&quot;can&#39;t parse: ays&quot;</span>
+</pre></div>
+</div>
+<p>But, we have the same problem that we had with <em>Maybe</em>; we have a lot of
+repetition.</p>
+<p>The solution is similar.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">bindEither</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">b</span>
+<span class="nf">bindEither</span> <span class="p">(</span><span class="kt">Left</span> <span class="n">err</span><span class="p">)</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">Left</span> <span class="n">err</span>
+<span class="nf">bindEither</span> <span class="p">(</span><span class="kt">Right</span> <span class="n">x</span><span class="p">)</span>  <span class="n">f</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">x</span>
+
+<span class="nf">foo&#39;</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">readEither</span> <span class="n">x</span> <span class="p">`</span><span class="n">bindEither</span><span class="p">`</span> <span class="nf">\</span><span class="n">k</span> <span class="ow">-&gt;</span>
+            <span class="n">readEither</span> <span class="n">y</span> <span class="p">`</span><span class="n">bindEither</span><span class="p">`</span> <span class="nf">\</span><span class="n">l</span> <span class="ow">-&gt;</span>
+            <span class="n">readEither</span> <span class="n">z</span> <span class="p">`</span><span class="n">bindEither</span><span class="p">`</span> <span class="nf">\</span><span class="n">m</span> <span class="ow">-&gt;</span>
+            <span class="kt">Right</span> <span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You can run this again in the REPL and it will behave in the same way as
+its long-winded version.</p>
+</div>
+<div class="section" id="writer">
+<h3><span class="section-number">4.2.5. </span>Writer<a class="headerlink" href="#writer" title="Permalink to this headline">¶</a></h3>
+<p>So far we have looked at three examples: <em>IO a</em>, <em>Maybe a</em> and <em>Either
+String a</em>. <em>IO a</em> represents plans that can involve side effects and,
+when executed, produce an <em>a</em>. <em>Maybe a</em> and <em>Either String a</em> represent
+computations that can produce an <em>a</em> but can also fail. The difference
+between <em>Maybe</em> and <em>Either</em> is just that <em>Maybe</em> does not produce any
+error message, but <em>Either</em> does.</p>
+<p>Now let’s look at a completely different example that captures the idea
+of computations that can also produce log output.</p>
+<p>We can represent that with a type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Writer</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Writer</span> <span class="n">a</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span>
+   <span class="kr">deriving</span> <span class="kt">Show</span>
+</pre></div>
+</div>
+<p>As an example, let’s write a function that returns a <em>Writer</em> for an
+<em>Int</em> and writes a log message.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">number</span> <span class="ow">::</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span>
+<span class="nf">number</span> <span class="n">n</span> <span class="ow">=</span> <span class="kt">Writer</span> <span class="n">n</span> <span class="o">$</span> <span class="p">[</span><span class="s">&quot;number: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">n</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>In the REPL:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Writer</span><span class="o">&gt;</span> <span class="n">number</span> <span class="mi">42</span>
+<span class="kt">Writer</span> <span class="mi">42</span> <span class="p">[</span><span class="s">&quot;number: 42&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Now, let’s do something similar to that which we have done with <em>Maybe</em>
+and <em>Either</em>.</p>
+<p>Let’s write a function that takes three logging computations that each
+produce an <em>Int</em> and we want to return a single computation that
+produces the sum of those <em>Int</em>s.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span>
+<span class="nf">foo</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">k</span> <span class="n">xs</span><span class="p">)</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">l</span> <span class="n">ys</span><span class="p">)</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">m</span> <span class="n">zs</span><span class="p">)</span> <span class="ow">=</span>
+<span class="kt">Writer</span> <span class="p">(</span><span class="kt">K</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span><span class="p">)</span> <span class="o">$</span> <span class="n">xs</span> <span class="o">++</span> <span class="n">ys</span> <span class="o">++</span> <span class="n">zs</span>
+</pre></div>
+</div>
+<p>In the REPL:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Writer</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="p">(</span><span class="n">number</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">number</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="n">number</span> <span class="mi">3</span><span class="p">)</span>
+<span class="kt">Writer</span> <span class="mi">6</span> <span class="p">[</span><span class="s">&quot;number: 1&quot;</span><span class="p">,</span><span class="s">&quot;number: 2&quot;</span><span class="p">,</span><span class="s">&quot;number: 3&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Now, let’s write another useful function that takes a list of message
+and producers a <em>Writer</em> with no useful result.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">tell</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">String</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="nb">()</span>
+<span class="nf">tell</span> <span class="ow">=</span> <span class="kt">Writer</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>Now, we can update <em>foo</em> to add an extra log message showing the sum of
+the numbers.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span>
+<span class="nf">foo</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">k</span> <span class="n">xs</span><span class="p">)</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">l</span> <span class="n">ys</span><span class="p">)</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">m</span> <span class="n">zs</span><span class="p">)</span> <span class="ow">=</span>
+<span class="kr">let</span>
+   <span class="n">s</span> <span class="ow">=</span> <span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span>
+   <span class="kt">Writer</span> <span class="kr">_</span> <span class="n">us</span> <span class="ow">=</span> <span class="n">tell</span> <span class="p">[</span><span class="s">&quot;sum: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">s</span><span class="p">]</span>
+<span class="kr">in</span>
+   <span class="kt">Writer</span> <span class="n">s</span> <span class="o">$</span> <span class="n">xs</span> <span class="o">++</span> <span class="n">ys</span> <span class="o">++</span> <span class="n">zs</span> <span class="o">++</span> <span class="n">us</span>
+</pre></div>
+</div>
+<p>In the REPL:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Writer</span><span class="o">&gt;</span> <span class="n">foo</span> <span class="p">(</span><span class="n">number</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">number</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="n">number</span> <span class="mi">3</span><span class="p">)</span>
+<span class="kt">Writer</span> <span class="mi">6</span> <span class="p">[</span><span class="s">&quot;number: 1&quot;</span><span class="p">,</span><span class="s">&quot;number: 2&quot;</span><span class="p">,</span><span class="s">&quot;number: 3&quot;</span><span class="p">,</span><span class="s">&quot;sum: 6&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>As before, we can write a bind function:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">bindWriter</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="n">b</span>
+<span class="nf">bindWriter</span> <span class="p">(</span><span class="kt">Writer</span> <span class="n">a</span> <span class="n">xs</span><span class="p">)</span> <span class="n">f</span> <span class="ow">=</span>
+<span class="kr">let</span>
+   <span class="kt">Writer</span> <span class="n">b</span> <span class="n">ys</span> <span class="ow">=</span> <span class="n">f</span> <span class="n">a</span>
+<span class="kr">in</span>
+   <span class="kt">Writer</span> <span class="n">b</span> <span class="o">$</span> <span class="n">xs</span> <span class="o">++</span> <span class="n">ys</span>
+</pre></div>
+</div>
+<p>Here, the <em>bindWriter</em> function is returning the <em>Writer b</em> and
+producing log messages which are a concatenation of the <em>xs</em> that we
+pattern matched on input, and the <em>ys</em> that we pattern matched when
+calling <em>f a</em> in order to produce the <em>Writer b</em>.</p>
+<p>Now, we can rewrite <em>foo</em> using <em>bindWriter</em> and make it much nicer.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo&#39;</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">x</span> <span class="p">`</span><span class="n">bindWriter</span><span class="p">`</span> <span class="nf">\</span><span class="n">k</span> <span class="ow">-&gt;</span>
+            <span class="n">y</span> <span class="p">`</span><span class="n">bindWriter</span><span class="p">`</span> <span class="nf">\</span><span class="n">l</span> <span class="ow">-&gt;</span>
+            <span class="n">z</span> <span class="p">`</span><span class="n">bindWriter</span><span class="p">`</span> <span class="nf">\</span><span class="n">m</span> <span class="ow">-&gt;</span>
+            <span class="kr">let</span> <span class="n">s</span> <span class="ow">=</span> <span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span>
+            <span class="kr">in</span> <span class="n">tell</span> <span class="p">[</span><span class="s">&quot;sum: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">s</span><span class="p">]</span> <span class="p">`</span><span class="n">bindWriter</span><span class="p">`</span> <span class="nf">\</span><span class="kr">_</span> <span class="ow">-&gt;</span>
+               <span class="kt">Writer</span> <span class="n">s</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+<p>What we did with <em>foo</em> before, we can now do with <em>foo’</em>, and we get the
+same result.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Writer</span><span class="o">&gt;</span> <span class="n">foo&#39;</span> <span class="p">(</span><span class="n">number</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">number</span> <span class="mi">2</span><span class="p">)</span> <span class="p">(</span><span class="n">number</span> <span class="mi">3</span><span class="p">)</span>
+<span class="kt">Writer</span> <span class="mi">6</span> <span class="p">[</span><span class="s">&quot;number: 1&quot;</span><span class="p">,</span><span class="s">&quot;number: 2&quot;</span><span class="p">,</span><span class="s">&quot;number: 3&quot;</span><span class="p">,</span><span class="s">&quot;sum: 6&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Admittedly, it is longer than it was before, but it is much nicer. We no
+longer need to do the pattern matching to extract the messages. We don’t
+have to explicitly combine the log messages, where we could make a
+mistake and forget one, or get the order wrong. Instead, we abstract all
+that away and can just concentrate on the business logic.</p>
+<p>Although the pattern is the same as with <em>Maybe</em> and <em>Either</em>, note that
+the special aspect of these computations is completely different. With
+<em>Maybe</em> and <em>Either</em> we dealt with the notion of failure, whereas here,
+with the <em>Writer</em>, there is no failure, but we instead have additional
+output.</p>
+</div>
+<div class="section" id="what-is-a-monad">
+<h3><span class="section-number">4.2.6. </span>What is a Monad?<a class="headerlink" href="#what-is-a-monad" title="Permalink to this headline">¶</a></h3>
+<p>Now, we are in a position to explain what a Monad is.</p>
+<p>Looking back at the four examples, what did they have in common? In all
+four cases, We had a type constructor with one type parameter - <em>IO</em>,
+<em>Maybe</em>, <em>Either String</em> and <em>Writer</em> all take a type parameter.</p>
+<p>And, for all four of these examples, we had a bind function. For <em>IO</em>,
+we had the <em>&gt;&gt;=</em> function and for the others we had the bind functions
+that we wrote ourselves.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">bindWriter</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="n">b</span>
+<span class="nf">bindEither</span> <span class="ow">::</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">b</span>
+<span class="nf">bindMaybe</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>How the bind works depends on the case. In the case of <em>IO</em> it is
+built-in magic, but you can think of it as just combining the two plans
+describing the actions to take during computation. For <em>bindMaybe</em> and
+<em>bindEither</em> the logic is for the whole plan to fail if any part of it
+fails, and for <em>bindWriter</em>, the logic was to combine the list of log
+messages.</p>
+<p>And that is the main idea of Monads. It’s a concept of computation with
+some additional side effects, and the ability to bind two such
+computations together.</p>
+<p>There is another aspect that we briefly mentioned in the case of <em>IO</em>
+but not for the other examples - another thing that we can always do.</p>
+<p>Whenever we have such a concept of computation with side effects, we
+also also always have the ability to produce a computation of this kind
+that <em>doesn’t</em> have any side effects.</p>
+<p>In the example of <em>IO</em>, this was done with <em>return</em>. Given an <em>a</em>, you
+can create an <em>IO a</em> which is the recipe that always simply returns the
+<em>a</em> with no side effects. Each of the other example has this ability as
+well, as shown below.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">return</span>              <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="n">a</span>
+<span class="kt">Just</span>                <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">a</span>
+<span class="kt">Right</span>               <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="n">a</span>
+<span class="p">(</span><span class="nf">\</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="n">a</span> <span class="kt">[]</span><span class="p">)</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>And it is the combination of these two features that defines a Monad.</p>
+<ul class="simple">
+<li><p>the ability to bind two computations together</p></li>
+<li><p>the possibility to construct a computation from a pure value without
+making use of any of the potential side effects</p></li>
+</ul>
+<p>If we look in the REPL:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Monad</span>
+<span class="kr">type</span> <span class="kt">Monad</span> <span class="ow">::</span> <span class="p">(</span><span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Constraint</span>
+<span class="kr">class</span> <span class="kt">Applicative</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="kr">where</span>
+<span class="p">(</span><span class="o">&gt;&gt;=</span><span class="p">)</span> <span class="ow">::</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+<span class="p">(</span><span class="o">&gt;&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+<span class="nf">return</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+<span class="cm">{-# MINIMAL (&gt;&gt;=) #-}</span>
+   <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">e</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="kt">[]</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="p">((</span><span class="ow">-&gt;</span><span class="p">)</span> <span class="n">r</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Monoid</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Monoid</span> <span class="n">b</span><span class="p">,</span> <span class="kt">Monoid</span> <span class="n">c</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Monad</span> <span class="p">((,,,)</span> <span class="n">a</span> <span class="n">b</span> <span class="n">c</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Monoid</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Monoid</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Monad</span> <span class="p">((,,)</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Monad</span> <span class="p">((,)</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+</pre></div>
+</div>
+<p>We see the bind function</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="o">&gt;&gt;=</span><span class="p">)</span> <span class="ow">::</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>And the <em>return</em> function that takes a pure value and turns it into a
+computation that has potential for side effects, but does not use them.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">return</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>The other function <em>&gt;&gt;</em> can easily be defined in terms of <em>&gt;&gt;=</em>, but is
+provided for convenience.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="o">&gt;&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="n">m</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>What this function does is to throw away the result of the first
+computation, so you could define it in terms of <em>&gt;&gt;=</em> by just ignoring
+the argument to the function parameter.</p>
+<p>There’s another technical computation. We see that <em>Monad</em> has the super
+class <em>Applicative</em>, so every Monad is <em>Applicative</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Applicative</span>
+<span class="kr">type</span> <span class="kt">Applicative</span> <span class="ow">::</span> <span class="p">(</span><span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Constraint</span>
+<span class="kr">class</span> <span class="kt">Functor</span> <span class="n">f</span> <span class="ow">=&gt;</span> <span class="kt">Applicative</span> <span class="n">f</span> <span class="kr">where</span>
+<span class="nf">pure</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span>
+<span class="p">(</span><span class="o">&lt;*&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="n">f</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+<span class="kt">GHC</span><span class="o">.</span><span class="kt">Base</span><span class="o">.</span><span class="n">liftA2</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">c</span>
+<span class="p">(</span><span class="o">*&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+<span class="p">(</span><span class="o">&lt;*</span><span class="p">)</span> <span class="ow">::</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span>
+<span class="cm">{-# MINIMAL pure, ((&lt;*&gt;) | liftA2) #-}</span>
+   <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">e</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="kt">[]</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="p">((</span><span class="ow">-&gt;</span><span class="p">)</span> <span class="n">r</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Monoid</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Monoid</span> <span class="n">b</span><span class="p">,</span> <span class="kt">Monoid</span> <span class="n">c</span><span class="p">)</span> <span class="ow">=&gt;</span>
+         <span class="kt">Applicative</span> <span class="p">((,,,)</span> <span class="n">a</span> <span class="n">b</span> <span class="n">c</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">Monoid</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Monoid</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Applicative</span> <span class="p">((,,)</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+<span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Monoid</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">Applicative</span> <span class="p">((,)</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+</pre></div>
+</div>
+<p>We see it has a bunch of functions, but we only need the first two.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">pure</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span>
+<span class="p">(</span><span class="o">&lt;*&gt;</span><span class="p">)</span> <span class="ow">::</span> <span class="n">f</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+</pre></div>
+</div>
+<p>The function <em>pure</em> has the same type signature as <em>return</em>. Then there
+is &lt;*&gt; (pronounced ‘ap’) which looks a bit more complicated. But, the
+truth is that, once you have <em>return</em> and <em>&gt;&gt;=</em> in a Monad, we can
+easily define both <em>pure</em> and &lt;*&gt;.</p>
+<p>We see that <em>Applicative</em> also has a superclass <em>Functor</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week04</span><span class="o">.</span><span class="kt">Contract</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Functor</span>
+<span class="kr">type</span> <span class="kt">Functor</span> <span class="ow">::</span> <span class="p">(</span><span class="o">*</span> <span class="ow">-&gt;</span> <span class="o">*</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Constraint</span>
+<span class="kr">class</span> <span class="kt">Functor</span> <span class="n">f</span> <span class="kr">where</span>
+<span class="nf">fmap</span> <span class="ow">::</span> <span class="p">(</span><span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">b</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span>
+<span class="p">(</span><span class="o">&lt;$</span><span class="p">)</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">b</span> <span class="ow">-&gt;</span> <span class="n">f</span> <span class="n">a</span>
+<span class="cm">{-# MINIMAL fmap #-}</span>
+   <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘Data.Either’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">[]</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Maybe</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">IO</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((</span><span class="ow">-&gt;</span><span class="p">)</span> <span class="n">r</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((,,,)</span> <span class="n">a</span> <span class="n">b</span> <span class="n">c</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((,,)</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="p">((,)</span> <span class="n">a</span><span class="p">)</span> <span class="c1">-- Defined in ‘GHC.Base’</span>
+</pre></div>
+</div>
+<p>As we mentioned in the context of <em>IO</em>, <em>Functor</em> has the <em>fmap</em>
+function which, given a function from <em>a</em> to <em>b</em> will turn an <em>f a</em> into
+an <em>f b</em>.</p>
+<p>The prototypical example for <em>fmap</em> is lists where <em>fmap</em> is just <em>map</em>.
+Given a function from <em>a</em> to <em>b</em>, you can create a list of type <em>b</em> from
+a list of type <em>a</em> by applying the <em>map</em> function to each of the
+elements of the list.</p>
+<p>Again, once you have <em>return</em> and <em>&gt;&gt;=</em>, it is easy to define <em>fmap</em>.</p>
+<p>So, whenever you want to define a Monad, you just define <em>return</em> and
+<em>&gt;&gt;=</em>, and to make the compiler happy and to give instances for
+<em>Functor</em> and <em>Applicative</em>, there’s always a standard way of doing it.</p>
+<p>We can do this in the example of <em>Writer</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">import</span> <span class="nn">Control.Monad</span>
+
+<span class="kr">instance</span> <span class="kt">Functor</span> <span class="kt">Writer</span> <span class="kr">where</span>
+   <span class="n">fmap</span> <span class="ow">=</span> <span class="n">liftM</span>
+
+<span class="kr">instance</span> <span class="kt">Applicative</span> <span class="kt">Writer</span> <span class="kr">where</span>
+   <span class="n">pure</span> <span class="ow">=</span> <span class="n">return</span>
+   <span class="p">(</span><span class="o">&lt;*&gt;</span><span class="p">)</span> <span class="ow">=</span> <span class="n">ap</span>
+
+<span class="kr">instance</span> <span class="kt">Monad</span> <span class="kt">Writer</span> <span class="kr">where</span>
+   <span class="n">return</span> <span class="n">a</span> <span class="ow">=</span> <span class="kt">Writer</span> <span class="n">a</span> <span class="kt">[]</span>
+   <span class="p">(</span><span class="o">&gt;&gt;=</span><span class="p">)</span> <span class="ow">=</span> <span class="n">bindWriter</span>
+</pre></div>
+</div>
+<p>We don’t have to do the same for <em>Maybe</em>, <em>Either</em> or <em>IO</em> because they
+are already Monads defined by the Prelude.</p>
+</div>
+<div class="section" id="why-is-this-useful">
+<h3><span class="section-number">4.2.7. </span>Why Is This useful?<a class="headerlink" href="#why-is-this-useful" title="Permalink to this headline">¶</a></h3>
+<p>It is always useful, in general, to identify a common pattern and give
+it a name.</p>
+<p>But, maybe the most important advantage is that there are lots of
+functions that don’t care which Monad we are dealing with - they will
+work with all Monads.</p>
+<p>Let’s generalize the example where we compute the sum of three integers.
+We use a <em>let</em> in the example below for reasons that will become clear
+in moment.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">threeInts</span> <span class="ow">::</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Int</span>
+<span class="nf">threeInts</span> <span class="n">mx</span> <span class="n">my</span> <span class="n">mz</span> <span class="ow">=</span>
+   <span class="n">mx</span> <span class="o">&gt;&gt;=</span> <span class="nf">\</span><span class="n">k</span> <span class="ow">-&gt;</span>
+   <span class="n">my</span> <span class="o">&gt;&gt;=</span> <span class="nf">\</span><span class="n">l</span> <span class="ow">-&gt;</span>
+   <span class="n">mz</span> <span class="o">&gt;&gt;=</span> <span class="nf">\</span><span class="n">m</span> <span class="ow">-&gt;</span>
+   <span class="kr">let</span> <span class="n">s</span> <span class="ow">=</span> <span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span> <span class="kr">in</span> <span class="n">return</span> <span class="n">s</span>
+</pre></div>
+</div>
+<p>Now we have this function, we can return to the <em>Maybe</em> example and
+rewrite it.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo&#39;&#39;</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">threeInts</span> <span class="p">(</span><span class="n">readMaybe</span> <span class="n">x</span><span class="p">)</span> <span class="p">(</span><span class="n">readMaybe</span> <span class="n">y</span><span class="p">)</span> <span class="p">(</span><span class="n">readMaybe</span> <span class="n">z</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We can do the same for the <em>Either</em> example.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo&#39;&#39;</span> <span class="ow">::</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Either</span> <span class="kt">String</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">threeInts</span> <span class="p">(</span><span class="n">readEither</span> <span class="n">x</span><span class="p">)</span> <span class="p">(</span><span class="n">readEither</span> <span class="n">y</span><span class="p">)</span> <span class="p">(</span><span class="n">readEither</span> <span class="n">z</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <em>Writer</em> example is not exactly the same.</p>
+<p>If we are happy not to have the log message for the sum, it is very
+simple as it is already an instance of <em>threeInts</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo&#39;&#39;</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="n">threeInts</span>
+</pre></div>
+</div>
+<p>However, if we want the final log message, it becomes a little more
+complicated.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">foo&#39;&#39;</span> <span class="ow">::</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="kt">Writer</span> <span class="kt">Int</span>
+<span class="nf">foo&#39;&#39;</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span> <span class="ow">=</span> <span class="kr">do</span>
+   <span class="n">s</span> <span class="ow">&lt;-</span> <span class="n">threeInts</span> <span class="n">x</span> <span class="n">y</span> <span class="n">z</span>
+   <span class="n">tell</span> <span class="p">[</span><span class="s">&quot;sum: &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">s</span><span class="p">]</span>
+   <span class="n">return</span> <span class="n">s</span>
+</pre></div>
+</div>
+<p>If you look into the Control.Monad module in the standard Haskell
+Prelude, you will see that there are many useful functions that you can
+use for all Monads.</p>
+<p>One way to think about a Monad is as a computation with a super power.</p>
+<p>In the case of <em>IO</em>, the super power would be having real-world
+side-effects. In the case of <em>Maybe</em>, the super power is being able to
+fail. The super power of <em>Either</em> is to fail with an error message. And
+in the case of <em>Writer</em>, the super power is to log messages.</p>
+<p>There is a saying in the Haskell community that Haskell has an
+overloaded semi-colon. The explanation for this is that in many
+imperative programming languages, you have semi-colons that end with a
+semi-colon - each statement is executed one after the other, each
+separated by a semi-colon. But, what exactly the semi-colon means
+depends on the language. For example, there could be an exception, in
+which case computation would stop and wouldn’t continue with the next
+lines.</p>
+<p>In a sense, <em>bind</em> is like a semi-colon. And the cool thing about
+Haskell is that it is a programmable semi-colon. We get to say what the
+logic is for combining two computations together.</p>
+<p>Each Monad comes with its own “semi-colon”.</p>
+</div>
+<div class="section" id="do-notation">
+<h3><span class="section-number">4.2.8. </span>‘do’ notation<a class="headerlink" href="#do-notation" title="Permalink to this headline">¶</a></h3>
+<p>Because this pattern is so common and monadic computations are all over
+the place, there is a special notation for this in Haskell, called <em>do</em>
+notation.</p>
+<p>It is syntactic sugar. Let’s rewrite <em>threeInts</em> using <em>do</em> notation.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">threeInts&#39;</span> <span class="ow">::</span> <span class="kt">Monad</span> <span class="n">m</span> <span class="ow">=&gt;</span> <span class="n">m</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Int</span> <span class="ow">-&gt;</span> <span class="n">m</span> <span class="kt">Int</span>
+<span class="nf">threeInts&#39;</span> <span class="n">mx</span> <span class="n">my</span> <span class="n">mz</span> <span class="ow">=</span> <span class="kr">do</span>
+   <span class="n">k</span> <span class="ow">&lt;-</span> <span class="n">mx</span>
+   <span class="n">l</span> <span class="ow">&lt;-</span> <span class="n">my</span>
+   <span class="n">m</span> <span class="ow">&lt;-</span> <span class="n">mz</span>
+   <span class="kr">let</span> <span class="n">s</span> <span class="ow">=</span> <span class="n">k</span> <span class="o">+</span> <span class="n">l</span> <span class="o">+</span> <span class="n">m</span>
+   <span class="n">return</span> <span class="n">s</span>
+</pre></div>
+</div>
+<p>This does exactly the same thing as the non-<em>do</em> version, but it has
+less noise.</p>
+<p>Note that the <em>let</em> statement does not use an <em>in</em> part. It does not
+need to inside a <em>do</em> block.</p>
+<p>And that’s Monads. There is a lot more to say about them but hopefully
+you now have an idea of what Monads are and how they work.</p>
+<p>Often you are in a situation where you want several effects at once -
+for example you may want optional failure <em>and</em> log messages. There are
+ways to do that in Haskell. For example there are Monad Transformers
+where one can basically build custom Monads with the features that you
+want.</p>
+<p>There are other approaches. One is called Effect Systems, which has a
+similar objective. And this is incidentally what Plutus uses for
+important Monads. In particular the Contact Monad in the wallet, and the
+Trace Monad which is used to test Plutus code.</p>
+<p>The good news is that you don’t need to understand Effect Systems to
+work with these Monads. You just need to know that you are working with
+a Monad, and what super powers it has.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Plutus Pioneer Program</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="week1.html">1. Week 01</a></li>
+<li class="toctree-l1"><a class="reference internal" href="week2.html">2. Week 02</a></li>
+<li class="toctree-l1"><a class="reference internal" href="week3.html">3. Week 03</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">4. Week 04</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">4.1. Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#monads">4.2. Monads</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#hello-world">4.2.1. Hello World</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#getline">4.2.2. getLine</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maybe">4.2.3. Maybe</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#either">4.2.4. Either</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#writer">4.2.5. Writer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#what-is-a-monad">4.2.6. What is a Monad?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#why-is-this-useful">4.2.7. Why Is This useful?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#do-notation">4.2.8. ‘do’ notation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="week3.html" title="previous chapter"><span class="section-number">3. </span>Week 03</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;1980, Chris Moreton.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/week4.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
