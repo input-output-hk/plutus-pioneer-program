@@ -3158,7 +3158,7 @@ It is always useful, in general, to identify a common pattern and give it a name
 
 But, maybe the most important advantage is that there are lots of functions that don't care which Monad we are dealing with - they will work with all Monads.
 
-Let's generalize the *Writer* example where we computed the sum of three integers.
+Let's generalize the example where we compute the sum of three integers. We use a *let* in the example below for reasons that will become clear in moment.
 
 ```haskell
 threeInts :: Monad m => m Int -> m Int -> m Int -> m Int
@@ -3168,6 +3168,41 @@ threeInts mx my mz =
     mz >>= \m ->
     let s = k + l + m in return s
 ```
+
+Now we have this function, we can return to the *Maybe* example and rewrite it.
+
+```haskell
+foo'' :: String -> String -> String -> Maybe Int
+foo'' x y z = threeInts (readMaybe x) (readMaybe y) (readMaybe z)
+```
+
+We can do the same for the *Either* example.
+
+```haskell
+foo'' :: String -> String -> String -> Either String Int
+foo'' x y z = threeInts (readEither x) (readEither y) (readEither z)
+```
+
+The *Writer* example is not exactly the same.
+
+If we are happy not to have the log message for the sum, it is very simple as it is already an instance of *threeInts*.
+
+```haskell
+foo'' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo'' x y z = threeInts
+```
+
+However, if we want the final log message, it becomes a little more complicated.
+
+```haskell
+foo'' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo'' x y z = do
+    s <- threeInts x y z
+    tell ["sum: " ++ show s]
+    return s
+```
+
+
 
 
 
