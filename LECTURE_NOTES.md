@@ -2996,11 +2996,10 @@ Now, we are in a position to explain what a Monad is.
 
 Looking back at the four examples, what did they have in common? In all four cases, We had a type constructor with one type parameter - *IO*, *Maybe*, *Either String* and *Writer* all take a type parameter.
 
-And, for all four of these examples, we had a bind function. For *IO*, we had the *>>=* function and for the others we had then bind functions that we wrote ourselves.
+And, for all four of these examples, we had a bind function. For *IO*, we had the *>>=* function and for the others we had the bind functions that we wrote ourselves.
 
 
 ```haskell
-(>>=) :: Monad m => m a -> (a -> m b) -> m b
 bindWriter :: Writer a -> (a -> Writer b) -> Writer b
 bindEither :: Either String a -> (a -> Either String b) -> Either String b
 bindMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
@@ -3023,11 +3022,152 @@ Right               :: a -> Either String a
 (\a -> Writer a []) :: a -> Writer a
 ```
 
+And it is the combination of these two features that defines a Monad.
 
+- the ability to bind two computations together
+- the possibility to construct a computation from a pure value without making use of any of the potential side effects
 
+If we look in the REPL:
 
+```haskell
+Prelude Week04.Contract> :i Monad
+type Monad :: (* -> *) -> Constraint
+class Applicative m => Monad m where
+  (>>=) :: m a -> (a -> m b) -> m b
+  (>>) :: m a -> m b -> m b
+  return :: a -> m a
+  {-# MINIMAL (>>=) #-}
+  	-- Defined in ‘GHC.Base’
+instance Monad (Either e) -- Defined in ‘Data.Either’
+instance Monad [] -- Defined in ‘GHC.Base’
+instance Monad Maybe -- Defined in ‘GHC.Base’
+instance Monad IO -- Defined in ‘GHC.Base’
+instance Monad ((->) r) -- Defined in ‘GHC.Base’
+instance (Monoid a, Monoid b, Monoid c) => Monad ((,,,) a b c)
+  -- Defined in ‘GHC.Base’
+instance (Monoid a, Monoid b) => Monad ((,,) a b)
+  -- Defined in ‘GHC.Base’
+instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+```
 
+We see the bind function
 
+```haskell
+(>>=) :: m a -> (a -> m b) -> m b
+```
+
+And the *return* function that takes a pure value and turns it into a computation that has potential for side effects, but does not use them.
+
+```haskell
+return :: a -> m a
+```
+
+The other function *>>* can easily be defined in terms of *>>=*, but is provided for convenience.
+
+```haskell
+(>>) :: m a -> m b -> m b
+```
+
+What this function does is to throw away the result of the first computation, so you could define it in terms of *>>=* by just ignoring the argument to the function parameter.
+
+There's another technical computation. We see that *Monad* has the super class *Applicative*, so every Monad is *Applicative*.
+
+```haskell
+Prelude Week04.Contract> :i Applicative
+type Applicative :: (* -> *) -> Constraint
+class Functor f => Applicative f where
+  pure :: a -> f a
+  (<*>) :: f (a -> b) -> f a -> f b
+  GHC.Base.liftA2 :: (a -> b -> c) -> f a -> f b -> f c
+  (*>) :: f a -> f b -> f b
+  (<*) :: f a -> f b -> f a
+  {-# MINIMAL pure, ((<*>) | liftA2) #-}
+  	-- Defined in ‘GHC.Base’
+instance Applicative (Either e) -- Defined in ‘Data.Either’
+instance Applicative [] -- Defined in ‘GHC.Base’
+instance Applicative Maybe -- Defined in ‘GHC.Base’
+instance Applicative IO -- Defined in ‘GHC.Base’
+instance Applicative ((->) r) -- Defined in ‘GHC.Base’
+instance (Monoid a, Monoid b, Monoid c) =>
+         Applicative ((,,,) a b c)
+  -- Defined in ‘GHC.Base’
+instance (Monoid a, Monoid b) => Applicative ((,,) a b)
+  -- Defined in ‘GHC.Base’
+instance Monoid a => Applicative ((,) a) -- Defined in ‘GHC.Base’
+```
+
+We see it has a bunch of functions, but we only need the first two.
+
+```haskell
+pure :: a -> f a
+(<*>) :: f (a -> b) -> f a -> f b
+```
+
+The function *pure* has the same type signature as *return*. Then there is <\*> (pronounced 'ap') which looks a bit more complicated. But, the truth is that, once you have *return* and *>>=* in a Monad, we can easily define both *pure* and <*>.
+
+We see that *Applicative* also has a superclass *Functor*.
+
+```haskell
+Prelude Week04.Contract> :i Functor
+type Functor :: (* -> *) -> Constraint
+class Functor f where
+  fmap :: (a -> b) -> f a -> f b
+  (<$) :: a -> f b -> f a
+  {-# MINIMAL fmap #-}
+  	-- Defined in ‘GHC.Base’
+instance Functor (Either a) -- Defined in ‘Data.Either’
+instance Functor [] -- Defined in ‘GHC.Base’
+instance Functor Maybe -- Defined in ‘GHC.Base’
+instance Functor IO -- Defined in ‘GHC.Base’
+instance Functor ((->) r) -- Defined in ‘GHC.Base’
+instance Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
+instance Functor ((,,) a b) -- Defined in ‘GHC.Base’
+instance Functor ((,) a) -- Defined in ‘GHC.Base’
+```
+
+As we mentioned in the context of *IO*, *Functor* has the *fmap* function which, given a function from *a* to *b* will turn an *f a* into an *f b*. 
+
+The prototypical example for *fmap* is lists where *fmap* is just *map*. Given a function from *a* to *b*, you can create a list of type *b* from a list of type *a* by applying the *map* function to each of the elements of the list.
+
+Again, once you have *return* and *>>=*, it is easy to define *fmap*.
+
+So, whenever you want to define a Monad, you just define *return* and *>>=*, and to make the compiler happy and to give instances for *Functor* and *Applicative*, there's always a standard way of doing it.
+
+We can do this in the example of *Writer*.
+
+```haskell
+import Control.Monad
+
+instance Functor Writer where
+    fmap = liftM
+
+instance Applicative Writer where
+    pure = return
+    (<*>) = ap
+
+instance Monad Writer where
+    return a = Writer a []
+    (>>=) = bindWriter
+```    
+
+We don't have to do the same for *Maybe*, *Either* or *IO* because they are already Monads defined by the Prelude. 
+
+### Why Is This useful?
+
+It is always useful, in general, to identify a common pattern and give it a name.
+
+But, maybe the most important advantage is that there are lots of functions that don't care which Monad we are dealing with - they will work with all Monads.
+
+Let's generalize the *Writer* example where we computed the sum of three integers.
+
+```haskell
+threeInts :: Monad m => m Int -> m Int -> m Int -> m Int
+threeInts mx my mz =
+    mx >>= \k ->
+    my >>= \l ->
+    mz >>= \m ->
+    let s = k + l + m in return s
+```
 
 
 
