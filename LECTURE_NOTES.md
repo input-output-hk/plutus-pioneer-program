@@ -2852,3 +2852,33 @@ foo x y z = case readEither x of
             Right m  -> Right (k + l + m)
 ```
 
+Let's try it. First, the happy path:
+
+```haskell
+Prelude Week04.Either> foo "1" "2" "3"
+Right 6
+```
+
+Then, when we have a problem:
+
+```haskell
+Prelude Week04.Either> foo "ays" "2" "3"
+Left "can't parse: ays"
+```
+
+But, we have the same problem that we had with *Maybe*; we have a lot of repetition.
+
+The solution is similar.
+
+```haskell
+bindEither :: Either String a -> (a -> Either String b) -> Either String b
+bindEither (Left err) _ = Left err
+bindEither (Right x)  f = f x
+
+foo' :: String -> String -> String -> Either String Int
+foo' x y z = readEither x `bindEither` \k ->
+             readEither y `bindEither` \l ->
+             readEither z `bindEither` \m ->
+             Right (k + l + m)
+```            
+
