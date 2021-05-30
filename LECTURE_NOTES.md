@@ -3008,6 +3008,24 @@ bindMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
 
 How the bind works depends on the case. In the case of *IO* it is built-in magic, but you can think of it as just combining the two plans describing the actions to take during computation. For *bindMaybe* and *bindEither* the logic is for the whole plan to fail if any part of it fails, and for *bindWriter*, the logic was to combine the list of log messages.
 
+And that is the main idea of Monads. It's a concept of computation with some additional side effects, and the ability to bind two such computations together.
+
+There is another aspect that we briefly mentioned in the case of *IO* but not for the other examples - another thing that we can always do. 
+
+Whenever we have such a concept of computation with side effects, we also also always have the ability to produce a computation of this kind that *doesn't* have any side effects.
+
+In the example of *IO*, this was done with *return*. Given an *a*, you can create an *IO a* which is the recipe that always simply returns the *a* with no side effects. Each of the other example has this ability as well, as shown below.
+
+```haskell
+return              :: a -> IO a
+Just                :: a -> Maybe a
+Right               :: a -> Either String a
+(\a -> Writer a []) :: a -> Writer a
+```
+
+
+
+
 
 
 
