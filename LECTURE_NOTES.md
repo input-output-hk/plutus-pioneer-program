@@ -2,6 +2,8 @@
 
 This is a written version of the Plutus Pioneer Program YouTube lectures by Lars Brünjes.
 
+If this is useful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, or any of the many other small pools run by single stake pool operators.
+
 #
 
 - [Week 01](#week-01)
@@ -2835,5 +2837,18 @@ Right 42
 ```haskell
 Prelude Week04.Either> readEither "42+u" :: Either String Int
 Left "can't parse: 42+u"
+```
+
+Using this, we can now rewrite *foo* in terms of *Either*. First, using the long-winded method:
+
+```haskell
+foo :: String -> String -> String -> Either String Int
+foo x y z = case readEither x of
+    Left err -> Left err
+    Right k  -> case readEither y of
+        Left err -> Left err
+        Right l  -> case readEither z of
+            Left err -> Left err
+            Right m  -> Right (k + l + m)
 ```
 
