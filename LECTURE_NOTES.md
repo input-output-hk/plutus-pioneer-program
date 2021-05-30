@@ -2882,3 +2882,116 @@ foo' x y z = readEither x `bindEither` \k ->
              Right (k + l + m)
 ```            
 
+You can run this again in the REPL and it will behave in the same way as its long-winded version.
+
+### Writer
+
+So far we have looked at three examples: *IO a*, *Maybe a* and *Either String a*. *IO a* represents plans that can involve side effects and, when executed, produce an *a*. *Maybe a* and *Either String a* represent computations that can produce an *a* but can also fail. The difference between *Maybe* and *Either* is just that *Maybe* does not produce any error message, but *Either* does.
+
+Now let's look at a completely different example that captures the idea of computations that can also produce log output.
+
+We can represent that with a type.
+
+```haskell
+data Writer a = Writer a [String]
+    deriving Show
+```    
+
+As an example, let's write a function that returns a *Writer* for an *Int* and writes a log message.
+
+```haskell
+number :: Int -> Writer Int
+number n = Writer n $ ["number: " ++ show n]
+```
+
+In the REPL:
+
+```haskell
+Prelude Week04.Writer> number 42
+Writer 42 ["number: 42"]
+```
+
+Now, let's do something similar to that which we have done with *Maybe* and *Either*.
+
+Let's write a function that takes three logging computations that each produce an *Int* and we want to return a single computation that produces the sum of those *Int*s.
+
+```haskell
+foo :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo (Writer k xs) (Writer l ys) (Writer m zs) =
+  Writer (K + l + m) $ xs ++ ys ++ zs
+```
+
+In the REPL:
+
+```haskell
+Prelude Week04.Writer> foo (number 1) (number 2) (number 3)
+Writer 6 ["number: 1","number: 2","number: 3"]
+```
+
+Now, let's write another useful function that takes a list of message and producers a *Writer* with no useful result.
+
+```haskell
+tell :: [String] -> Writer ()
+tell = Writer ()
+```
+
+Now, we can update *foo* to add an extra log message showing the sum of the numbers.
+
+```haskell
+foo :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo (Writer k xs) (Writer l ys) (Writer m zs) =
+  let
+    s = k + l + m
+    Writer _ us = tell ["sum: " ++ show s]
+  in
+    Writer s $ xs ++ ys ++ zs ++ us
+```
+
+In the REPL:
+
+```haskell
+Prelude Week04.Writer> foo (number 1) (number 2) (number 3)
+Writer 6 ["number: 1","number: 2","number: 3","sum: 6"]
+```
+
+As before, we can write a bind function:
+
+```haskell
+bindWriter :: Writer a -> (a -> Writer b) -> Writer b
+bindWriter (Writer a xs) f =
+  let
+    Writer b ys = f a
+  in
+    Writer b $ xs ++ ys
+```    
+
+Here, the *bindWriter* function is returning the *Writer b* and producing log messages which are a concatenation of the *xs* that we pattern matched on input, and the *ys* that we pattern matched when calling *f a* in order to produce the *Writer b*.
+
+Now, we can rewrite *foo* using *bindWriter* and make it much nicer.
+
+```haskell
+foo' :: Writer Int -> Writer Int -> Writer Int -> Writer Int
+foo' x y z = x `bindWriter` \k ->
+             y `bindWriter` \l ->
+             z `bindWriter` \m ->
+             let s = k + l + m
+             in tell ["sum: " ++ show s] `bindWriter` \_ ->
+                Writer s []
+```
+
+What we did witt *foo* before, we can now do with *foo'*, and we get the same result.
+
+```haskell
+Prelude Week04.Writer> foo' (number 1) (number 2) (number 3)
+Writer 6 ["number: 1","number: 2","number: 3","sum: 6"]
+```
+
+Admittedly, it is longer than it was before, but it is much nicer. We no longer need to do the pattern matching to extract the messages. We don't have to explicitly combine the log messages, where we could make a mistake and forget one, or get the order wrong. Instead, we abstract all that away and can just concentrate on the business logic.
+
+
+
+
+
+
+
+
