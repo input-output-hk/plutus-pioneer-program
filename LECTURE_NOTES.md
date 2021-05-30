@@ -2,6 +2,8 @@
 
 This is a written version of the Plutus Pioneer Program YouTube lectures by Lars Brünjes.
 
+[The lectures notes are being moved to a better format](https://plutus-pioneer-program.readthedocs.io/en/latest/).
+
 If this is useful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, or any of the many other small pools run by single stake pool operators.
 
 - [Week 01](#week-01)
