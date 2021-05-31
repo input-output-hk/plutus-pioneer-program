@@ -8,9 +8,6 @@ It covers an introduction to Plutus, the (E)UTxO model (and how it
 compares to other models), and concludes with an example English Auction
 managed with a Plutus smart contract running on the Plutus Playground.
 
-Please feel free to raise pull requests for typos, poor formatting, poor
-grammar, or anything else that is poor or inaccurate.
-
 Welcome
 -------
 

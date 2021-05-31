@@ -7,9 +7,6 @@ These is a written version of `Lecture
 It covers low-level, untyped on-chain validation scripts and high-level,
 typed on-chain validation scripts.
 
-Please feel free to raise pull requests for typos, poor formatting, poor
-grammar, or anything else that is poor or inaccurate.
-
 ## Overview
 
 We saw in the first lecture that there are two sides to a smart contract
