@@ -1643,6 +1643,7 @@ We can also log from inside the *Trace* monad. We could, for example, lof the re
 We would then see this output when we run the emulation:
 
 .. code::
+
       ...
       Slot 00020: SlotAdd Slot 21
       Slot 00021: *** USER LOG: reached slot Slot {getSlot = 21}
@@ -1650,5 +1651,15 @@ We would then see this output when we run the emulation:
       Slot 00021: SlotAdd Slot 22
       ...
 
+Now let's look at the Contract Monad.
+
 The Contract Monad
 ~~~~~~~~~~~~~~~~~~
+
+The purpose of the Contract Monad is to define off-chain code that runs in the wallet. It has four type parameters:
+
+.. code:: haskell
+
+      Contract w s e a
+
+The *a* is the same as in every Monad - it denotes the result type of the computation.
