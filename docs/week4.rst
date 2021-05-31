@@ -1775,6 +1775,69 @@ Recall that we chose the type *Text* as the error message.
 
 Now, we don't get the log message, but we do get told that the contract stopped with an error and we see our exception message.
 
+Another thing you can do is to handle exceptions. We will use the *handleError* function from module *Plutus.Contract.Types*.
 
+..code ::
 
+      handleError ::
+            forall w s e e' a.
+            (e -> Contract w s e' a)
+            -> Contract w s e a
+            -> Contract w s e' a
+      handleError f (Contract c) = Contract c' where
+            c' = E.handleError @e (raiseUnderN @'[E.Error e'] c) (fmap unContract f)
 
+The *handleError* function takes an error handler and a *Contract* instance. The error handler takes an argument of type *e* from our contract,
+and returns a new *Contract* with the same type parameters as the first, but we can change the type of the *e* argument - the error type, which is expressed in the
+return *Contract* argument list as *e'*.
+
+..code :: haskell
+
+      myContract2 :: Contract () BlockchainActions Void ()
+      myContract2 = Contract.handleError
+            (\err -> Contract.logError $ "Caught error: " ++ unpack err)
+            myContract1
+
+      myTrace2 :: EmulatorTrace ()
+      myTrace2 = void $ activateContractWallet (Wallet 1) myContract2
+
+      test2 :: IO ()
+      test2 = runEmulatorTraceIO myTrace2
+
+We use the type *Void* as the error type. *Void* is a type that can hold no value, so, by using this type we are saying that there cannot be any errors for this contract.
+
+.. note::
+The use of *unpack* which is a function from the *Data.Text* module which converts a value of type *Text* to a value of type *String*.
+
+..code ::
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test2
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      Slot 00000: SlotAdd Slot 1
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+      Contract instance started
+      Slot 00001: *** CONTRACT LOG: "Caught error: BOOM!"
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+      Contract instance stopped (no errors)
+      Slot 00001: SlotAdd Slot 2
+      Final balances
+      Wallet 1: 
+      {, ""}: 100000000
+      Wallet 2: 
+      {, ""}: 100000000
+      Wallet 3: 
+      {, ""}: 100000000
+      Wallet 4: 
+      {, ""}: 100000000
+      Wallet 5: 
+      {, ""}: 100000000
+      Wallet 6: 
+      {, ""}: 100000000
+      Wallet 7: 
+      {, ""}: 100000000
+      Wallet 8: 
+      {, ""}: 100000000
+      Wallet 9: 
+      {, ""}: 100000000
+      Wallet 10: 
+      {, ""}: 100000000
