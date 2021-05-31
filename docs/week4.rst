@@ -1338,11 +1338,90 @@ the trace on an emulated blockchain, and then gives a result as a list of *Emula
 
 We see it only has one field, which is of type *InitialChainState* and it is either *InitialDistribution* or *Block*.
 
-*InitialDistribution* is defined in another module in the same package, and it is a type synonym for a map of key value pairs of *Wallet*s to *Value*s, as you would expect.
+*InitialDistribution* is defined in another module in the same package, and it is a type synonym for a map of key value pairs of *Wallet*s to *Value*s, as you would expect. *Value* can be
+either lovelace or native tokens.
 
 .. code:: haskell
       module Plutus.Contract.Trace
 
       type InitialDistribution = Map Wallet Value
+
+In the same module, we see something called *defaultDist* which returns a default distribution for all wallets. It does this by passing the 10 wallets defined by *allWallets* to *defaultDistFor* which takes a list of 
+wallets.
+
+.. code:: haskell
+      -- | The wallets used in mockchain simulations by default. There are
+      --   ten wallets because the emulator comes with ten private keys.
+      allWallets :: [EM.Wallet]
+      allWallets = EM.Wallet <$> [1 .. 10]
+
+      defaultDist :: InitialDistribution
+      defaultDist = defaultDistFor allWallets
+
+      defaultDistFor :: [EM.Wallet] -> InitialDistribution
+      defaultDistFor wallets = Map.fromList $ zip wallets (repeat (Ada.lovelaceValueOf 100_000_000))
+
+We can try this out in the REPL:
+
+.. code:: haskell
+      Prelude Week04.Contract> import Plutus.Trace.Emulator
+      Prelude Plutus.Trace.Emulator Week04.Contract> import Plutus.Contract.Trace
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> defaultDist
+      fromList [(Wallet 1,Value (Map [(,Map [("",100000000)])])),(Wallet 2,Value (Map [(,Map [("",100000000)])])),(Wallet 3,Value (Map [(,Map [("",100000000)])])),(Wallet 4,Value (Map [(,Map [("",100000000)])])),(Wallet 5,Value (Map [(,Map [("",100000000)])])),(Wallet 6,Value (Map [(,Map [("",100000000)])])),(Wallet 7,Value (Map [(,Map [("",100000000)])])),(Wallet 8,Value (Map [(,Map [("",100000000)])])),(Wallet 9,Value (Map [(,Map [("",100000000)])])),(Wallet 10,Value (Map [(,Map [("",100000000)])]))]
+
+We can see that each of the 10 wallets has been given an initial distribution of 100,000,000 lovelace.
+
+We can also get the balances for a specific wallet or wallets:
+
+.. code:: haskell
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> defaultDistFor [Wallet 1]
+      fromList [(Wallet 1,Value (Map [(,Map [("",100000000)])]))]
+
+If you want different initial values, of if you want native tokens, then you have to specify that manually.
+
+Let's see what we need to run our first trace:
+
+.. code:: haskell
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> :t runEmulatorTrace
+      runEmulatorTrace
+      :: EmulatorConfig
+      -> EmulatorTrace ()
+      -> ([Wallet.Emulator.MultiAgent.EmulatorEvent], Maybe EmulatorErr,
+            Wallet.Emulator.MultiAgent.EmulatorState)
+
+So, we need an *EmulatorConfig* which we know takes an *InitialChainState*.
+
+.. code:: haskell
+      
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> import Wallet.Emulator.Stream 
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator.Stream Week04.Contract> :i InitialChainState 
+      type InitialChainState :: *
+      type InitialChainState =
+      Either InitialDistribution Ledger.Blockchain.Block
+            -- Defined in ‘Wallet.Emulator.Stream’
+
+If we take the *Left* of the *defaultDist* will will get an *InitialDistribution*.
+
+.. code:: haskell
+      
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator.Stream Week04.Contract> :t Left defaultDist
+      Left defaultDist :: Either InitialDistribution b
+
+Which we can then use to construct an *EmulatorConfig*.
+
+.. code:: haskell
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator.Stream Week04.Contract> EmulatorConfig $ Left defaultDist
+      EmulatorConfig {_initialChainState = Left (fromList [(Wallet 1,Value (Map [(,Map [("",100000000)])])),(Wallet 2,Value (Map [(,Map [("",100000000)])])),(Wallet 3,Value (Map [(,Map [("",100000000)])])),(Wallet 4,Value (Map [(,Map [("",100000000)])])),(Wallet 5,Value (Map [(,Map [("",100000000)])])),(Wallet 6,Value (Map [(,Map [("",100000000)])])),(Wallet 7,Value (Map [(,Map [("",100000000)])])),(Wallet 8,Value (Map [(,Map [("",100000000)])])),(Wallet 9,Value (Map [(,Map [("",100000000)])])),(Wallet 10,Value (Map [(,Map [("",100000000)])]))])}
+
+So, let's try out *runEmulatorTrace*. Recall that, as well as and *EmulatorConfig*, we also need to pass in an *EmulatorTrace*, and the most simple one we can create is simply one that returns Unit - *return ()*.
+
+.. code:: haskell
+      runEmulatorTrace (EmulatorConfig $ Left defaultDist) $ return ()
+
+If you run this in the REPL you will get a crazy amount of data output to the console, even though we are not doing anything with the trace. If you want to make it useful, you must
+somehow filter all this data down to something that sensible, and aggregate it in some way.
+
+Luckily, there are other functions as well as *runEmulatorTrace*.
+
 
 
