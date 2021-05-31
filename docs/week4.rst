@@ -1289,8 +1289,8 @@ The Contract Monad defines code that will run in the wallet, which is the off-ch
 
 But, before we go into details, we will talk about a second Monad, the EmulatorTrace monad.
 
-EmulatorTrace Monad
-~~~~~~~~~~~~~~~~~~~
+The EmulatorTrace Monad
+~~~~~~~~~~~~~~~~~~~~~~~
 
 You may have wondered if there is a way to execute Plutus code for testing purposes without using the Plutus Playground. There is indeed, and this is done using the *EmulatorTrace* Monad.
 
@@ -1543,7 +1543,7 @@ First, we define a *Trace*.
             }
       void $ waitUntilSlot 20
       callEndpoint @"grab" h2 ()
-      s <- waitNSlots 1
+      void $ waitNSlots 1
 
 The first thing we have to do is to activate the wallets using the monadic function *activateContractWallet*. We bind the result of this function to *h1*, and then bind the result of
 a second call (for Wallet 2) to *h2*. Those two values - *h1* and *h2* are handles to their respective wallets.
@@ -1602,7 +1602,6 @@ And, we can then run this in the REPL:
       Slot 00020: W2: TxSubmit: d9a2028384b4472242371f27cb51727f5c7c04327972e4278d1f69f606019a8b
       Slot 00020: TxnValidate d9a2028384b4472242371f27cb51727f5c7c04327972e4278d1f69f606019a8b
       Slot 00020: SlotAdd Slot 21
-      Slot 00021: *** USER LOG: reached slot Slot {getSlot = 21}
       Slot 00021: *** CONTRACT LOG: "collected gifts"
       Slot 00021: SlotAdd Slot 22
       Final balances
@@ -1629,3 +1628,27 @@ And, we can then run this in the REPL:
       
 This output is very similar to the output we see in the playground. We can see the Genesis transaction as well as both the *give* and *grab* transactions from the *Trace*. We can also see
 some log output from the contract itself, prefixed with *CONTRACT LOG*.
+
+We can also log from inside the *Trace* monad. We could, for example, lof the result of the final *waitNSlots* call:
+
+.. code:: haskell
+
+      myTrace :: EmulatorTrace ()
+      myTrace = do
+      ...
+      ...
+      s <- waitNSlots 1
+      Extras.logInfo $ "reached slot " ++ show s
+
+We would then see this output when we run the emulation:
+
+.. code::
+      ...
+      Slot 00020: SlotAdd Slot 21
+      Slot 00021: *** USER LOG: reached slot Slot {getSlot = 21}
+      Slot 00021: *** CONTRACT LOG: "collected gifts"
+      Slot 00021: SlotAdd Slot 22
+      ...
+
+The Contract Monad
+~~~~~~~~~~~~~~~~~~
