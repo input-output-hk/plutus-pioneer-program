@@ -1672,7 +1672,7 @@ We will go into the other three in more detail later but just briefly:
 
 Let's write an example.
 
-code ..:: haskell
+..code ::haskell
 
       myContract1 :: Contract () BlockchainActions Text ()
       myContract1 = Contract.logInfo @String "Hello from the contract!"
@@ -1688,8 +1688,8 @@ so the compiler needs to know what type we are referencing - a *Text* or a *Stri
 
 Let's now define a *Trace* that starts the contract in the wallet, and a *test* function to run it.
 
-code ..:: haskell
-
+.. code:: haskell
+      
       myTrace1 :: EmulatorTrace ()
       myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
 
@@ -1733,7 +1733,7 @@ If we run this in the REPL, we will see our log message from the contract.
 
 Now, let's throw an exception.
 
-..code :: haskell
+.. code:: haskell
 
       myContract1 :: Contract () BlockchainActions Text ()
       myContract1 = do
@@ -1791,7 +1791,7 @@ The *handleError* function takes an error handler and a *Contract* instance. The
 and returns a new *Contract* with the same type parameters as the first, but we can change the type of the *e* argument - the error type, which is expressed in the
 return *Contract* argument list as *e'*.
 
-..code :: haskell
+.. code:: haskell
 
       myContract2 :: Contract () BlockchainActions Void ()
       myContract2 = Contract.handleError
@@ -1809,7 +1809,7 @@ We use the type *Void* as the error type. *Void* is a type that can hold no valu
 .. note::
       The function *unpack* is defined in the *Data.Text* module. It converts a value of type *Text* to a value of type *String*.
 
-.. code ::
+.. code::
 
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test2
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
@@ -1826,8 +1826,9 @@ We use the type *Void* as the error type. *Void* is a type that can hold no valu
 We no longer get the error message, but, instead we get a message from the error handler showing the exception that was thrown by Contract1. Note that we still do not get the message
 "Hello from the contract!". Contract 1 still stopped processing after its error, but there was no overall contract error due to the exception being caught and handled.
 
+Of course, exceptions can also happen even if they are not explicitly thrown by your contract code. There are operations, such as submitting a transaction where there are insufficient
+inputs to make a payment for an output, where Plutus will throw an exception.
 
-
-
+Next, let's look at the *s* parameter that determines the available blockchain actions.
       
 
