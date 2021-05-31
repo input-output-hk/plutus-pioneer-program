@@ -1689,7 +1689,7 @@ so the compiler needs to know what type we are referencing - a *Text* or a *Stri
 Let's now define a *Trace* that starts the contract in the wallet, and a *test* function to run it.
 
 .. code:: haskell
-      
+
       myTrace1 :: EmulatorTrace ()
       myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
 
@@ -1829,6 +1829,182 @@ We no longer get the error message, but, instead we get a message from the error
 Of course, exceptions can also happen even if they are not explicitly thrown by your contract code. There are operations, such as submitting a transaction where there are insufficient
 inputs to make a payment for an output, where Plutus will throw an exception.
 
-Next, let's look at the *s* parameter that determines the available blockchain actions.
+Next, let's look at the *s* parameter, the second parameter to *Contract*, that determines the available blockchain actions.
+      
+In the first two examples we just used the *BlockChainActions* type which has all the standard functionality but without support for specific endpoints. If we want support for
+specific endpoints, we must use a different type.
+
+The way that is usually done is by using a type synonym. The following example will create a type synonym *MySchema* that has all the capabilities of *BlockChainActions* but
+with the addition of being able to call endpoint *foo* with an argument of type *Int*.
+
+.. code:: haskell
+
+      type MySchema = BlockchainActions .\/ Endpoint "foo" Int
+
+.. note::
+      The operator *.\\/* is a type operator - it operates on types, not values. In order to use this we need to use the *TypeOperators* and *DataKinds* compiler options.
+
+Now, we can use the *MySchema* type to define our contract.
+
+.. code:: haskell
+
+      myContract3 :: Contract () MySchema Text ()
+      myContract3 = do
+            n <- endpoint @"foo"
+            Contract.logInfo n
+
+This contract will block until the endpoint *foo* is called with, in our case, an *Int*. Then the value of the *Int* parameter will be bound to *n*. 
+Because of this, it is no longer enough for us to just activate the contract to test it. Now, we must invoke the endpoint as well.
+
+In order to do this, we now need to handle from *activateContractWallet*, which we can then use to call the endpoint.
+
+.. code:: haskell
+
+      myTrace3 :: EmulatorTrace ()
+      myTrace3 = do
+            h <- activateContractWallet (Wallet 1) myContract3
+            callEndpoint @"foo" h 42
+
+      test3 :: IO ()
+      test3 = runEmulatorTraceIO myTrace3
+
+Running this in the REPL:
+
+.. code::
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test3
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      ...
+      Receive endpoint call: Object (fromList [("tag",String "foo"),("value",Object (fromList [("unEndpointValue",Number 42.0)]))])
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+      Contract log: Number 42.0
+      ...
+      Final balances
+      ...
+      Wallet 10: 
+      {, ""}: 100000000
+
+Finally, let's look at the first type parameter, the writer. The *w* cannot be an arbitrary type, it must be an instance of the type class *Monoid*.
+
+.. code:: haskell
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> :i Monoid
+      type Monoid :: * -> Constraint
+      class Semigroup a => Monoid a where
+      mempty :: a
+      mappend :: a -> a -> a
+      mconcat :: [a] -> a
+      {-# MINIMAL mempty #-}
+            -- Defined in ‘GHC.Base’
+      instance Monoid [a] -- Defined in ‘GHC.Base’
+      instance Monoid Ordering -- Defined in ‘GHC.Base’
+      instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
+      instance Monoid a => Monoid (IO a) -- Defined in ‘GHC.Base’
+      instance Monoid b => Monoid (a -> b) -- Defined in ‘GHC.Base’
+      instance (Monoid a, Monoid b, Monoid c, Monoid d, Monoid e) =>
+            Monoid (a, b, c, d, e)
+      -- Defined in ‘GHC.Base’
+      instance (Monoid a, Monoid b, Monoid c, Monoid d) =>
+            Monoid (a, b, c, d)
+      -- Defined in ‘GHC.Base’
+      instance (Monoid a, Monoid b, Monoid c) => Monoid (a, b, c)
+      -- Defined in ‘GHC.Base’
+      instance (Monoid a, Monoid b) => Monoid (a, b)
+      -- Defined in ‘GHC.Base’
+      instance Monoid () -- Defined in ‘GHC.Base’
+
+This is a very important and very common type class in Haskell. It defines *mempty* and *mappend*.
+
+The function *mempty* is like the neutral element, and *mappend* combines two elements of this type to create a new element of the same type.
+
+The prime example of a *Monoid* is *List*, when *mempty* is the empty list *[]*, and *mappend* is concatenation *++*.
+
+For example:
+
+.. code:: haskell
+
+      Prelude> mempty :: [Int]
+      []
+      Prelude> mappend [1, 2, 3 :: Int] [4, 5, 6]
+      [1,2,3,4,5,6]
+
+The are many, many other examples of the *Monoid* type, and we will see other instances in this course.
+
+But for now, let's stick with lists and write our last example.
+
+.. code:: haskell
+
+      myContract4 :: Contract [Int] BlockchainActions Text ()
+      myContract4 = do
+          void $ Contract.waitNSlots 10
+          tell [1]
+          void $ Contract.waitNSlots 10
+          tell [2]
+          void $ Contract.waitNSlots 10
+      
+
+Rather than using *Unit* as our *w* type, we are using *[Int]*. This allows us to use the *tell* function as shown.
+
+This now gives us access to those messages during the trace, using the *observableState* function.
+
+.. code:: haskell
+
+      myTrace4 :: EmulatorTrace ()
+      myTrace4 = do
+          h <- activateContractWallet (Wallet 1) myContract4
+      
+          void $ Emulator.waitNSlots 5
+          xs <- observableState h
+          Extras.logInfo $ show xs
+      
+          void $ Emulator.waitNSlots 10
+          ys <- observableState h
+          Extras.logInfo $ show ys
+      
+          void $ Emulator.waitNSlots 10
+          zs <- observableState h
+          Extras.logInfo $ show zs
+      
+      test4 :: IO ()
+      test4 = runEmulatorTraceIO myTrace4
+
+If we run this in the REPL, we can see the *USER LOG* messages created using the *tell* function.
+
+.. code::
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test4
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      Slot 00000: SlotAdd Slot 1
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+        Contract instance started
+      Slot 00001: SlotAdd Slot 2
+      ...
+      Slot 00005: SlotAdd Slot 6
+      Slot 00006: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+        Sending contract state to Thread 0
+      Slot 00006: SlotAdd Slot 7
+      Slot 00007: *** USER LOG: []
+      Slot 00007: SlotAdd Slot 8
+      ...
+      Slot 00015: SlotAdd Slot 16
+      Slot 00016: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+        Sending contract state to Thread 0
+      Slot 00016: SlotAdd Slot 17
+      Slot 00017: *** USER LOG: [1]
+      Slot 00017: SlotAdd Slot 18
+      ...
+      Slot 00025: SlotAdd Slot 26
+      Slot 00026: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+        Sending contract state to Thread 0
+      Slot 00026: SlotAdd Slot 27
+      Slot 00027: *** USER LOG: [1,2]
+      Final balances
+      Wallet 1: 
+          {, ""}: 100000000
+      Wallet 2: 
+          {, ""}: 100000000
+      ...
+      Wallet 10: 
+          {, ""}: 100000000
       
 
