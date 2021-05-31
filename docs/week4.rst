@@ -1,11 +1,12 @@
 Week 04
 =======
 
-These is a written version of `Lecture
-#4 <https://youtu.be/6Reuh0xZDjY>`__.
+.. note::
+      These is a written version of `Lecture
+      #4 <https://youtu.be/6Reuh0xZDjY>`__.
 
-In this lecture we learn about Monads. In particular the EmulatorTrace
-and Contract monads.
+      In this lecture we learn about Monads. In particular the EmulatorTrace
+      and Contract monads.
 
 Overview
 --------
