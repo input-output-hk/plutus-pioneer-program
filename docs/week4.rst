@@ -1504,7 +1504,7 @@ an *EmulatorEvent* as an argument and can return *Nothing* it the event should n
 Here is the default *TraceConfig* used by *runEmulatorTraceIO*. We can see that most events are ignored and that we only get output for some of the events.
 
 .. code:: haskell
-      
+
       instance Default TraceConfig where
       def = TraceConfig
                   { showEvent     = defaultShowEvent
@@ -1526,5 +1526,106 @@ Here is the default *TraceConfig* used by *runEmulatorTraceIO*. We can see that 
 
 The second field is a handle which defaults to *stdout*, but we could also specify a file here.
 
-Now let's look at a more interesting trace.
+Now let's look at a more interesting trace, using the *Vesting* contract from the last lecture.
 
+First, we define a *Trace*.
+
+.. code:: haskell
+
+      myTrace :: EmulatorTrace ()
+      myTrace = do
+      h1 <- activateContractWallet (Wallet 1) endpoints
+      h2 <- activateContractWallet (Wallet 2) endpoints
+      callEndpoint @"give" h1 $ GiveParams
+            { gpBeneficiary = pubKeyHash $ walletPubKey $ Wallet 2
+            , gpDeadline    = Slot 20
+            , gpAmount      = 1000
+            }
+      void $ waitUntilSlot 20
+      callEndpoint @"grab" h2 ()
+      s <- waitNSlots 1
+
+The first thing we have to do is to activate the wallets using the monadic function *activateContractWallet*. We bind the result of this function to *h1*, and then bind the result of
+a second call (for Wallet 2) to *h2*. Those two values - *h1* and *h2* are handles to their respective wallets.
+
+Next, we use *callEndpoint* to simulate Wallet 1 calling the *give* endpoint, with the shown parameters. We then wait for 20 slots. The function *waitUntilSlot* actually returns 
+a value representing the slot that was reached, but, as we are not interested in that value here, we use *void* to ignore it. We then simulate the call to the *grab* endpoint
+by Wallet 2.
+
+Now, we can write a function to call *runEmulatorTraceIO* with out *Trace*.
+
+.. code:: haskell
+      
+      test :: IO ()
+      test = runEmulatorTraceIO myTrace
+
+And, we can then run this in the REPL:
+
+.. code:: haskell
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test
+
+.. code:: 
+
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      Slot 00000: SlotAdd Slot 1
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+        Contract instance started
+      Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+        Contract instance started
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+        Receive endpoint call: Object (fromList [("tag",String "give"),("value",Object (fromList [("unEndpointValue",Object (fromList [("gpAmount",Number 1000.0),("gpBeneficiary",Object (fromList [("getPubKeyHash",String "39f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f")])),("gpDeadline",Object (fromList [("getSlot",Number 20.0)]))]))]))])
+      Slot 00001: W1: TxSubmit: 49f326a21c09ba52eddee46b65bdb5fb33b3444745e9af1510a68f9043696eba
+      Slot 00001: TxnValidate 49f326a21c09ba52eddee46b65bdb5fb33b3444745e9af1510a68f9043696eba
+      Slot 00001: SlotAdd Slot 2
+      Slot 00002: *** CONTRACT LOG: "made a gift of 1000 lovelace to 39f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f with deadline Slot {getSlot = 20}"
+      Slot 00002: SlotAdd Slot 3
+      Slot 00003: SlotAdd Slot 4
+      Slot 00004: SlotAdd Slot 5
+      Slot 00005: SlotAdd Slot 6
+      Slot 00006: SlotAdd Slot 7
+      Slot 00007: SlotAdd Slot 8
+      Slot 00008: SlotAdd Slot 9
+      Slot 00009: SlotAdd Slot 10
+      Slot 00010: SlotAdd Slot 11
+      Slot 00011: SlotAdd Slot 12
+      Slot 00012: SlotAdd Slot 13
+      Slot 00013: SlotAdd Slot 14
+      Slot 00014: SlotAdd Slot 15
+      Slot 00015: SlotAdd Slot 16
+      Slot 00016: SlotAdd Slot 17
+      Slot 00017: SlotAdd Slot 18
+      Slot 00018: SlotAdd Slot 19
+      Slot 00019: SlotAdd Slot 20
+      Slot 00020: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+        Receive endpoint call: Object (fromList [("tag",String "grab"),("value",Object (fromList [("unEndpointValue",Array [])]))])
+      Slot 00020: W2: TxSubmit: d9a2028384b4472242371f27cb51727f5c7c04327972e4278d1f69f606019a8b
+      Slot 00020: TxnValidate d9a2028384b4472242371f27cb51727f5c7c04327972e4278d1f69f606019a8b
+      Slot 00020: SlotAdd Slot 21
+      Slot 00021: *** USER LOG: reached slot Slot {getSlot = 21}
+      Slot 00021: *** CONTRACT LOG: "collected gifts"
+      Slot 00021: SlotAdd Slot 22
+      Final balances
+      Wallet 1: 
+          {, ""}: 99998990
+      Wallet 2: 
+          {, ""}: 100000990
+      Wallet 3: 
+          {, ""}: 100000000
+      Wallet 4: 
+          {, ""}: 100000000
+      Wallet 5: 
+          {, ""}: 100000000
+      Wallet 6: 
+          {, ""}: 100000000
+      Wallet 7: 
+          {, ""}: 100000000
+      Wallet 8: 
+          {, ""}: 100000000
+      Wallet 9: 
+          {, ""}: 100000000
+      Wallet 10: 
+          {, ""}: 100000000
+      
+This output is very similar to the output we see in the playground. We can see the Genesis transaction as well as both the *give* and *grab* transactions from the *Trace*. We can also see
+some log output from the contract itself, prefixed with *CONTRACT LOG*.
