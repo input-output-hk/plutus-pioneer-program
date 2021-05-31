@@ -1327,6 +1327,7 @@ the trace on an emulated blockchain, and then gives a result as a list of *Emula
 *EmulatorConfig* is defined in a different module in the same package:
 
 .. code:: haskell
+
       module Wallet.Emulator.Stream
 
       data EmulatorConfig =
@@ -1342,6 +1343,7 @@ We see it only has one field, which is of type *InitialChainState* and it is eit
 either lovelace or native tokens.
 
 .. code:: haskell
+
       module Plutus.Contract.Trace
 
       type InitialDistribution = Map Wallet Value
@@ -1350,6 +1352,7 @@ In the same module, we see something called *defaultDist* which returns a defaul
 wallets.
 
 .. code:: haskell
+      
       -- | The wallets used in mockchain simulations by default. There are
       --   ten wallets because the emulator comes with ten private keys.
       allWallets :: [EM.Wallet]
@@ -1364,6 +1367,7 @@ wallets.
 We can try this out in the REPL:
 
 .. code:: haskell
+
       Prelude Week04.Contract> import Plutus.Trace.Emulator
       Prelude Plutus.Trace.Emulator Week04.Contract> import Plutus.Contract.Trace
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> defaultDist
@@ -1374,6 +1378,7 @@ We can see that each of the 10 wallets has been given an initial distribution of
 We can also get the balances for a specific wallet or wallets:
 
 .. code:: haskell
+
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> defaultDistFor [Wallet 1]
       fromList [(Wallet 1,Value (Map [(,Map [("",100000000)])]))]
 
@@ -1382,6 +1387,7 @@ If you want different initial values, of if you want native tokens, then you hav
 Let's see what we need to run our first trace:
 
 .. code:: haskell
+
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Week04.Contract> :t runEmulatorTrace
       runEmulatorTrace
       :: EmulatorConfig
@@ -1410,12 +1416,14 @@ If we take the *Left* of the *defaultDist* will will get an *InitialDistribution
 Which we can then use to construct an *EmulatorConfig*.
 
 .. code:: haskell
+
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator.Stream Week04.Contract> EmulatorConfig $ Left defaultDist
       EmulatorConfig {_initialChainState = Left (fromList [(Wallet 1,Value (Map [(,Map [("",100000000)])])),(Wallet 2,Value (Map [(,Map [("",100000000)])])),(Wallet 3,Value (Map [(,Map [("",100000000)])])),(Wallet 4,Value (Map [(,Map [("",100000000)])])),(Wallet 5,Value (Map [(,Map [("",100000000)])])),(Wallet 6,Value (Map [(,Map [("",100000000)])])),(Wallet 7,Value (Map [(,Map [("",100000000)])])),(Wallet 8,Value (Map [(,Map [("",100000000)])])),(Wallet 9,Value (Map [(,Map [("",100000000)])])),(Wallet 10,Value (Map [(,Map [("",100000000)])]))])}
 
 So, let's try out *runEmulatorTrace*. Recall that, as well as and *EmulatorConfig*, we also need to pass in an *EmulatorTrace*, and the most simple one we can create is simply one that returns Unit - *return ()*.
 
 .. code:: haskell
+
       runEmulatorTrace (EmulatorConfig $ Left defaultDist) $ return ()
 
 If you run this in the REPL you will get a crazy amount of data output to the console, even though we are not doing anything with the trace. If you want to make it useful, you must
@@ -1424,6 +1432,7 @@ somehow filter all this data down to something that sensible, and aggregate it i
 Luckily, there are other functions as well as *runEmulatorTrace*. One of them is *runEmulatorTraceIo* which runs the emulation then outputs the trace in a nice form on the screen.
 
 .. code:: haskell
+
       runEmulatorTraceIO
       :: EmulatorTrace ()
       -> IO ()
@@ -1434,9 +1443,11 @@ To use this function, we don't need to specify an *EmulatorConfig* like we did b
 In the REPL:
 
 .. code:: haskell
+
       Prelude...> runEmulatorTraceIO $ return ()
 
 .. code::
+
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
       Slot 00000: SlotAdd Slot 1
       Slot 00001: SlotAdd Slot 2
@@ -1467,6 +1478,7 @@ And we see a much more manageable, concise output. Nothing happens, but we see t
 If you want more control, there is also *runEmulatorTraceIO'*, which does take an *EmulatorConfig*, so we could specify a different distribution.
 
 .. code:: haskell
+
       runEmulatorTraceIO'
       :: TraceConfig
       -> EmulatorConfig
@@ -1478,6 +1490,7 @@ If you want more control, there is also *runEmulatorTraceIO'*, which does take a
 It also takes a *TraceConfig*, which has two fields. 
 
 .. code:: haskell
+
       data TraceConfig = TraceConfig
       { showEvent    :: EmulatorEvent' -> Maybe String
       -- ^ Function to decide how to print the particular events.
@@ -1491,6 +1504,7 @@ an *EmulatorEvent* as an argument and can return *Nothing* it the event should n
 Here is the default *TraceConfig* used by *runEmulatorTraceIO*. We can see that most events are ignored and that we only get output for some of the events.
 
 .. code:: haskell
+      
       instance Default TraceConfig where
       def = TraceConfig
                   { showEvent     = defaultShowEvent
