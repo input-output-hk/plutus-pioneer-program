@@ -1421,7 +1421,43 @@ So, let's try out *runEmulatorTrace*. Recall that, as well as and *EmulatorConfi
 If you run this in the REPL you will get a crazy amount of data output to the console, even though we are not doing anything with the trace. If you want to make it useful, you must
 somehow filter all this data down to something that sensible, and aggregate it in some way.
 
-Luckily, there are other functions as well as *runEmulatorTrace*.
+Luckily, there are other functions as well as *runEmulatorTrace*. One of them is *runEmulatorTraceIo* which runs the emulation then outputs the trace in a nice form on the screen.
 
+.. code::haskell
+      runEmulatorTraceIO
+      :: EmulatorTrace ()
+      -> IO ()
+      runEmulatorTraceIO = runEmulatorTraceIO' def def
 
+To use this function, we don't need to specify an *EmulatorConfig* like we did before, because by default will will just use the default distribution.
 
+In the REPL:
+
+code ..haskell
+      Prelude...> runEmulatorTraceIO $ return ()
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      Slot 00000: SlotAdd Slot 1
+      Slot 00001: SlotAdd Slot 2
+      Final balances
+      Wallet 1: 
+      {, ""}: 100000000
+      Wallet 2: 
+      {, ""}: 100000000
+      Wallet 3: 
+      {, ""}: 100000000
+      Wallet 4: 
+      {, ""}: 100000000
+      Wallet 5: 
+      {, ""}: 100000000
+      Wallet 6: 
+      {, ""}: 100000000
+      Wallet 7: 
+      {, ""}: 100000000
+      Wallet 8: 
+      {, ""}: 100000000
+      Wallet 9: 
+      {, ""}: 100000000
+      Wallet 10: 
+      {, ""}: 100000000
+
+And we see a much more manageable, concise output.
