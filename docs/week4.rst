@@ -1433,10 +1433,10 @@ To use this function, we don't need to specify an *EmulatorConfig* like we did b
 
 In the REPL:
 
-code ..:: haskell
+.. code:: haskell
       Prelude...> runEmulatorTraceIO $ return ()
 
-code ..:: haskell
+.. code::
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
       Slot 00000: SlotAdd Slot 1
       Slot 00001: SlotAdd Slot 2
@@ -1466,7 +1466,7 @@ And we see a much more manageable, concise output. Nothing happens, but we see t
 
 If you want more control, there is also *runEmulatorTraceIO'*, which does take an *EmulatorConfig*, so we could specify a different distribution.
 
-code ..:: haskell
+.. code:: haskell
       runEmulatorTraceIO'
       :: TraceConfig
       -> EmulatorConfig
@@ -1477,7 +1477,7 @@ code ..:: haskell
       
 It also takes a *TraceConfig*, which has two fields. 
 
-code ..:: haskell
+.. code:: haskell
       data TraceConfig = TraceConfig
       { showEvent    :: EmulatorEvent' -> Maybe String
       -- ^ Function to decide how to print the particular events.
@@ -1490,7 +1490,7 @@ an *EmulatorEvent* as an argument and can return *Nothing* it the event should n
 
 Here is the default *TraceConfig* used by *runEmulatorTraceIO*. We can see that most events are ignored and that we only get output for some of the events.
 
-code ..:: haskell
+.. code:: haskell
       instance Default TraceConfig where
       def = TraceConfig
                   { showEvent     = defaultShowEvent
@@ -1509,3 +1509,8 @@ code ..:: haskell
       ChainIndexEvent _ _                                                  -> Nothing
       WalletEvent _ _                                                      -> Nothing
       ev                                                                   -> Just . renderString . layoutPretty defaultLayoutOptions . pretty $ ev
+
+The second field is a handle which defaults to *stdout*, but we could also specify a file here.
+
+Now let's look at a more interesting trace.
+
