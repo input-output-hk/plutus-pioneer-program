@@ -1672,7 +1672,7 @@ We will go into the other three in more detail later but just briefly:
 
 Let's write an example.
 
-..code ::haskell
+..code :: haskell
 
       myContract1 :: Contract () BlockchainActions Text ()
       myContract1 = Contract.logInfo @String "Hello from the contract!"
