@@ -1435,6 +1435,8 @@ In the REPL:
 
 code ..haskell
       Prelude...> runEmulatorTraceIO $ return ()
+
+code ..
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
       Slot 00000: SlotAdd Slot 1
       Slot 00001: SlotAdd Slot 2
