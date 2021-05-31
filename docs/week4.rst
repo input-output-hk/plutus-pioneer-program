@@ -1460,4 +1460,50 @@ code ..haskell
       Wallet 10: 
       {, ""}: 100000000
 
-And we see a much more manageable, concise output.
+And we see a much more manageable, concise output. Nothing happens, but we see the Genesis transaction and then the final balances for each wallet.
+
+If you want more control, there is also *runEmulatorTraceIO'*, which does take an *EmulatorConfig*, so we could specify a different distribution.
+
+code ..haskell
+      runEmulatorTraceIO'
+      :: TraceConfig
+      -> EmulatorConfig
+      -> EmulatorTrace ()
+      -> IO ()
+      runEmulatorTraceIO' tcfg cfg trace
+      = runPrintEffect (outputHandle tcfg) $ runEmulatorTraceEff tcfg cfg trace
+      
+It also takes a *TraceConfig*, which has two fields. 
+
+code ..haskell
+      data TraceConfig = TraceConfig
+      { showEvent    :: EmulatorEvent' -> Maybe String
+      -- ^ Function to decide how to print the particular events.
+      , outputHandle :: Handle
+      -- ^ Where to print the outputs to. Default: 'System.IO.stdout'
+      }
+
+The first field, *showEvent* is a function that specifies which *EmulatorEvent*s are displayed and how they are displayed. It takes
+an *EmulatorEvent* as an argument and can return *Nothing* it the event should not be displayed, or a *Just* with a *String* showing how the event will be displayed.
+
+Here is the default *TraceConfig* used by *runEmulatorTraceIO*. We can see that most events are ignored and that we only get output for some of the events.
+
+code ..haskell
+      instance Default TraceConfig where
+      def = TraceConfig
+                  { showEvent     = defaultShowEvent
+                  , outputHandle  = stdout
+                  }
+
+      defaultShowEvent :: EmulatorEvent' -> Maybe String
+      defaultShowEvent = \case
+      UserThreadEvent (UserLog msg)                                        -> Just $ "*** USER LOG: " <> msg
+      InstanceEvent (ContractInstanceLog (ContractLog (A.String msg)) _ _) -> Just $ "*** CONTRACT LOG: " <> show msg
+      InstanceEvent (ContractInstanceLog (StoppedWithError err)       _ _) -> Just $ "*** CONTRACT STOPPED WITH ERROR: " <> show err
+      InstanceEvent (ContractInstanceLog NoRequestsHandled            _ _) -> Nothing
+      InstanceEvent (ContractInstanceLog (HandledRequest _)           _ _) -> Nothing
+      InstanceEvent (ContractInstanceLog (CurrentRequests _)          _ _) -> Nothing
+      SchedulerEvent _                                                     -> Nothing
+      ChainIndexEvent _ _                                                  -> Nothing
+      WalletEvent _ _                                                      -> Nothing
+      ev                                                                   -> Just . renderString . layoutPretty defaultLayoutOptions . pretty $ ev
