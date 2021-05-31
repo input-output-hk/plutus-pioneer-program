@@ -1321,6 +1321,28 @@ The most basic function is called *runEmulatorTrace*.
           $ foldEmulatorStreamM (generalize list)
           $ runEmulatorStream cfg trace
 
- It gets something called an *EmulatorConfig* and an *EmulatorTrace ()*, which is a pure computation where no real-world side effects are involved. It is a pure function that executes
- the trace on an emulated blockchain, and then gives a result as a list of *EmulatorEvent*s, maybe an error, if there was one, and then finally the final *EmulatorState*.
- 
+It gets something called an *EmulatorConfig* and an *EmulatorTrace ()*, which is a pure computation where no real-world side effects are involved. It is a pure function that executes
+the trace on an emulated blockchain, and then gives a result as a list of *EmulatorEvent*s, maybe an error, if there was one, and then finally the final *EmulatorState*.
+
+*EmulatorConfig* is defined in a different module in the same package:
+
+.. code:: haskell
+      module Wallet.Emulator.Stream
+
+      data EmulatorConfig =
+      EmulatorConfig
+          { _initialChainState      :: InitialChainState -- ^ State of the blockchain at the beginning of the simulation. Can be given as a map of funds to wallets, or as a block of transactions.
+          } deriving (Eq, Show)
+          
+      type InitialChainState = Either InitialDistribution Block
+
+We see it only has one field, which is of type *InitialChainState* and it is either *InitialDistribution* or *Block*.
+
+*InitialDistribution* is defined in another module in the same package, and it is a type synonym for a map of key value pairs of *Wallet*s to *Value*s, as you would expect.
+
+.. code:: haskell
+      module Plutus.Contract.Trace
+
+      type InitialDistribution = Map Wallet Value
+
+
