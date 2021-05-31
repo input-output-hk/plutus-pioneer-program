@@ -1292,8 +1292,35 @@ But, before we go into details, we will talk about a second Monad, the EmulatorT
 EmulatorTrace Monad
 ~~~~~~~~~~~~~~~~~~~
 
-You may have wondered if there is a way to execute Plutus code for testing purposes without using the Plutus Playground.
+You may have wondered if there is a way to execute Plutus code for testing purposes without using the Plutus Playground. There is indeed, and this is done using the *EmulatorTrace* Monad.
 
-There is indeed, and this is done using the *EmulatorTrace* Monad.
+You can think of a program in this monad as what we do manually in the *simulator* tab of the playground. That is, we define the initial conditions, we define the actions such as which wallets
+invoke which endpoints with which parameters and we define the waiting periods between actions.
+
+The relevant definitions are in the package *plutus-contract* in module *Plutus.Trace.Emulator*.
 
 
+.. code:: haskell
+
+      module Plutus.Trace.Emulator
+
+The most basic function is called *runEmulatorTrace*.      
+
+.. code:: haskell
+
+      -- | Run an emulator trace to completion, returning a tuple of the final state
+      -- of the emulator, the events, and any error, if any.
+      runEmulatorTrace
+          :: EmulatorConfig
+          -> EmulatorTrace ()
+          -> ([EmulatorEvent], Maybe EmulatorErr, EmulatorState)
+      runEmulatorTrace cfg trace =
+          (\(xs :> (y, z)) -> (xs, y, z))
+          $ run
+          $ runReader ((initialDist . _initialChainState) cfg)
+          $ foldEmulatorStreamM (generalize list)
+          $ runEmulatorStream cfg trace
+
+ It gets something called an *EmulatorConfig* and an *EmulatorTrace ()*, which is a pure computation where no real-world side effects are involved. It is a pure function that executes
+ the trace on an emulated blockchain, and then gives a result as a list of *EmulatorEvent*s, maybe an error, if there was one, and then finally the final *EmulatorState*.
+ 
