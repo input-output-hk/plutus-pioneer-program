@@ -1807,9 +1807,9 @@ return *Contract* argument list as *e'*.
 We use the type *Void* as the error type. *Void* is a type that can hold no value, so, by using this type we are saying that there cannot be any errors for this contract.
 
 .. note::
-The use of *unpack* which is a function from the *Data.Text* module which converts a value of type *Text* to a value of type *String*.
+      The function *unpack* is defined in the *Data.Text* module. It converts a value of type *Text* to a value of type *String*.
 
-..code ::
+.. code ::
 
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test2
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
@@ -1821,23 +1821,13 @@ The use of *unpack* which is a function from the *Data.Text* module which conver
       Contract instance stopped (no errors)
       Slot 00001: SlotAdd Slot 2
       Final balances
-      Wallet 1: 
-      {, ""}: 100000000
-      Wallet 2: 
-      {, ""}: 100000000
-      Wallet 3: 
-      {, ""}: 100000000
-      Wallet 4: 
-      {, ""}: 100000000
-      Wallet 5: 
-      {, ""}: 100000000
-      Wallet 6: 
-      {, ""}: 100000000
-      Wallet 7: 
-      {, ""}: 100000000
-      Wallet 8: 
-      {, ""}: 100000000
-      Wallet 9: 
-      {, ""}: 100000000
-      Wallet 10: 
-      {, ""}: 100000000
+      ...
+
+We no longer get the error message, but, instead we get a message from the error handler showing the exception that was thrown by Contract1. Note that we still do not get the message
+"Hello from the contract!". Contract 1 still stopped processing after its error, but there was no overall contract error due to the exception being caught and handled.
+
+
+
+
+      
+
