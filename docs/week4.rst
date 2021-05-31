@@ -1663,3 +1663,118 @@ The purpose of the Contract Monad is to define off-chain code that runs in the w
       Contract w s e a
 
 The *a* is the same as in every Monad - it denotes the result type of the computation.
+
+We will go into the other three in more detail later but just briefly:
+
+- w is like our Writer monad example, it allows us to write log messages of type *w*.
+- s describes the blockchain capabilities, e.g. waiting for a slot, submitting transactions, getting the wallet's public key. It can also contain specific endpoints.
+- e describes the type of error messages that this monad can throw.
+
+Let's write an example.
+
+code ..:: haskell
+
+      myContract1 :: Contract () BlockchainActions Text ()
+      myContract1 = Contract.logInfo @String "Hello from the contract!"
+
+Here, we pass a *Contract* constructed with *Unit* as the *w* type and *BlockchainActions* as the second argument, *s*. This gives us access to all the blockchain actions - the only thing we can't do is to call specific endpoints.
+
+For *e* - the error message type, we use *Text*. *Text* is a Haskell type which is like *String*, but it is much more efficient.
+
+We don't want a specific result, so we use *Unit* for the type *a*.
+
+For the function body, we write a log message. We use *@String* because, we have imported the type *Data.Text* and we have used the *OverloadedStrings* GHC compiler option, 
+so the compiler needs to know what type we are referencing - a *Text* or a *String*. We can use *@String* if we also use the compiler option *TypeApplications*.
+
+Let's now define a *Trace* that starts the contract in the wallet, and a *test* function to run it.
+
+code ..:: haskell
+
+      myTrace1 :: EmulatorTrace ()
+      myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
+
+      test1 :: IO ()
+      test1 = runEmulatorTraceIO myTrace1
+
+If we run this in the REPL, we will see our log message from the contract.
+
+..code ::
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test1
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      Slot 00000: SlotAdd Slot 1
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+      Contract instance started
+      Slot 00001: *** CONTRACT LOG: "Hello from the contract!"
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+      Contract instance stopped (no errors)
+      Slot 00001: SlotAdd Slot 2
+      Final balances
+      Wallet 1: 
+      {, ""}: 100000000
+      Wallet 2: 
+      {, ""}: 100000000
+      Wallet 3: 
+      {, ""}: 100000000
+      Wallet 4: 
+      {, ""}: 100000000
+      Wallet 5: 
+      {, ""}: 100000000
+      Wallet 6: 
+      {, ""}: 100000000
+      Wallet 7: 
+      {, ""}: 100000000
+      Wallet 8: 
+      {, ""}: 100000000
+      Wallet 9: 
+      {, ""}: 100000000
+      Wallet 10: 
+      {, ""}: 100000000
+
+Now, let's throw an exception.
+
+..code :: haskell
+
+      myContract1 :: Contract () BlockchainActions Text ()
+      myContract1 = do
+      void $ Contract.throwError "BOOM!"
+      Contract.logInfo @String "Hello from the contract!"
+
+Recall that we chose the type *Text* as the error message.
+
+..code :: 
+
+      Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test1
+      Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+      Slot 00000: SlotAdd Slot 1
+      Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+      Contract instance started
+      Slot 00001: *** CONTRACT STOPPED WITH ERROR: "\"BOOM!\""
+      Slot 00001: SlotAdd Slot 2
+      Final balances
+      Wallet 1: 
+      {, ""}: 100000000
+      Wallet 2: 
+      {, ""}: 100000000
+      Wallet 3: 
+      {, ""}: 100000000
+      Wallet 4: 
+      {, ""}: 100000000
+      Wallet 5: 
+      {, ""}: 100000000
+      Wallet 6: 
+      {, ""}: 100000000
+      Wallet 7: 
+      {, ""}: 100000000
+      Wallet 8: 
+      {, ""}: 100000000
+      Wallet 9: 
+      {, ""}: 100000000
+      Wallet 10: 
+      {, ""}: 100000000
+
+Now, we don't get the log message, but we do get told that the contract stopped with an error and we see our exception message.
+
+
+
+
