@@ -2007,4 +2007,6 @@ If we run this in the REPL, we can see the *USER LOG* messages created using the
       Wallet 10: 
           {, ""}: 100000000
       
+Using this mechanism, it is possible to pass information from the contract running in the wallet to the outside world. Using endpoints we can pass information into a contract. 
+And using the *tell* mechanism we can get information out of the wallet.
 
