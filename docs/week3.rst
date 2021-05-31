@@ -1,11 +1,12 @@
 Week 03
 =======
 
-These is a written version of `Lecture
-#3 <https://youtu.be/Lk1eIVm_ZTQ>`__.
+.. note::
+      This is a written version of `Lecture
+      #3 <https://youtu.be/Lk1eIVm_ZTQ>`__.
 
-In this lecture we learn about the script context (the third validation
-argument), handling time, and parameterized contracts.
+      In this lecture we learn about the script context (the third validation
+      argument), handling time, and parameterized contracts.
 
 Housekeeping
 ------------

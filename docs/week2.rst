@@ -1,11 +1,12 @@
 Week 02
 =======
 
-These is a written version of `Lecture
-#2 <https://youtu.be/E5KRk5y9KjQ>`__.
+.. note::
+      This is a written version of `Lecture
+      #2 <https://youtu.be/E5KRk5y9KjQ>`__.
 
-It covers low-level, untyped on-chain validation scripts and high-level,
-typed on-chain validation scripts.
+      It covers low-level, untyped on-chain validation scripts and high-level,
+      typed on-chain validation scripts.
 
 ## Overview
 

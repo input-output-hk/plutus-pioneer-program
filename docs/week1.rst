@@ -1,12 +1,13 @@
 Week 01
 =======
 
-This is a written version of `Lecture
-#1 <https://youtu.be/IEn6jUo-0vU>`__.
+.. note::
+   This is a written version of `Lecture
+   #1 <https://youtu.be/IEn6jUo-0vU>`__.
 
-It covers an introduction to Plutus, the (E)UTxO model (and how it
-compares to other models), and concludes with an example English Auction
-managed with a Plutus smart contract running on the Plutus Playground.
+   It covers an introduction to Plutus, the (E)UTxO model (and how it
+   compares to other models), and concludes with an example English Auction
+   managed with a Plutus smart contract running on the Plutus Playground.
 
 Welcome
 -------
