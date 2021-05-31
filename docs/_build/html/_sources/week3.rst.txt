@@ -7,9 +7,6 @@ These is a written version of `Lecture
 In this lecture we learn about the script context (the third validation
 argument), handling time, and parameterized contracts.
 
-Please feel free to raise pull requests for typos, poor formatting, poor
-grammar, or anything else that is poor or inaccurate.
-
 Housekeeping
 ------------
 

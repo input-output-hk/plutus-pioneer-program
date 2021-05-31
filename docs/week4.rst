@@ -1278,3 +1278,22 @@ Trace Monad which is used to test Plutus code.
 The good news is that you don't need to understand Effect Systems to
 work with these Monads. You just need to know that you are working with
 a Monad, and what super powers it has.
+
+Plutus Monads
+-------------
+
+Now that we have seen how to write monadic code, either by using bind and return or by using do notation, we can look a very important Monad, namely the Contract Monad, which you may have
+already noticed in previous code examples.
+
+The Contract Monad defines code that will run in the wallet, which is the off-chain part of Plutus.
+
+But, before we go into details, we will talk about a second Monad, the EmulatorTrace monad.
+
+EmulatorTrace Monad
+~~~~~~~~~~~~~~~~~~~
+
+You may have wondered if there is a way to execute Plutus code for testing purposes without using the Plutus Playground.
+
+There is indeed, and this is done using the *EmulatorTrace* Monad.
+
+
