@@ -60,5 +60,16 @@ A *CurrencySymbol* is a *newtype* wrapper around a *ByteString*.
         deriving newtype (Haskell.Eq, Haskell.Ord, Eq, Ord, PlutusTx.IsData)
         deriving anyclass (Hashable, ToJSONKey, FromJSONKey,  NFData)
 
+And the same is true for *TokenName*.
 
+.. code:: haskell
+
+    newtype TokenName = TokenName { unTokenName :: Builtins.ByteString }
+        deriving (Serialise) via LedgerBytes
+        deriving stock (Generic)
+        deriving newtype (Haskell.Eq, Haskell.Ord, Eq, Ord, PlutusTx.IsData)
+        deriving anyclass (Hashable, NFData)
+        deriving Pretty via (PrettyShow TokenName)    
+
+So we have these two *ByteStrings* that define a coin, or, as it is also called, an *asset class*.
 
