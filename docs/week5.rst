@@ -31,13 +31,24 @@ Value
 The relevant types are defined in package *plutus-ledger-api*. The modules of interest are
 
 .. code:: haskell
-    
+
     module Plutus.V1.Ledger.Value
     module Plutus.V1.Ledger.Ada
 
+The Value Type
+~~~~~~~~~~~~~~
 
+*Value* is defined as a map from *CurrencySymbol*s to maps from *TokenName*s to *Integers*, which sounds a bit weird and complicated.
 
+.. code:: haskell
 
+    newtype Value = Value { getValue :: Map.Map CurrencySymbol (Map.Map TokenName Integer) }
+        deriving stock (Generic)
+        deriving anyclass (ToJSON, FromJSON, Hashable, NFData)
+        deriving newtype (Serialise, PlutusTx.IsData)
+        deriving Pretty via (PrettyShow Value)
+
+The first thing to note is that each native token, including Ada, is identified by two pieces of data.
 
 
 
