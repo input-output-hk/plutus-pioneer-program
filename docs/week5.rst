@@ -1,0 +1,24 @@
+Week 05
+=======
+
+.. note::
+      These is a written version of `Lecture
+      #5 <https://youtu.be/6VbhY162GQA>`__.
+
+      In this lecture we learn about native tokens, minting policies and NFTs.
+
+
+Value
+-----
+
+We are going to talk about how Plutus supports native tokens and how to define under which conditions native tokens can be minted and burned. But before we get to that,
+let's explore what *value* means in Cardano.
+
+When we talked about the (E)UTxO model, we learned that each UTxO (unspent transaction) has an address and a value. And, we saw that, as a result of being extended to the (E)UTxO model, each
+UTxO also has a *Datum*. We have seen examples of such UTxOs in previous lectures.
+
+In almost all the examples we have seen so far, the value was simply and Ada value, denominated in lovelace. The exception was the first example, from lecture 1, namely the *English Auction*
+example.
+
+
+
