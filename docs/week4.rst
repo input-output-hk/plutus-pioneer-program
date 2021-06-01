@@ -1661,8 +1661,9 @@ The purpose of the Contract Monad is to define off-chain code that runs in the w
 
 .. code:: haskell
 
-      Contract w s e a
-
+      newtype Contract w s e a = Contract { unContract :: Eff (ContractEffs w s e) a }
+            deriving newtype (Functor, Applicative, Monad)
+      
 The *a* is the same as in every Monad - it denotes the result type of the computation.
 
 We will go into the other three in more detail later but just briefly:
