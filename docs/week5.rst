@@ -31,6 +31,7 @@ Value
 The relevant types are defined in package *plutus-ledger-api*. The modules of interest are
 
 .. code:: haskell
+    
     module Plutus.V1.Ledger.Value
     module Plutus.V1.Ledger.Ada
 
