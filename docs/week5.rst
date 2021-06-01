@@ -48,8 +48,17 @@ The Value Type
         deriving newtype (Serialise, PlutusTx.IsData)
         deriving Pretty via (PrettyShow Value)
 
-The first thing to note is that each native token, including Ada, is identified by two pieces of data.
+The first thing to note is that each native token, including Ada, is identified by two pieces of data - the *CurrencySymbol* and the *TokenName*.
 
+A *CurrencySymbol* is a *newtype* wrapper around a *ByteString*.
+
+.. code:: haskell
+
+    newtype CurrencySymbol = CurrencySymbol { unCurrencySymbol :: Builtins.ByteString }
+        deriving (IsString, Show, Serialise, Pretty) via LedgerBytes
+        deriving stock (Generic)
+        deriving newtype (Haskell.Eq, Haskell.Ord, Eq, Ord, PlutusTx.IsData)
+        deriving anyclass (Hashable, ToJSONKey, FromJSONKey,  NFData)
 
 
 
