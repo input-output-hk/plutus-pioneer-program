@@ -8,20 +8,20 @@ I have tried to transcribe as closely as possible to the source material. I hope
 Once I have all the videos transcribed, I'll go back and fix all the typos and other errors I have made. Please feel free to issue pull requests for updates and corrections, no matter how trivial. I promise you
 that I am not precious about being corrected.
 
-The Plutus Pioneer lectures were created at a time when Plutus was going through rapid development. As a result, some of the earlier lectures rely on earlier versions of the Plutus
-code. Once Plutus has settled into a more stable form, I will update all these notes to reflect this, and will make sure to highlight the differences between the video 
-lectures and these written notes.
+.. note::
+    The Plutus Pioneer lectures were created at a time when Plutus was going through rapid development. As a result, some of the earlier lectures rely on earlier versions of the Plutus
+    code. Once Plutus has settled into a more stable form, I will update all these notes to reflect this, and will make sure to highlight the differences between the video 
+    lectures and these written notes.
 
 Once I've worked my way through the Pioneer lectures, I will be adding to the documentation here to show how I wrote my chess program in Haskell, which, hopefully, can act
 as a further resource for Haskell learning for those who want to dive deeper into this wonderful language.
 
-.. note::
-    If you find this helpful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, 
-    or any of the many other small pools run by single stake pool operators. 
-    
-    Staking with a single pool operator helps with the decentralization of Cardano. Rather than having all the ADA staked with a few big players, the overall stake is spread
-    across a large number of operators. 
-    
-    Although the frequency of rewards with a single SPO may be be lower, those size of those rewards will offset the lower frequency, and the overall annual 
-    return will be the same as with any other operator (5-6% per annum).
+If you find this helpful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, 
+or any of the many other small pools run by single stake pool operators. 
+
+Staking with a single pool operator helps with the decentralization of Cardano. Rather than having all the ADA staked with a few big players, the overall stake is spread
+across a large number of operators. 
+
+Although the frequency of rewards with a single SPO may be be lower, those size of those rewards will offset the lower frequency, and the overall annual 
+return will be the same as with any other operator (5-6% per annum).
 
