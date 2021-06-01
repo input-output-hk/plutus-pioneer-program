@@ -19,5 +19,5 @@ as a further resource for Haskell learning for those who want to dive deeper int
     across a large number of operators. 
     
     Although the frequency of rewards with a single SPO may be be lower, those size of those rewards will offset the lower frequency, and the overall annual 
-    return will be the same as with a larger pool (5-6% per annum).
+    return will be the same as with any other operator (5-6% per annum).
 
