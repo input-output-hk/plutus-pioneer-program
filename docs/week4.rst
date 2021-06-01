@@ -1699,6 +1699,7 @@ Let's now define a *Trace* that starts the contract in the wallet, and a *test* 
 
 If we run this in the REPL, we will see our log message from the contract.
 
+.. code::
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test1
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
       Slot 00000: SlotAdd Slot 1
