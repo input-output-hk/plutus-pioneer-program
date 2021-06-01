@@ -9,8 +9,8 @@ Once I have all the videos transcribed, I'll go back and fix all the typos and o
 that I am not precious about being corrected.
 
 .. note::
-    The Plutus Pioneer lectures were created at a time when Plutus was going through rapid development. As a result, some of the earlier lectures rely on earlier versions of the Plutus
-    code. Once Plutus has settled into a more stable form, I will update all these notes to reflect this, and will make sure to highlight the differences between the video 
+    The Plutus Pioneer lectures were created at a time when Plutus was going through rapid development. As a result, earlier lectures rely on earlier versions of the Plutus
+    code. Once Plutus has settled into a stable form, I will update all these notes to reflect this, and will make sure to highlight the differences between the video 
     lectures and these written notes.
 
 Once I've worked my way through the Pioneer lectures, I will be adding to the documentation here to show how I wrote my chess program in Haskell, which, hopefully, can act
