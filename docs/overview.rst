@@ -9,7 +9,12 @@ Once I have all the videos transcribed, I'll go back and fix all the typos and o
 that I am not precious about being corrected.
 
 .. note::
-    If you find this helpful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, or any of the many other small pools run by single stake pool operators.
+    If you find this helpful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, 
+    or any of the many other small pools run by single stake pool operators. 
+    
+    Staking with a single pool operator helps with the decentralization of Cardano, rather than
+    having all the ADA staked with a few big players. Although the frequency of rewards with a single SPO will be lower, those rewards will be higher, and the overall annual 
+    return will be the same (5-6%).
 
 Once I've worked my way through the Pioneer lectures, I will be adding to the documentation here to show how I wrote my chess program in Haskell, which, hopefully, can act
 as a further resource for Haskell learning for those who want to dive deeper into this wonderful language.

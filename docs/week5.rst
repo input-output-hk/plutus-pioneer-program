@@ -18,7 +18,13 @@ When we talked about the (E)UTxO model, we learned that each UTxO (unspent trans
 UTxO also has a *Datum*. We have seen examples of such UTxOs in previous lectures.
 
 In almost all the examples we have seen so far, the value was simply an Ada value, denominated in lovelace. The exception was the first example, from lecture 1, namely the *English Auction*
-example.
+example. In that example we auctioned away an NFT. However, the NFT was just created out of thin air in the playground.
+
+In the real Cardano blockchain, however, in the beginning there are only Ada, there are no other native tokens.
+
+
+
+
 
 
 
