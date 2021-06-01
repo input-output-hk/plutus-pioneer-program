@@ -22,6 +22,6 @@ or any of the many other small pools run by single stake pool operators.
 Staking with a single pool operator helps with the decentralization of Cardano. Rather than having all the ADA staked with a few big players, the overall stake is spread
 across a large number of operators. 
 
-Although the frequency of rewards with a single SPO may be be lower, those size of those rewards will offset the lower frequency, and the overall annual 
+Although the frequency of rewards with a single SPO may be be lower, the size of those rewards will offset the lower frequency, meaning that the overall annual 
 return will be the same as with any other operator (5-6% per annum).
 
