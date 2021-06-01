@@ -8,8 +8,8 @@ Week 05
       In this lecture we learn about native tokens, minting policies and NFTs.
 
 
-Value
------
+Overview
+--------
 
 We are going to talk about how Plutus supports native tokens and how to define under which conditions native tokens can be minted and burned. But before we get to that,
 let's explore what *value* means in Cardano.
@@ -20,7 +20,20 @@ UTxO also has a *Datum*. We have seen examples of such UTxOs in previous lecture
 In almost all the examples we have seen so far, the value was simply an Ada value, denominated in lovelace. The exception was the first example, from lecture 1, namely the *English Auction*
 example. In that example we auctioned away an NFT. However, the NFT was just created out of thin air in the playground.
 
-In the real Cardano blockchain, however, in the beginning there are only Ada, there are no other native tokens.
+In the real Cardano blockchain, however, in the beginning there are only Ada, there are no other native tokens. So, you have to do something to create new native tokens, or to burn existing ones.
+In this lecture we will see how to do that.
+
+But let's first talk above values.
+
+Value
+-----
+
+The relevant types are defined in package *plutus-ledger-api*. The modules of interest are
+
+.. code:: haskell
+    module Plutus.V1.Ledger.Value
+    module Plutus.V1.Ledger.Ada
+
 
 
 
