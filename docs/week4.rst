@@ -1743,6 +1743,8 @@ Now, let's throw an exception.
 
 Recall that we chose the type *Text* as the error message.
 
+.. code::
+      
       Prelude Plutus.Trace.Emulator Plutus.Contract.Trace Wallet.Emulator Week04.Trace Wallet.Emulator.Stream Week04.Contract> test1
       Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
       Slot 00000: SlotAdd Slot 1
