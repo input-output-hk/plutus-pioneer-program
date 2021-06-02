@@ -187,7 +187,25 @@ Another useful function is *valueOf* which allows us to get the value of a given
     Week05.Free> valueOf v "a8ff" "XYZ"
     100    
     
+    Week05.Free> valueOf v "a8ff" "ABC"
+    7
+
+    Week05.Free> valueOf v "a8ff" "abc"
+    0
+
+ Another useful function is *flattenValue*. As the name suggests, it flattens the map of maps into a flat list of triples.
+
+ .. code:: haskell
+
+    Week05.Free> :t flattenValue
+    flattenValue :: Value -> [(CurrencySymbol, TokenName, Integer)]
+
+    Week05.Free> flattenValue v
+    [(a8ff,"ABC",7),(a8ff,"XYZ",100),(,"",42)]
     
+    
+ 
+ 
 
 
 
