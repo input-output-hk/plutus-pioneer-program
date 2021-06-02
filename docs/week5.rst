@@ -229,6 +229,31 @@ All the Ada that exists comes from the Genesis transaction and the total amount 
 
 So we'll look at an example of a minting policy next and will see that it is very similar to a validation script, but not identical.
 
+Before we write out first minting policy, let's briefly recall how validation works.
+
+When we don't have a public key address, but a script address, and a UTxO that sits at that address, then for any transaction that tries to consume that UTxO, a validation script is run.
+
+That validation script gets, as input, the datum, which comes from the UTxO, the redeemer, which comes from the input, and the context.
+
+Recall that the *ScriptContext* has two fields.
+
+.. code:: haskell
+
+    data ScriptContext = ScriptContext{scriptContextTxInfo :: TxInfo, scriptContextPurpose :: ScriptPurpose }
+
+One of those fields is *ScriptPurpose*, and, for this field, everything we have seen until now has been of type *Spending*.
+
+.. code:: haskell
+
+    data ScriptPurpose
+        = Minting CurrencySymbol
+        | Spending TxOutRef
+        | Rewarding StakingCredential
+        | Certifying DCert
+    
+    
+
+
 
 
  
