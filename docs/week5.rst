@@ -251,7 +251,6 @@ One of those fields is *ScriptPurpose*, and, for this field, everything we have 
         | Rewarding StakingCredential
         | Certifying DCert
     
-    
 The other field is of type *TxInfo* which contains all the context information about the transaction.
 
 .. code:: haskell
@@ -281,6 +280,23 @@ Whereas the validation scripts had three inputs - the datum, the redeemer and th
 And it is the same context as we had before - the *ScriptContext*. It would make no sense to have the datum, as it belongs to the UTxO, and it would make no sense to have
 the redeemer as it belongs to the validation script. The minting policy belongs to the transaction itself, not to a specific input or output.
 
+As for the *ScriptPurpose*, this will not be *Spending* as it has been until now, but will be *Minting*.
+
+Example 1 - Free
+----------------
+
+Let's write a simple minting policy.
+
+When we wrote a validator we had a function such as the following:
+
+.. code:: haskell
+
+    mkValidator :: Datum -> Redeemer -> ScriptContext -> Bool
+
+We also saw the low-level version where we had three *Data* arguments and returned *Unit*. And we saw that there can be additional arguments before the datum, if we
+write a parameterized script.
+
+We can also have parameterized minting policy scripts and we will see that in a later example. But first we will look at one that is not parameterized.
 
 
 
