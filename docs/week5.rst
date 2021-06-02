@@ -79,3 +79,26 @@ So we have these two *ByteStrings* that define a coin, or, as it is also called,
 
     assetClass :: CurrencySymbol -> TokenName -> AssetClass
     assetClass s t = AssetClass (s, t)
+
+Ada is one asset class, and custom native tokens will be other asset classes.
+
+A *Value* simply shows how many units exist for a given asset class.
+
+Let's start the REPL and import the two relevant modules.
+
+.. code:: haskell
+        
+    cabal repl
+    Prelude Week05.Free> import Plutus.V1.Ledger.Ada
+    Prelude Plutus.V1.Ledger.Ada Week05.Free> import Plutus.V1.Ledger.Value 
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> 
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> :set -XOverloadedStrings
+
+.. note::
+    
+    We have also activated the *OverloadedStrings* extension so that we can enter *ByteString*s as literal strings.
+    
+    
+
+
+
