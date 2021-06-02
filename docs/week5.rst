@@ -252,6 +252,39 @@ One of those fields is *ScriptPurpose*, and, for this field, everything we have 
         | Certifying DCert
     
     
+The other field is of type *TxInfo* which contains all the context information about the transaction.
+
+.. code:: haskell
+
+    -- | A pending transaction. This is the view as seen by validator scripts, so some details are stripped out.
+    data TxInfo = TxInfo
+        { txInfoInputs      :: [TxInInfo] -- ^ Transaction inputs
+        , txInfoInputsFees  :: [TxInInfo]     -- ^ Transaction inputs designated to pay fees
+        , txInfoOutputs     :: [TxOut] -- ^ Transaction outputs
+        , txInfoFee         :: Value -- ^ The fee paid by this transaction.
+        , txInfoForge       :: Value -- ^ The 'Value' forged by this transaction.
+        , txInfoDCert       :: [DCert] -- ^ Digests of certificates included in this transaction
+        , txInfoWdrl        :: [(StakingCredential, Integer)] -- ^ Withdrawals
+        , txInfoValidRange  :: SlotRange -- ^ The valid range for the transaction.
+        , txInfoSignatories :: [PubKeyHash] -- ^ Signatures provided with the transaction, attested that they all signed the tx
+        , txInfoData        :: [(DatumHash, Datum)]
+        , txInfoId          :: TxId
+        -- ^ Hash of the pending transaction (excluding witnesses)
+        } deriving (Generic)
+        
+For minting policies, this is triggered if the *txInfoForge* field of the transaction contains a non-zero value. In all of the transactions we have seen so far, this field value
+has been zero - we have never created or destroyed any tokens.
+
+If it *is* non-zero, then for each currency symbol contained in the *Value*, the corresponding minting policy script is run. 
+
+Whereas the validation scripts had three inputs - the datum, the redeemer and the context, these minting policy scripts only have one input - the context. 
+And it is the same context as we had before - the *ScriptContext*. It would make no sense to have the datum, as it belongs to the UTxO, and it would make no sense to have
+the redeemer as it belongs to the validation script. The minting policy belongs to the transaction itself, not to a specific input or output.
+
+
+
+
+
 
 
 
