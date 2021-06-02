@@ -211,6 +211,25 @@ symbol have to be in hexadecimal digits?
 
 This is where so-called minting policies come in.
 
+The rule is that, in general, a transaction can't create or delete tokens. Everything that goes in also comes out, with the exception of the fees. There is always a lovelace feel
+that has to be paid with each transaction. The fee depends on the size of the transaction and the number of steps that the validation script takes to execute, and the memory
+consumption of the script.
+
+But, if that was the whole story then we could never create native tokens. And this is where minting policies come in, and the relevance of the currency symbol comes in.
+
+The reason that the currency symbol has to consist of hexadecimal digits is that it is actually the hash of a script. And this script is called the minting policy, and if
+we have a transaction where we ant to create native or burn native tokens then, for each native token that we try to create or burn, the currency symbol is looked up. So, the
+corresponding script must also be contained in the transaction. And that script is executed along with the other validation scripts.
+
+And, similar to the validation scripts that we have seen so that validate input, the purpose of these minting scripts is to decide whether this transaction has the right to
+mint or burn tokens. Ada also fits into this scheme. Remember the the currency symbol of Ada is just an empty string, which is not the hash of any scripts. So there is no
+script that hashes to the empty string, so there is no script that would allow the minting or burning of Ada, which means that Ada can never be minted or burned.
+
+All the Ada that exists comes from the Genesis transaction and the total amount of Ada in the system is fixed and can never change. Only custom native tokens can have custom minting policies.
+
+So we'll look at an example of a minting policy next and will see that it is very similar to a validation script, but not identical.
+
+
 
  
  
