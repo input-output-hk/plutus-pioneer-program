@@ -193,7 +193,7 @@ Another useful function is *valueOf* which allows us to get the value of a given
     Week05.Free> valueOf v "a8ff" "abc"
     0
 
- Another useful function is *flattenValue*. As the name suggests, it flattens the map of maps into a flat list of triples.
+Another useful function is *flattenValue*. As the name suggests, it flattens the map of maps into a flat list of triples.
 
  .. code:: haskell
 
