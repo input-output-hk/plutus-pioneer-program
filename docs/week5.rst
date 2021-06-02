@@ -169,9 +169,25 @@ And, we can combine, as before, with the *mappend* operator. We can now create a
     
 Now, we see a map representing 42 lovelace as well as two tokens *ABC* and *XYZ* both belonging to the *CurrencySymbol* "af88", and each with their respective integer amounts.
 
+Let's give this value a name:
 
+.. code:: haskell
 
+    Week05.Free> let v = singleton "a8ff" "ABC" 7 <> lovelaceValueOf 42 <> singleton "a8ff" "XYZ" 100
+    Week05.Free> v
+    Value (Map [(,Map [("",42)]),(a8ff,Map [("ABC",7),("XYZ",100)])])
+    
+Another useful function is *valueOf* which allows us to get the value of a given currency symbol and token name.
 
+.. code:: haskell
+
+    Week05.Free> :t valueOf
+    valueOf :: Value -> CurrencySymbol -> TokenName -> Integer
+
+    Week05.Free> valueOf v "a8ff" "XYZ"
+    100    
+    
+    
 
 
 
