@@ -141,6 +141,27 @@ One thing we can do with values is combine them. The *Value* class is an instanc
     Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> lovelaceValueOf 123 <> lovelaceValueOf 10
     Value (Map [(,Map [("",133)])])
     
+So, how do we create *Value*s containing native tokens?
+
+There is a very useful function called *singleton*.
+
+.. code:: haskell
+
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> :t singleton
+    singleton :: CurrencySymbol -> TokenName -> Integer -> Value
+
+This will create a *Value* for a token specified by the *CurrencySymbol* and the *TokenName*, and for a given *Integer* amount.
+
+.. code:: haskell
+
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> singleton "a8ff" "ABC" 7
+    Value (Map [(a8ff,Map [("ABC",7)])])
+
+The first argument, "a8ff" for *CurrencySymbol" has to be a string representing a hexadecimal value, for reasons that will soon become clear. The second argument, "ABC"
+for *TokenName* can be an arbitrary string.
+
+
+
 
 
 
