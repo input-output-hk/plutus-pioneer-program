@@ -102,10 +102,27 @@ Now let's look at some values. Let's start with lovelace values. In the *Ledger.
 
 .. code:: haskell
 
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> :t adaSymbol
     adaSymbol :: CurrencySymbol
-    adaSymbol = TH.currencySymbol emptyByteString
     
-This gives us the currency symbol of the Ada asset class, which is just an empty *ByteString*.
+This gives us the currency symbol of the Ada asset class, which is just the empty *ByteString*. Similarly, there is a function *adaToken*, which will give us the token name.
+
+.. code:: haskell
+
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> :t adaToken
+    adaToken :: TokenName
+
+Again, this is also the empty *ByteString*.
+
+We have seen before in the examples how to construct a *Value* containing just lovelace. There is a function *lovelaceValueOf* that, given an *Integer*, gives us a *Value*.
+
+.. code:: haskell
+
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> :t lovelaceValueOf
+    lovelaceValueOf :: Integer -> Value
     
+    
+
+
 
 
