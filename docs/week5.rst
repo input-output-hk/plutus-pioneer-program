@@ -97,8 +97,15 @@ Let's start the REPL and import the two relevant modules.
 .. note::
     
     We have also activated the *OverloadedStrings* extension so that we can enter *ByteString*s as literal strings.
-    
-    
 
+Now let's look at some values. Let's start with lovelace values. In the *Ledger.Ada* module there is a function called *adaSymbol*.
+
+.. code:: haskell
+
+    adaSymbol :: CurrencySymbol
+    adaSymbol = TH.currencySymbol emptyByteString
+    
+This gives us the currency symbol of the Ada asset class, which is just an empty *ByteString*.
+    
 
 
