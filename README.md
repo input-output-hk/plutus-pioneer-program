@@ -138,6 +138,16 @@
   - [`RockPaperScissors`](code/week07/src/Week07/RockPaperScissors.hs)
   - [`TestRockPaperScissors`](code/week07/src/Week07/TestRockPaperScissors.hs)
 
+- Week #8
+
+  - [`TokenSaleWithClose`](code/week08/src/Week08/TokenSaleWithClose.hs)
+  - [`ModelWithClose`](code/week08/test/Spec/ModelWithClose.hs)
+  - [`TraceWithClose`](code/week08/test/Spec/TraceWithClose.hs)
+
+- Week #9
+
+  - [`solution`](code/week09/app/solution.hs)
+
 ## Some Plutus Modules
 
 - [`Plutus.Contract.StateMachine`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/StateMachine.hs), contains types and functions for using state machines.
