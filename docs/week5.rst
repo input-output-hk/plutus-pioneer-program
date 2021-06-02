@@ -154,11 +154,20 @@ This will create a *Value* for a token specified by the *CurrencySymbol* and the
 
 .. code:: haskell
 
-    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> singleton "a8ff" "ABC" 7
+    Week05.Free> singleton "a8ff" "ABC" 7
     Value (Map [(a8ff,Map [("ABC",7)])])
 
 The first argument, "a8ff" for *CurrencySymbol" has to be a string representing a hexadecimal value, for reasons that will soon become clear. The second argument, "ABC"
 for *TokenName* can be an arbitrary string.
+
+And, we can combine, as before, with the *mappend* operator. We can now create a somewhat more interesting map.
+
+.. code:: haskell
+
+    Week05.Free> singleton "a8ff" "ABC" 7 <> lovelaceValueOf 42 <> singleton "a8ff" "XYZ" 100
+    Value (Map [(,Map [("",42)]),(a8ff,Map [("ABC",7),("XYZ",100)])])
+    
+Now, we see a map representing 42 lovelace as well as two tokens *ABC* and *XYZ* both belonging to the *CurrencySymbol* "af88", and each with their respective integer amounts.
 
 
 
