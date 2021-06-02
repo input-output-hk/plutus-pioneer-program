@@ -7,6 +7,8 @@ Week 05
 
       In this lecture we learn about native tokens, minting policies and NFTs.
 
+      These notes use Plutus commit 0c3c310cab61dbff8cbc1998a3678b367be6815a
+
 
 Overview
 --------
@@ -73,3 +75,7 @@ And the same is true for *TokenName*.
 
 So we have these two *ByteStrings* that define a coin, or, as it is also called, an *asset class*.
 
+.. code:: haskell
+
+    assetClass :: CurrencySymbol -> TokenName -> AssetClass
+    assetClass s t = AssetClass (s, t)
