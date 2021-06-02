@@ -202,8 +202,16 @@ Another useful function is *valueOf* which allows us to get the value of a given
 
     Week05.Free> flattenValue v
     [(a8ff,"ABC",7),(a8ff,"XYZ",100),(,"",42)]
-    
-    
+
+Minting Policies
+~~~~~~~~~~~~~~~~
+
+Now the question is why? Why do we need both a currency symbol and a token name? Why don't we just use one identifier for an asset class? And why does the currency
+symbol have to be in hexadecimal digits?
+
+This is where so-called minting policies come in.
+
+
  
  
 
