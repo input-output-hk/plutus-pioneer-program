@@ -51,6 +51,12 @@
   - Property based testing with `QuickCheck`.
   - Testing Plutus contracts with property based testing.
 
+- [Lecture #9](https://youtu.be/-RpCqHuxfQQ)
+
+  - Marlowe overview ([slides](Marlowe_Plutus_Pioneers_June_2021.pdf))
+  - Marlowe in Plutus
+  - Marlowe Playground demo
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
@@ -61,6 +67,7 @@
 - Lecture #6: [Oracles](code/week06)
 - Lecture #7: [State Machines](code/week07)
 - Lecture #8: [Testing](code/week08)
+- Lecture #9: [Marlowe](code/week09)
 
 ## Exercises
 
@@ -112,6 +119,11 @@
     retrieve all remaining funds (including the NFT).
   - Modify the tests accordingly.
 
+- Week #9
+
+  - Modify the example Marlowe contract, so that Charlie must put down twice the deposit in the very beginning,
+    which gets split between Alice and Bob if Charlie refuses to make his choice.
+
 ## Solutions
 
 - Week #2
@@ -138,8 +150,15 @@
   - [`RockPaperScissors`](code/week07/src/Week07/RockPaperScissors.hs)
   - [`TestRockPaperScissors`](code/week07/src/Week07/TestRockPaperScissors.hs)
 
+- Week #8
+
+  - [`TokenSaleWithClose`](code/week08/src/Week08/TokenSaleWithClose.hs)
+  - [`ModelWithClose`](code/week08/test/Spec/ModelWithClose.hs)
+  - [`TraceWithClose`](code/week08/test/Spec/TraceWithClose.hs)
+
 ## Some Plutus Modules
 
+- [`Language.Marlowe.Semantics`](https://github.com/input-output-hk/plutus/blob/master/marlowe/src/Language/Marlowe/Semantics.hs), contains Marlowe types and semantics.
 - [`Plutus.Contract.StateMachine`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/StateMachine.hs), contains types and functions for using state machines.
 - [`Plutus.Contract.Test`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test.hs), provides various ways to write tests for Plutus contracts.
 - [`Plutus.Contract.Test.ContractModel`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test/ContractModel.hs), support for property based testing of Plutus contracts.
