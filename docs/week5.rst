@@ -121,6 +121,30 @@ We have seen before in the examples how to construct a *Value* containing just l
     Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> :t lovelaceValueOf
     lovelaceValueOf :: Integer -> Value
     
+So, for example to have 123 lovelace, we can do:
+
+.. code:: haskell
+
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> lovelaceValueOf 123
+    Value (Map [(,Map [("",123)])])
+
+You will always use a helper function such as *lovelaceValueOf* to construct the value maps - you would never need to construct one directly.
+
+Here we see the map. The out map of currency symbols has one key, which is the empty symbol for Ada, and the inner map of token names has one key, the empty string for Ada,
+and a value of 123.
+
+One thing we can do with values is combine them. The *Value* class is an instance of *Monoid*, so we can use *mappend*, which we can write as *<>*, which comes from a super class of
+*Monoid* called *Semigroup*.
+
+.. code:: haskell
+
+    Prelude Plutus.V1.Ledger.Ada Plutus.V1.Ledger.Value Week05.Free> lovelaceValueOf 123 <> lovelaceValueOf 10
+    Value (Map [(,Map [("",133)])])
+    
+
+
+
+
     
 
 
