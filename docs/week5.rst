@@ -435,7 +435,26 @@ If, on the other hand, we were burning tokens (if *mpAmount* is negative), then 
 would find an input in our own wallet from which to take the tokens.
 
 The submit function can also fail. For example, if we want to pay someone, but we do not have enough funds in our wallet, it would fail. Or, if we are asking to burn tokens 
-that we don't have, it will also fail.
+that we don't have, it will also fail. On failure, an exception would be thrown, with an error message of type *Text*.
+
+Now, back to the *lookups*. In order to fulfil the conditions in the *mustForgeValue* function, and to construct the transaction, sometimes the library needs additional information.
+In this case, in order to validate a transaction that forges value, the nodes that validate the transaction have to run the policy script.
+
+But, the currency symbol is only the hash of the policy script. In order to run the script itself, it must be included in the transaction. Which means that, in the 
+construction step of the transaction, when the algorithm see the *mustForgeValue* constraint, it knows it has to attach the corresponding policy script to the transaction.
+
+In order to tell the algorithm where the policy script is, we can give it hints, and these are the lookups. The are a variety of lookups that can be used - you can give 
+UTxOs, validator scripts, and, as we do here, you can give monetary policy scripts.
+
+In our case, the only thing we need to supply as a lookup is the policy that we defined earlier in the script.
+
+There are variants of *submitTxConstraintsWith* without the *with* that do not take lookups, as we have seen in previous lectures.
+
+
+
+
+
+
 
 
 
