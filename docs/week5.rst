@@ -364,8 +364,8 @@ The next step is to define the schema. Recall that one of the parameters of the 
 .. code:: haskell
 
     type FreeSchema =
-    BlockchainActions
-        .\/ Endpoint "mint" MintParams
+        BlockchainActions
+            .\/ Endpoint "mint" MintParams
         
 As always, we have *BlockchainActions* that give us access generic things like getting your own public key. And here, we have added an endpoint *mint* using the type-level operator
 we have seen previously.
@@ -383,8 +383,19 @@ So, now we can look at the contract itself.
         void $ awaitTxConfirmed $ txId ledgerTx
         Contract.logInfo @String $ printf "forged %s" (show val)
         
-        
-        
+In the past, we have not gone into detail with the off-chain part of the contract. But, as we now know about the *Contract* monad from the last lecture, we are ready to go into it
+in much more detail.
+
+Recall that the *Contract* monad takes four type parameters. 
+
+The first is the writer monad which allows us to use a *tell* function. By leaving this parametric with a small
+*w*, we indicate that we will not be making use of this parameter - we won't *tell* any state.
+
+The next parameter is the schema that we just discussed. As noted above, by using *FreeSchema* we have access to the regular block chain actions, as well as the *mint* endpoint.
+
+The third parameter is the type of error message, and as we have seen, *Text* is usually a good choice.
+
+Finally the last parameter is the return type, and our contract will just have the Unit return type.
 
 
 
