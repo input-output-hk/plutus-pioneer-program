@@ -467,8 +467,44 @@ use the *Void* type.
 Also, in the same line, we see a monadic bind, so we know that this is a monadic action happening within the *Contract* monad. The reason for this is that, in order to lookup,
 for example, our UTxOs, the *submitTxConstraintsWith* function must make use of the super power of the *Contract* monad, which is to access the *BlockchainActions*.
 
+Now, *ledgerTx* is basically a handle to the transaction to we just submitted.
 
+Then we wait for the transaction to be confirmed.
 
+.. code:: haskell
+
+    void $ awaitTxConfirmed $ txId ledgerTx
+
+Currently, if the transaction validation fails, the await for confirmation line will block forever. However, this will soon change in an upcoming Plutus release to allow
+us to listen for status changes, so you could detect if validation failed.
+
+Once confirmed, we simply write a log message.
+
+Finally, we need some more boilerplate to define our endpoint, to be able to actually execute the *mint* function, for example, in the playground.
+
+.. code:: haskell
+
+    endpoints :: Contract () FreeSchema Text ()
+    endpoints = mint' >> endpoints
+      where
+        mint' = endpoint @"mint" >>= mint    
+
+We define another contract, *endpoints*, and that is always the name of the contract that the playground will run. So, if you want to test something in the playground, you
+always need something called *endpoints*.
+
+Here we just define a function called *mint'* and then recursively call *endpoints*, so once it has executed, it will be available to be executed again.
+
+For *mint'* we must somehow get the *MintParams* and for that we use the *endpoint* function. The *endpoint* function blocks until someone provides a parameter. Once the
+parameter of *MintParams* is provided, we use the monadic bind to call the *mint* function with those arguments.
+
+The final two lines, as we have seen before, are just needed for the playground UI.
+
+.. code:: haskell
+
+    mkSchemaDefinitions ''FreeSchema
+    mkKnownCurrencies []    
+
+    
 
 
 
