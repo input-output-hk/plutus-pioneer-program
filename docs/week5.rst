@@ -428,7 +428,17 @@ So what must the *submitTxConstraintsWith* do in order to create a valid transac
 have transaction fees, we need an input that covers the transactions fees. So, to create the transaction, the function will look at our own UTxOs and find one, or more, that can
 cover the transaction fees, and use them as an input to the transaction.
 
-Furthermore, if we are forging value (it the *mpAmount* is positive), that must go somewhere.
+Furthermore, if we are forging value (if *mpAmount* is positive), that must go somewhere. In this case, *submitTxConstraintsWith*, will create an output that sends the 
+newly-minted value to our own wallet.
+ 
+If, on the other hand, we were burning tokens (if *mpAmount* is negative), then those tokens must come from somewhere. In that case, the *submitTxConstraintsWith* function
+would find an input in our own wallet from which to take the tokens.
+
+The submit function can also fail. For example, if we want to pay someone, but we do not have enough funds in our wallet, it would fail. Or, if we are asking to burn tokens 
+that we don't have, it will also fail.
+
+
+
 
 
 
