@@ -409,8 +409,27 @@ The arguments to the *singleton* function are the currency symbol that represent
 We'll skip the *lookups* assignment for the moment, and move onto the *tx* assignment.
 
 One of the main purposes of the *Contract* monad is to construct and submit transactions. The path that the Plutus team has taken to do that is provide a way to specify
-the constraints of the transaction you are defining. The Plutus libraries then take care of constructing the correct transaction. This is as opposed to being require to specify
+the constraints of the transaction you are defining. The Plutus libraries then take care of constructing the correct transaction (if possible). This is as opposed to being require to specify
 all the inputs and outputs manually, which would be tedious as many requirements, such as sending change back to the sending wallet, are often the same.
+
+These conditions all have names that start with *must*. There are things like *mustSpendScriptOutput*, *mustPayToPublicKey* and all sorts of conditions that can be put 
+on a condition.
+
+In our example, we are using *mustForgeValue* and we pass it the previously-defined *val*. The result of forging the tokens specified by *val* is that they will end up 
+in our own wallet.
+
+Once the conditions are defined, you then need to call a function to submit the transaction. There are a variety of such functions, but in this case, the appropriate one
+is *submitTxConstraintsWith*. 
+
+These *submitTx* functions all take these declarative conditions that the transaction must satisfy, and then they try to construct a transaction that 
+fulfils those conditions. In our case, the only condition is that we want to forge the value.
+
+So what must the *submitTxConstraintsWith* do in order to create a valid transaction? It must, for example balance the inputs and outputs. In this case, because we always 
+have transaction fees, we need an input that covers the transactions fees. So, to create the transaction, the function will look at our own UTxOs and find one, or more, that can
+cover the transaction fees, and use them as an input to the transaction.
+
+Furthermore, if we are forging value (it the *mpAmount* is positive), that must go somewhere.
+
 
 
 
