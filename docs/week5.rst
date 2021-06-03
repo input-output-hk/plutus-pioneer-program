@@ -375,13 +375,6 @@ So, now we can look at the contract itself.
 .. code:: haskell
 
     mint :: MintParams -> Contract w FreeSchema Text ()
-    mint mp = do
-        let val     = Value.singleton curSymbol (mpTokenName mp) (mpAmount mp)
-            lookups = Constraints.monetaryPolicy policy
-            tx      = Constraints.mustForgeValue val
-        ledgerTx <- submitTxConstraintsWith @Void lookups tx
-        void $ awaitTxConfirmed $ txId ledgerTx
-        Contract.logInfo @String $ printf "forged %s" (show val)
         
 In the past, we have not gone into detail with the off-chain part of the contract. But, as we now know about the *Contract* monad from the last lecture, we are ready to go into it
 in much more detail.
@@ -396,6 +389,20 @@ The next parameter is the schema that we just discussed. As noted above, by usin
 The third parameter is the type of error message, and as we have seen, *Text* is usually a good choice.
 
 Finally the last parameter is the return type, and our contract will just have the Unit return type.
+
+Now the function body. As *Contact* is a monad, we can use *do* notation.
+
+.. code:: haskell
+
+    mint mp = do
+        let val     = Value.singleton curSymbol (mpTokenName mp) (mpAmount mp)
+            lookups = Constraints.monetaryPolicy policy
+            tx      = Constraints.mustForgeValue val
+        ledgerTx <- submitTxConstraintsWith @Void lookups tx
+        void $ awaitTxConfirmed $ txId ledgerTx
+        Contract.logInfo @String $ printf "forged %s" (show val)
+        
+The first thing that we define is the value that we want to forge. For this we are using the *singleton* function that we tried out in the REPL earlier.
 
 
 
