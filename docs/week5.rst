@@ -359,13 +359,30 @@ We have the currency symbol, so what is missing is the token name and the amount
 
 We see two fields - *mpTokenName* and *mpAmount*. The idea is that if the *mpAmount* is positive, we should create tokens, and if it is negative, we should burn tokens.
 
-The next step is to define the schema. Recall that one of the parameters of the *Contact* monad was the schema that defined the available endpoints.
+The next step is to define the schema. Recall that one of the parameters of the *Contact* monad was the schema that defined the available actions that we can take.
 
 .. code:: haskell
 
     type FreeSchema =
     BlockchainActions
         .\/ Endpoint "mint" MintParams
+        
+As always, we have *BlockchainActions* that give us access generic things like getting your own public key. And here, we have added an endpoint *mint* using the type-level operator
+we have seen previously.
+
+So, now we can look at the contract itself.
+
+.. code:: haskell
+
+    mint :: MintParams -> Contract w FreeSchema Text ()
+    mint mp = do
+        let val     = Value.singleton curSymbol (mpTokenName mp) (mpAmount mp)
+            lookups = Constraints.monetaryPolicy policy
+            tx      = Constraints.mustForgeValue val
+        ledgerTx <- submitTxConstraintsWith @Void lookups tx
+        void $ awaitTxConfirmed $ txId ledgerTx
+        Contract.logInfo @String $ printf "forged %s" (show val)
+        
         
         
 
