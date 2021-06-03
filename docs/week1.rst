@@ -55,7 +55,6 @@ blockchain that have not yet been spent. Let's look at an example where
 we have two such UTxOs.
 
 .. figure:: img/1.png
-   :alt: Image 1
 
 Alice wants to send 10 ADA to Bob, so she creates a transaction. A
 transaction is something that contains an arbitrary number of inputs and

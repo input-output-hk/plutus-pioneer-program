@@ -513,20 +513,26 @@ wait for 1 slot at the end.
 .. figure:: img/week5__00007.png
    :alt: 
 
+
 .. figure:: img/week5__00008.png
    :alt: 
+
 
 .. figure:: img/week5__00009.png
    :alt: 
 
+
 .. figure:: img/week5__00010.png
    :alt: 
+
 
 .. figure:: img/week5__00011.png
    :alt: 
 
+
 .. figure:: img/week5__00012.png
    :alt: 
+
 
 
 
