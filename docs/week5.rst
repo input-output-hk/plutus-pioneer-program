@@ -510,28 +510,27 @@ In The Playground
 We have set up a scenario where Wallet 1 mints 555 ABC tokens, and Wallet 2 mints 444 ABC tokens. Then, after waiting for 1 slot, Wallet 1 burns 222 ABC tokens. Finally, we
 wait for 1 slot at the end.
 
-.. figure:: img/week5__00007.png
-   :alt: 
+.. figure:: img/week05__00007.png
 
+Now, if we evaluate this, first we see the genesis transaction where the wallets are given 1000 lovelace each.
 
-.. figure:: img/week5__00008.png
-   :alt: 
+.. figure:: img/week05__00008.png
 
+Next, we see two transactions at Slot 1. The first is the transaction from Wallet 2, where 444 ABC tokens are minted, and a 10 lovelace fee is paid.
 
-.. figure:: img/week5__00009.png
-   :alt: 
+.. figure:: img/week05__00009.png
 
+Then, we see the transaction from Wallet 1, where 555 ABC tokens are minted, and a 10 lovelace fee is paid.
 
-.. figure:: img/week5__00010.png
-   :alt: 
+.. figure:: img/week05__00010.png
 
+Finally, we see the burning of 222 tokens by Wallet 1.
 
-.. figure:: img/week5__00011.png
-   :alt: 
+.. figure:: img/week05__00011.png
 
+And we can also view the final balances to double check that all went according to plan.
 
-.. figure:: img/week5__00012.png
-   :alt: 
+.. figure:: img/week05__00012.png
 
 
 
