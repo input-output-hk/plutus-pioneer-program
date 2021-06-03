@@ -516,7 +516,14 @@ Now, if we evaluate this, first we see the genesis transaction where the wallets
 
 .. figure:: img/week05__00008.png
 
-Next, we see two transactions at Slot 1. The first is the transaction from Wallet 2, where 444 ABC tokens are minted, and a 10 lovelace fee is paid.
+Next, we see two transactions at Slot 1. The first is the transaction from Wallet 2, where 444 ABC tokens are minted, and a 10 lovelace fee is paid. The UTxO to pay the fees 
+was automatically found by the function that created the transaction *submitTxConstraintsWith*, as discussed previously.
+
+We see something here that we have not seen before - the *Forge* part of a transaction, where the native tokens are actually created. The box contains the currency symbol (the 
+policy hash) and the token name.
+
+We also see the two outputs - once with the 990 lovelace change, and another with the newly-minted tokens. These outputs could, in fact, be combined, but here they are shown 
+as two separate UTxOs.
 
 .. figure:: img/week05__00009.png
 
@@ -524,7 +531,9 @@ Then, we see the transaction from Wallet 1, where 555 ABC tokens are minted, and
 
 .. figure:: img/week05__00010.png
 
-Finally, we see the burning of 222 tokens by Wallet 1.
+Finally, we see the burning of 222 tokens by Wallet 1. Here we see that the algorithm did something slightly different. When it notices that a burn is taking place, it has
+found the ABC tokens UTxO in Wallet 1 and used them as an input. We also note here that the output UTxO is combined, which, as we mentioned above, can be done instead of
+using two output UTxOs.
 
 .. figure:: img/week05__00011.png
 
