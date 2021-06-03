@@ -287,6 +287,9 @@ Example 1 - Free
 
 Let's write a simple minting policy.
 
+On chain
+~~~~~~~~
+
 When we wrote a validator we had a function such as the following:
 
 .. code:: haskell
@@ -338,7 +341,29 @@ And, we can look at this in the REPL:
     Prelude Week05.Free> curSymbol
     e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf
 
-    
+And this completes the on-chain part, for this simple minting policy. But in order to try it out and interact with it, we need an off-chain part.
+
+Off chain
+~~~~~~~~~
+
+What should the off-chain part do? Well, it should allow arbitrary wallets to mint and burn tokens of this currency symbol.
+
+We have the currency symbol, so what is missing is the token name and the amount we want to mint or burn. And for this, we will define a data type *MintParams*.
+
+.. code:: haskell
+
+    data MintParams = MintParams
+        { mpTokenName :: !TokenName
+        , mpAmount    :: !Integer
+        } deriving (Generic, ToJSON, FromJSON, ToSchema)    
+
+
+
+
+
+
+
+
     
 
 
