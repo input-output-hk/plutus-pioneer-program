@@ -620,9 +620,25 @@ Let's look at a more realistic example.
 We'll take a copy of the Free module, and call it Signed.
 
 Probably the easiest example of a realistic minting policy is one where the minting and burning of tokens is restricted to transactions that are signed by a specific
-public key hash.
+public key hash. That is similar to a central bank, in fiat currencies.
 
+This means that our policies is no longer without parameters. We need the public key hash.  In addition, we are going to need to look at the context, so we can't just ignore it like last time.
 
+We recall that *scriptContextTxInfo* from the context contains a list of all the signatories of the transaction. So, we can use this to see if the required signatory is one
+of them.
+
+.. code:: haskell
+
+    mkPolicy :: PubKeyHash -> ScriptContext -> Bool
+    mkPolicy pkh ctx = txSignedBy (scriptContextTxInfo ctx) pkh
+
+The *txSignedBy* function is a more convenient way of checking this than we have done for similar examples, when we used the *elem* function.
+
+.. code:: haskell
+
+    Prelude Week05.Free> import Ledger
+    Prelude Ledger Week05.Free> :t txSignedBy
+    txSignedBy :: TxInfo -> PubKeyHash -> Bool
 
 
 
