@@ -541,6 +541,78 @@ And we can also view the final balances to double check that all went according 
 
 .. figure:: img/week05__00012.png
 
+With our monetary policy, we can create arbitrary forging and burning transactions by any wallet. So, this is probably not a very good monetary policy. The purpose of a
+token is to represent value, but if anybody at any time can mint new tokens, this token will not make much sense. There might be some exotic use case for it, but realistically
+this policy is rather useless.
+
+Testing with EmulatorTrace
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Let's also test this from the command line, rather than in the playground.
+
+.. code:: haskell
+
+test :: IO ()
+test = runEmulatorTraceIO $ do
+    let tn = "ABC"
+    h1 <- activateContractWallet (Wallet 1) endpoints
+    h2 <- activateContractWallet (Wallet 2) endpoints
+    callEndpoint @"mint" h1 $ MintParams
+        { mpTokenName = tn
+        , mpAmount    = 555
+        }
+    callEndpoint @"mint" h2 $ MintParams
+        { mpTokenName = tn
+        , mpAmount    = 444
+        }
+    void $ Emulator.waitNSlots 1
+    callEndpoint @"mint" h1 $ MintParams
+        { mpTokenName = tn
+        , mpAmount    = -222
+        }
+    void $ Emulator.waitNSlots 1
+
+If we run this in the REPL:
+
+.. code:: haskell
+
+Prelude Week05.Free> test
+Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+Slot 00000: SlotAdd Slot 1
+Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+  Contract instance started
+Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+  Contract instance started
+Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+  Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("mpAmount",Number 555.0),("mpTokenName",Object (fromList [("unTokenName",String "ABC")]))]))]))])
+Slot 00001: W1: TxSubmit: 7c01d39fc031815eaf05d97709e4973a24dfa38e9dd68a4fd1ec92bb80cf76e4
+Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+  Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("mpAmount",Number 444.0),("mpTokenName",Object (fromList [("unTokenName",String "ABC")]))]))]))])
+Slot 00001: W2: TxSubmit: 6ba7eb4441992284e687d184080d4a8693e7b188fc45150d6e7ccd1243968f53
+Slot 00001: TxnValidate 6ba7eb4441992284e687d184080d4a8693e7b188fc45150d6e7ccd1243968f53
+Slot 00001: TxnValidate 7c01d39fc031815eaf05d97709e4973a24dfa38e9dd68a4fd1ec92bb80cf76e4
+Slot 00001: SlotAdd Slot 2
+Slot 00002: *** CONTRACT LOG: "forged Value (Map [(e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf,Map [(\"ABC\",555)])])"
+Slot 00002: *** CONTRACT LOG: "forged Value (Map [(e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf,Map [(\"ABC\",444)])])"
+Slot 00002: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+  Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("mpAmount",Number -222.0),("mpTokenName",Object (fromList [("unTokenName",String "ABC")]))]))]))])
+Slot 00002: W1: TxSubmit: 95d42e93ee41ab5bed7857b176be5a4e16602323eaacaa90f3bb807a9fd235c0
+Slot 00002: TxnValidate 95d42e93ee41ab5bed7857b176be5a4e16602323eaacaa90f3bb807a9fd235c0
+Slot 00002: SlotAdd Slot 3
+Slot 00003: *** CONTRACT LOG: "forged Value (Map [(e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf,Map [(\"ABC\",-222)])])"
+Slot 00003: SlotAdd Slot 4
+Final balances
+Wallet 1: 
+    {, ""}: 99999980
+    {e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf, "ABC"}: 333
+Wallet 2: 
+    {e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf, "ABC"}: 444
+    {, ""}: 99999990
+...    
+Wallet 10: 
+    {, ""}: 100000000
+
+
 
 
 
