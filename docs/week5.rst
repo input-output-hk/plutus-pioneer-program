@@ -298,6 +298,19 @@ write a parameterized script.
 
 We can also have parameterized minting policy scripts and we will see that in a later example. But first we will look at one that is not parameterized.
 
+First, let's rename the function to *mkPolicy*, remove the datum and redeemer, and write the simplest minting policy that we can.
+
+.. code:: haskell
+
+    mkPolicy :: ScriptContext -> Bool
+    mkPolicy _ = True
+
+This policy ignores the context and always returns *True*.
+
+
+
+
+
 
 
 
