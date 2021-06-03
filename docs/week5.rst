@@ -504,7 +504,17 @@ The final two lines, as we have seen before, are just needed for the playground 
     mkSchemaDefinitions ''FreeSchema
     mkKnownCurrencies []    
 
-    
+In The Playground  
++++++++++++++++++
+
+We have set up a scenario where Wallet 1 mints 555 ABC tokens, and Wallet 2 mints 444 ABC tokens. Then, after waiting for 1 slot, Wallet 1 burns 222 ABC tokens. Finally, we
+wait for 1 slot at the end.
+
+.. figure:: img/week5__00001.png
+   :alt: 
+
+
+
 
 
 

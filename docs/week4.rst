@@ -1300,7 +1300,6 @@ invoke which endpoints with which parameters and we define the waiting periods b
 
 The relevant definitions are in the package *plutus-contract* in module *Plutus.Trace.Emulator*.
 
-
 .. code:: haskell
 
       module Plutus.Trace.Emulator
