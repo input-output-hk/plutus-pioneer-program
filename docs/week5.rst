@@ -357,7 +357,17 @@ We have the currency symbol, so what is missing is the token name and the amount
         , mpAmount    :: !Integer
         } deriving (Generic, ToJSON, FromJSON, ToSchema)    
 
+We see two fields - *mpTokenName* and *mpAmount*. The idea is that if the *mpAmount* is positive, we should create tokens, and if it is negative, we should burn tokens.
 
+The next step is to define the schema. Recall that one of the parameters of the *Contact* monad was the schema that defined the available endpoints.
+
+.. code:: haskell
+
+    type FreeSchema =
+    BlockchainActions
+        .\/ Endpoint "mint" MintParams
+        
+        
 
 
 
