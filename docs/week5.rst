@@ -404,8 +404,13 @@ Now the function body. As *Contact* is a monad, we can use *do* notation.
         
 The first thing that we define is the value that we want to forge. For this we are using the *singleton* function that we tried out in the REPL earlier.
 
+The arguments to the *singleton* function are the currency symbol that represents the hash of the minting policy, plus the token name and amount extracted from the *MintParams*.
 
+We'll skip the *lookups* assignment for the moment, and move onto the *tx* assignment.
 
+One of the main purposes of the *Contract* monad is to construct and submit transactions. The path that the Plutus team has taken to do that is provide a way to specify
+the constraints of the transaction you are defining. The Plutus libraries then take care of constructing the correct transaction. This is as opposed to being require to specify
+all the inputs and outputs manually, which would be tedious as many requirements, such as sending change back to the sending wallet, are often the same.
 
 
 
