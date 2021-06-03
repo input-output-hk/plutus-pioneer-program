@@ -57,7 +57,6 @@ we have two such UTxOs.
 .. figure:: img/1.png
    :alt: Image 1
 
-   alt text
 Alice wants to send 10 ADA to Bob, so she creates a transaction. A
 transaction is something that contains an arbitrary number of inputs and
 an arbitrary number of outputs.
@@ -69,7 +68,6 @@ input. Alice cannot simply split her existing 100 ADA into a 90 and a
 .. figure:: img/2.png
    :alt: Image 2
 
-   alt text
 Alice's transaction is no longer a UTxO (an unspent transaction). It has
 been spent as an input to Tx 1. And now, she can create outputs for her
 transaction.
@@ -83,7 +81,6 @@ of 90 ADA.
 .. figure:: img/3.png
    :alt: Image 3
 
-   alt text
 In any transaction, the sum of the output values must match the sum of
 the input values. Although, strictly speaking, this is not true. There
 are two exceptions.
@@ -107,7 +104,6 @@ Charlie. Bob will have to use both his UTxOs as input.
 .. figure:: img/4.png
    :alt: Image 4
 
-   alt text
 When Is Spending Allowed?
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -130,7 +126,6 @@ Alice's UTxO of 100 ADA by Tx 1.
 .. figure:: img/5.png
    :alt: Image 5
 
-   alt text
 In the UTxO model, the validation that decides whether the transaction
 that this input belongs to is allowed to consume the UTxO, relies on
 digital signatures. In this case, that means that Alice has to sign the
@@ -154,7 +149,6 @@ some arbitrary piece of logic that is called the Redeemer.
 .. figure:: img/6.png
    :alt: Image 6
 
-   alt text
 What exactly does that mean?
 
 It is important to consider the context that the script has. There are
@@ -212,7 +206,6 @@ with the UTxO value.
 .. figure:: img/7.png
    :alt: Image 7
 
-   alt text
 With this it is possible to prove mathematically that Plutus is at least
 as powerful as the Ethereum model - any logic you can express in
 Ethereum you can also it can express using the (E)UTxO model.
@@ -331,7 +324,6 @@ which can be bypassed.
 .. figure:: img/plutus_playground.png
    :alt: Plutus Playground
 
-   alt text
 Copy and paste the EnglishAuction.sh file contents into the playground,
 replacing the existing demo contract.
 
@@ -347,14 +339,12 @@ later Plutus commits.
 .. figure:: img/playground_2.png
    :alt: Plutus Playground
 
-   alt text
 Click the compile button. Once it has compiled, click the Simulate
 button.
 
 .. figure:: img/playground_3.png
    :alt: Plutus Playground
 
-   alt text
 The default wallets are setup with 10 Lovelace and 10 T, where T is a
 native token simulated by the script in the following lines:
 
@@ -374,7 +364,6 @@ Click the "Add Wallet" option, the adjust the balances accordingly:
 .. figure:: img/playground_4.png
    :alt: Plutus Playground
 
-   alt text
 You can see in the playground that the contract has three endpoints:
 start, bid, and close.
 
@@ -387,7 +376,6 @@ Click "start" on wallet 1, to create an action:
 .. figure:: img/actions.png
    :alt: Plutus Playground
 
-   alt text
 This is where the seller is going to set the rules for the auction.
 
 The getSlot field specifies the deadline for the auction. Bidding after
