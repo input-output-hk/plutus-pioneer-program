@@ -305,7 +305,24 @@ First, let's rename the function to *mkPolicy*, remove the datum and redeemer, a
     mkPolicy :: ScriptContext -> Bool
     mkPolicy _ = True
 
-This policy ignores the context and always returns *True*.
+This policy ignores the context and always returns *True*. This will allow arbitrary minting and burning of tokens for and token name that belongs to the currency symbol
+associated with this policy.
+
+Remember that, when we were writing a validator, we needed to use Template Haskell to compile this function to Plutus code. We need to do something similar for our minting policy.
+
+.. code:: haskell
+
+    policy :: Scripts.MonetaryPolicy
+    policy = mkMonetaryPolicyScript $$(PlutusTx.compile [|| Scripts.wrapMonetaryPolicy mkPolicy ||])
+    
+And, as before, we need to make the *mkPolicy* function *INLINABLE*, as everything within the Oxford brackets needs to be available at compile time.
+
+
+.. code:: haskell
+
+    {-# INLINABLE mkPolicy #-}
+    mkPolicy :: ScriptContext -> Bool
+    mkPolicy _ = True
 
 
 

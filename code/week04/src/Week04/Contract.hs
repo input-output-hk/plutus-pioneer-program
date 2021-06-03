@@ -9,9 +9,26 @@ import Control.Monad.Freer.Extras as Extras
 import Data.Functor               (void)
 import Data.Text                  (Text, unpack)
 import Data.Void                  (Void)
-import Plutus.Contract            as Contract
-import Plutus.Trace.Emulator      as Emulator
-import Wallet.Emulator.Wallet
+import Plutus.Contract as Contract
+    ( logError,
+      logInfo,
+      tell,
+      waitNSlots,
+      endpoint,
+      handleError,
+      throwError,
+      type (.\/),
+      BlockchainActions,
+      Endpoint,
+      Contract )
+import Plutus.Trace.Emulator as Emulator
+    ( activateContractWallet,
+      callEndpoint,
+      observableState,
+      waitNSlots,
+      runEmulatorTraceIO,
+      EmulatorTrace )
+import Wallet.Emulator.Wallet ( Wallet(Wallet) )
 
 -- Contract w s e a
 -- EmulatorTrace a
