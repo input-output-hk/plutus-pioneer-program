@@ -572,7 +572,7 @@ test = runEmulatorTraceIO $ do
         }
     void $ Emulator.waitNSlots 1
 
-If we run this in the REPL:
+If we run this in the REPL, we see what we saw in the playground, but instead on the console. It's not as pretty, but it is quicker.
 
 .. code:: haskell
 
@@ -612,6 +612,15 @@ Wallet 2:
 Wallet 10: 
     {, ""}: 100000000
 
+Example 2 - Signed
+------------------
+
+Let's look at a more realistic example.
+
+We'll take a copy of the Free module, and call it Signed.
+
+Probably the easiest example of a realistic minting policy is one where the minting and burning of tokens is restricted to transactions that are signed by a specific
+public key hash.
 
 
 
