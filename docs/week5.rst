@@ -324,7 +324,22 @@ And, as before, we need to make the *mkPolicy* function *INLINABLE*, as everythi
     mkPolicy :: ScriptContext -> Bool
     mkPolicy _ = True
 
+Now that we have a policy, we can get a currency symbol from the policy.
 
+.. code:: haskell
+
+    curSymbol :: CurrencySymbol
+    curSymbol = scriptCurrencySymbol policy
+    
+And, we can look at this in the REPL:
+
+.. code:: haskell
+
+    Prelude Week05.Free> curSymbol
+    e01824b4319351c40b5ec727fff328a82076b1474a6bad6c8e8a2cd835cc6aaf
+
+    
+    
 
 
 
