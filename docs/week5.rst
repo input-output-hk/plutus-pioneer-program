@@ -450,6 +450,24 @@ In our case, the only thing we need to supply as a lookup is the policy that we 
 
 There are variants of *submitTxConstraintsWith* without the *with* that do not take lookups, as we have seen in previous lectures.
 
+Finally, the *@Void* on the line:
+
+.. code:: haskell
+
+    ledgerTx <- submitTxConstraintsWith @Void lookups tx
+
+Most of the constraint functions are geared towards using a specific validator script. Normally you have the situation that you are working on one specific smart contract.
+And that specific smart contract has a datum and a redeemer type, and most of the constraints functions are parametric in the datum and redeemer type. In that case you
+can directly use the datum type without first having to convert it to the Plutus *Datum* type.
+
+But in this case, we are not making use of that. We don't have any validator script. Which means that *submitTxConstraintsWith* wouldn't know which type to use for datum and
+redeemer because we don't have them in this example. So, in that case we must tell the compiler which type to use. We don't care, as there is no datum and redeemer, so we
+use the *Void* type.
+
+Also, in the same line, we see a monadic bind, so we know that this is a monadic action happening within the *Contract* monad. The reason for this is that, in order to lookup,
+for example, our UTxOs, the *submitTxConstraintsWith* function must make use of the super power of the *Contract* monad, which is to access the *BlockchainActions*.
+
+
 
 
 
