@@ -689,7 +689,7 @@ Off-chain
 We don't need to extend the *MintParams* data type for the off-chain code. A wallet that wants to mint or burn a currency can sign with its own public key hash. This is the only 
 signature that a wallet can provide, and it has the ability to look it up for itself.
 
-We will make a change to the name of the schema for clarity.
+We will make a change to the name of the schema for clarity. We'll also, of course, update this name wherever it appears in the contract script.
 
 .. code:: haskell
 
@@ -724,13 +724,74 @@ There is one more thing we can do to improve this. There is an operator for *fma
 
 .. code:: haskell
 
+Ok, now let's update the lookups line to pass in the public key hash.
+
+.. code:: haskell
+
+    lookups = Constraints.monetaryPolicy $ policy pkh
+
+And now we have finished modifying the *mint* function.
+
+.. code:: haskell
+
     mint :: MintParams -> Contract w SignedSchema Text ()
     mint mp = do
         pkh <- pubKeyHash <$> Contract.ownPubKey
-        let val     = Value.singleton (curSymbol pkh) (mpTokenName mp) (mpAmount mp)    
+        let val     = Value.singleton (curSymbol pkh) (mpTokenName mp) (mpAmount mp)
+            lookups = Constraints.monetaryPolicy $ policy pkh
+            tx      = Constraints.mustForgeValue val
+        ledgerTx <- submitTxConstraintsWith @Void lookups tx
+        void $ awaitTxConfirmed $ txId ledgerTx
+        Contract.logInfo @String $ printf "forged %s" (show val)
 
+So, let's try it out using the *test* function.
 
+.. code::
 
+    Prelude Ledger Week05.Signed> Week05.Signed.test
+    Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+    Slot 00000: SlotAdd Slot 1
+    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Contract instance started
+    Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+    Contract instance started
+    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("mpAmount",Number 555.0),("mpTokenName",Object (fromList [("unTokenName",String "ABC")]))]))]))])
+    Slot 00001: W1: TxSubmit: 20289e7b1bb6692b35e24e0f9293327f9169d843ae0ea431186fdefae6092a44
+    Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+    Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("mpAmount",Number 444.0),("mpTokenName",Object (fromList [("unTokenName",String "ABC")]))]))]))])
+    Slot 00001: W2: TxSubmit: 1c367cf81dd2da478abb96235ee16facf9f7d47374c9455d5fdd516aaf04d0c2
+    Slot 00001: TxnValidate 1c367cf81dd2da478abb96235ee16facf9f7d47374c9455d5fdd516aaf04d0c2
+    Slot 00001: TxnValidate 20289e7b1bb6692b35e24e0f9293327f9169d843ae0ea431186fdefae6092a44
+    Slot 00001: SlotAdd Slot 2
+    Slot 00002: *** CONTRACT LOG: "forged Value (Map [(7183b1cf81e44b26c558ddf442c4a7161a1b504b61136a8773dc2e4960323521,Map [(\"ABC\",555)])])"
+    Slot 00002: *** CONTRACT LOG: "forged Value (Map [(2a964fa6314803cf1b61165aeb1d758e355aae9480a29e282b58e76983f101ba,Map [(\"ABC\",444)])])"
+    Slot 00002: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("mpAmount",Number -222.0),("mpTokenName",Object (fromList [("unTokenName",String "ABC")]))]))]))])
+    Slot 00002: W1: TxSubmit: 6e20d243447d7f49de509ef6b52c6d947769d95a6451c9cda53e42a0ba02fa69
+    Slot 00002: TxnValidate 6e20d243447d7f49de509ef6b52c6d947769d95a6451c9cda53e42a0ba02fa69
+    Slot 00002: SlotAdd Slot 3
+    Slot 00003: *** CONTRACT LOG: "forged Value (Map [(7183b1cf81e44b26c558ddf442c4a7161a1b504b61136a8773dc2e4960323521,Map [(\"ABC\",-222)])])"
+    Slot 00003: SlotAdd Slot 4
+    Final balances
+    Wallet 1: 
+        {, ""}: 99999980
+        {7183b1cf81e44b26c558ddf442c4a7161a1b504b61136a8773dc2e4960323521, "ABC"}: 333
+    Wallet 2: 
+        {2a964fa6314803cf1b61165aeb1d758e355aae9480a29e282b58e76983f101ba, "ABC"}: 444
+        {, ""}: 99999990
+    ...
+    Wallet 10: 
+        {, ""}: 100000000
+
+This looks very similar to before, but this time, notice that, while the token names are the same, the currency symbols are different for each wallet.
+
+NFTs
+----
+
+Let's now talk about NFTs - Non-Fungible Tokens. And let's bring up a diagram from our first lecture.
+
+.. figure:: img/4.png
 
 
 
