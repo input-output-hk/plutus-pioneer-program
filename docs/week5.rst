@@ -615,6 +615,9 @@ If we run this in the REPL, we see what we saw in the playground, but instead on
 Example 2 - Signed
 ------------------
 
+On-chain
+~~~~~~~~
+
 Let's look at a more realistic example.
 
 We'll take a copy of the Free module, and call it Signed.
@@ -675,6 +678,24 @@ is exactly the same as...
 .. code:: haskell
 
    timesSix = timesTwo . timesThree
+
+This process of simplification is called ETA reduction, so if you ever see your IDE hinting that you can ETA reduce, this is what it's talking about.
+
+Now for the off-chain code.
+
+Off-chain
+~~~~~~~~~
+
+We don't need to extend the *MintParams* data type for the off-chain code. A wallet that wants to mint or burn a currency can sign with its own public key hash. This is the only 
+signature that a wallet can provide, and it has the ability to look it up for itself.
+
+We will make a change to the name of the schema for clarity.
+
+.. code:: haskell
+
+    type SignedSchema =
+        BlockchainActions
+            .\/ Endpoint "mint" MintParams
 
 
 
