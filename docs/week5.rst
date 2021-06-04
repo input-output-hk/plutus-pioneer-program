@@ -698,7 +698,36 @@ We will make a change to the name of the schema for clarity.
             .\/ Endpoint "mint" MintParams
 
 
+Now, for the *mint* function, we need to pass the public key hash to the *curSymbol* function. Getting hold of the public key is something that is provided by 
+*BlockchainActions*. So, we will get this from *Contract* and apply the *pubKeyHash* function to it.
 
+One way to do this would be
+
+.. code:: haskell
+
+    pk <- Contract.ownPubKey
+    let pkh = pubKeyHash pk
+
+However, as *Contract* is a monad, and therefore an instance of *Functor*, we have the *fmap* function available, which will turn a *Contract a* into a *Contract b*. In
+this case we can take advantage of that by using the *pubKeyHash* function as the (a -> b) function of fmap and this will turn *Contract pubKey* into *Contract pubKeyHash*,
+and then we can grab this value instead.
+
+.. code:: haskell
+
+    pkh <- fmap pubKeyHash Contract.ownPubKey
+
+There is one more thing we can do to improve this. There is an operator for *fmap*.    
+
+.. code:: haskell
+
+    pkh <- pubKeyHash <$> Contract.ownPubKey
+
+.. code:: haskell
+
+    mint :: MintParams -> Contract w SignedSchema Text ()
+    mint mp = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let val     = Value.singleton (curSymbol pkh) (mpTokenName mp) (mpAmount mp)    
 
 
 
