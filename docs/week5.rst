@@ -962,6 +962,14 @@ As luck would have it, there is a function called *ownCurrencySymbol* which exis
 
     flattenValue (txInfoForge info) == [(ownCurrencySymbol ctx, tn, 1)]
 
+As it happens, this won't compile, because *Eq* is not defined for triples in the Plutus Prelude. So, we can work around this with a case statement and some pattern matching.
+
+.. code:: haskell
+
+    case flattenValue (txInfoForge info) of
+            [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
+            _                -> False
+
 Now, we can complete our policy.
 
 .. code:: haskell
@@ -977,7 +985,9 @@ Now, we can complete our policy.
         hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
 
         checkMintedAmount :: Bool
-        checkMintedAmount = flattenValue (txInfoForge info) == [(ownCurrencySymbol ctx, tn, 1)]
+        checkMintedAmount = case flattenValue (txInfoForge info) of
+            [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
+            _                -> False
 
 And we will update our boilerplate.
 
@@ -1033,8 +1043,7 @@ An *AddressMap* is a map where the keys are *TxOutRef*s and the values are *TxOu
 
     Prelude Week05.NFT> :i Ledger.AddressMap.UtxoMap
     type Ledger.AddressMap.UtxoMap :: *
-    type Ledger.AddressMap.UtxoMap =
-        Data.Map.Internal.Map TxOutRef TxOutTx
+    type Ledger.AddressMap.UtxoMap = Data.Map.Internal.Map TxOutRef TxOutTx
 
 If we pass this function our own address then the keys of this map will be the UTxOs that belong to us. It doesn't matter which one of these we pick. So long as we own
 at least one UTxO, we are good.
@@ -1045,19 +1054,137 @@ The first step is to find our own address. We know how to find our own public ke
 
     pubKeyAddress :: PubKey -> address
 
+Let's get them.
 
+.. code:: haskell
 
+    import qualified Data.Map as Map
 
+    mint :: TokenName -> Contract w NFTSchema Text ()
+    mint tn = do
+        pk    <- Contract.ownPubKey
+        utxos <- utxoAt (pubKeyAddress pk)
 
+We only need one - we don't care which one. We will write a case statement that will either log an error if we have no UTxO available, or will use the first
+UTxO in the list continue with the forging code.
 
+The first change is to specify *1* instead of the *mpAmount*, as we want exactly 1 coin minted.
 
+.. code:: haskell
 
+    case Map.keys utxos of
+        []       -> Contract.logError @String "no utxo found"
+        oref : _ -> do
+            let val     = Value.singleton (curSymbol oref tn) tn 1
 
+Secondly, we add the token name argument to the lookups.
 
+.. code:: haskell
 
+    lookups = Constraints.monetaryPolicy $ policy oref tn
 
+Thirdly, we now need an additional constraint which insists that our specific UTxO is consumed.
 
+There's a function for that.
 
+.. code:: haskell
+
+    Prelude Week05.NFT> import Ledger.Constraints
+    Prelude Week05.NFT> :t mustSpendPubKeyOutput
+    mustSpendPubKeyOutput :: TxOutRef -> TxConstraints i o
+
+How do we combine the constraints of *mustForgeValue* and *mustSpendPubKeyOutput*? *Contraints* don't form a *Monoid*, but they do form a *Semigroup*, and the difference
+is just that in *Semigroup* we don't have *mempty*, the neutral element. We can still combine them with the *<>* operator.
+
+.. code:: haskell
+
+    tx = Constraints.mustForgeValue val <> Constraints.mustSpendPubKeyOutput oref
+
+Now, we need to provide a lookup that gives access to where the UTxO *oref* can be found. For that we can use
+
+.. code:: haskell
+
+    Ledger.Constraints.unspentOutputs :: Data.Map.Internal.Map TxOutRef TxOutTx -> ScriptLookups a
+
+So, let's update our lookups.
+
+.. code:: haskell
+
+    lookups = Constraints.monetaryPolicy (policy oref tn) <> Constraints.unspentOutputs utxos
+
+Something we need to do before this script will run is to import the operator *<>* for *Semigroup* from the standard Haskell Prelude, as we have explicitly excluded it from
+the *PlutusTx.Prelude* module.
+
+.. code:: haskell
+
+    import Prelude (Semigroup (..))
+
+Let's take a look at the whole function.
+
+.. code:: haskell
+
+    mint :: TokenName -> Contract w NFTSchema Text ()
+    mint tn = do
+        pk    <- Contract.ownPubKey
+        utxos <- utxoAt (pubKeyAddress pk)
+        case Map.keys utxos of
+            []       -> Contract.logError @String "no utxo found"
+            oref : _ -> do
+                let val     = Value.singleton (curSymbol oref tn) tn 1
+                    lookups = Constraints.monetaryPolicy (policy oref tn) <> Constraints.unspentOutputs utxos
+                    tx      = Constraints.mustForgeValue val <> Constraints.mustSpendPubKeyOutput oref
+                ledgerTx <- submitTxConstraintsWith @Void lookups tx
+                void $ awaitTxConfirmed $ txId ledgerTx
+                Contract.logInfo @String $ printf "forged %s" (show val)
+
+For the test script.
+
+.. code:: haskell
+
+    test :: IO ()
+    test = runEmulatorTraceIO $ do
+        let tn = "ABC"
+        h1 <- activateContractWallet (Wallet 1) endpoints
+        h2 <- activateContractWallet (Wallet 2) endpoints
+        callEndpoint @"mint" h1 tn
+        callEndpoint @"mint" h2 tn
+        void $ Emulator.waitNSlots 1
+
+Let's test.
+
+.. code:: haskell
+
+    Prelude Week05.Signed Ledger Plutus.Contract Ledger.Constraints Week05.Free> Week05.NFT.test
+    Slot 00000: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+    Slot 00000: SlotAdd Slot 1
+    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Contract instance started
+    Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+    Contract instance started
+    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("unTokenName",String "ABC")]))]))])
+    Slot 00001: W1: TxSubmit: 691a5c0725ac09f79c8c45c899d732d26460d18c4c18167be71d55319bcd5669
+    Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
+    Receive endpoint call: Object (fromList [("tag",String "mint"),("value",Object (fromList [("unEndpointValue",Object (fromList [("unTokenName",String "ABC")]))]))])
+    Slot 00001: W2: TxSubmit: e53519b17bf7d11a148ce17ac0305330f138a684530ba08b1c57f714672b8c68
+    Slot 00001: TxnValidate e53519b17bf7d11a148ce17ac0305330f138a684530ba08b1c57f714672b8c68
+    Slot 00001: TxnValidate 691a5c0725ac09f79c8c45c899d732d26460d18c4c18167be71d55319bcd5669
+    Slot 00001: SlotAdd Slot 2
+    Slot 00002: *** CONTRACT LOG: "forged Value (Map [(9d969e597d45fcd1732ce255e12a97599e883f924b4565fc3a2407bc08d34524,Map [(\"ABC\",1)])])"
+    Slot 00002: *** CONTRACT LOG: "forged Value (Map [(913f220c3b1ba49531bae2fedd9edb138a8b360e7e605bfcf4ff3f2045433069,Map [(\"ABC\",1)])])"
+    Slot 00002: SlotAdd Slot 3
+    Final balances
+    Wallet 1: 
+        {9d969e597d45fcd1732ce255e12a97599e883f924b4565fc3a2407bc08d34524, "ABC"}: 1
+        {, ""}: 99999990
+    Wallet 2: 
+        {913f220c3b1ba49531bae2fedd9edb138a8b360e7e605bfcf4ff3f2045433069, "ABC"}: 1
+        {, ""}: 99999990
+    ...
+    Wallet 10: 
+        {, ""}: 100000000
+
+And now we have minted some NFTs.
 
 
 
