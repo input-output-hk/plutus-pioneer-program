@@ -43,7 +43,7 @@ the Extended Unspent Transaction Output model.
 The UTxO model, without the (E) is the one that was introduced by
 Bitcoin, but there are other models. Ethereum for example, uses the
 so-called account-based model, which is what you are used to from normal
-banking, where everybody has an account and each account has a balance
+banking, where everybody has an account, each account has a balance
 and if you transfer money from one account to another then the balances
 get updated accordingly.
 
@@ -51,14 +51,17 @@ That is not how the UTxO model works.
 
 Unspent transaction outputs are exactly what the name says. They are
 transaction outputs from previous transactions that have happened on the
-blockchain that have not yet been spent. Let's look at an example where
+blockchain and have not yet been spent. Let's look at an example where
 we have two such UTxOs.
 
 .. figure:: img/1.png
 
-Alice wants to send 10 ADA to Bob, so she creates a transaction. A
-transaction is something that contains an arbitrary number of inputs and
-an arbitrary number of outputs.
+Alice wants to send 10 ADA to Bob, so she creates a transaction. 
+
+.. note::
+    A transaction is something that contains an arbitrary number of inputs and
+    an arbitrary number of outputs. The effect of a transaction is to consume 
+    inputs and produce new outputs.
 
 The important thing is that you can only ever use complete UTxOs as
 input. Alice cannot simply split her existing 100 ADA into a 90 and a
@@ -71,10 +74,10 @@ Alice's transaction is no longer a UTxO (an unspent transaction). It has
 been spent as an input to Tx 1. And now, she can create outputs for her
 transaction.
 
-She wants to pay 10 ADA to Bob, so one output will be 10 ADA (to Bob),
-and then she wants her change back so she creates a second output of 90
+She wants to pay 10 ADA to Bob, so one output will be 10 ADA (to Bob).
+She then wants her change back, so she creates a second output of 90
 ADA (to herself). The full UTxO of 100 ADA has been spent, with Bob
-receiving a new transaction of 10 ADA, and Alice receiving the "change"
+receiving a new transaction of 10 ADA, and Alice receiving the change
 of 90 ADA.
 
 .. figure:: img/3.png
@@ -90,8 +93,6 @@ are two exceptions.
    or to burn tokens, in which case the inputs will be lower or higher
    than the outputs, depending on the scenario.
 
-*The effect of a transaction is to consume inputs and produce new
-outputs.*
 
 Let's take a look at a slightly more complicated example.
 
