@@ -789,9 +789,29 @@ This looks very similar to before, but this time, notice that, while the token n
 NFTs
 ----
 
-Let's now talk about NFTs - Non-Fungible Tokens. And let's bring up a diagram from our first lecture.
+Let's now talk about NFTs - Non-Fungible Tokens. NFTs are tokens that have a quantity of exactly 1.
+
+Let's bring up a diagram from our first lecture.
 
 .. figure:: img/4.png
+
+The examples of native tokens that we have studied so far are definitely not NFTs because we could easily mint as many as we wanted. This is true not only in the first
+example where anyone could mint tokens, but also in the second example, where, so long as you are the owner of the correct public key hash, you could mint unlimited tokens
+for the associated currency symbol and token name.
+
+In order to produce an NFT, perhaps the first naive idea would be to look at forge field in the policy and enforce a policy where the amount is one.
+
+But that wouldn't help us. That would only mean that during one transaction you can mint only one token. But nobody could stop us from submitting as many of those transactions
+as we like.
+
+The second option is actually in use already on the Cardano blockchain. NFTs have been available since the Mary fork, which predates Plutus, and to do this, they are implemented
+using deadlines.
+
+We saw in previous examples how time can be incorporated in validation scripts, and the same can be done in policy scripts. 
+
+The idea here is to only allow minting before a given deadline has passed. Using this method, if you want to mint an NFT, you mint one token before the deadline, then allow the
+deadline to pass.
+
 
 
 
