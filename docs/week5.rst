@@ -632,13 +632,51 @@ of them.
     mkPolicy :: PubKeyHash -> ScriptContext -> Bool
     mkPolicy pkh ctx = txSignedBy (scriptContextTxInfo ctx) pkh
 
-The *txSignedBy* function is a more convenient way of checking this than we have done for similar examples, when we used the *elem* function.
+The *txSignedBy* function is a convenient way of checking this. In previous examples, we used the *elem* function to check that it existed in the list.
 
 .. code:: haskell
 
     Prelude Week05.Free> import Ledger
     Prelude Ledger Week05.Free> :t txSignedBy
     txSignedBy :: TxInfo -> PubKeyHash -> Bool
+
+Now, we need to update the part of the code that compiles our *mkPolicy* function into Plutus code. We will use the same techniques that we have used when writing
+validator scripts. Specifically, we use the *applyCode* function to allows us to reference *pkh*, whose value is only known at runtime.
+
+.. code:: haskell
+
+    policy :: PubKeyHash -> Scripts.MonetaryPolicy
+    policy pkh = mkMonetaryPolicyScript $
+        $$(PlutusTx.compile [|| Scripts.wrapMonetaryPolicy . mkPolicy ||])
+        `PlutusTx.applyCode`
+        PlutusTx.liftCode pkh
+
+We also need to update the *curSymbol* function, as it now depends on the public key hash. It depends on it so that it can pass it to the *policy* function.
+
+.. code:: haskell
+
+    curSymbol :: PubKeyHash -> CurrencySymbol
+    curSymbol = scriptCurrencySymbol . policy
+
+Note, the second line here, the body, is a shorter way of writing:
+
+.. code:: haskell
+
+   curSymbol pkh = scriptCurrencySymbol $ policy pkh
+
+This is clear, when you consider something like the following, where *timesSix* is just another way of writing the results of combining the functions *timesTwo* and *timesThree*.
+
+.. code:: haskell
+
+   timesSix x = timesTwo $ timesThree x 
+
+is exactly the same as...
+
+.. code:: haskell
+
+   timesSix = timesTwo . timesThree
+
+
 
 
 
