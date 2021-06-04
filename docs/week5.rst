@@ -791,10 +791,6 @@ NFTs
 
 Let's now talk about NFTs - Non-Fungible Tokens. NFTs are tokens that have a quantity of exactly 1.
 
-Let's bring up a diagram from our first lecture.
-
-.. figure:: img/4.png
-
 The examples of native tokens that we have studied so far are definitely not NFTs because we could easily mint as many as we wanted. This is true not only in the first
 example where anyone could mint tokens, but also in the second example, where, so long as you are the owner of the correct public key hash, you could mint unlimited tokens
 for the associated currency symbol and token name.
