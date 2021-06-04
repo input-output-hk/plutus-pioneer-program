@@ -840,6 +840,89 @@ Example 3 - NFT
 
 We start with a copy of the previous example, *Signed* and we will call it *NFT*.
 
+So let's turn the signed policy into a true NFT policy.
+
+First, we will no longer use the public key hash as an input, as if we were a central bank, but will use a UTxO instead. So, what type corresponds to a UTxO?
+
+Let's look in the REPL and remind ourselves about *TxInfo*.
+
+.. code:: haskell
+
+    Prelude Week05.Signed Week05.Free> import Ledger
+    Prelude Week05.Signed Ledger Week05.Free> :i TxInfo
+    type TxInfo :: *
+    data TxInfo
+        = TxInfo {txInfoInputs :: [TxInInfo],
+                    txInfoInputsFees :: [TxInInfo],
+                    txInfoOutputs :: [TxOut],
+                    txInfoFee :: Value,
+                    txInfoForge :: Value,
+                    txInfoDCert :: [Plutus.V1.Ledger.DCert.DCert],
+                    txInfoWdrl :: [(Plutus.V1.Ledger.Credential.StakingCredential,
+                                    Integer)],
+                    txInfoValidRange :: SlotRange,
+                    txInfoSignatories :: [PubKeyHash],
+                    txInfoData :: [(DatumHash, Datum)],
+                    txInfoId :: TxId}
+
+We we are interested in this field:
+
+.. code:: haskell
+
+    txInfoInputs :: [TxInInfo]
+
+Let's look at the type *TxInInfo*
+
+    Prelude Week05.Signed Ledger Week05.Free> :i TxInInfo
+    type TxInInfo :: *
+    data TxInInfo
+        = TxInInfo {txInInfoOutRef :: TxOutRef, txInInfoResolved :: TxOut}
+
+We see that it is a record with two fields. The first is of type *TxOutRef*, and this references a UTxO, which is exactly what we need. So, let's use it.
+
+.. code:: haskell
+
+    mkPolicy :: TxOutRef -> TokenName -> ScriptContext -> Bool
+
+Now, we are ready to write the logic. We must check that the script contains the specified UTxO as input. We will delegate this to a helper function. This function, which we
+will call *hasUTxO* uses the *any* function, which is a standard Prelude function, but also has a Plutus version, for reasons we have addressed previously.
+
+The *any* function takes a predicate (a function that returns a boolean) and applies it to an input collection of the type *Foldable* (a list, for example), and will
+return true if the predicate is true for any of the inputs.
+
+Here, we use the *any* function to see if any of the *txInInfoOutRef*s from the *txInfoInputs* from the *TxInfo* field of the context matches the UTxO for which
+we are validating.
+
+For clarity, we will also provide a helper function to get the list of *txInfoInputs*.
+
+.. code:: haskell
+
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    hasUTxO :: Bool
+    hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
+
+.. code:: haskell
+
+    mkPolicy :: TxOutRef -> TokenName -> ScriptContext -> Bool
+    mkPolicy oref tn ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
+                           traceIfFalse "wrong amount minted" checkMintedAmount
+    where
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+
+        hasUTxO :: Bool
+        hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
+
+        checkMintedAmount :: Bool
+        checkMintedAmount = case flattenValue (txInfoForge info) of
+            [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
+            _                -> False
+
+
+
+
 
 
 
