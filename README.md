@@ -47,6 +47,20 @@ I also use this to add comments to the code.
   - Commit schemes.
   - State machines.
 
+- [Lecture #8](https://youtu.be/JMRwkMgaBOg)
+
+  - Another state machine example: token sale.
+  - Automatic testing using emulator traces.
+  - Interlude: optics.
+  - Property based testing with `QuickCheck`.
+  - Testing Plutus contracts with property based testing.
+
+- [Lecture #9](https://youtu.be/-RpCqHuxfQQ)
+
+  - Marlowe overview ([slides](Marlowe_Plutus_Pioneers_June_2021.pdf))
+  - Marlowe in Plutus
+  - Marlowe Playground demo
+
 ## Code Examples
 
 - Lecture #1: [English Auction](code/week01)
@@ -56,6 +70,8 @@ I also use this to add comments to the code.
 - Lecture #5: [Minting Policies](code/week05)
 - Lecture #6: [Oracles](code/week06)
 - Lecture #7: [State Machines](code/week07)
+- Lecture #8: [Testing](code/week08)
+- Lecture #9: [Marlowe](code/week09)
 
 ## Exercises
 
@@ -101,6 +117,17 @@ I also use this to add comments to the code.
 
   - Implement the game of "Rock, Paper, Scissors" using state machines.
 
+- Week #8
+
+  - Add a new operation `close` to the `TokenSale`-contract that allows the seller to close the contract and
+    retrieve all remaining funds (including the NFT).
+  - Modify the tests accordingly.
+
+- Week #9
+
+  - Modify the example Marlowe contract, so that Charlie must put down twice the deposit in the very beginning,
+    which gets split between Alice and Bob if Charlie refuses to make his choice.
+
 ## Solutions
 
 - Week #2
@@ -122,9 +149,23 @@ I also use this to add comments to the code.
   - [`Homework1`](code/week05/src/Week05/Solution1.hs)
   - [`Homework2`](code/week05/src/Week05/Solution2.hs)
 
+- Week #7
+
+  - [`RockPaperScissors`](code/week07/src/Week07/RockPaperScissors.hs)
+  - [`TestRockPaperScissors`](code/week07/src/Week07/TestRockPaperScissors.hs)
+
+- Week #8
+
+  - [`TokenSaleWithClose`](code/week08/src/Week08/TokenSaleWithClose.hs)
+  - [`ModelWithClose`](code/week08/test/Spec/ModelWithClose.hs)
+  - [`TraceWithClose`](code/week08/test/Spec/TraceWithClose.hs)
+
 ## Some Plutus Modules
 
+- [`Language.Marlowe.Semantics`](https://github.com/input-output-hk/plutus/blob/master/marlowe/src/Language/Marlowe/Semantics.hs), contains Marlowe types and semantics.
 - [`Plutus.Contract.StateMachine`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/StateMachine.hs), contains types and functions for using state machines.
+- [`Plutus.Contract.Test`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test.hs), provides various ways to write tests for Plutus contracts.
+- [`Plutus.Contract.Test.ContractModel`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test/ContractModel.hs), support for property based testing of Plutus contracts.
 - [`Plutus.PAB.Webserver.API`](https://github.com/input-output-hk/plutus/blob/master/plutus-pab/src/Plutus/PAB/Webserver/API.hs), contains the HTTP-interface provided by the PAB.
 - [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
 - [`Plutus.V1.Ledger.Ada`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs), contains support for the Ada currency.
