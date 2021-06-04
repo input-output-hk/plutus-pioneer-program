@@ -8,7 +8,8 @@ Week 02
       It covers low-level, untyped on-chain validation scripts and high-level,
       typed on-chain validation scripts.
 
-## Overview
+Overview
+--------
 
 We saw in the first lecture that there are two sides to a smart contract
 - an on-chain part and an off-chain part.
