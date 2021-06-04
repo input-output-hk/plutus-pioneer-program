@@ -842,6 +842,9 @@ We start with a copy of the previous example, *Signed* and we will call it *NFT*
 
 So let's turn the signed policy into a true NFT policy.
 
+On-chain
+++++++++
+
 First, we will no longer use the public key hash as an input, as if we were a central bank, but will use a UTxO instead. So, what type corresponds to a UTxO?
 
 Let's look in the REPL and remind ourselves about *TxInfo*.
@@ -882,7 +885,7 @@ We see that it is a record with two fields. The first is of type *TxOutRef*, and
 
 .. code:: haskell
 
-    mkPolicy :: TxOutRef -> TokenName -> ScriptContext -> Bool
+    mkPolicy :: TxOutRef -> ScriptContext -> Bool
 
 Now, we are ready to write the logic. We must check that the script contains the specified UTxO as input. We will delegate this to a helper function. This function, which we
 will call *hasUTxO* uses the *any* function, which is a standard Prelude function, but also has a Plutus version, for reasons we have addressed previously.
@@ -903,11 +906,69 @@ For clarity, we will also provide a helper function to get the list of *txInfoIn
     hasUTxO :: Bool
     hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
 
+So, do we have enough to finish writing our policy? Let's see what we have.
+
+.. code:: haskell
+
+    mkPolicy :: TxOutRef -> ScriptContext -> Bool
+    mkPolicy oref ctx = traceIfFalse "UTxO not consumed" hasUTxO
+    where
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+
+        hasUTxO :: Bool
+        hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
+
+Right now, we have a policy that can only mint or burn once. But, of course, in that single transaction, we can still mint as many tokens as we like.
+
+Now, we think about what we actually want. Maybe we want a policy that allows us to mint just one token for the currency symbol. Or perhaps, we would like to be able
+to mint many NFTs at once, each with a different token name.
+
+It's up to us. But, let's say we go with the first option. We just want to mint one token.
+
+So, it makes sense to pass the token name as a parameter.
+
+.. code:: haskell
+
+    mkPolicy :: TxOutRef -> TokenName -> ScriptContext -> Bool
+
+And we need a second condition that checks that we mint just this one specific coin.
+
+.. code:: haskell
+
+    mkPolicy oref tn ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
+                           traceIfFalse "wrong amount minted" checkMintedAmount
+
+And, of course, we need to implement *checkMintedAmount*.
+
+First of all, we need access to the forged value. We get this from the field *txInfoForge* of *TxInfo*.
+
+How do we check that this forged value is exactly 1 token of the name that we require? There are several approaches, but one is to use the *flattenValue* function which,
+we will recall, returns a list of triples of currency symbol, token name and value. We can then check that the output of *flattenValue* is exactly one triple that matches
+the symbol, token and value that we expect.
+
+This would look something like this:
+
+.. code:: haskell
+
+    flattenValue (txInfoForge info) == [(cs, tn, 1)]
+
+But we still have a problem to solve - we need to know what the currency symbol is. Given that the currency symbol is a hash of the policy, it seems as if we have a chicken
+and egg problem.
+
+As luck would have it, there is a function called *ownCurrencySymbol* which exists to solve exactly this problem.
+
+.. code:: haskell
+
+    flattenValue (txInfoForge info) == [(ownCurrencySymbol ctx, tn, 1)]
+
+Now, we can complete our policy.
+
 .. code:: haskell
 
     mkPolicy :: TxOutRef -> TokenName -> ScriptContext -> Bool
     mkPolicy oref tn ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
-                           traceIfFalse "wrong amount minted" checkMintedAmount
+                        traceIfFalse "wrong amount minted" checkMintedAmount
     where
         info :: TxInfo
         info = scriptContextTxInfo ctx
@@ -916,9 +977,73 @@ For clarity, we will also provide a helper function to get the list of *txInfoIn
         hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
 
         checkMintedAmount :: Bool
-        checkMintedAmount = case flattenValue (txInfoForge info) of
-            [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
-            _                -> False
+        checkMintedAmount = flattenValue (txInfoForge info) == [(ownCurrencySymbol ctx, tn, 1)]
+
+And we will update our boilerplate.
+
+.. code:: haskell
+
+    policy :: TxOutRef -> TokenName -> Scripts.MonetaryPolicy
+    policy oref tn = mkMonetaryPolicyScript $
+        $$(PlutusTx.compile [|| \oref' tn' -> Scripts.wrapMonetaryPolicy $ mkPolicy oref' tn' ||])
+        `PlutusTx.applyCode`
+        PlutusTx.liftCode oref
+        `PlutusTx.applyCode`
+        PlutusTx.liftCode tn
+
+    curSymbol :: TxOutRef -> TokenName -> CurrencySymbol
+    curSymbol oref tn = scriptCurrencySymbol $ policy oref tn    
+
+That completes the on-chain part.
+
+Off-chain
++++++++++
+
+We need to think about the inputs we need for this transaction.
+
+First, we need a UTxO, and we need to provide one of our own. However, we don't need to pass that in because we can look it up directly.
+
+We only need to provide the token name, so we no longer need a special data type, so we can delete *MintParams* and just use *TokenName*.
+
+.. code:: haskell
+
+    type NFTSchema =
+        BlockchainActions
+            .\/ Endpoint "mint" TokenName
+
+
+Now we will write the off-chain *mint* function.
+
+.. code:: haskell
+
+    mint :: TokenName -> Contract w NFTSchema Text ()
+    mint tn = do
+
+The first thing to do is to get the list of UTxOs that belong to us.
+
+The *Plutus.Contract* module gives us the *utxoAt* function, which has the signature below, and looks up all the UTxOs at a given address.
+
+.. code:: haskell
+
+    utxoAt :: Address -> Contract w s e Ledger.AddressMap.UtxoMap
+
+An *AddressMap* is a map where the keys are *TxOutRef*s and the values are *TxOutTx*s.
+
+.. code:: haskell
+
+    Prelude Week05.NFT> :i Ledger.AddressMap.UtxoMap
+    type Ledger.AddressMap.UtxoMap :: *
+    type Ledger.AddressMap.UtxoMap =
+        Data.Map.Internal.Map TxOutRef TxOutTx
+
+If we pass this function our own address then the keys of this map will be the UTxOs that belong to us. It doesn't matter which one of these we pick. So long as we own
+at least one UTxO, we are good.
+
+The first step is to find our own address. We know how to find our own public key, and, given this, we can use the function *pubKeyAddress* to get our address.
+
+.. code:: haskell
+
+    pubKeyAddress :: PubKey -> address
 
 
 
