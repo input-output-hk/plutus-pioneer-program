@@ -810,7 +810,17 @@ using deadlines.
 We saw in previous examples how time can be incorporated in validation scripts, and the same can be done in policy scripts. 
 
 The idea here is to only allow minting before a given deadline has passed. Using this method, if you want to mint an NFT, you mint one token before the deadline, then allow the
-deadline to pass.
+deadline to pass. This guarantees that, after the deadline, no new tokens will ever be minted.
+
+But, in order to check that you only minted one token before the deadline, you need something like a blockchain explorer. So, in this sense, they are not true NFTs, insofar as
+the currency symbol itself guarantees that they are unique.
+
+Using Plutus, it is possible to mint true NFTs.
+
+
+
+
+
 
 
 
