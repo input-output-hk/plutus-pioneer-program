@@ -815,7 +815,37 @@ deadline to pass. This guarantees that, after the deadline, no new tokens will e
 But, in order to check that you only minted one token before the deadline, you need something like a blockchain explorer. So, in this sense, they are not true NFTs, insofar as
 the currency symbol itself guarantees that they are unique.
 
-Using Plutus, it is possible to mint true NFTs.
+Using Plutus, it is possible to mint true NFTs. If you know the policy script that corresponds to the currency symbol, you can be sure that only one token is in existence
+without having to resort to something like a blockchain explorer.
+
+And, thinking about how to do that, there must be a way to prevent there ever being more than one minting transaction for the token in question. Whatever you write in your
+policy script, it must only return true for one transaction, so that it is impossible to do the same again in another transaction.
+
+At first, this sounds impossible. Why can't you just run the same transaction again and have validation succeed again? Even considering deadlines, what stops a second transaction
+in the same slot from passing validation?
+
+The key here is that we need something unique. Something that can only exist in one transaction and never again. This is an important trick, and it is something to keep in mind.
+
+The idea is to use UTxOs. A UTxO is unique. A UTxO is the output of a transaction and its unique identifier is the transaction ID and its index in the list of outputs from that transaction.
+
+The reason that transactions are unique is a bit subtle. They would not necessarily be unique if it were not for fees. Without fees, you could have a transaction that has
+zero inputs and only with outputs without value. Such a transaction would have the exact some hash each time it was run, and therefore the exact same transaction id. But with
+fees, such a transaction cannot exist, as you always need an input that provides fees.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
