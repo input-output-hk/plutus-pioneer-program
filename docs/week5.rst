@@ -830,7 +830,23 @@ The idea is to use UTxOs. A UTxO is unique. A UTxO is the output of a transactio
 
 The reason that transactions are unique is a bit subtle. They would not necessarily be unique if it were not for fees. Without fees, you could have a transaction that has
 zero inputs and only with outputs without value. Such a transaction would have the exact some hash each time it was run, and therefore the exact same transaction id. But with
-fees, such a transaction cannot exist, as you always need an input that provides fees.
+fees, such a transaction cannot exist, as you always need an input that provides fees, and the fees can never come from the same UTxO as input.
+
+So, to create an NFT, we are going to provide a specific UTxO as a parameter to the minting policy and, in the policy, we are going to check that the transaction consumes this
+UTxO. And, as we have just noted, once that UTxO is consumed, it can never be consumed again.
+
+Example 3 - NFT
+~~~~~~~~~~~~~~~
+
+We start with a copy of the previous example, *Signed* and we will call it *NFT*.
+
+
+
+
+
+
+
+
 
 
 
