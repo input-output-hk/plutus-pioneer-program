@@ -39,6 +39,22 @@ collateral that is lost if data is not provided or is inaccurate. Or, you could 
 and only accept the result if they all agree, or take the median, or average value of various sources. You could also
 come up with more sophisticated mechanisms.
 
+As we know, for anything to happen on the blockchain, there must be a UTxO, so the obvious thing to do is to represent
+the data feed as a UTxO. The UTxO sits at the script address of the oracle, and its datum field it carries the current 
+value of the oracle data.
+
+.. figure:: img/week06__00000.png
+
+And this is where we find our first problem. As we have noted before, validation only happens when you want to consume
+something from a script address, not when you produce an output at a script address. This means that we can't prevent
+anybody producing arbitrary outputs at the script address.
+
+.. figure:: img/week06__00001.png
+
+Somehow we need to distinguish the true oracle output from other outputs sitting at the same script address.
+
+
+
 
 
 

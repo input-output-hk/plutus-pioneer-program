@@ -27,7 +27,6 @@ Let's recall the Extended UTxO model where the idea is that we introduce
 a new type of address.
 
 .. figure:: img/1.png
-   :alt: 
 
 In the simple UTxO model are so-called public key addresses, where the
 address is given by the hash of the public key. If a UTxO sits at such a
