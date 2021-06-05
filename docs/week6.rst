@@ -84,6 +84,8 @@ and 1 ADA to the oracle.
 
 What will the transaction look like?
 
+.. figure:: img/week06__00004.png
+
 First of all, the swap validation logic will need access to the current oracle value, which means that the oracle UTxO must be an input to the transaction.
 
 Then we have the oracle validation logic. In this case we want to use the oracle. So, let's say we have a redeemer called *use*. Now, the oracle validator has
@@ -94,8 +96,11 @@ to check several things.
 3. Is the value in the output UTxO the same as the input value?
 4. Is the fee present?
 
-.. figure:: img/week06__00004.png
+Now we can complete the transaction.
 
+We consume two additional inputs - the fee paid by the buyer and the 100 ADA deposited by the seller. Then we have two additional outputs - the 175 USD to the seller, and the 100 ADA to the buyer.
+
+.. figure:: img/week06__00005.png
 
 
 
