@@ -82,6 +82,20 @@ So, let's say that the oracle provider determines a fee of 1 ADA that has to be 
 In this example, that would mean that the person wanting to by the ADA would have to pay 175 USD to the seller of the ADA,
 and 1 ADA to the oracle.
 
+What will the transaction look like?
+
+First of all, the swap validation logic will need access to the current oracle value, which means that the oracle UTxO must be an input to the transaction.
+
+Then we have the oracle validation logic. In this case we want to use the oracle. So, let's say we have a redeemer called *use*. Now, the oracle validator has
+to check several things.
+
+1. Is the NFT present in the consumed input?
+2. Is there an output from the transaction at the same address containing the same NFT?
+3. Is the value in the output UTxO the same as the input value?
+4. Is the fee present?
+
+.. figure:: img/week06__00004.png
+
 
 
 
