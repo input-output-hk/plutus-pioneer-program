@@ -51,7 +51,12 @@ anybody producing arbitrary outputs at the script address.
 
 .. figure:: img/week06__00001.png
 
-Somehow we need to distinguish the true oracle output from other outputs sitting at the same script address.
+Somehow we need to distinguish the true oracle output from other outputs that may be sitting at the same script address.
+And the way we do this is to put an NFT on the output. Because an NFT can only exist once, there can only be one UTxO
+at the script address that holds the NFT.
+
+.. figure:: img/week06__00002.png
+
 
 
 
