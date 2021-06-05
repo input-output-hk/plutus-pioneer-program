@@ -30,7 +30,14 @@ sports game, for example.
 
 There are various ways to implement oracles, of varying sophistication.
 
-We are going to use a very simple approach, where we have one trusted data provider.
+We are going to use a very simple approach, where we have one trusted data provider. And, as an example of data, we
+are going to use the ADA/USD exchange rate.
+
+There are lots of problems with this approach, as we have to trust the data source. There are ways to mitigate the risk
+that the data source is either untrustworthy or unreliable. For example, we could ask the provider to put down some
+collateral that is lost if data is not provided or is inaccurate.
+
+
 
 
 
