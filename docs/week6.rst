@@ -25,7 +25,14 @@ The example we are going to use for this is to implement a very simple oracle.
     make it usable in smart contracts.
 
 There are numerous examples of use cases for oracles. We can think of external data sources such as weather data, election
-results, stock exchange data or randomness.
+results, stock exchange data or randomness. You may have a betting contract that depends on the outcome of a specific
+sports game, for example.
+
+There are various ways to implement oracles, of varying sophistication.
+
+We are going to use a very simple approach, where we have one trusted data provider.
+
+
 
 
 
