@@ -57,6 +57,21 @@ at the script address that holds the NFT.
 
 .. figure:: img/week06__00002.png
 
+How can such an oracle be used?
+
+Here we come to something we haven't seen before. In all our code writing validators and contracts, we always knew the
+full API up front. In the case of an oracle, this is different. At the point that an oracle is created, you don't know how
+people may want to use it. It must be like an open API, able to work with smart contracts that have not yet been
+designed.
+
+As an example of a use-case that might make use of this specific oracle, let's consider a swap contract where, at the swap
+address, somebody can deposit ADA, and then somebody else can take those ADA in exchange for USD.
+
+.. figure:: img/week06__00003.png
+
+Of course, we don't have USD directly on the blockchain, but we can imagine that they are represented by some native token.
+
+
 
 
 
