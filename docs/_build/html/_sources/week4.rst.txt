@@ -1,5 +1,5 @@
-Week 04
-=======
+Week 04 - Monads
+================
 
 .. note::
       These is a written version of `Lecture

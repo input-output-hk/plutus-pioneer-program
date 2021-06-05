@@ -1,5 +1,5 @@
-Week 05
-=======
+Week 05 - Native Tokens
+=======================
 
 .. note::
       These is a written version of `Lecture

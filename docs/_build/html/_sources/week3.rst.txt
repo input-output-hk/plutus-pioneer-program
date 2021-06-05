@@ -1,5 +1,5 @@
-Week 03
-=======
+Week 03 - Script Context
+========================
 
 .. note::
       This is a written version of `Lecture

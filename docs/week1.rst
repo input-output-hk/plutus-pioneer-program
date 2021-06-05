@@ -1,5 +1,5 @@
-Week 01
-=======
+Week 01 - Introduction
+======================
 
 .. note::
    This is a written version of `Lecture

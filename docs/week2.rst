@@ -1,5 +1,5 @@
-Week 02
-=======
+Week 02 - Validation
+====================
 
 .. note::
       This is a written version of `Lecture
