@@ -71,6 +71,19 @@ address, somebody can deposit ADA, and then somebody else can take those ADA in 
 
 Of course, we don't have USD directly on the blockchain, but we can imagine that they are represented by some native token.
 
+In this example, as the value at the oracle is 1.75, then if someone offers 100 ADA, the price for that should be
+175 USD.
+
+In addition to this, we need an incentive for the oracle to provide the data, because in additional to other costs for
+providing the data, at a minimum they would have to pay fees to create the UTxO.
+
+So, let's say that the oracle provider determines a fee of 1 ADA that has to be paid each time the oracle is used.
+
+In this example, that would mean that the person wanting to by the ADA would have to pay 175 USD to the seller of the ADA,
+and 1 ADA to the oracle.
+
+
+
 
 
 
