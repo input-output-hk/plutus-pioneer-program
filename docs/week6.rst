@@ -122,8 +122,24 @@ We insist that the NFT be present in the output, but we don't say anything about
 
 .. figure:: img/week06__00006.png
 
+Summary
+~~~~~~~
 
+To sum up, we represent the oracle by a UTxO and identify the correct UTxO with an NFT. The oracle value is the datum of the UTxO. We support two operations. 
 
+One is *use* which uses the oracle in some arbitrary 
+transaction. The *use* validator will make sure that the consumed oracle input carries the NFT, that there is an output that again carries the NFT, doesn't change the datum, and carries additional fees.
+
+The second operation is *update* which can only be done by the oracle provider. For an *update* transaction, the oracle input must again carry the NFT, there must be an oracle output, also carrying the NFT. There are no 
+further restrictions. The datum can change, and the accumulated fees can be taken out.
+
+Writing the Oracle
+------------------
+
+Now that we know how it is supposed to work, let's look at some code.
+
+Oracle Core
+~~~~~~~~~~~
 
 
 
