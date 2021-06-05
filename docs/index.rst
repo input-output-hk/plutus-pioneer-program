@@ -14,3 +14,5 @@
    week3.rst
    week4.rst
    week5.rst
+   week6.rst
+   
