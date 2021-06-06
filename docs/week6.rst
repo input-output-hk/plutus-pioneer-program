@@ -206,6 +206,68 @@ is just a newtype wrapper around *Data*, so we can then use *PlutusTx.fromData* 
 
 We will see in a moment where we use the *oracleValue* function.
 
+The most important function is *mkOracleValidator*.
+
+.. code:: haskell
+
+    {-# INLINABLE mkOracleValidator #-}
+    mkOracleValidator :: Oracle -> Integer -> OracleRedeemer -> ScriptContext -> Bool
+    mkOracleValidator oracle x r ctx =
+        traceIfFalse "token missing from input"  inputHasToken  &&
+        traceIfFalse "token missing from output" outputHasToken &&
+        case r of
+            Update -> traceIfFalse "operator signature missing" (txSignedBy info $ oOperator oracle) &&
+                      traceIfFalse "invalid output datum"       validOutputDatum
+            Use    -> traceIfFalse "oracle value changed"       (outputDatum == Just x)              &&
+                      traceIfFalse "fees not paid"              feesPaid
+      where
+        info :: TxInfo
+        info = scriptContextTxInfo ctx
+    
+        ownInput :: TxOut
+        ownInput = case findOwnInput ctx of
+            Nothing -> traceError "oracle input missing"
+            Just i  -> txInInfoResolved i
+    
+        inputHasToken :: Bool
+        inputHasToken = assetClassValueOf (txOutValue ownInput) (oracleAsset oracle) == 1
+    
+        ownOutput :: TxOut
+        ownOutput = case getContinuingOutputs ctx of
+            [o] -> o
+            _   -> traceError "expected exactly one oracle output"
+    
+        outputHasToken :: Bool
+        outputHasToken = assetClassValueOf (txOutValue ownOutput) (oracleAsset oracle) == 1
+    
+        outputDatum :: Maybe Integer
+        outputDatum = oracleValue ownOutput (`findDatum` info)
+    
+        validOutputDatum :: Bool
+        validOutputDatum = isJust outputDatum
+    
+        feesPaid :: Bool
+        feesPaid =
+          let
+            inVal  = txOutValue ownInput
+            outVal = txOutValue ownOutput
+          in
+            outVal `geq` (inVal <> Ada.lovelaceValueOf (oFee oracle))
+            
+            
+The function *mkOracleValidator* takes our parameter *Oracle*, the datum, which, in this example is an *Integer*, the redeemer type *OracleRedeemer* and finally the *ScriptContext*.
+
+There are two cases for this validator - *use* and *update* - but there are similarities. In both cases we want to check that we have the input that holds the NFT and that there is an output that holds the NFT.
+
+As both these checks need to be done regardless of the use case, they are done upfront.
+
+.. code:: haskell
+
+    ...
+    traceIfFalse "token missing from input"  inputHasToken  &&
+    traceIfFalse "token missing from output" outputHasToken &&
+    ...    
+    
 
 
 
