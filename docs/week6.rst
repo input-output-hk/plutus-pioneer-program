@@ -163,3 +163,20 @@ The oracle will be a parameterized contract, and it will depend on four fields.
 - *oFee* is the fee in lovelace that is due every time the oracle is used
 - *oAsset* represents the asset class that we want to exchange rate for against Ada, which in our case will be some kind of USD token
 
+The redeemer will support two operations.
+
+.. code:: haskell
+
+    data OracleRedeemer = Update | Use
+        deriving Show
+
+    PlutusTx.unstableMakeIsData ''OracleRedeemer
+
+Then, as mentioned, we are going to use the empty string for the token name.
+
+.. code:: haskell
+
+    oracleTokenName :: TokenName
+    oracleTokenName = TokenName emptyByteString
+
+    
