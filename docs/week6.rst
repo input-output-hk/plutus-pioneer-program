@@ -268,6 +268,27 @@ As both these checks need to be done regardless of the use case, they are done u
     traceIfFalse "token missing from output" outputHasToken &&
     ...    
     
+After this, we consider which use case we are dealing with.
+
+.. code:: haskell
+
+    case r of
+        Update -> traceIfFalse "operator signature missing" (txSignedBy info $ oOperator oracle) &&
+                  traceIfFalse "invalid output datum"       validOutputDatum
+        Use    -> traceIfFalse "oracle value changed"       (outputDatum == Just x)              &&
+                  traceIfFalse "fees not paid"              feesPaid    
+
+Before looking at the *inputHasToken* function there is another help function to look at.
+
+.. code:: haskell
+
+    ownInput :: TxOut
+    ownInput = case findOwnInput ctx of
+        Nothing -> traceError "oracle input missing"
+        Just i  -> txInInfoResolved i
+        
+The *ownInput* function returns the *TxOut* that the script is trying to consume, which in this case is the oracle output. The *Nothing* case here can happen if we are in a different context, such as a minting context, so
+this eventuality will not occur for us. The *findOwnInput* function is provided by Plutus and will, given the context, find the relevant input.
 
 
 
