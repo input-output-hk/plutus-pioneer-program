@@ -191,7 +191,17 @@ The *oracleAsset* will be used to identify the NFT - this is not to be confused 
 We create a little helper function called *oracleValue*. This takes an output transaction and a function which looks up the datum, and then returns an *Integer*. The *Integer* represents the exchange rate (e.g. 1.75) multiplied
 by a million. This avoids potential complicates using real numbers.
 
+.. code:: haskell
 
+    {-# INLINABLE oracleValue #-}
+    oracleValue :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe Integer
+    oracleValue o f = do
+        dh      <- txOutDatum o
+        Datum d <- f dh
+        PlutusTx.fromData d
+        
+We will see later how this helper function is used.
+        
 
 
 
