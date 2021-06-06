@@ -172,11 +172,26 @@ The redeemer will support two operations.
 
     PlutusTx.unstableMakeIsData ''OracleRedeemer
 
-Then, as mentioned, we are going to use the empty string for the token name.
+We need to define the NFT asset class. As mentioned, we are going to use the empty string for the token name.
 
 .. code:: haskell
 
+    {-# INLINABLE oracleTokenName #-}
     oracleTokenName :: TokenName
     oracleTokenName = TokenName emptyByteString
-
     
+The *oracleAsset* will be used to identify the NFT - this is not to be confused with *oAsset*, defined above.
+
+.. code:: haskell
+
+    {-# INLINABLE oracleAsset #-}
+    oracleAsset :: Oracle -> AssetClass
+    oracleAsset oracle = AssetClass (oSymbol oracle, oracleTokenName)
+
+We create a little helper function called *oracleValue*. This takes an output transaction and a function which looks up the datum, and then returns an *Integer*. The *Integer* represents the exchange rate (e.g. 1.75) multiplied
+by a million. This avoids potential complicates using real numbers.
+
+
+
+
+
