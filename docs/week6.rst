@@ -141,6 +141,21 @@ Now that we know how it is supposed to work, let's look at some code.
 Oracle Core
 ~~~~~~~~~~~
 
+First, let's look at the Plutus code that implements the oracle itself.
 
+.. code:: haskell
 
+    module Week06.Oracle.Core
 
+The oracle will be a parameterized contract, and it will depend on four fields.
+
+.. code:: haskell
+
+    data Oracle = Oracle
+        { oSymbol   :: !CurrencySymbol
+        , oOperator :: !PubKeyHash
+        , oFee      :: !Integer
+        , oAsset    :: !AssetClass
+        } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)    
+
+*oSymbol* is the currencySymbol of the NFT that is used to identify the transaction. We don't need the token name as we will just use the empty string as the token name.
