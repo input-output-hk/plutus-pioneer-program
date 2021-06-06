@@ -158,4 +158,8 @@ The oracle will be a parameterized contract, and it will depend on four fields.
         , oAsset    :: !AssetClass
         } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)    
 
-*oSymbol* is the currencySymbol of the NFT that is used to identify the transaction. We don't need the token name as we will just use the empty string as the token name.
+- *oSymbol* is the currencySymbol of the NFT that is used to identify the transaction. We don't need the token name as we will just use the empty string as the token name.
+- *oOperator* is the owner of the oracle - the hash of the public key owner which can make updates
+- *oFee* is the fee in lovelace that is due every time the oracle is used
+- *oAsset* represents the asset class that we want to exchange rate for against Ada, which in our case will be some kind of USD token
+
