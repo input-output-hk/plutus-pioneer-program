@@ -200,8 +200,16 @@ by a million. This avoids potential complicates using real numbers.
         Datum d <- f dh
         PlutusTx.fromData d
         
-We will see later how this helper function is used.
-        
+This function is an example of monadic computation in monad that is not *IO* or the *Contract* monad. First we call *txOutDatum*, which can fail if because not every output has a datum. If it succeeds, we get a datum hash
+which we can reference in *dh*. Next we used the function *f* which is provided as the second argument to maybe turn this datum hash into a datum. This too can fail. If it succeeds we can reference the result in *d*. *Datum*
+is just a newtype wrapper around *Data*, so we can then use *PlutusTx.fromData* to maybe turn *d* into an *Integer*. Again, this can fail, because even if the datum is there, it may not be convertible to an integer value.
+
+We will see in a moment where we use the *oracleValue* function.
+
+
+
+
+
 
 
 
