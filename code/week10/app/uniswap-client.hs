@@ -6,25 +6,38 @@ module Main
     ( main
     ) where
 
-import Control.Concurrent
-import Control.Exception
-import Control.Monad.IO.Class                  (MonadIO (..))
-import Data.Aeson                              (Result (..), fromJSON)
-import Data.Monoid                             (Last (..))
-import Data.Proxy                              (Proxy (..))
-import Data.Text                               (pack)
-import Data.UUID
-import Ledger.Value                            (flattenValue)
-import Network.HTTP.Req
-import Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
-import Plutus.PAB.Webserver.Types
-import System.Environment                      (getArgs)
-import System.IO
-import Text.Read                               (readMaybe)
+import           Control.Concurrent
+import           Control.Exception
+import           Control.Monad.IO.Class                  (MonadIO (..))
+import           Data.Aeson                              (Result (..), decode, fromJSON)
+import qualified Data.ByteString.Lazy as LB
+import           Data.Monoid                             (Last (..))
+import           Data.Proxy                              (Proxy (..))
+import           Data.Text                               (pack)
+import           Data.UUID
+import           Ledger.Value                            (flattenValue)
+import           Network.HTTP.Req
+import           Plutus.Contracts.Uniswap                (Uniswap)
+import           Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
+import           Plutus.PAB.Webserver.Types
+import           System.Environment                      (getArgs)
+import           System.Exit                             (exitFailure)
+import           System.IO
+import           Text.Read                               (readMaybe)
+import           Wallet.Emulator.Types                   (Wallet (..))
+
+import           Uniswap                                 (cidFile)
 
 main :: IO ()
 main = do
-    putStrLn "Uniswap Client"
+    w   <- Wallet . read . head <$> getArgs
+    cid <- read                 <$> readFile (cidFile w)
+    mus <- decode               <$> LB.readFile "uniswap.json"
+    case mus of
+        Nothing -> putStrLn "invalid uniswap.json" >> exitFailure
+        Just us -> do
+            putStrLn $ "cid: " ++ show (cid :: UUID)
+            putStrLn $ "uniswap: " ++ show (us :: Uniswap)
 {-
     [i :: Int] <- map read <$> getArgs
     uuid       <- read <$> readFile ('W' : show i ++ ".cid")

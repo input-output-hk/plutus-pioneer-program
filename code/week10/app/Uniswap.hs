@@ -41,3 +41,6 @@ wallets = [Wallet i | i <- [1 .. 4]]
 
 tokenNames :: [TokenName]
 tokenNames = ["A", "B", "C", "D"]
+
+cidFile :: Wallet -> FilePath
+cidFile w = "W" ++ show (getWallet w) ++ ".cid"

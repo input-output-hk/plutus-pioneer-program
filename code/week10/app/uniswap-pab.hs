@@ -13,19 +13,18 @@ module Main
     ( main
     ) where
 
-import           Control.Monad                       (forM, void)
+import           Control.Monad                       (forM_, void)
 import           Control.Monad.Freer                 (Eff, Member, interpret, type (~>))
 import           Control.Monad.Freer.Error           (Error)
 import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
 import           Data.Aeson                          (FromJSON, Result (..), ToJSON, encode, fromJSON)
-import qualified Data.Map.Strict                     as Map
+import qualified Data.ByteString.Lazy                as LB
 import qualified Data.Monoid                         as Monoid
 import qualified Data.Semigroup                      as Semigroup
 import           Data.Text                           (Text)
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import           GHC.Generics                        (Generic)
-import           Ledger.Ada                          (adaSymbol, adaToken)
 import           Plutus.Contract
 import qualified Plutus.Contracts.Currency           as Currency
 import qualified Plutus.Contracts.Uniswap            as Uniswap
@@ -40,6 +39,7 @@ import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Prelude                             hiding (init)
 import           Uniswap                             as US
 import           Wallet.Emulator.Types               (Wallet (..))
+import           Wallet.Types                        (ContractInstanceId (..))
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
@@ -54,37 +54,20 @@ main = void $ Simulator.runSimulationWith handlers $ do
 
     logString @(Builtin UniswapContracts) $ "Initialization finished. Minted: " ++ show cs
 
-    let coins = Map.fromList [(tn, Uniswap.mkCoin cs tn) | tn <- tokenNames]
-        ada   = Uniswap.mkCoin adaSymbol adaToken
-
     cidStart <- Simulator.activateContract (Wallet 1) UniswapStart
     us       <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.Uniswap))) of
                     Success (Monoid.Last (Just (Right us))) -> Just us
                     _                                       -> Nothing
+    liftIO $ LB.writeFile "uniswap.json" $ encode us
     logString @(Builtin UniswapContracts) $ "Uniswap instance created: " ++ show us
 
-    cids <- fmap Map.fromList $ forM wallets $ \w -> do
+    forM_ wallets $ \w -> do
         cid <- Simulator.activateContract w $ UniswapUser us
+        liftIO $ writeFile (cidFile w) $ show $ unContractInstanceId cid
         logString @(Builtin UniswapContracts) $ "Uniswap user contract started for " ++ show w
-        Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" ()
-        v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.UserContractState))) of
-                Success (Monoid.Last (Just (Right (Uniswap.Funds v)))) -> Just v
-                _                                                      -> Nothing
-        logString @(Builtin UniswapContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
-        return (w, cid)
 
-    let cp = Uniswap.CreateParams ada (coins Map.! "A") 100000 500000
-    logString @(Builtin UniswapContracts) $ "creating liquidity pool: " ++ show (encode cp)
-    let cid2 = cids Map.! Wallet 2
-    Simulator.waitForEndpoint cid2 "create"
-    _  <- Simulator.callEndpointOnInstance cid2 "create" cp
-    flip Simulator.waitForState (cids Map.! Wallet 2) $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.UserContractState))) of
-        Success (Monoid.Last (Just (Right Uniswap.Created))) -> Just ()
-        _                                                    -> Nothing
-    logString @(Builtin UniswapContracts) "liquidity pool created"
+    void $ liftIO getLine
 
-    _ <- liftIO getLine
     shutdown
 
 data UniswapContracts =
@@ -115,5 +98,5 @@ handleUniswapContract = Builtin.handleBuiltin getSchema getContract where
 
 handlers :: SimulatorEffectHandlers (Builtin UniswapContracts)
 handlers =
-    Simulator.mkSimulatorHandlers @(Builtin UniswapContracts) [] -- [Init, UniswapStart, UniswapUser ???]
+    Simulator.mkSimulatorHandlers @(Builtin UniswapContracts) []
     $ interpret handleUniswapContract
