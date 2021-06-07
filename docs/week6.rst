@@ -296,8 +296,17 @@ The *inputHashToken* function checks that the token is present. It uses the *ass
 
     inputHasToken :: Bool
     inputHasToken = assetClassValueOf (txOutValue ownInput) (oracleAsset oracle) == 1
-        
 
+The next helper function, *ownOutput* checks that we have exactly one output and returns that output to us.
+
+.. code:: haskell
+
+    ownOutput :: TxOut
+    ownOutput = case getContinuingOutputs ctx of
+        [o] -> o
+        _   -> traceError "expected exactly one oracle output"    
+
+        
 
 
 
