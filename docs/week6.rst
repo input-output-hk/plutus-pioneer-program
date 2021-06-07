@@ -306,8 +306,15 @@ The next helper function, *ownOutput* checks that we have exactly one output and
         [o] -> o
         _   -> traceError "expected exactly one oracle output"    
 
-        
+We can use this for the *outputHasToken* helper function in the same way as we did for the *inputHashToken* function.
+
+.. code:: haskell
+
+    outputHasToken :: Bool
+    outputHasToken = assetClassValueOf (txOutValue ownOutput) (oracleAsset oracle) == 1
+
+That covers the code for the common cases. Now, let's let at the code specific to the *update* case.
 
 
-
+    
 
