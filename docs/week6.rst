@@ -435,7 +435,7 @@ We could have used the same code for minting the NFT as we used in lecture 5. Th
 
 However, this is a currency module provided in *plutus-use-cases* that provides a *forgeContract* function that allows us to mint NFTs.
 
-If we look at the type of the *forgeContract* function in the REPL, it looks horrible. 
+Here is the type of the *forgeContract* function shown in the REPL.
 
 .. code::
 
