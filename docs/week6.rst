@@ -290,7 +290,13 @@ Before looking at the *inputHasToken* function there is another help function to
 The *ownInput* function returns the *TxOut* that the script is trying to consume, which in this case is the oracle output. The *Nothing* case here can happen if we are in a different context, such as a minting context, so
 this eventuality will not occur for us. The *findOwnInput* function is provided by Plutus and will, given the context, find the relevant input.
 
+The *inputHashToken* function checks that the token is present. It uses the *assetClassValueOf* function to look for the NFT within the *ownInput* response.
 
+.. code:: haskell
+
+    inputHasToken :: Bool
+    inputHasToken = assetClassValueOf (txOutValue ownInput) (oracleAsset oracle) == 1
+        
 
 
 
