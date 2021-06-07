@@ -98,7 +98,11 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#writing-the-oracle">7.2. Writing the Oracle</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#oracle-core">7.2.1. Oracle Core</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#oracle-core">7.2.1. Oracle Core</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#on-chain">7.2.1.1. On-chain</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#off-chain">7.2.1.2. Off-chain</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -283,6 +287,8 @@ further restrictions. The datum can change, and the accumulated fees can be take
 <p>Now that we know how it is supposed to work, let’s look at some code.</p>
 <div class="section" id="oracle-core">
 <h3><span class="section-number">7.2.1. </span>Oracle Core<a class="headerlink" href="#oracle-core" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="on-chain">
+<h4><span class="section-number">7.2.1.1. </span>On-chain<a class="headerlink" href="#on-chain" title="Permalink to this headline">¶</a></h4>
 <p>First, let’s look at the Plutus code that implements the oracle itself.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">module</span> <span class="nn">Week06.Oracle.Core</span>
 </pre></div>
@@ -470,6 +476,53 @@ oracle to give the oracle provider a tip, if they so wish.</p>
 <p>So this now is basically the core business logic of the oracle as shown in the diagrams.</p>
 <div class="figure align-default">
 <img alt="_images/week06__00006.png" src="_images/week06__00006.png" />
+</div>
+<p>Now we have our usual boilerplate. In particular notice that we use the pattern that we need for a parameterized validator.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Oracling</span>
+<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptType</span> <span class="kt">Oracling</span> <span class="kr">where</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Oracling</span> <span class="ow">=</span> <span class="kt">Integer</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Oracling</span> <span class="ow">=</span> <span class="kt">OracleRedeemer</span>
+
+<span class="nf">oracleInst</span> <span class="ow">::</span> <span class="kt">Oracle</span> <span class="ow">-&gt;</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptInstance</span> <span class="kt">Oracling</span>
+<span class="nf">oracleInst</span> <span class="n">oracle</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validator</span> <span class="o">@</span><span class="kt">Oracling</span>
+    <span class="p">(</span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkOracleValidator</span> <span class="o">||</span><span class="p">])</span> <span class="p">`</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">applyCode</span><span class="p">`</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">liftCode</span> <span class="n">oracle</span><span class="p">)</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
+<span class="kr">where</span>
+    <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="kt">Integer</span> <span class="o">@</span><span class="kt">OracleRedeemer</span>
+
+<span class="nf">oracleValidator</span> <span class="ow">::</span> <span class="kt">Oracle</span> <span class="ow">-&gt;</span> <span class="kt">Validator</span>
+<span class="nf">oracleValidator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorScript</span> <span class="o">.</span> <span class="n">oracleInst</span>
+
+<span class="nf">oracleAddress</span> <span class="ow">::</span> <span class="kt">Oracle</span> <span class="ow">-&gt;</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Address</span>
+<span class="nf">oracleAddress</span> <span class="ow">=</span> <span class="n">scriptAddress</span> <span class="o">.</span> <span class="n">oracleValidator</span>
+</pre></div>
+</div>
+<p>And this concludes the on-chain part of the oracle code.</p>
+</div>
+<div class="section" id="off-chain">
+<h4><span class="section-number">7.2.1.2. </span>Off-chain<a class="headerlink" href="#off-chain" title="Permalink to this headline">¶</a></h4>
+<p>We also create some off-chain code, namely to start the oracle, and to update it. However, we don’t write off-chain code to <em>use</em> the oracle. That is not the
+responsibility of the author of this contract. That will be the responsibility of the person that wants to use the oracle - they will write the code to create the
+transaction with the <em>use</em> redeemer. This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.</p>
+<div class="section" id="starting-the-oracle">
+<h5><span class="section-number">7.2.1.2.1. </span>Starting the Oracle<a class="headerlink" href="#starting-the-oracle" title="Permalink to this headline">¶</a></h5>
+<p>To start the oracle, we need some parameters.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">OracleParams</span> <span class="ow">=</span> <span class="kt">OracleParams</span>
+    <span class="p">{</span> <span class="n">opFees</span>   <span class="ow">::</span> <span class="o">!</span><span class="kt">Integer</span>
+    <span class="p">,</span> <span class="n">opSymbol</span> <span class="ow">::</span> <span class="o">!</span><span class="kt">CurrencySymbol</span>
+    <span class="p">,</span> <span class="n">opToken</span>  <span class="ow">::</span> <span class="o">!</span><span class="kt">TokenName</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span> <span class="kt">Generic</span><span class="p">,</span> <span class="kt">FromJSON</span><span class="p">,</span> <span class="kt">ToJSON</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <em>opFees</em> parameter represents the number of lovelace that will be charged to use the oracle.</p>
+<p>The <em>opSymbol</em> and <em>opToken</em> parameters represent the token against which we are providing the Ada exchange rate, in this case a USD token.</p>
+<p>First we create a <em>startOracle</em> function, whose responsibility is to mint the NFT that will be used to identify the oracle UTxO. The <em>startOracle</em> function will
+not provide an initial value for the oracle, this will be handled by the <em>updateOracle</em> function. The reason for this is that, if we provided an initial value, it may
+be outdated by the time the NFT is minted.</p>
+<p>We could have used the same code for minting the NFT as we used in lecture 5. This would have worked perfectly well.</p>
+<p>However, this is a currency module provided in <em>plutus-use-cases</em> that provides a <em>forgeContract</em> function that allows us to mint NFTs.</p>
+<p>If we look at the type of the <em>forgeContract</em> function in the REPL, it looks horrible, but it just provides all the usual restrictions. The important part is highlighted below.</p>
+</div>
 </div>
 </div>
 </div>

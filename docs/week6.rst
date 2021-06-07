@@ -423,11 +423,50 @@ To start the oracle, we need some parameters.
         , opToken  :: !TokenName
         } deriving (Show, Generic, FromJSON, ToJSON)    
 
-*opFees* represents the number of lovalace that will be charged to use the oracle.
-*opSymbol* and *opToken* represent the token against which we are providing the Ada exchange rate, in this case a USD token.
+The *opFees* parameter represents the number of lovelace that will be charged to use the oracle.
+
+The *opSymbol* and *opToken* parameters represent the token against which we are providing the Ada exchange rate, in this case a USD token.
 
 First we create a *startOracle* function, whose responsibility is to mint the NFT that will be used to identify the oracle UTxO. The *startOracle* function will
 not provide an initial value for the oracle, this will be handled by the *updateOracle* function. The reason for this is that, if we provided an initial value, it may
 be outdated by the time the NFT is minted.
+
+We could have used the same code for minting the NFT as we used in lecture 5. This would have worked perfectly well.
+
+However, this is a currency module provided in *plutus-use-cases* that provides a *forgeContract* function that allows us to mint NFTs.
+
+This provides more general functionality than our previous NFT contract. It allows is to generate multiple NFTs in one go. It will create a currency symbol that can only be used one, similar 
+to our NFT from last time, so there can only be one minting transaction. But for the one currency symbol, you can mint various tokens in the same transaction, with 
+various token names and in various quantities.
+
+If we look at the type of the *forgeContract* function in the REPL, it looks horrible. 
+
+.. code::
+
+    Prelude Week06.Oracle.Core> :t Plutus.Contracts.Currency.forgeContract
+    Plutus.Contracts.Currency.forgeContract
+      :: (row-types-1.0.1.0:Data.Row.Internal.AllUniqueLabels
+            (Plutus.Contract.Schema.Input s),
+          row-types-1.0.1.0:Data.Row.Internal.AllUniqueLabels
+            (Plutus.Contract.Schema.Output s),
+          Plutus.Contracts.Currency.AsCurrencyError e,
+          (Plutus.Contract.Schema.Input s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx-confirmation")
+          ~ Plutus.Contract.Effects.AwaitTxConfirmed.TxConfirmed,
+          (Plutus.Contract.Schema.Input s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx")
+          ~ Plutus.Contract.Effects.WriteTx.WriteTxResponse,
+          (Plutus.Contract.Schema.Output s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx")
+          ~ Ledger.Constraints.OffChain.UnbalancedTx,
+          (Plutus.Contract.Schema.Output s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx-confirmation")
+          ~ Plutus.V1.Ledger.TxId.TxId) =>
+         Plutus.V1.Ledger.Crypto.PubKeyHash
+         -> [(Plutus.V1.Ledger.Value.TokenName, Integer)]
+         -> Plutus.Contract.Types.Contract
+              w s e Plutus.Contracts.Currency.OneShotCurrency
+    
+The important part starts towards the end, where the first parameter - of type *PubKeyHash* - is defined. This is the hash of the public key of the recipient of the NFT.
 
 

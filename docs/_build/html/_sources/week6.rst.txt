@@ -141,6 +141,9 @@ Now that we know how it is supposed to work, let's look at some code.
 Oracle Core
 ~~~~~~~~~~~
 
+On-chain
+++++++++
+
 First, let's look at the Plutus code that implements the oracle itself.
 
 .. code:: haskell
@@ -376,8 +379,88 @@ So this now is basically the core business logic of the oracle as shown in the d
 
 .. figure:: img/week06__00006.png
 
+Now we have our usual boilerplate. In particular notice that we use the pattern that we need for a parameterized validator.
 
+.. code:: haskell
 
+    data Oracling
+    instance Scripts.ScriptType Oracling where
+        type instance DatumType Oracling = Integer
+        type instance RedeemerType Oracling = OracleRedeemer
+
+    oracleInst :: Oracle -> Scripts.ScriptInstance Oracling
+    oracleInst oracle = Scripts.validator @Oracling
+        ($$(PlutusTx.compile [|| mkOracleValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode oracle)
+        $$(PlutusTx.compile [|| wrap ||])
+    where
+        wrap = Scripts.wrapValidator @Integer @OracleRedeemer
+
+    oracleValidator :: Oracle -> Validator
+    oracleValidator = Scripts.validatorScript . oracleInst
+
+    oracleAddress :: Oracle -> Ledger.Address
+    oracleAddress = scriptAddress . oracleValidator
+
+And this concludes the on-chain part of the oracle code.
     
-    
+Off-chain
++++++++++
 
+We also create some off-chain code, namely to start the oracle, and to update it. However, we don't write off-chain code to *use* the oracle. That is not the 
+responsibility of the author of this contract. That will be the responsibility of the person that wants to use the oracle - they will write the code to create the
+transaction with the *use* redeemer. This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.
+
+Starting the Oracle
+___________________
+
+To start the oracle, we need some parameters.
+
+.. code:: haskell
+
+    data OracleParams = OracleParams
+        { opFees   :: !Integer
+        , opSymbol :: !CurrencySymbol
+        , opToken  :: !TokenName
+        } deriving (Show, Generic, FromJSON, ToJSON)    
+
+The *opFees* parameter represents the number of lovelace that will be charged to use the oracle.
+
+The *opSymbol* and *opToken* parameters represent the token against which we are providing the Ada exchange rate, in this case a USD token.
+
+First we create a *startOracle* function, whose responsibility is to mint the NFT that will be used to identify the oracle UTxO. The *startOracle* function will
+not provide an initial value for the oracle, this will be handled by the *updateOracle* function. The reason for this is that, if we provided an initial value, it may
+be outdated by the time the NFT is minted.
+
+We could have used the same code for minting the NFT as we used in lecture 5. This would have worked perfectly well.
+
+However, this is a currency module provided in *plutus-use-cases* that provides a *forgeContract* function that allows us to mint NFTs.
+
+If we look at the type of the *forgeContract* function in the REPL, it looks horrible, but it just provides all the usual restrictions. The important part is highlighted below.
+
+.. code::
+    :emphasize-lines: 21,22,23,24
+
+    Prelude Week06.Oracle.Core> :t Plutus.Contracts.Currency.forgeContract
+    Plutus.Contracts.Currency.forgeContract
+      :: (row-types-1.0.1.0:Data.Row.Internal.AllUniqueLabels
+            (Plutus.Contract.Schema.Input s),
+          row-types-1.0.1.0:Data.Row.Internal.AllUniqueLabels
+            (Plutus.Contract.Schema.Output s),
+          Plutus.Contracts.Currency.AsCurrencyError e,
+          (Plutus.Contract.Schema.Input s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx-confirmation")
+          ~ Plutus.Contract.Effects.AwaitTxConfirmed.TxConfirmed,
+          (Plutus.Contract.Schema.Input s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx")
+          ~ Plutus.Contract.Effects.WriteTx.WriteTxResponse,
+          (Plutus.Contract.Schema.Output s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx")
+          ~ Ledger.Constraints.OffChain.UnbalancedTx,
+          (Plutus.Contract.Schema.Output s
+           row-types-1.0.1.0:Data.Row.Internal..! "tx-confirmation")
+          ~ Plutus.V1.Ledger.TxId.TxId) =>
+         Plutus.V1.Ledger.Crypto.PubKeyHash
+         -> [(Plutus.V1.Ledger.Value.TokenName, Integer)]
+         -> Plutus.Contract.Types.Contract
+              w s e Plutus.Contracts.Currency.OneShotCurrency
+    
