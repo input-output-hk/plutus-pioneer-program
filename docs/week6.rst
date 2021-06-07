@@ -315,6 +315,37 @@ We can use this for the *outputHasToken* helper function in the same way as we d
 
 That covers the code for the common cases. Now, let's let at the code specific to the *update* case.
 
+There are two conditions to check. The first is that the operator actually signed the transaction. This is so simple that we can do it inline without
+a helper function.
 
+.. code:: haskell
+
+    traceIfFalse "operator signature missing" (txSignedBy info $ oOperator oracle)
+
+The next thing to check is that the output datum. We know that the value can change, but we need to check that it is at least of the correct type.
+
+.. code:: haskell
+
+    traceIfFalse "invalid output datum" validOutputDatum
+    
+And for this we have referenced a new helper function *validOutputDatum*, which itself makes use of a helper function *outputDatum*.
+
+.. code:: haskell
+
+    outputDatum :: Maybe Integer
+    outputDatum = oracleValue ownOutput (`findDatum` info)    
+
+    validOutputDatum :: Bool
+    validOutputDatum = isJust outputDatum
+
+This works by trying to get the datum value from the datum hash and then trying to create the oracle value from it. If it succeeds it will return a *Just Integer*,
+otherwise it will return *Nothing*, so the *validOutputDatum* function just needs to check that the return value is not *Nothing*, in other words, that it 
+is a *Just*.
+
+
+  
+
+
+    
     
 
