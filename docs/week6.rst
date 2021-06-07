@@ -347,8 +347,28 @@ just to collect the fees that have accumulated from the use the oracle.
 
 The second case for *mkOracleValidator* is the *use* case. This case can be used by anyone, but it is much more restrictive.
 
+First, we don't allow the value to change. So this is the first condition.
 
-  
+.. code:: haskell
+
+    traceIfFalse "oracle value changed" (outputDatum == Just x)
+
+We have already written the *outputDatum* helper function. Instead of checking only that it is an *Integer*, here we also check that its output value is the same
+as the input value.
+
+And finally, we must check that the fees have been paid. And for this we use a new helper function called *feesPaid*.
+
+.. code:: haskell
+
+    feesPaid :: Bool
+    feesPaid =
+      let
+        inVal  = txOutValue ownInput
+        outVal = txOutValue ownOutput
+      in
+        outVal `geq` (inVal <> Ada.lovelaceValueOf (oFee oracle))    
+
+
 
 
     
