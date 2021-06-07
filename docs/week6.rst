@@ -408,8 +408,22 @@ Off-chain
 
 We also create some off-chain code, namely to start the oracle, and to update it. However, we don't write off-chain code to *use* the oracle. That is not the 
 responsibility of the author of this contract. That will be the responsibility of the person that wants to use the oracle - they will write the code to create the
-transaction with the *use* redeemer.
+transaction with the *use* redeemer. This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.
 
-This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.
+Starting the Oracle
+___________________
+
+To start the oracle, we need some parameters.
+
+.. code:: haskell
+
+    data OracleParams = OracleParams
+        { opFees   :: !Integer
+        , opSymbol :: !CurrencySymbol
+        , opToken  :: !TokenName
+        } deriving (Show, Generic, FromJSON, ToJSON)    
+
+*opFees* represents the number of lovalace that will be charged to use the oracle.
+*opSymbol* and *opToken* represent the token against which we are providing the Ada exchange rate, in this case a USD token.
 
 
