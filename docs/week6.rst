@@ -141,6 +141,9 @@ Now that we know how it is supposed to work, let's look at some code.
 Oracle Core
 ~~~~~~~~~~~
 
+On-chain
+++++++++
+
 First, let's look at the Plutus code that implements the oracle itself.
 
 .. code:: haskell
@@ -376,8 +379,37 @@ So this now is basically the core business logic of the oracle as shown in the d
 
 .. figure:: img/week06__00006.png
 
+Now we have our usual boilerplate. In particular notice that we use the pattern that we need for a parameterized validator.
 
+.. code:: haskell
 
+    data Oracling
+    instance Scripts.ScriptType Oracling where
+        type instance DatumType Oracling = Integer
+        type instance RedeemerType Oracling = OracleRedeemer
+
+    oracleInst :: Oracle -> Scripts.ScriptInstance Oracling
+    oracleInst oracle = Scripts.validator @Oracling
+        ($$(PlutusTx.compile [|| mkOracleValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode oracle)
+        $$(PlutusTx.compile [|| wrap ||])
+    where
+        wrap = Scripts.wrapValidator @Integer @OracleRedeemer
+
+    oracleValidator :: Oracle -> Validator
+    oracleValidator = Scripts.validatorScript . oracleInst
+
+    oracleAddress :: Oracle -> Ledger.Address
+    oracleAddress = scriptAddress . oracleValidator
+
+And this concludes the on-chain part of the oracle code.
     
-    
+Off-chain
++++++++++
+
+We also create some off-chain code, namely to start the oracle, and to update it. However, we don't write off-chain code to *use* the oracle. That is not the 
+responsibility of the author of this contract. That will be the responsibility of the person that wants to use the oracle - they will write the code to create the
+transaction with the *use* redeemer.
+
+This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.
+
 
