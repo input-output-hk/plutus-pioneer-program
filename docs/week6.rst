@@ -426,4 +426,8 @@ To start the oracle, we need some parameters.
 *opFees* represents the number of lovalace that will be charged to use the oracle.
 *opSymbol* and *opToken* represent the token against which we are providing the Ada exchange rate, in this case a USD token.
 
+First we create a *startOracle* function, whose responsibility is to mint the NFT that will be used to identify the oracle UTxO. The *startOracle* function will
+not provide an initial value for the oracle, this will be handled by the *updateOracle* function. The reason for this is that, if we provided an initial value, it may
+be outdated by the time the NFT is minted.
+
 
