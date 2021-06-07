@@ -435,10 +435,6 @@ We could have used the same code for minting the NFT as we used in lecture 5. Th
 
 However, this is a currency module provided in *plutus-use-cases* that provides a *forgeContract* function that allows us to mint NFTs.
 
-This provides more general functionality than our previous NFT contract. It allows is to generate multiple NFTs in one go. It will create a currency symbol that can only be used one, similar 
-to our NFT from last time, so there can only be one minting transaction. But for the one currency symbol, you can mint various tokens in the same transaction, with 
-various token names and in various quantities.
-
 If we look at the type of the *forgeContract* function in the REPL, it looks horrible. 
 
 .. code::
@@ -468,5 +464,13 @@ If we look at the type of the *forgeContract* function in the REPL, it looks hor
               w s e Plutus.Contracts.Currency.OneShotCurrency
     
 The important part starts towards the end, where the first parameter - of type *PubKeyHash* - is defined. This is the hash of the public key of the recipient of the NFT.
+
+The *forgeContract* function provides more general functionality than our previous NFT contract. It allows is to generate multiple NFTs in one go. It will create a currency symbol that can only be used one, similar 
+to our NFT from last time, so there can only be one minting transaction. But for the one currency symbol, you can mint various tokens in the same transaction, with 
+various token names and in various quantities. The second parameter allows us to define these token names and quantities.
+
+And it gives us a *Contract* that returns the *OneShotCurrency* type. This type is specific to the currency and it doesn't really matter to us what it is. All that matters 
+for us is that we can get the currency symbol out of it again.
+
 
 
