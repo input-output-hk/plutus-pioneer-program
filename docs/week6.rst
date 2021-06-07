@@ -342,6 +342,11 @@ This works by trying to get the datum value from the datum hash and then trying 
 otherwise it will return *Nothing*, so the *validOutputDatum* function just needs to check that the return value is not *Nothing*, in other words, that it 
 is a *Just*.
 
+Note that we are not checking anything about the value of the *Integer*. This could even remain the same as the input value, if the transaction is used 
+just to collect the fees that have accumulated from the use the oracle.
+
+The second case for *mkOracleValidator* is the *use* case. This case can be used by anyone, but it is much more restrictive.
+
 
   
 
