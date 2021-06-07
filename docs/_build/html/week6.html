@@ -93,7 +93,14 @@
 <li class="toctree-l1"><a class="reference internal" href="week4.html">5. Week 04 - Monads</a></li>
 <li class="toctree-l1"><a class="reference internal" href="week5.html">6. Week 05 - Native Tokens</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">7. Week 06 - Oracles</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#overview">7.1. Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#overview">7.1. Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#summary">7.1.1. Summary</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#writing-the-oracle">7.2. Writing the Oracle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#oracle-core">7.2.1. Oracle Core</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -244,8 +251,226 @@ to check several things.</p>
 <li><p>Is the fee present?</p></li>
 </ol>
 <p>Now we can complete the transaction.</p>
+<p>We consume two additional inputs - the fee paid by the buyer and the 100 ADA deposited by the seller. Then we have two additional outputs - the 175 USD to the seller, and the 100 ADA to the buyer. And for these new inputs and
+outputs, it is the responsibility of the swap validator to make sure that it is correct. Whereas, the oracle validator is only interested with making sure that everything concerning the oracle is correct.</p>
 <div class="figure align-default">
 <img alt="_images/week06__00005.png" src="_images/week06__00005.png" />
+</div>
+<p>Just to emphasize, this swap contract is just an example. The oracle should be capable of working with many different smart contracts that want to make use of its data.</p>
+<p>If this was all, then we wouldn’t need an oracle. If the value was fixed, so that it was always 1.75 then we could simply hard-code this into our contract. So, the value must be able to change. At least, in an example such
+as this one where we have an exchange rate that can, of course, change over time. There may be other examples such as the result of a sports match, where it is a singular event in history, but in this case, it is important
+that it be able to change.</p>
+<p>This means that the oracle validator, in addition to the <em>use</em> redeemer, must be able to support another operation where the provider of the oracle can actually change the data.</p>
+<p>So let’s say the the value changes from 1.75 to 1.77.</p>
+<p>We know that on a (E)UTxO blockchain, nothing ever changes, so you can’t change the datum of an existing UTxO. All you can do is consume UTxOs and produce new ones.</p>
+<p>We would have a transaction that uses an <em>update</em> redeemer. The validation logic is somewhat different. It is the same as before in that the NFT needs to be present in the consumed oracle input, and also needs to be
+present in the new output. In addition to that, the transaction must be signed by the oracle provider. And, we can use this update transaction as an opportunity for the oracle provider to collect the fees.</p>
+<p>We insist that the NFT be present in the output, but we don’t say anything about other values. All the fees that got there by other transactions using this oracle data can be collected during the <em>update</em> transaction.</p>
+<div class="figure align-default">
+<img alt="_images/week06__00006.png" src="_images/week06__00006.png" />
+</div>
+<div class="section" id="summary">
+<h3><span class="section-number">7.1.1. </span>Summary<a class="headerlink" href="#summary" title="Permalink to this headline">¶</a></h3>
+<p>To sum up, we represent the oracle by a UTxO and identify the correct UTxO with an NFT. The oracle value is the datum of the UTxO. We support two operations.</p>
+<p>One is <em>use</em> which uses the oracle in some arbitrary
+transaction. The <em>use</em> validator will make sure that the consumed oracle input carries the NFT, that there is an output that again carries the NFT, doesn’t change the datum, and carries additional fees.</p>
+<p>The second operation is <em>update</em> which can only be done by the oracle provider. For an <em>update</em> transaction, the oracle input must again carry the NFT, there must be an oracle output, also carrying the NFT. There are no
+further restrictions. The datum can change, and the accumulated fees can be taken out.</p>
+</div>
+</div>
+<div class="section" id="writing-the-oracle">
+<h2><span class="section-number">7.2. </span>Writing the Oracle<a class="headerlink" href="#writing-the-oracle" title="Permalink to this headline">¶</a></h2>
+<p>Now that we know how it is supposed to work, let’s look at some code.</p>
+<div class="section" id="oracle-core">
+<h3><span class="section-number">7.2.1. </span>Oracle Core<a class="headerlink" href="#oracle-core" title="Permalink to this headline">¶</a></h3>
+<p>First, let’s look at the Plutus code that implements the oracle itself.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">module</span> <span class="nn">Week06.Oracle.Core</span>
+</pre></div>
+</div>
+<p>The oracle will be a parameterized contract, and it will depend on four fields.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Oracle</span> <span class="ow">=</span> <span class="kt">Oracle</span>
+    <span class="p">{</span> <span class="n">oSymbol</span>   <span class="ow">::</span> <span class="o">!</span><span class="kt">CurrencySymbol</span>
+    <span class="p">,</span> <span class="n">oOperator</span> <span class="ow">::</span> <span class="o">!</span><span class="kt">PubKeyHash</span>
+    <span class="p">,</span> <span class="n">oFee</span>      <span class="ow">::</span> <span class="o">!</span><span class="kt">Integer</span>
+    <span class="p">,</span> <span class="n">oAsset</span>    <span class="ow">::</span> <span class="o">!</span><span class="kt">AssetClass</span>
+    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span> <span class="kt">Generic</span><span class="p">,</span> <span class="kt">FromJSON</span><span class="p">,</span> <span class="kt">ToJSON</span><span class="p">,</span> <span class="kt">Prelude</span><span class="o">.</span><span class="kt">Eq</span><span class="p">,</span> <span class="kt">Prelude</span><span class="o">.</span><span class="kt">Ord</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><em>oSymbol</em> is the currencySymbol of the NFT that is used to identify the transaction. We don’t need the token name as we will just use the empty string as the token name.</p></li>
+<li><p><em>oOperator</em> is the owner of the oracle - the hash of the public key owner which can make updates</p></li>
+<li><p><em>oFee</em> is the fee in lovelace that is due every time the oracle is used</p></li>
+<li><p><em>oAsset</em> represents the asset class that we want to exchange rate for against Ada, which in our case will be some kind of USD token</p></li>
+</ul>
+<p>The redeemer will support two operations.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">OracleRedeemer</span> <span class="ow">=</span> <span class="kt">Update</span> <span class="o">|</span> <span class="kt">Use</span>
+    <span class="kr">deriving</span> <span class="kt">Show</span>
+
+<span class="kt">PlutusTx</span><span class="o">.</span><span class="n">unstableMakeIsData</span> <span class="kt">&#39;&#39;OracleRedeemer</span>
+</pre></div>
+</div>
+<p>We need to define the NFT asset class. As mentioned, we are going to use the empty string for the token name.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE oracleTokenName #-}</span>
+<span class="nf">oracleTokenName</span> <span class="ow">::</span> <span class="kt">TokenName</span>
+<span class="nf">oracleTokenName</span> <span class="ow">=</span> <span class="kt">TokenName</span> <span class="n">emptyByteString</span>
+</pre></div>
+</div>
+<p>The <em>oracleAsset</em> will be used to identify the NFT - this is not to be confused with <em>oAsset</em>, defined above.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE oracleAsset #-}</span>
+<span class="nf">oracleAsset</span> <span class="ow">::</span> <span class="kt">Oracle</span> <span class="ow">-&gt;</span> <span class="kt">AssetClass</span>
+<span class="nf">oracleAsset</span> <span class="n">oracle</span> <span class="ow">=</span> <span class="kt">AssetClass</span> <span class="p">(</span><span class="n">oSymbol</span> <span class="n">oracle</span><span class="p">,</span> <span class="n">oracleTokenName</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We create a little helper function called <em>oracleValue</em>. This takes an output transaction and a function which looks up the datum, and then returns an <em>Integer</em>. The <em>Integer</em> represents the exchange rate (e.g. 1.75) multiplied
+by a million. This avoids potential complicates using real numbers.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE oracleValue #-}</span>
+<span class="nf">oracleValue</span> <span class="ow">::</span> <span class="kt">TxOut</span> <span class="ow">-&gt;</span> <span class="p">(</span><span class="kt">DatumHash</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Datum</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>
+<span class="nf">oracleValue</span> <span class="n">o</span> <span class="n">f</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">dh</span>      <span class="ow">&lt;-</span> <span class="n">txOutDatum</span> <span class="n">o</span>
+    <span class="kt">Datum</span> <span class="n">d</span> <span class="ow">&lt;-</span> <span class="n">f</span> <span class="n">dh</span>
+    <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">fromData</span> <span class="n">d</span>
+</pre></div>
+</div>
+<p>This function is an example of monadic computation in monad that is not <em>IO</em> or the <em>Contract</em> monad. First we call <em>txOutDatum</em>, which can fail if because not every output has a datum. If it succeeds, we get a datum hash
+which we can reference in <em>dh</em>. Next we used the function <em>f</em> which is provided as the second argument to maybe turn this datum hash into a datum. This too can fail. If it succeeds we can reference the result in <em>d</em>. <em>Datum</em>
+is just a newtype wrapper around <em>Data</em>, so we can then use <em>PlutusTx.fromData</em> to maybe turn <em>d</em> into an <em>Integer</em>. Again, this can fail, because even if the datum is there, it may not be convertible to an integer value.</p>
+<p>We will see in a moment where we use the <em>oracleValue</em> function.</p>
+<p>The most important function is <em>mkOracleValidator</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkOracleValidator #-}</span>
+<span class="nf">mkOracleValidator</span> <span class="ow">::</span> <span class="kt">Oracle</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">OracleRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">mkOracleValidator</span> <span class="n">oracle</span> <span class="n">x</span> <span class="n">r</span> <span class="n">ctx</span> <span class="ow">=</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;token missing from input&quot;</span>  <span class="n">inputHasToken</span>  <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;token missing from output&quot;</span> <span class="n">outputHasToken</span> <span class="o">&amp;&amp;</span>
+    <span class="kr">case</span> <span class="n">r</span> <span class="kr">of</span>
+        <span class="kt">Update</span> <span class="ow">-&gt;</span> <span class="n">traceIfFalse</span> <span class="s">&quot;operator signature missing&quot;</span> <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="o">$</span> <span class="n">oOperator</span> <span class="n">oracle</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+                  <span class="n">traceIfFalse</span> <span class="s">&quot;invalid output datum&quot;</span>       <span class="n">validOutputDatum</span>
+        <span class="kt">Use</span>    <span class="ow">-&gt;</span> <span class="n">traceIfFalse</span> <span class="s">&quot;oracle value changed&quot;</span>       <span class="p">(</span><span class="n">outputDatum</span> <span class="o">==</span> <span class="kt">Just</span> <span class="n">x</span><span class="p">)</span>              <span class="o">&amp;&amp;</span>
+                  <span class="n">traceIfFalse</span> <span class="s">&quot;fees not paid&quot;</span>              <span class="n">feesPaid</span>
+  <span class="kr">where</span>
+    <span class="n">info</span> <span class="ow">::</span> <span class="kt">TxInfo</span>
+    <span class="n">info</span> <span class="ow">=</span> <span class="n">scriptContextTxInfo</span> <span class="n">ctx</span>
+
+    <span class="n">ownInput</span> <span class="ow">::</span> <span class="kt">TxOut</span>
+    <span class="n">ownInput</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">findOwnInput</span> <span class="n">ctx</span> <span class="kr">of</span>
+        <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">traceError</span> <span class="s">&quot;oracle input missing&quot;</span>
+        <span class="kt">Just</span> <span class="n">i</span>  <span class="ow">-&gt;</span> <span class="n">txInInfoResolved</span> <span class="n">i</span>
+
+    <span class="n">inputHasToken</span> <span class="ow">::</span> <span class="kt">Bool</span>
+    <span class="n">inputHasToken</span> <span class="ow">=</span> <span class="n">assetClassValueOf</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="p">(</span><span class="n">oracleAsset</span> <span class="n">oracle</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="n">ownOutput</span> <span class="ow">::</span> <span class="kt">TxOut</span>
+    <span class="n">ownOutput</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">getContinuingOutputs</span> <span class="n">ctx</span> <span class="kr">of</span>
+        <span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">o</span>
+        <span class="kr">_</span>   <span class="ow">-&gt;</span> <span class="n">traceError</span> <span class="s">&quot;expected exactly one oracle output&quot;</span>
+
+    <span class="n">outputHasToken</span> <span class="ow">::</span> <span class="kt">Bool</span>
+    <span class="n">outputHasToken</span> <span class="ow">=</span> <span class="n">assetClassValueOf</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownOutput</span><span class="p">)</span> <span class="p">(</span><span class="n">oracleAsset</span> <span class="n">oracle</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+
+    <span class="n">outputDatum</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>
+    <span class="n">outputDatum</span> <span class="ow">=</span> <span class="n">oracleValue</span> <span class="n">ownOutput</span> <span class="p">(`</span><span class="n">findDatum</span><span class="p">`</span> <span class="n">info</span><span class="p">)</span>
+
+    <span class="n">validOutputDatum</span> <span class="ow">::</span> <span class="kt">Bool</span>
+    <span class="n">validOutputDatum</span> <span class="ow">=</span> <span class="n">isJust</span> <span class="n">outputDatum</span>
+
+    <span class="n">feesPaid</span> <span class="ow">::</span> <span class="kt">Bool</span>
+    <span class="n">feesPaid</span> <span class="ow">=</span>
+      <span class="kr">let</span>
+        <span class="n">inVal</span>  <span class="ow">=</span> <span class="n">txOutValue</span> <span class="n">ownInput</span>
+        <span class="n">outVal</span> <span class="ow">=</span> <span class="n">txOutValue</span> <span class="n">ownOutput</span>
+      <span class="kr">in</span>
+        <span class="n">outVal</span> <span class="p">`</span><span class="n">geq</span><span class="p">`</span> <span class="p">(</span><span class="n">inVal</span> <span class="o">&lt;&gt;</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="p">(</span><span class="n">oFee</span> <span class="n">oracle</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>The function <em>mkOracleValidator</em> takes our parameter <em>Oracle</em>, the datum, which, in this example is an <em>Integer</em>, the redeemer type <em>OracleRedeemer</em> and finally the <em>ScriptContext</em>.</p>
+<p>There are two cases for this validator - <em>use</em> and <em>update</em> - but there are similarities. In both cases we want to check that we have the input that holds the NFT and that there is an output that holds the NFT.</p>
+<p>As both these checks need to be done regardless of the use case, they are done upfront.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="nf">traceIfFalse</span> <span class="s">&quot;token missing from input&quot;</span>  <span class="n">inputHasToken</span>  <span class="o">&amp;&amp;</span>
+<span class="nf">traceIfFalse</span> <span class="s">&quot;token missing from output&quot;</span> <span class="n">outputHasToken</span> <span class="o">&amp;&amp;</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>After this, we consider which use case we are dealing with.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">case</span> <span class="n">r</span> <span class="kr">of</span>
+    <span class="kt">Update</span> <span class="ow">-&gt;</span> <span class="n">traceIfFalse</span> <span class="s">&quot;operator signature missing&quot;</span> <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="o">$</span> <span class="n">oOperator</span> <span class="n">oracle</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+              <span class="n">traceIfFalse</span> <span class="s">&quot;invalid output datum&quot;</span>       <span class="n">validOutputDatum</span>
+    <span class="kt">Use</span>    <span class="ow">-&gt;</span> <span class="n">traceIfFalse</span> <span class="s">&quot;oracle value changed&quot;</span>       <span class="p">(</span><span class="n">outputDatum</span> <span class="o">==</span> <span class="kt">Just</span> <span class="n">x</span><span class="p">)</span>              <span class="o">&amp;&amp;</span>
+              <span class="n">traceIfFalse</span> <span class="s">&quot;fees not paid&quot;</span>              <span class="n">feesPaid</span>
+</pre></div>
+</div>
+<p>Before looking at the <em>inputHasToken</em> function there is another help function to look at.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">ownInput</span> <span class="ow">::</span> <span class="kt">TxOut</span>
+<span class="nf">ownInput</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">findOwnInput</span> <span class="n">ctx</span> <span class="kr">of</span>
+    <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="n">traceError</span> <span class="s">&quot;oracle input missing&quot;</span>
+    <span class="kt">Just</span> <span class="n">i</span>  <span class="ow">-&gt;</span> <span class="n">txInInfoResolved</span> <span class="n">i</span>
+</pre></div>
+</div>
+<p>The <em>ownInput</em> function returns the <em>TxOut</em> that the script is trying to consume, which in this case is the oracle output. The <em>Nothing</em> case here can happen if we are in a different context, such as a minting context, so
+this eventuality will not occur for us. The <em>findOwnInput</em> function is provided by Plutus and will, given the context, find the relevant input.</p>
+<p>The <em>inputHashToken</em> function checks that the token is present. It uses the <em>assetClassValueOf</em> function to look for the NFT within the <em>ownInput</em> response.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">inputHasToken</span> <span class="ow">::</span> <span class="kt">Bool</span>
+<span class="nf">inputHasToken</span> <span class="ow">=</span> <span class="n">assetClassValueOf</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="p">(</span><span class="n">oracleAsset</span> <span class="n">oracle</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>The next helper function, <em>ownOutput</em> checks that we have exactly one output and returns that output to us.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">ownOutput</span> <span class="ow">::</span> <span class="kt">TxOut</span>
+<span class="nf">ownOutput</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">getContinuingOutputs</span> <span class="n">ctx</span> <span class="kr">of</span>
+    <span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">o</span>
+    <span class="kr">_</span>   <span class="ow">-&gt;</span> <span class="n">traceError</span> <span class="s">&quot;expected exactly one oracle output&quot;</span>
+</pre></div>
+</div>
+<p>We can use this for the <em>outputHasToken</em> helper function in the same way as we did for the <em>inputHashToken</em> function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">outputHasToken</span> <span class="ow">::</span> <span class="kt">Bool</span>
+<span class="nf">outputHasToken</span> <span class="ow">=</span> <span class="n">assetClassValueOf</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownOutput</span><span class="p">)</span> <span class="p">(</span><span class="n">oracleAsset</span> <span class="n">oracle</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>That covers the code for the common cases. Now, let’s let at the code specific to the <em>update</em> case.</p>
+<p>There are two conditions to check. The first is that the operator actually signed the transaction. This is so simple that we can do it inline without
+a helper function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">traceIfFalse</span> <span class="s">&quot;operator signature missing&quot;</span> <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="o">$</span> <span class="n">oOperator</span> <span class="n">oracle</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The next thing to check is that the output datum. We know that the value can change, but we need to check that it is at least of the correct type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">traceIfFalse</span> <span class="s">&quot;invalid output datum&quot;</span> <span class="n">validOutputDatum</span>
+</pre></div>
+</div>
+<p>And for this we have referenced a new helper function <em>validOutputDatum</em>, which itself makes use of a helper function <em>outputDatum</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">outputDatum</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>
+<span class="nf">outputDatum</span> <span class="ow">=</span> <span class="n">oracleValue</span> <span class="n">ownOutput</span> <span class="p">(`</span><span class="n">findDatum</span><span class="p">`</span> <span class="n">info</span><span class="p">)</span>
+
+<span class="nf">validOutputDatum</span> <span class="ow">::</span> <span class="kt">Bool</span>
+<span class="nf">validOutputDatum</span> <span class="ow">=</span> <span class="n">isJust</span> <span class="n">outputDatum</span>
+</pre></div>
+</div>
+<p>This works by trying to get the datum value from the datum hash and then trying to create the oracle value from it. If it succeeds it will return a <em>Just Integer</em>,
+otherwise it will return <em>Nothing</em>, so the <em>validOutputDatum</em> function just needs to check that the return value is not <em>Nothing</em>, in other words, that it
+is a <em>Just</em>.</p>
+<p>Note that we are not checking anything about the value of the <em>Integer</em>. This could even remain the same as the input value, if the transaction is used
+just to collect the fees that have accumulated from the use the oracle.</p>
+<p>The second case for <em>mkOracleValidator</em> is the <em>use</em> case. This case can be used by anyone, but it is much more restrictive.</p>
+<p>First, we don’t allow the value to change. So this is the first condition.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">traceIfFalse</span> <span class="s">&quot;oracle value changed&quot;</span> <span class="p">(</span><span class="n">outputDatum</span> <span class="o">==</span> <span class="kt">Just</span> <span class="n">x</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We have already written the <em>outputDatum</em> helper function. Instead of checking only that it is an <em>Integer</em>, here we also check that its output value is the same
+as the input value.</p>
+<p>And finally, we must check that the fees have been paid. And for this we use a new helper function called <em>feesPaid</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">feesPaid</span> <span class="ow">::</span> <span class="kt">Bool</span>
+<span class="nf">feesPaid</span> <span class="ow">=</span>
+  <span class="kr">let</span>
+    <span class="n">inVal</span>  <span class="ow">=</span> <span class="n">txOutValue</span> <span class="n">ownInput</span>
+    <span class="n">outVal</span> <span class="ow">=</span> <span class="n">txOutValue</span> <span class="n">ownOutput</span>
+  <span class="kr">in</span>
+    <span class="n">outVal</span> <span class="p">`</span><span class="n">geq</span><span class="p">`</span> <span class="p">(</span><span class="n">inVal</span> <span class="o">&lt;&gt;</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="p">(</span><span class="n">oFee</span> <span class="n">oracle</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>This <em>feesPaid</em> function checks that the output value is at least as much as the input value plus the required fee. We again use the semigroup operator
+<em>&lt;&gt;</em> to add the fee value to the input value. We could have used equal (eq) instead of greater than or equal (geq). Using <em>geq</em> allows the user of the
+oracle to give the oracle provider a tip, if they so wish.</p>
+<p>So this now is basically the core business logic of the oracle as shown in the diagrams.</p>
+<div class="figure align-default">
+<img alt="_images/week06__00006.png" src="_images/week06__00006.png" />
+</div>
 </div>
 </div>
 </div>

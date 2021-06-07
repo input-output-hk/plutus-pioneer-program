@@ -368,6 +368,13 @@ And finally, we must check that the fees have been paid. And for this we use a n
       in
         outVal `geq` (inVal <> Ada.lovelaceValueOf (oFee oracle))    
 
+This *feesPaid* function checks that the output value is at least as much as the input value plus the required fee. We again use the semigroup operator 
+*<>* to add the fee value to the input value. We could have used equal (eq) instead of greater than or equal (geq). Using *geq* allows the user of the 
+oracle to give the oracle provider a tip, if they so wish.
+
+So this now is basically the core business logic of the oracle as shown in the diagrams.
+
+.. figure:: img/week06__00006.png
 
 
 

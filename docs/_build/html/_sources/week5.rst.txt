@@ -872,6 +872,8 @@ We we are interested in this field:
 
 Let's look at the type *TxInInfo*
 
+.. code:: haskell
+    
     Prelude Week05.Signed Ledger Week05.Free> :i TxInInfo
     type TxInInfo :: *
     data TxInInfo
