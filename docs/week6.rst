@@ -577,7 +577,14 @@ First we create a helper function *findOracle*.
         f :: TxOutTx -> Bool
         f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1
         
-        
+The purpose of *findOracle* is to look up the existing oracle UTxO. This can fail because the oracle might not be there. This will happen if we have just started the
+oracles and have not yet created a UTxO with the oracle value. But, if we find it, we return a triple containing the UTxO identifer (TxOutRef), the UTxO itself, which 
+contains all the data (TxOutTx) and the oracle value (the current exchange rate held by the oracle). The *Integer* containing the oracle value is encoded also in the
+TxOutTx value, but we add it to the triple to make it easier to work with.
+
+
+
+
 
         
 
