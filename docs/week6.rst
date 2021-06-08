@@ -621,6 +621,31 @@ In the off-chain code, we can use the following function parameter
 
 Here, *txData* is a field of the transaction and it is a map from datum hashes to datums. We get the transaction from *txOutTxTx o*.
 
+If this all succeeds, when will return the triple (oref, o, x), where x is the *Integer* value of the oracle.
+
+Now that we have written the *findOracle* function we can look at the *updateOracle* function.
+
+.. code:: haskell
+
+    updateOracle :: forall w s. HasBlockchainActions s => Oracle -> Integer -> Contract w s Text ()
+    updateOracle oracle x = do
+        m <- findOracle oracle
+        let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
+        case m of
+            Nothing -> do
+                ledgerTx <- submitTxConstraints (oracleInst oracle) c
+                awaitTxConfirmed $ txId ledgerTx
+                logInfo @String $ "set initial oracle value to " ++ show x
+            Just (oref, o,  _) -> do
+                let lookups = Constraints.unspentOutputs (Map.singleton oref o)     <>
+                              Constraints.scriptInstanceLookups (oracleInst oracle) <>
+                              Constraints.otherScript (oracleValidator oracle)
+                    tx      = c <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Update)
+                ledgerTx <- submitTxConstraintsWith @Oracling lookups tx
+                awaitTxConfirmed $ txId ledgerTx
+                logInfo @String $ "updated oracle value to " ++ show x
+                
+                
 
 
 
