@@ -50,6 +50,7 @@ main = void $ Simulator.runSimulationWith handlers $ do
                     _                                   -> Nothing
     _        <- Simulator.waitUntilFinished cidInit
 
+    liftIO $ LB.writeFile "symbol.json" $ encode cs
     logString @(Builtin UniswapContracts) $ "Initialization finished. Minted: " ++ show cs
 
     cidStart <- Simulator.activateContract (Wallet 1) UniswapStart

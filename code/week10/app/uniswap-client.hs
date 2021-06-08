@@ -16,7 +16,7 @@ import           Data.Monoid                             (Last (..))
 import           Data.Proxy                              (Proxy (..))
 import           Data.Text                               (Text, pack)
 import           Data.UUID
-import           Ledger.Value                            (flattenValue)
+import           Ledger.Value                            (CurrencySymbol, flattenValue)
 import           Network.HTTP.Req
 import           Plutus.Contracts.Uniswap                (Uniswap, UserContractState (..))
 import           Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
@@ -34,14 +34,16 @@ main = do
     w   <- Wallet . read . head <$> getArgs
     cid <- read                 <$> readFile (cidFile w)
     mus <- decode               <$> LB.readFile "uniswap.json"
-    case mus of
-        Nothing -> putStrLn "invalid uniswap.json" >> exitFailure
-        Just us -> do
+    mcs <- decode               <$> LB.readFile "symbol.json"
+    case (mus, mcs) of
+        (Just us, Just cs) -> do
             putStrLn $ "cid: " ++ show cid
             putStrLn $ "uniswap: " ++ show (us :: Uniswap)
+            putStrLn $ "symbol: " ++ show (cs :: CurrencySymbol)
             forever $ do
                 getFunds cid
                 threadDelay 1_000_000
+        _ -> putStrLn "invalid uniswap.json and/or symbol.json" >> exitFailure
 
 getFunds :: UUID -> IO ()
 getFunds uuid = handle h $ runReq defaultHttpConfig $ do
