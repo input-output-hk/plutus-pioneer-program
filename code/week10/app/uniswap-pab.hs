@@ -57,7 +57,6 @@ main = void $ Simulator.runSimulationWith handlers $ do
     us       <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.Uniswap))) of
                     Success (Monoid.Last (Just (Right us))) -> Just us
                     _                                       -> Nothing
-    liftIO $ LB.writeFile "uniswap.json" $ encode us
     logString @(Builtin UniswapContracts) $ "Uniswap instance created: " ++ show us
 
     forM_ wallets $ \w -> do
