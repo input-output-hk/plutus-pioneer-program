@@ -523,6 +523,23 @@ So, let's look at the *startOracle* function.
 Here we see the error conversion function is provided as *pack . show*. The *show* function converts the error to a *String* and the *pack* function converts a *String*
 to a *Data.Text* type.
 
+At this point, *osc* holds the *OneShotCurrency*, and we can then use the *currencySymbol* function to get the currency symbol as *cs*.
+
+The *currencySymbol* function has type
+
+.. code:: haskell
+    
+    currencySymbol
+          :: OneShotCurrency -> Plutus.V1.Ledger.Value.CurrencySymbol
+
+And is used accordingly
+
+.. code:: haskell
+
+    let cs = Currency.currencySymbol osc
+    
+Now we have minted our NFT and it has currency symbol *cs*.
+
 
         
 
