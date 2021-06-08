@@ -703,9 +703,24 @@ the oracle validator.
     Constraints.scriptInstanceLookups (oracleInst oracle) <>
     Constraints.otherScript (oracleValidator oracle)
 
+We didn't need to provide the *scriptInstanceLookups* lookup in the first case, as we were able to pass *oracleInst oracle* to the *submitTxConstraints* function. However,
+with the *submitTxConstraintsWith* function, we don't have that option.
 
+When submitting the transaction, we need to give the compiler a little nudge to let it know the script we are talking about - so that it knows, for example, what The Script is in *mustPayToTheScript*. For 
+this we reference the *Oracling* type.
 
+.. code:: haskell
 
+    ledgerTx <- submitTxConstraintsWith @Oracling lookups tx
+
+Hopefully now we have a valid transaction that gets submitted, and then we wait for it to be confirmed, and write some logging information.
+
+.. code:: haskell
+
+    awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "updated oracle value to " ++ show x
+    
+    
 
 
 
