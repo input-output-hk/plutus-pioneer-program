@@ -499,7 +499,34 @@ Luckily there is a function that can helper
        -> Plutus.Contract.Types.Contract w s e a
        -> Plutus.Contract.Types.Contract w s e' a
 
-Given a *Contract*, it allows us to create a new *Contract* with a new type of error message.
+Given a *Contract*, it allows us to create a new *Contract* with a new type of error message. That is provided we give a function that converts from the first error 
+type to the second error type.
+
+So, let's look at the *startOracle* function.
+
+.. code:: haskell
+
+    startOracle :: forall w s. HasBlockchainActions s => OracleParams -> Contract w s Text Oracle
+    startOracle op = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        osc <- mapError (pack . show) (forgeContract pkh [(oracleTokenName, 1)] :: Contract w s CurrencyError OneShotCurrency)
+        let cs     = Currency.currencySymbol osc
+            oracle = Oracle
+                { oSymbol   = cs
+                , oOperator = pkh
+                , oFee      = opFees op
+                , oAsset    = AssetClass (opSymbol op, opToken op)
+                }
+        logInfo @String $ "started oracle " ++ show oracle
+        return oracle
+        
+Here we see the error conversion function is provided as *pack . show*. The *show* function converts the error to a *String* and the *pack* function converts a *String*
+to a *Data.Text* type.
+
+
+        
+
+
 
 
 
