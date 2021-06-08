@@ -18,7 +18,7 @@ import           Data.Text                               (Text, pack)
 import           Data.UUID
 import           Ledger.Value                            (CurrencySymbol, flattenValue)
 import           Network.HTTP.Req
-import           Plutus.Contracts.Uniswap                (Uniswap, UserContractState (..))
+import qualified Plutus.Contracts.Uniswap                as US
 import           Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
 import           Plutus.PAB.Webserver.Types
 import           System.Environment                      (getArgs)
@@ -38,12 +38,27 @@ main = do
     case (mus, mcs) of
         (Just us, Just cs) -> do
             putStrLn $ "cid: " ++ show cid
-            putStrLn $ "uniswap: " ++ show (us :: Uniswap)
+            putStrLn $ "uniswap: " ++ show (us :: US.Uniswap)
             putStrLn $ "symbol: " ++ show (cs :: CurrencySymbol)
-            forever $ do
-                getFunds cid
-                threadDelay 1_000_000
+            go cid
         _ -> putStrLn "invalid uniswap.json and/or symbol.json" >> exitFailure
+  where
+    go :: UUID -> IO a
+    go cid = do
+        cmd <- readCommandIO
+        case cmd of
+            Funds -> getFunds cid
+            Pools -> getPools cid
+        go cid
+
+data Command = Funds | Pools
+    deriving (Show, Read, Eq, Ord)
+
+readCommandIO :: IO Command
+readCommandIO = do
+    putStrLn "Enter a command: Funds, Pools"
+    s <- getLine
+    maybe readCommandIO return $ readMaybe s
 
 getFunds :: UUID -> IO ()
 getFunds uuid = handle h $ runReq defaultHttpConfig $ do
@@ -64,9 +79,35 @@ getFunds uuid = handle h $ runReq defaultHttpConfig $ do
                 (Proxy :: Proxy (JsonResponse (ContractInstanceClientState UniswapContracts)))
                 (port 8080)
             liftIO $ putStrLn $ case fromJSON $ observableState $ cicCurrentState $ responseBody w of
-                Success (Last (Just (Right (Funds f)))) -> "funds: " ++ show (flattenValue f)
-                Success (Last (Just (Left e)))          -> "error: " ++ show (e :: Text)
-                _                               -> "error decoding state"
+                Success (Last (Just (Right (US.Funds f)))) -> "funds: " ++ show (flattenValue f)
+                Success (Last (Just (Left e)))             -> "error: " ++ show (e :: Text)
+                _                                          -> "error decoding state"
+  where
+    h :: HttpException -> IO ()
+    h _ = threadDelay 1_000_000 >> getFunds uuid
+
+getPools :: UUID -> IO ()
+getPools uuid = handle h $ runReq defaultHttpConfig $ do
+    v <- req
+        POST
+        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "pools")
+        (ReqBodyJson ())
+        (Proxy :: Proxy (JsonResponse ()))
+        (port 8080)
+    if responseStatusCode v /= 200
+        then liftIO $ putStrLn "error getting funds"
+        else do
+            liftIO $ threadDelay 2_000_000
+            w <- req
+                GET
+                (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "status")
+                NoReqBody
+                (Proxy :: Proxy (JsonResponse (ContractInstanceClientState UniswapContracts)))
+                (port 8080)
+            liftIO $ putStrLn $ case fromJSON $ observableState $ cicCurrentState $ responseBody w of
+                Success (Last (Just (Right (US.Pools ps)))) -> "pools: " ++ show ps
+                Success (Last (Just (Left e)))              -> "error: " ++ show (e :: Text)
+                _                                           -> "error decoding state"
   where
     h :: HttpException -> IO ()
     h _ = threadDelay 1_000_000 >> getFunds uuid
