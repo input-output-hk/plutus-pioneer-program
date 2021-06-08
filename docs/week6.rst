@@ -646,6 +646,28 @@ Now that we have written the *findOracle* function we can look at the *updateOra
                 logInfo @String $ "updated oracle value to " ++ show x
                 
                 
+After the *findOracle* line there is a helper function definition, as we will need this constraint twice.
+
+.. code:: haskell
+
+    let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
+
+After looking for the oracle, there are wo possibilities - either we found it or we did not.
+
+If we didn't find it, then we have started the oracle but we have not yet provided an initial value. This is the first case. And in this case, all we have to 
+do is to submit a transaction that produces the first value for the oracle.
+
+.. code:: haskell
+
+    ledgerTx <- submitTxConstraints (oracleInst oracle) c
+    awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "set initial oracle value to " ++ show x
+    
+    
+
+
+
+
 
 
 
