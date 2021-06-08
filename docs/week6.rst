@@ -663,7 +663,48 @@ do is to submit a transaction that produces the first value for the oracle.
     awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "set initial oracle value to " ++ show x
     
-    
+Here is the first usage of the *c* helper function. It provides the constraint *mustPayToTheScript* which ensures that the transaction will have an output 
+that pays to a script address. As arguments it takes the datum *x* and the NFT. The script that it must pay to is always the script that is in focus - here it is
+the first parameter to *submitTxConstraints* - *(oracleInst oracle)*.
+
+We then wait for confirmation and write a log message. And this is all we need to do for this case.
+
+In the other case, where we already have a value, we need to reference the UTxO parts, but we don't care about the current datum, as we are going to update it anyway.
+
+.. code:: haskell
+
+    Just (oref, o,  _) -> do
+
+Now it gets a bit more complicated, because now we need two conditions.
+
+The first constraint is the same as in the other case - the constraint referenced by the helper function *c*. But there is now an extra constraint that we must also 
+consume the existing UTxO.
+
+.. code:: haskell
+
+    tx = c <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Update)
+
+The *mustSpendScriptOutput* function is basically the opposite of *mustPayToTheScript*. It creates an input to this script address. As parameters it takes the reference 
+to the UTxO we want to consume, and it takes a *Redeemer*. In this case the *Redeemer* is *Update* and it is converted to the Plutus *Data* type.
+
+In order for this to work we need to provide some lookups.
+
+In order to find the output *oref* that it wants to spend, we must use the *unspentOutputs* lookup, and in this case, we just provide the lookup with one UTxO.
+
+.. code:: haskell
+
+    Constraints.unspentOutputs (Map.singleton oref o)
+
+Then we must provide the script instances. We need to do this twice, once for the input side, and once for the output side. For this, we provide the oracle instance and 
+the oracle validator.
+
+.. code:: haskell
+
+    Constraints.scriptInstanceLookups (oracleInst oracle) <>
+    Constraints.otherScript (oracleValidator oracle)
+
+
+
 
 
 
