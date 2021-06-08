@@ -582,6 +582,50 @@ oracles and have not yet created a UTxO with the oracle value. But, if we find i
 contains all the data (TxOutTx) and the oracle value (the current exchange rate held by the oracle). The *Integer* containing the oracle value is encoded also in the
 TxOutTx value, but we add it to the triple to make it easier to work with.
 
+The first thing we do is to get all the UTxOs sitting at this address. But only one of these will be the one we are looking for - the one that contains the NFT.
+
+We do this by using the *Map.filter* function which takes a function as a parameter which, in this case, returns True for the UTxO where the NFT is present.
+
+.. code:: haskell
+
+    utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
+    ...
+    where
+      f :: TxOutTx -> Bool
+      f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1    
+
+We will end up with a map in *utxos* which is either empty or contains one item. Now, we distinguish between these two cases.
+
+.. code:: haskell
+
+    return $ case Map.toList utxos of
+        [(oref, o)] -> do
+            x <- oracleValue (txOutTxOut o) $ \dh -> Map.lookup dh $ txData $ txOutTxTx o
+            return (oref, o, x)
+        _           -> Nothing
+        
+We convert the map to a list of tuples representing key value pairs of transaction ids and the transactions themselves.
+
+For the case where there is no element, we use the _ case to represent all other cases. This could only ever be the empty list, but the compiler doesn't know that.
+
+If, however, we have found the UTxO, then, as we already have its id and transaction, we just need to find its *Integer* value. This part could still go wrong. Even 
+though we have found the correct UTxO, there could be some corrupt data in it for whatever reason.
+
+We use the *oracleValue* function that we used also in validation. This function takes a *TxOut* parameter followed by a second parameter is a function, which, given a datum hash will return the associated datum.
+
+In the off-chain code, we can use the following function parameter
+
+.. code:: haskell
+
+    \dh -> Map.lookup dh $ txData $ txOutTxTx o
+
+Here, *txData* is a field of the transaction and it is a map from datum hashes to datums. We get the transaction from *txOutTxTx o*.
+
+
+
+
+
+
 
 
 
