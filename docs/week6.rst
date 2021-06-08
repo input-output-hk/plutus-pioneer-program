@@ -789,6 +789,21 @@ However, if the second *Last* is a nothing, it will return the first one.
 
 If both are *Nothing*, it will be *Nothing*.
 
+*Last* is very useful because it allows us to keep the current state. The value of the log will basically be the last *Just* we told.
+
+In this contract we will only do that once. In the beginning it will be *Last Nothing*. Then we mint the NFT, and then, when we get the oracle value in 
+*runOracle*, and then *tell* it, it will always have that value. If other contracts from the outside query the state, they will always get the *Just oracle*, so 
+they will be able to discover the value of the oracle.
+
+So, next in *runOracle*, we call the helper function *go*. What this does is to block at the update endpoint. As soon as someone provides an *Integer* as the new value,
+it will call the *updateOracle* function with the new value, and then just loop to go again.
+
+In summary, *runOracle* starts the oracle, tells the oracle, then loops to allow others to update the oracle.
+
+And that concludes the code for the oracle itself. What is now missing is an example, a contract that actually uses the oracle - a swap contract. And also using the
+Plutus Application Backend to run this code in the real world or, in our case, in a simulated blockchain.
+
+
 
     
 
