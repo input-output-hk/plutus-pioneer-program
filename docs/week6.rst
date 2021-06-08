@@ -481,6 +481,30 @@ There is one slight problem. This is not compatible with what we want. We want t
 An arbitrary writer type (because we don't make use of it), an arbitrary schema (as long as we have *BlockChainActions* available), *Text* error messages and a return 
 type of *Oracle*.
 
+The problem is that the *Contract* returned by *forgeContract* doesn't allow *Text* error messages. You can see this in the verbose output from the REPL - there is 
+a constraint on the *e* parameter.
+
+.. code:: haskell
+
+    Plutus.Contracts.Currency.AsCurrencyError e,
+
+Unfortunately *Text* doesn't implement *AsCurrencyError*.
+
+Luckily there is a function that can helper
+
+.. code:: haskell
+
+    Plutus.Contract.mapError
+    :: (e -> e')
+       -> Plutus.Contract.Types.Contract w s e a
+       -> Plutus.Contract.Types.Contract w s e' a
+
+Given a *Contract*, it allows us to create a new *Contract* with a new type of error message.
+
+
+
+
+
 
 
 
