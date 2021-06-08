@@ -720,7 +720,84 @@ Hopefully now we have a valid transaction that gets submitted, and then we wait 
     awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "updated oracle value to " ++ show x
     
+Remember, we talked about fee collecting earlier. This will happen automatically. The function *submitTxConstraintsWith* will send the fees to our own wallet. It does 
+this because there is an imbalance between the value attached to the input, which includes the fees and the NFT, and the value we have said must be paid to the script,
+which is just the NFT.
+
+This process will also automatically create an extra input from our own input to pay the transaction fees for executing the transaction.
+
+Lastly, we provide a function that combines these two operations, *startOracle* and *updateOracle* into one contract. This will make it possible to use in the playground 
+and the *EmulatorTrace* monad, as well as in the PAB.
+
+.. code:: haskell
+
+    type OracleSchema = BlockchainActions .\/ Endpoint "update" Integer
+
+    runOracle :: OracleParams -> Contract (Last Oracle) OracleSchema Text ()
+    runOracle op = do
+        oracle <- startOracle op
+        tell $ Last $ Just oracle
+        go oracle
+      where
+        go :: Oracle -> Contract (Last Oracle) OracleSchema Text a
+        go oracle = do
+            x <- endpoint @"update"
+            updateOracle oracle x
+            go oracle
     
+The function *runOracle* first starts the oracle. Then, for reasons that will become clear later, we use *tell* to write the oracle parameter. We need to be able to
+communicate the parameter value of the oracle to the outside world, so that people can use the oracle. We will not know until runtime the currency symbol that will be used
+for the NFT, so we don't know the value of the oracle parameter yet.
+
+Remember that *tell* expects a *Monoid* type. The typical example is a list of strings that get concatenated to one list of all log messages.
+
+But it doesn't have to be lists. In *Data.Monoid* we have this *Last* Monoid.
+
+.. code:: haskell
+
+    Prelude Week06.Oracle.Core> import Data.Monoid (Last (..))
+    Prelude Data.Monoid Week06.Oracle.Core> :i Last
+    type Last :: * -> *
+    newtype Last a = Last {getLast :: Maybe a}
+          -- Defined in ‘Data.Monoid’
+    instance Applicative Last -- Defined in ‘Data.Monoid’
+    instance Eq a => Eq (Last a) -- Defined in ‘Data.Monoid’
+    instance Functor Last -- Defined in ‘Data.Monoid’
+    instance Monad Last -- Defined in ‘Data.Monoid’
+    instance Monoid (Last a) -- Defined in ‘Data.Monoid’
+    instance Ord a => Ord (Last a) -- Defined in ‘Data.Monoid’
+    instance Semigroup (Last a) -- Defined in ‘Data.Monoid’
+    instance Show a => Show (Last a) -- Defined in ‘Data.Monoid’
+    instance Read a => Read (Last a) -- Defined in ‘Data.Monoid’
+    instance Traversable Last -- Defined in ‘Data.Traversable’
+    instance Foldable Last -- Defined in ‘Data.Foldable’
+
+We see that it is just a *newtype* wrapper around *Maybe*. The point is to provide a specific *Monoid* instance. The idea, as the name suggests, is that it is
+a monoid operation that always remembers the last Just value. For example:
+
+.. code:: haskell
+
+    Prelude Data.Monoid Week06.Oracle.Core> Last (Just 'x') <> Last (Just 'y')
+    Last {getLast = Just 'y'}
+    
+However, if the second *Last* is a nothing, it will return the first one.
+
+.. code:: haskell
+
+    Prelude Data.Monoid Week06.Oracle.Core> Last (Just 'x') <> Last Nothing
+    Last {getLast = Just 'x'}
+
+If both are *Nothing*, it will be *Nothing*.
+
+
+    
+
+
+
+
+
+
+
 
 
 
