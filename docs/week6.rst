@@ -469,8 +469,18 @@ The *forgeContract* function provides more general functionality than our previo
 to our NFT from last time, so there can only be one minting transaction. But for the one currency symbol, you can mint various tokens in the same transaction, with 
 various token names and in various quantities. The second parameter allows us to define these token names and quantities.
 
-And it gives us a *Contract* that returns the *OneShotCurrency* type. This type is specific to the currency and it doesn't really matter to us what it is. All that matters 
+And it gives us a *Contract* that returns a value of the *OneShotCurrency* type. This type is specific to the currency and it doesn't really matter to us what it is. All that matters 
 for us is that we can get the currency symbol out of it again.
+
+There is one slight problem. This is not compatible with what we want. We want this types
+
+.. code:: haskell
+
+    Contract w s Text Oracle
+
+An arbitrary writer type (because we don't make use of it), an arbitrary schema (as long as we have *BlockChainActions* available), *Text* error messages and a return 
+type of *Oracle*.
+
 
 
 
