@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds          #-}
 {-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE LambdaCase         #-}
@@ -18,13 +17,11 @@ import           Control.Monad.Freer                 (Eff, Member, interpret, ty
 import           Control.Monad.Freer.Error           (Error)
 import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON, Result (..), ToJSON, encode, fromJSON)
+import           Data.Aeson                          (Result (..), encode, fromJSON)
 import qualified Data.ByteString.Lazy                as LB
 import qualified Data.Monoid                         as Monoid
 import qualified Data.Semigroup                      as Semigroup
 import           Data.Text                           (Text)
-import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
-import           GHC.Generics                        (Generic)
 import           Plutus.Contract
 import qualified Plutus.Contracts.Currency           as Currency
 import qualified Plutus.Contracts.Uniswap            as Uniswap
@@ -37,9 +34,10 @@ import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Prelude                             hiding (init)
-import           Uniswap                             as US
 import           Wallet.Emulator.Types               (Wallet (..))
 import           Wallet.Types                        (ContractInstanceId (..))
+
+import           Uniswap                             as US
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
@@ -69,16 +67,6 @@ main = void $ Simulator.runSimulationWith handlers $ do
     void $ liftIO getLine
 
     shutdown
-
-data UniswapContracts =
-      Init
-    | UniswapStart
-    | UniswapUser Uniswap.Uniswap
-    deriving (Eq, Ord, Show, Generic)
-    deriving anyclass (FromJSON, ToJSON)
-
-instance Pretty UniswapContracts where
-    pretty = viaShow
 
 handleUniswapContract ::
     ( Member (Error PABError) effs

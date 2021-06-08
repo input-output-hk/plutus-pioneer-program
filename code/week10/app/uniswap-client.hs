@@ -8,16 +8,17 @@ module Main
 
 import           Control.Concurrent
 import           Control.Exception
+import           Control.Monad                           (forever)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Data.Aeson                              (Result (..), decode, fromJSON)
 import qualified Data.ByteString.Lazy as LB
 import           Data.Monoid                             (Last (..))
 import           Data.Proxy                              (Proxy (..))
-import           Data.Text                               (pack)
+import           Data.Text                               (Text, pack)
 import           Data.UUID
 import           Ledger.Value                            (flattenValue)
 import           Network.HTTP.Req
-import           Plutus.Contracts.Uniswap                (Uniswap)
+import           Plutus.Contracts.Uniswap                (Uniswap, UserContractState (..))
 import           Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
 import           Plutus.PAB.Webserver.Types
 import           System.Environment                      (getArgs)
@@ -26,7 +27,7 @@ import           System.IO
 import           Text.Read                               (readMaybe)
 import           Wallet.Emulator.Types                   (Wallet (..))
 
-import           Uniswap                                 (cidFile)
+import           Uniswap                                 (cidFile, UniswapContracts)
 
 main :: IO ()
 main = do
@@ -36,8 +37,37 @@ main = do
     case mus of
         Nothing -> putStrLn "invalid uniswap.json" >> exitFailure
         Just us -> do
-            putStrLn $ "cid: " ++ show (cid :: UUID)
+            putStrLn $ "cid: " ++ show cid
             putStrLn $ "uniswap: " ++ show (us :: Uniswap)
+            forever $ do
+                getFunds cid
+                threadDelay 1_000_000
+
+getFunds :: UUID -> IO ()
+getFunds uuid = handle h $ runReq defaultHttpConfig $ do
+    v <- req
+        POST
+        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "funds")
+        (ReqBodyJson ())
+        (Proxy :: Proxy (JsonResponse ()))
+        (port 8080)
+    if responseStatusCode v /= 200
+        then liftIO $ putStrLn "error getting funds"
+        else do
+            liftIO $ threadDelay 2_000_000
+            w <- req
+                GET
+                (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "status")
+                NoReqBody
+                (Proxy :: Proxy (JsonResponse (ContractInstanceClientState UniswapContracts)))
+                (port 8080)
+            liftIO $ putStrLn $ case fromJSON $ observableState $ cicCurrentState $ responseBody w of
+                Success (Last (Just (Right (Funds f)))) -> "funds: " ++ show (flattenValue f)
+                Success (Last (Just (Left e)))          -> "error: " ++ show (e :: Text)
+                _                               -> "error decoding state"
+  where
+    h :: HttpException -> IO ()
+    h _ = threadDelay 1_000_000 >> getFunds uuid
 {-
     [i :: Int] <- map read <$> getArgs
     uuid       <- read <$> readFile ('W' : show i ++ ".cid")
@@ -63,30 +93,6 @@ main = do
 
 data Command = Offer Integer | Retrieve | Use | Funds
     deriving (Show, Read, Eq, Ord)
-
-getFunds :: UUID -> IO ()
-getFunds uuid = handle h $ runReq defaultHttpConfig $ do
-    v <- req
-        POST
-        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "funds")
-        (ReqBodyJson ())
-        (Proxy :: Proxy (JsonResponse ()))
-        (port 8080)
-    if responseStatusCode v /= 200
-        then liftIO $ putStrLn "error getting funds"
-        else do
-            w <- req
-                GET
-                (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "status")
-                NoReqBody
-                (Proxy :: Proxy (JsonResponse (ContractInstanceClientState OracleContracts)))
-                (port 8080)
-            liftIO $ putStrLn $ case fromJSON $ observableState $ cicCurrentState $ responseBody w of
-                Success (Last (Just f)) -> "funds: " ++ show (flattenValue f)
-                _                       -> "error decoding state"
-  where
-    h :: HttpException -> IO ()
-    h _ = threadDelay 1_000_000 >> getFunds uuid
 
 offer :: UUID -> Integer -> IO ()
 offer uuid amt = handle h $ runReq defaultHttpConfig $ do

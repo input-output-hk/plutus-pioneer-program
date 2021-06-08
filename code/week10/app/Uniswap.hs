@@ -13,13 +13,27 @@
 module Uniswap where
 
 import           Control.Monad             (forM_, when)
+import           Data.Aeson                (FromJSON, ToJSON)
 import qualified Data.Semigroup            as Semigroup
+import           Data.Text.Prettyprint.Doc (Pretty (..), viaShow)
+import           GHC.Generics              (Generic)
 import           Ledger
 import           Ledger.Constraints
 import           Ledger.Value              as Value
 import           Plutus.Contract           hiding (when)
 import qualified Plutus.Contracts.Currency as Currency
+import qualified Plutus.Contracts.Uniswap  as Uniswap
 import           Wallet.Emulator.Types     (Wallet (..), walletPubKey)
+
+data UniswapContracts =
+      Init
+    | UniswapStart
+    | UniswapUser Uniswap.Uniswap
+    deriving (Eq, Ord, Show, Generic)
+    deriving anyclass (FromJSON, ToJSON)
+
+instance Pretty UniswapContracts where
+    pretty = viaShow
 
 initContract :: Contract (Maybe (Semigroup.Last Currency.OneShotCurrency)) Currency.CurrencySchema Currency.CurrencyError ()
 initContract = do
