@@ -538,7 +538,26 @@ And is used accordingly
 
     let cs = Currency.currencySymbol osc
     
-Now we have minted our NFT and it has currency symbol *cs*.
+Now we have minted our NFT and it has currency symbol *cs*. And now we can construct our *Oracle* parameter value.
+
+.. code:: haskell
+
+    oracle = Oracle
+        { oSymbol   = cs
+        , oOperator = pkh
+        , oFee      = opFees op
+        , oAsset    = AssetClass (opSymbol op, opToken op)
+        }
+
+The reason that *opSymbol* and *opToken* are defined separately in the *OracleParams* type *op* is just that this makes is easier when we are using the playground.
+
+Updating the Oracle
+___________________
+
+The *updateOracle* function is more complicated.
+
+
+
 
 
         
