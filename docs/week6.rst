@@ -556,9 +556,28 @@ ___________________
 
 The *updateOracle* function is more complicated.
 
+This function has to deal with two cases. Namely, the case where we have a value that we wish to update, and the case where we have just started the oracle and we want
+to create a value for the very first time.
 
+It takes our oracle parameters and also the *Integer* value that we wish to have the oracle hold.
 
+First we create a helper function *findOracle*.
 
+.. code:: haskell
+
+    findOracle :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text (Maybe (TxOutRef, TxOutTx, Integer))
+    findOracle oracle = do
+        utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
+        return $ case Map.toList utxos of
+            [(oref, o)] -> do
+                x <- oracleValue (txOutTxOut o) $ \dh -> Map.lookup dh $ txData $ txOutTxTx o
+                return (oref, o, x)
+            _           -> Nothing
+      where
+        f :: TxOutTx -> Bool
+        f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1
+        
+        
 
         
 
