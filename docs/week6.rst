@@ -133,16 +133,13 @@ transaction. The *use* validator will make sure that the consumed oracle input c
 The second operation is *update* which can only be done by the oracle provider. For an *update* transaction, the oracle input must again carry the NFT, there must be an oracle output, also carrying the NFT. There are no 
 further restrictions. The datum can change, and the accumulated fees can be taken out.
 
-Writing the Oracle
-------------------
+Oracle Core
+-----------
 
 Now that we know how it is supposed to work, let's look at some code.
 
-Oracle Core
-~~~~~~~~~~~
-
 On-chain
-++++++++
+~~~~~~~~
 
 First, let's look at the Plutus code that implements the oracle itself.
 
@@ -411,7 +408,7 @@ responsibility of the author of this contract. That will be the responsibility o
 transaction with the *use* redeemer. This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.
 
 Starting the Oracle
-___________________
++++++++++++++++++++
 
 To start the oracle, we need some parameters.
 
@@ -552,7 +549,7 @@ Now we have minted our NFT and it has currency symbol *cs*. And now we can const
 The reason that *opSymbol* and *opToken* are defined separately in the *OracleParams* type *op* is just that this makes is easier when we are using the playground.
 
 Updating the Oracle
-___________________
++++++++++++++++++++
 
 The *updateOracle* function is more complicated.
 
@@ -804,7 +801,7 @@ And that concludes the code for the oracle itself. What is now missing is an exa
 Plutus Application Backend to run this code in the real world or, in our case, in a simulated blockchain.
 
 Swap Contract
-~~~~~~~~~~~~~
+-------------
     
 Our example swap contract can be found in
 
