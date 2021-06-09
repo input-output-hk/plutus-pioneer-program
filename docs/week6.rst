@@ -811,6 +811,24 @@ Our example swap contract can be found in
 
 The purpose of this contract is for someone to be able to deposit ADA and exchange it for a token, in our case a token that we will call USDT for US Dollar Token.
 
+The idea is that the price, the amount of USDT that will be required to be paid for the ADA, will be determined by the value of the oracle. Remember that we are using
+an *Integer* to reflect the exchange rate, with a value of one million being equal to one USDT.
+
+We'll start with a helper function called *price*, which, given a number of lovelace and the exchange rate, returns the USDT price.
+
+.. code:: haskell
+
+    price :: Integer -> Integer -> Integer
+    price lovelace exchangeRate = (lovelace * exchangeRate) `divide` 1000000
+    
+The next helper function, *lovelaces*, combines to functions from the Plutus libraries to extract a number of lovelace from a *Value* type.
+
+.. code:: haskell
+
+    lovelaces :: Value -> Integer
+    lovelaces = Ada.getLovelace . Ada.fromValue    
+
+    
 
 
 
