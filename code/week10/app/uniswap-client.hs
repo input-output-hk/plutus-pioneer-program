@@ -8,22 +8,24 @@ module Main
 
 import           Control.Concurrent
 import           Control.Exception
-import           Control.Monad                           (when)
+import           Control.Monad                           (forM_, when)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Data.Aeson                              (Result (..), ToJSON, decode, fromJSON)
-import qualified Data.ByteString.Lazy as LB
+import qualified Data.ByteString.Char8                   as B8
+import qualified Data.ByteString.Lazy                    as LB
 import           Data.Monoid                             (Last (..))
 import           Data.Proxy                              (Proxy (..))
 import           Data.String                             (IsString (..))
 import           Data.Text                               (Text, pack)
 import           Data.UUID                               hiding (fromString)
-import           Ledger.Value                            (AssetClass (..), CurrencySymbol, flattenValue)
+import           Ledger.Value                            (AssetClass (..), CurrencySymbol, Value, flattenValue, TokenName (unTokenName))
 import           Network.HTTP.Req
 import qualified Plutus.Contracts.Uniswap                as US
 import           Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
 import           Plutus.PAB.Webserver.Types
 import           System.Environment                      (getArgs)
 import           System.Exit                             (exitFailure)
+import           Text.Printf                             (printf)
 import           Text.Read                               (readMaybe)
 import           Wallet.Emulator.Types                   (Wallet (..))
 
@@ -82,8 +84,15 @@ getFunds cid = do
     go = do
         e <- getStatus cid
         case e of
-            Right (US.Funds v) -> putStrLn $ "funds: " ++ show (flattenValue v)
+            Right (US.Funds v) -> showFunds v
             _                  -> go
+
+    showFunds :: Value -> IO ()
+    showFunds v = do
+        printf "\n                                                 currency symbol                                                         token name          amount\n\n"
+        forM_ (flattenValue v) $ \(cs, tn, amt) ->
+            printf "%64s %66s %15d\n" (show cs) (show tn) amt
+        printf "\n"
 
 getPools :: UUID -> IO ()
 getPools cid = do
