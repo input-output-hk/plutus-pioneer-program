@@ -133,16 +133,13 @@ transaction. The *use* validator will make sure that the consumed oracle input c
 The second operation is *update* which can only be done by the oracle provider. For an *update* transaction, the oracle input must again carry the NFT, there must be an oracle output, also carrying the NFT. There are no 
 further restrictions. The datum can change, and the accumulated fees can be taken out.
 
-Writing the Oracle
-------------------
+Oracle Core
+-----------
 
 Now that we know how it is supposed to work, let's look at some code.
 
-Oracle Core
-~~~~~~~~~~~
-
 On-chain
-++++++++
+~~~~~~~~
 
 First, let's look at the Plutus code that implements the oracle itself.
 
@@ -404,14 +401,14 @@ Now we have our usual boilerplate. In particular notice that we use the pattern 
 And this concludes the on-chain part of the oracle code.
     
 Off-chain
-+++++++++
+~~~~~~~~~
 
 We also create some off-chain code, namely to start the oracle, and to update it. However, we don't write off-chain code to *use* the oracle. That is not the 
 responsibility of the author of this contract. That will be the responsibility of the person that wants to use the oracle - they will write the code to create the
 transaction with the *use* redeemer. This is the first time that we have seen the situation where we have some on-chain code that is not paired with some off-chain code.
 
 Starting the Oracle
-___________________
++++++++++++++++++++
 
 To start the oracle, we need some parameters.
 
@@ -435,10 +432,9 @@ We could have used the same code for minting the NFT as we used in lecture 5. Th
 
 However, this is a currency module provided in *plutus-use-cases* that provides a *forgeContract* function that allows us to mint NFTs.
 
-If we look at the type of the *forgeContract* function in the REPL, it looks horrible, but it just provides all the usual restrictions. The important part is highlighted below.
+Here is the type of the *forgeContract* function shown in the REPL.
 
 .. code::
-    :emphasize-lines: 21,22,23,24
 
     Prelude Week06.Oracle.Core> :t Plutus.Contracts.Currency.forgeContract
     Plutus.Contracts.Currency.forgeContract
@@ -464,3 +460,412 @@ If we look at the type of the *forgeContract* function in the REPL, it looks hor
          -> Plutus.Contract.Types.Contract
               w s e Plutus.Contracts.Currency.OneShotCurrency
     
+The important part starts towards the end, where the first parameter - of type *PubKeyHash* - is defined. This is the hash of the public key of the recipient of the NFT.
+
+The *forgeContract* function provides more general functionality than our previous NFT contract. It allows is to generate multiple NFTs in one go. It will create a currency symbol that can only be used one, similar 
+to our NFT from last time, so there can only be one minting transaction. But for the one currency symbol, you can mint various tokens in the same transaction, with 
+various token names and in various quantities. The second parameter allows us to define these token names and quantities.
+
+And it gives us a *Contract* that returns a value of the *OneShotCurrency* type. This type is specific to the currency and it doesn't really matter to us what it is. All that matters 
+for us is that we can get the currency symbol out of it again.
+
+There is one slight problem. This is not compatible with what we want. We want this types
+
+.. code:: haskell
+
+    Contract w s Text Oracle
+
+An arbitrary writer type (because we don't make use of it), an arbitrary schema (as long as we have *BlockChainActions* available), *Text* error messages and a return 
+type of *Oracle*.
+
+The problem is that the *Contract* returned by *forgeContract* doesn't allow *Text* error messages. You can see this in the verbose output from the REPL - there is 
+a constraint on the *e* parameter.
+
+.. code:: haskell
+
+    Plutus.Contracts.Currency.AsCurrencyError e,
+
+Unfortunately *Text* doesn't implement *AsCurrencyError*.
+
+Luckily there is a function that can helper
+
+.. code:: haskell
+
+    Plutus.Contract.mapError
+    :: (e -> e')
+       -> Plutus.Contract.Types.Contract w s e a
+       -> Plutus.Contract.Types.Contract w s e' a
+
+Given a *Contract*, it allows us to create a new *Contract* with a new type of error message. That is provided we give a function that converts from the first error 
+type to the second error type.
+
+So, let's look at the *startOracle* function.
+
+.. code:: haskell
+
+    startOracle :: forall w s. HasBlockchainActions s => OracleParams -> Contract w s Text Oracle
+    startOracle op = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        osc <- mapError (pack . show) (forgeContract pkh [(oracleTokenName, 1)] :: Contract w s CurrencyError OneShotCurrency)
+        let cs     = Currency.currencySymbol osc
+            oracle = Oracle
+                { oSymbol   = cs
+                , oOperator = pkh
+                , oFee      = opFees op
+                , oAsset    = AssetClass (opSymbol op, opToken op)
+                }
+        logInfo @String $ "started oracle " ++ show oracle
+        return oracle
+        
+Here we see the error conversion function is provided as *pack . show*. The *show* function converts the error to a *String* and the *pack* function converts a *String*
+to a *Data.Text* type.
+
+At this point, *osc* holds the *OneShotCurrency*, and we can then use the *currencySymbol* function to get the currency symbol as *cs*.
+
+The *currencySymbol* function has type
+
+.. code:: haskell
+    
+    currencySymbol
+          :: OneShotCurrency -> Plutus.V1.Ledger.Value.CurrencySymbol
+
+And is used accordingly
+
+.. code:: haskell
+
+    let cs = Currency.currencySymbol osc
+    
+Now we have minted our NFT and it has currency symbol *cs*. And now we can construct our *Oracle* parameter value.
+
+.. code:: haskell
+
+    oracle = Oracle
+        { oSymbol   = cs
+        , oOperator = pkh
+        , oFee      = opFees op
+        , oAsset    = AssetClass (opSymbol op, opToken op)
+        }
+
+The reason that *opSymbol* and *opToken* are defined separately in the *OracleParams* type *op* is just that this makes is easier when we are using the playground.
+
+Updating the Oracle
++++++++++++++++++++
+
+The *updateOracle* function is more complicated.
+
+This function has to deal with two cases. Namely, the case where we have a value that we wish to update, and the case where we have just started the oracle and we want
+to create a value for the very first time.
+
+It takes our oracle parameters and also the *Integer* value that we wish to have the oracle hold.
+
+First we create a helper function *findOracle*.
+
+.. code:: haskell
+
+    findOracle :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text (Maybe (TxOutRef, TxOutTx, Integer))
+    findOracle oracle = do
+        utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
+        return $ case Map.toList utxos of
+            [(oref, o)] -> do
+                x <- oracleValue (txOutTxOut o) $ \dh -> Map.lookup dh $ txData $ txOutTxTx o
+                return (oref, o, x)
+            _           -> Nothing
+      where
+        f :: TxOutTx -> Bool
+        f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1
+        
+The purpose of *findOracle* is to look up the existing oracle UTxO. This can fail because the oracle might not be there. This will happen if we have just started the
+oracles and have not yet created a UTxO with the oracle value. But, if we find it, we return a triple containing the UTxO identifer (TxOutRef), the UTxO itself, which 
+contains all the data (TxOutTx) and the oracle value (the current exchange rate held by the oracle). The *Integer* containing the oracle value is encoded also in the
+TxOutTx value, but we add it to the triple to make it easier to work with.
+
+The first thing we do is to get all the UTxOs sitting at this address. But only one of these will be the one we are looking for - the one that contains the NFT.
+
+We do this by using the *Map.filter* function which takes a function as a parameter which, in this case, returns True for the UTxO where the NFT is present.
+
+.. code:: haskell
+
+    utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
+    ...
+    where
+      f :: TxOutTx -> Bool
+      f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1    
+
+We will end up with a map in *utxos* which is either empty or contains one item. Now, we distinguish between these two cases.
+
+.. code:: haskell
+
+    return $ case Map.toList utxos of
+        [(oref, o)] -> do
+            x <- oracleValue (txOutTxOut o) $ \dh -> Map.lookup dh $ txData $ txOutTxTx o
+            return (oref, o, x)
+        _           -> Nothing
+        
+We convert the map to a list of tuples representing key value pairs of transaction ids and the transactions themselves.
+
+For the case where there is no element, we use the _ case to represent all other cases. This could only ever be the empty list, but the compiler doesn't know that.
+
+If, however, we have found the UTxO, then, as we already have its id and transaction, we just need to find its *Integer* value. This part could still go wrong. Even 
+though we have found the correct UTxO, there could be some corrupt data in it for whatever reason.
+
+We use the *oracleValue* function that we used also in validation. This function takes a *TxOut* parameter followed by a second parameter is a function, which, given a datum hash will return the associated datum.
+
+In the off-chain code, we can use the following function parameter
+
+.. code:: haskell
+
+    \dh -> Map.lookup dh $ txData $ txOutTxTx o
+
+Here, *txData* is a field of the transaction and it is a map from datum hashes to datums. We get the transaction from *txOutTxTx o*.
+
+If this all succeeds, when will return the triple (oref, o, x), where x is the *Integer* value of the oracle.
+
+Now that we have written the *findOracle* function we can look at the *updateOracle* function.
+
+.. code:: haskell
+
+    updateOracle :: forall w s. HasBlockchainActions s => Oracle -> Integer -> Contract w s Text ()
+    updateOracle oracle x = do
+        m <- findOracle oracle
+        let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
+        case m of
+            Nothing -> do
+                ledgerTx <- submitTxConstraints (oracleInst oracle) c
+                awaitTxConfirmed $ txId ledgerTx
+                logInfo @String $ "set initial oracle value to " ++ show x
+            Just (oref, o,  _) -> do
+                let lookups = Constraints.unspentOutputs (Map.singleton oref o)     <>
+                              Constraints.scriptInstanceLookups (oracleInst oracle) <>
+                              Constraints.otherScript (oracleValidator oracle)
+                    tx      = c <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Update)
+                ledgerTx <- submitTxConstraintsWith @Oracling lookups tx
+                awaitTxConfirmed $ txId ledgerTx
+                logInfo @String $ "updated oracle value to " ++ show x
+                
+                
+After the *findOracle* line there is a helper function definition, as we will need this constraint twice.
+
+.. code:: haskell
+
+    let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
+
+After looking for the oracle, there are wo possibilities - either we found it or we did not.
+
+If we didn't find it, then we have started the oracle but we have not yet provided an initial value. This is the first case. And in this case, all we have to 
+do is to submit a transaction that produces the first value for the oracle.
+
+.. code:: haskell
+
+    ledgerTx <- submitTxConstraints (oracleInst oracle) c
+    awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "set initial oracle value to " ++ show x
+    
+Here is the first usage of the *c* helper function. It provides the constraint *mustPayToTheScript* which ensures that the transaction will have an output 
+that pays to a script address. As arguments it takes the datum *x* and the NFT. The script that it must pay to is always the script that is in focus - here it is
+the first parameter to *submitTxConstraints* - *(oracleInst oracle)*.
+
+We then wait for confirmation and write a log message. And this is all we need to do for this case.
+
+In the other case, where we already have a value, we need to reference the UTxO parts, but we don't care about the current datum, as we are going to update it anyway.
+
+.. code:: haskell
+
+    Just (oref, o,  _) -> do
+
+Now it gets a bit more complicated, because now we need two conditions.
+
+The first constraint is the same as in the other case - the constraint referenced by the helper function *c*. But there is now an extra constraint that we must also 
+consume the existing UTxO.
+
+.. code:: haskell
+
+    tx = c <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Update)
+
+The *mustSpendScriptOutput* function is basically the opposite of *mustPayToTheScript*. It creates an input to this script address. As parameters it takes the reference 
+to the UTxO we want to consume, and it takes a *Redeemer*. In this case the *Redeemer* is *Update* and it is converted to the Plutus *Data* type.
+
+In order for this to work we need to provide some lookups.
+
+In order to find the output *oref* that it wants to spend, we must use the *unspentOutputs* lookup, and in this case, we just provide the lookup with one UTxO.
+
+.. code:: haskell
+
+    Constraints.unspentOutputs (Map.singleton oref o)
+
+Then we must provide the script instances. We need to do this twice, once for the input side, and once for the output side. For this, we provide the oracle instance and 
+the oracle validator.
+
+.. code:: haskell
+
+    Constraints.scriptInstanceLookups (oracleInst oracle) <>
+    Constraints.otherScript (oracleValidator oracle)
+
+We didn't need to provide the *scriptInstanceLookups* lookup in the first case, as we were able to pass *oracleInst oracle* to the *submitTxConstraints* function. However,
+with the *submitTxConstraintsWith* function, we don't have that option.
+
+When submitting the transaction, we need to give the compiler a little nudge to let it know the script we are talking about - so that it knows, for example, what The Script is in *mustPayToTheScript*. For 
+this we reference the *Oracling* type.
+
+.. code:: haskell
+
+    ledgerTx <- submitTxConstraintsWith @Oracling lookups tx
+
+Hopefully now we have a valid transaction that gets submitted, and then we wait for it to be confirmed, and write some logging information.
+
+.. code:: haskell
+
+    awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "updated oracle value to " ++ show x
+    
+Remember, we talked about fee collecting earlier. This will happen automatically. The function *submitTxConstraintsWith* will send the fees to our own wallet. It does 
+this because there is an imbalance between the value attached to the input, which includes the fees and the NFT, and the value we have said must be paid to the script,
+which is just the NFT.
+
+This process will also automatically create an extra input from our own input to pay the transaction fees for executing the transaction.
+
+Lastly, we provide a function that combines these two operations, *startOracle* and *updateOracle* into one contract. This will make it possible to use in the playground 
+and the *EmulatorTrace* monad, as well as in the PAB.
+
+.. code:: haskell
+
+    type OracleSchema = BlockchainActions .\/ Endpoint "update" Integer
+
+    runOracle :: OracleParams -> Contract (Last Oracle) OracleSchema Text ()
+    runOracle op = do
+        oracle <- startOracle op
+        tell $ Last $ Just oracle
+        go oracle
+      where
+        go :: Oracle -> Contract (Last Oracle) OracleSchema Text a
+        go oracle = do
+            x <- endpoint @"update"
+            updateOracle oracle x
+            go oracle
+    
+The function *runOracle* first starts the oracle. Then, for reasons that will become clear later, we use *tell* to write the oracle parameter. We need to be able to
+communicate the parameter value of the oracle to the outside world, so that people can use the oracle. We will not know until runtime the currency symbol that will be used
+for the NFT, so we don't know the value of the oracle parameter yet.
+
+Remember that *tell* expects a *Monoid* type. The typical example is a list of strings that get concatenated to one list of all log messages.
+
+But it doesn't have to be lists. In *Data.Monoid* we have this *Last* Monoid.
+
+.. code:: haskell
+
+    Prelude Week06.Oracle.Core> import Data.Monoid (Last (..))
+    Prelude Data.Monoid Week06.Oracle.Core> :i Last
+    type Last :: * -> *
+    newtype Last a = Last {getLast :: Maybe a}
+          -- Defined in ‘Data.Monoid’
+    instance Applicative Last -- Defined in ‘Data.Monoid’
+    instance Eq a => Eq (Last a) -- Defined in ‘Data.Monoid’
+    instance Functor Last -- Defined in ‘Data.Monoid’
+    instance Monad Last -- Defined in ‘Data.Monoid’
+    instance Monoid (Last a) -- Defined in ‘Data.Monoid’
+    instance Ord a => Ord (Last a) -- Defined in ‘Data.Monoid’
+    instance Semigroup (Last a) -- Defined in ‘Data.Monoid’
+    instance Show a => Show (Last a) -- Defined in ‘Data.Monoid’
+    instance Read a => Read (Last a) -- Defined in ‘Data.Monoid’
+    instance Traversable Last -- Defined in ‘Data.Traversable’
+    instance Foldable Last -- Defined in ‘Data.Foldable’
+
+We see that it is just a *newtype* wrapper around *Maybe*. The point is to provide a specific *Monoid* instance. The idea, as the name suggests, is that it is
+a monoid operation that always remembers the last Just value. For example:
+
+.. code:: haskell
+
+    Prelude Data.Monoid Week06.Oracle.Core> Last (Just 'x') <> Last (Just 'y')
+    Last {getLast = Just 'y'}
+    
+However, if the second *Last* is a nothing, it will return the first one.
+
+.. code:: haskell
+
+    Prelude Data.Monoid Week06.Oracle.Core> Last (Just 'x') <> Last Nothing
+    Last {getLast = Just 'x'}
+
+If both are *Nothing*, it will be *Nothing*.
+
+*Last* is very useful because it allows us to keep the current state. The value of the log will basically be the last *Just* we told.
+
+In this contract we will only do that once. In the beginning it will be *Last Nothing*. Then we mint the NFT, and then, when we get the oracle value in 
+*runOracle*, and then *tell* it, it will always have that value. If other contracts from the outside query the state, they will always get the *Just oracle*, so 
+they will be able to discover the value of the oracle.
+
+So, next in *runOracle*, we call the helper function *go*. What this does is to block at the update endpoint. As soon as someone provides an *Integer* as the new value,
+it will call the *updateOracle* function with the new value, and then just loop to go again.
+
+In summary, *runOracle* starts the oracle, *tell*\s the oracle, then loops to allow others to update the oracle.
+
+And that concludes the code for the oracle itself. What is now missing is an example, a contract that actually uses the oracle - a swap contract. And also using the
+Plutus Application Backend to run this code in the real world or, in our case, in a simulated blockchain.
+
+Swap Contract
+-------------
+    
+Our example swap contract can be found in
+
+.. code:: haskell
+
+    module Week06.Oracle.swap
+
+The purpose of this contract is for someone to be able to deposit ADA and exchange it for a token, in our case a token that we will call USDT for US Dollar Token.
+
+The idea is that the price, the amount of USDT that will be required to be paid for the ADA, will be determined by the value of the oracle. Remember that we are using
+an *Integer* to reflect the exchange rate, with a value of one million being equal to one USDT.
+
+We'll start with a helper function called *price*, which, given a number of lovelace and the exchange rate, returns the USDT price.
+
+.. code:: haskell
+
+    price :: Integer -> Integer -> Integer
+    price lovelace exchangeRate = (lovelace * exchangeRate) `divide` 1000000
+    
+The next helper function, *lovelaces*, combines to functions from the Plutus libraries to extract a number of lovelace from a *Value* type.
+
+.. code:: haskell
+
+    lovelaces :: Value -> Integer
+    lovelaces = Ada.getLovelace . Ada.fromValue    
+
+Now we will write *mkSwapValidator*. This is a parameterized validator with two parameters. 
+
+The first parameter is the oracle that we are using. To use this, we import the oracle module.
+
+.. code:: haskell
+
+    import Week06.Oracle.core
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+
+
+
+
+
+
+
+
+

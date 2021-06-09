@@ -795,7 +795,7 @@ they will be able to discover the value of the oracle.
 So, next in *runOracle*, we call the helper function *go*. What this does is to block at the update endpoint. As soon as someone provides an *Integer* as the new value,
 it will call the *updateOracle* function with the new value, and then just loop to go again.
 
-In summary, *runOracle* starts the oracle, tells the oracle, then loops to allow others to update the oracle.
+In summary, *runOracle* starts the oracle, *tell*\s the oracle, then loops to allow others to update the oracle.
 
 And that concludes the code for the oracle itself. What is now missing is an example, a contract that actually uses the oracle - a swap contract. And also using the
 Plutus Application Backend to run this code in the real world or, in our case, in a simulated blockchain.
@@ -836,7 +836,11 @@ The first parameter is the oracle that we are using. To use this, we import the 
 
     import Week06.Oracle.core
 
-    
+The second parameter is the address of the oracle. Normally, given the oracle, we would be able to compute the address from it. In the core module we saw a function
+*oracleAddress* which does this for us. But this is a function that we can't use in the validator, because it can't be compiled to Plutus script. So, here, we explicitly 
+hand the address to the validator.
+
+
 
 
 
