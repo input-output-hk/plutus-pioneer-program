@@ -1146,6 +1146,63 @@ As lookups, we must provide all the UTxOs and the swap validator.
 We have the list of UTxOs in *xs* and we use list comprehension to turn this list into a list of pairs, and we then use *Map.fromList* to turn those pairs into a 
 map, to which we then apply the *unspentOutputs* constraint.
 
+useSwaps
+~~~~~~~~
+
+And now the most interesting one, *useSwaps*. This is where we actually use the oracle.
+
+.. code:: haskell
+
+    useSwap :: forall w s. HasBlockchainActions s => Oracle -> Contract w s Text ()
+    useSwap oracle = do
+        funds <- ownFunds
+        let amt = assetClassValueOf funds $ oAsset oracle
+        logInfo @String $ "available assets: " ++ show amt
+    
+        m <- findOracle oracle
+        case m of
+            Nothing           -> logInfo @String "oracle not found"
+            Just (oref, o, x) -> do
+                logInfo @String $ "found oracle, exchange rate " ++ show x
+                pkh   <- pubKeyHash <$> Contract.ownPubKey
+                swaps <- findSwaps oracle (/= pkh)
+                case find (f amt x) swaps of
+                    Nothing                -> logInfo @String "no suitable swap found"
+                    Just (oref', o', pkh') -> do
+                        let v       = txOutValue (txOutTxOut o) <> lovelaceValueOf (oFee oracle)
+                            p       = assetClassValue (oAsset oracle) $ price (lovelaces $ txOutValue $ txOutTxOut o') x
+                            lookups = Constraints.otherScript (swapValidator oracle)                     <>
+                                      Constraints.otherScript (oracleValidator oracle)                   <>
+                                      Constraints.unspentOutputs (Map.fromList [(oref, o), (oref', o')])
+                            tx      = Constraints.mustSpendScriptOutput oref  (Redeemer $ PlutusTx.toData Use) <>
+                                      Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ())  <>
+                                      Constraints.mustPayToOtherScript
+                                        (validatorHash $ oracleValidator oracle)
+                                        (Datum $ PlutusTx.toData x)
+                                        v                                                                      <>
+                                      Constraints.mustPayToPubKey pkh' p
+                        ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
+                        awaitTxConfirmed $ txId ledgerTx
+                        logInfo @String $ "made swap with price " ++ show (Value.flattenValue p)
+      where
+        getPrice :: Integer -> TxOutTx -> Integer
+        getPrice x o = price (lovelaces $ txOutValue $ txOutTxOut o) x
+    
+        f :: Integer -> Integer -> (TxOutRef, TxOutTx, PubKeyHash) -> Bool
+        f amt x (_, o, _) = getPrice x o <= amt
+        
+First, we use the *ownFunds* function. This is defined in a separate module that we will get to in a bit. All it does is to add up all the money in our own
+wallet and returns a *Value*. We then find out how many USD Tokens we have.
+
+.. code:: haskell
+
+    funds <- ownFunds
+    let amt = assetClassValueOf funds $ oAsset oracle
+    logInfo @String $ "available assets: " ++ show amt
+    
+    
+
+
 
 
 
