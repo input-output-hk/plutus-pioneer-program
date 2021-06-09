@@ -990,8 +990,114 @@ Now, we can define the *sellerPaid* helper function.
         pricePaid >= minPrice
 
 The function *valuePaidTo* is from the Plutus libraries. Given *info* and a public key hash, it will add up all the values of all the public key outputs that go
-to this address. We then use the *assetClassValueOf* function to check the component of the value that is in USD token.
+to this address. We then use the *assetClassValueOf* function to check the component of the value that is in USD token, and the check that we have at least as many
+as we require.
 
+That's the end of the main part of the code for the swap validator. We just have our normal boiler plate to write.
+
+.. code:: haskell
+
+    data Swapping
+    instance Scripts.ScriptType Swapping where
+        type instance DatumType Swapping = PubKeyHash
+        type instance RedeemerType Swapping = ()
+    
+    swapInst :: Oracle -> Scripts.ScriptInstance Swapping
+    swapInst oracle = Scripts.validator @Swapping
+        ($$(PlutusTx.compile [|| mkSwapValidator ||])
+            `PlutusTx.applyCode` PlutusTx.liftCode oracle
+            `PlutusTx.applyCode` PlutusTx.liftCode (oracleAddress oracle))
+        $$(PlutusTx.compile [|| wrap ||])
+      where
+        wrap = Scripts.wrapValidator @PubKeyHash @()
+    
+    swapValidator :: Oracle -> Validator
+    swapValidator = Scripts.validatorScript . swapInst
+    
+    swapAddress :: Oracle -> Ledger.Address
+    swapAddress = scriptAddress . swapValidator
+    
+Note that in the *swapInst* function, where we use template haskell to generate the Plutus validator from the *mkSwapValidator* function, we do not need to pass in the 
+oracle address as a parameter. This is because we will compute this inside the function. Remember that we can't use the *oracleAddress* function inside the Plutus validator.
+
+Now we can create some functions that will work with instances of the swap contract.
+
+Also in the code, we have the function *offerSwap*. This function will submit a transaction to the swap contract instance. It is for the seller who wants to offer a 
+certain number of lovelace for exchange.
+
+.. code:: haskell
+
+    offerSwap :: forall w s. HasBlockchainActions s => Oracle -> Integer -> Contract w s Text ()
+    offerSwap oracle amt = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let tx = Constraints.mustPayToTheScript pkh $ Ada.lovelaceValueOf amt
+        ledgerTx <- submitTxConstraints (swapInst oracle) tx
+        awaitTxConfirmed $ txId ledgerTx
+        logInfo @String $ "offered " ++ show amt ++ " lovelace for swap"    
+
+Next, a helper function that will find all swaps that satisfy a given predicate. It takes an oracle plus a predicate based on public key hashes, and returns a list 
+of triples of the UTxOs that satisfy the predicate.
+
+.. code:: haskell
+
+    findSwaps :: HasBlockchainActions s => Oracle -> (PubKeyHash -> Bool) -> Contract w s Text [(TxOutRef, TxOutTx, PubKeyHash)]
+    findSwaps oracle p = do
+        utxos <- utxoAt $ swapAddress oracle
+        return $ mapMaybe g $ Map.toList utxos
+      where
+        f :: TxOutTx -> Maybe PubKeyHash
+        f o = do
+            dh        <- txOutDatumHash $ txOutTxOut o
+            (Datum d) <- Map.lookup dh $ txData $ txOutTxTx o
+            PlutusTx.fromData d
+    
+        g :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, PubKeyHash)
+        g (oref, o) = do
+            pkh <- f o
+            guard $ p pkh
+            return (oref, o, pkh)
+            
+First, we get a list of all the UTxOs sitting at the swap contract address. We then apply *mapMaybe* to this list.
+
+.. code:: haskell
+
+    mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+    
+This function will apply the *(a -> Maybe b)* function to each element in a list of *a*\s and creates a list of *Maybe b*\s, which could contain a mixture of *Just*\s
+and *Nothing*\s. It then throws away the *Nothing*\s and returns the values contained in the *Just*\s.
+
+To clarify this, imagine we have a function that returns as *Just* for even numbers and a *Nothing* for odd numbers.
+
+.. code:: haskell
+
+    f (n :: Int) = if even n then Just (div n 2) else Nothing
+
+We can use this as the first parameter to map Maybe
+
+.. code:: haskell
+
+    Prelude Week06.Oracle.Core> import Data.Maybe
+    Prelude Data.Maybe Week06.Oracle.Core> mapMaybe f [2, 4, 10, 11, 13, 100]
+    [1,2,5,50]
+    
+We use the *mapMaybe* and the function *g* to filter the list of UTxOs.
+
+.. code:: haskell
+
+    g :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, PubKeyHash)
+    g (oref, o) = do
+        pkh <- f o
+        guard $ p pkh
+        return (oref, o, pkh)
+        
+This function takes a key value pair representing the UTxO and returns a *Maybe* triple containing the items from the pair alongside a *PubKeyHash*.     
+
+Function *g* is inside the *Maybe* monad and makes use of function *f*, which is also inside the *Maybe* monad. Function *f* gets the public key hash from a UTxO,
+if it exists. After this, function *g* uses the *guard* function with the predicate function *p* that we passed in as an argument.
+
+The *guard* function is available in some monads, and the *Maybe* monad is one of them. It takes a boolean as a parameter, and, if the boolean is false, the computation 
+fails. In this case, failure means returning *Nothing*. If it is true, it just continues. In this case, that means returning the *Just* of the triple containing the 
+public key hash.
 
 
 
