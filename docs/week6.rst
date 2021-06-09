@@ -289,7 +289,7 @@ Before looking at the *inputHasToken* function there is another help function to
         
 The *ownInput* function returns the *TxOut* that the script is trying to consume, which in this case is the oracle output. The *Nothing* case here can happen if we are in a 
 different context, such as a minting context, so this eventuality will not occur for us. The *findOwnInput* function is provided by Plutus and will, given the context, 
-find the relevant input. The *txInInfoResolved* function turns a *TxInInfo* into a *TxOut*.
+find the relevant input. The *txInInfoResolved* function gets the *TxOut* from the *TxInInfo*.
 
 The *inputHashToken* function checks that the token is present. It uses the *assetClassValueOf* function to look for the NFT within the *ownInput* response.
 
@@ -957,6 +957,16 @@ Now, let's look at the *hasTwoScriptInputs* helper function.
         price lovelaceIn oracleValue'
         
         
+First, we filter, using the composite function
+
+.. code:: haskell
+
+    (isJust . toValidatorHash . txOutAddress . txInInfoResolved)
+
+Reading right to left, we get the UTxO from the input, then we get the address for this UTxO, then we get the validator hash for that address. Then, finally, we check
+if it is a script output, by seeing if it is a *Just*. If it is a *Nothing*, then this would show that it is a public key, not a script address.
+
+
 
 
 
