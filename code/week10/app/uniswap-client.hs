@@ -62,7 +62,7 @@ data Command =
 
 readCommandIO :: IO Command
 readCommandIO = do
-    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB"
+    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Swap amtA tnA tnB"
     s <- getLine
     maybe readCommandIO return $ readMaybe s
 
@@ -74,6 +74,12 @@ toCreateParams cs amtA tnA amtB tnB = US.CreateParams (toCoin cs tnA) (toCoin cs
 
 toSwapParams :: CurrencySymbol -> Integer -> Char -> Char -> US.SwapParams
 toSwapParams cs amtA tnA tnB = US.SwapParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount 0)
+
+showCoinHeader :: IO ()
+showCoinHeader = printf "\n                                                 currency symbol                                                         token name          amount\n\n"
+
+showCoin :: CurrencySymbol -> TokenName -> Integer -> IO ()
+showCoin cs tn amt = printf "%64s %66s %15d\n" (show cs) (show tn) amt
 
 getFunds :: UUID -> IO ()
 getFunds cid = do
@@ -89,9 +95,8 @@ getFunds cid = do
 
     showFunds :: Value -> IO ()
     showFunds v = do
-        printf "\n                                                 currency symbol                                                         token name          amount\n\n"
-        forM_ (flattenValue v) $ \(cs, tn, amt) ->
-            printf "%64s %66s %15d\n" (show cs) (show tn) amt
+        showCoinHeader
+        forM_ (flattenValue v) $ \(cs, tn, amt) -> showCoin cs tn amt
         printf "\n"
 
 getPools :: UUID -> IO ()
@@ -103,8 +108,15 @@ getPools cid = do
     go = do
         e <- getStatus cid
         case e of
-            Right (US.Pools ps) -> putStrLn $ "pools: " ++ show ps
+            Right (US.Pools ps) -> showPools ps
             _                   -> go
+
+    showPools :: [((US.Coin US.A, US.Amount US.A), (US.Coin US.B, US.Amount US.B))] -> IO ()
+    showPools ps = do
+        forM_ ps $ \((US.Coin (AssetClass (csA, tnA)), amtA), (US.Coin (AssetClass (csB, tnB)), amtB)) -> do
+            showCoinHeader
+            showCoin csA tnA (US.unAmount amtA)
+            showCoin csB tnB (US.unAmount amtB)
 
 createPool :: UUID -> US.CreateParams -> IO ()
 createPool cid cp = do
