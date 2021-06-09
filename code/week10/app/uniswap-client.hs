@@ -10,7 +10,8 @@ import           Control.Concurrent
 import           Control.Exception
 import           Control.Monad                           (forM_, when)
 import           Control.Monad.IO.Class                  (MonadIO (..))
-import           Data.Aeson                              (Result (..), ToJSON, decode, fromJSON)
+import           Data.Aeson                              (Result (..), ToJSON, decode, encode, fromJSON)
+import qualified Data.ByteString.Lazy.Char8              as B8
 import qualified Data.ByteString.Lazy                    as LB
 import           Data.Monoid                             (Last (..))
 import           Data.Proxy                              (Proxy (..))
@@ -212,6 +213,8 @@ getStatus cid = runReq defaultHttpConfig $ do
 
 callEndpoint :: ToJSON a => UUID -> String -> a -> IO ()
 callEndpoint cid name a = handle h $ runReq defaultHttpConfig $ do
+    liftIO $ printf "\npost request to 127.0.1:8080/api/new/contract/instance/%s/endpoint/%s\n" (show cid) name
+    liftIO $ printf "request body: %s\n\n" $ B8.unpack $ encode a
     v <- req
         POST
         (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show cid) /: "endpoint" /: pack name)
