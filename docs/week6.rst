@@ -846,19 +846,20 @@ We recall from the diagram, the swap transaction should have three inputs and th
 
 .. figure:: img/week06__00006.png
 
-Inputs
-~~~~~~
+.. list-table:: Swap Transaction Inputs and Outputs
+   :widths: 75 75
+   :header-rows: 1
 
-- The oracle, to check the current exchange rate.
-- The swap UTxO that holds the lovelace.
-- The source of the buyer's funds.
-
-Outputs
-~~~~~~~
-
-- The oracle again. We don't need to worry about this, because the oracle validator takes care of ensuring that the value is not changed and that the fees are added.
-- The tokens for the seller.
-- The lovelace for the buyer.
+   * - Inputs
+     - Outputs
+   * - The oracle, to check the current exchange rate.
+     - The oracle.
+   * - The swap UTxO that holds the lovelace.
+     - The tokens for the seller.
+   * - The source of the buyer's funds.
+     - The lovelace for the buyer.
+ 
+Note that we don't need to worry about the oracle as an output. The oracle validator takes care of ensuring that the value is not changed and that the fees are added.
 
 We also want to support the second use case, the case where the seller can retrieve the ADA tokens in the case that they no longer want to do the swap. If we don't
 support this case, the ADA could be locked there forever, if nobody ever decides to make the swap.
