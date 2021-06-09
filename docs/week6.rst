@@ -803,9 +803,18 @@ In summary, *runOracle* starts the oracle, tells the oracle, then loops to allow
 And that concludes the code for the oracle itself. What is now missing is an example, a contract that actually uses the oracle - a swap contract. And also using the
 Plutus Application Backend to run this code in the real world or, in our case, in a simulated blockchain.
 
-
-
+Swap Contract
+~~~~~~~~~~~~~
     
+Our example swap contract can be found in
+
+.. code:: haskell
+
+    module Week06.Oracle.swap
+
+The purpose of this contract is for someone to be able to deposit ADA and exchange it for a token, in our case a token that we will call USDT for US Dollar Token.
+
+
 
 
 
