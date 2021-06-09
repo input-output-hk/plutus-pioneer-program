@@ -1200,10 +1200,27 @@ wallet and returns a *Value*. We then find out how many USD Tokens we have.
     let amt = assetClassValueOf funds $ oAsset oracle
     logInfo @String $ "available assets: " ++ show amt
     
-    
+The *findOracle* function is defined in the Oracle.Core module from earlier. You will recall that it finds us the oracle UTxO that contains the oracle value.
 
+.. code:: haskell
 
+    m <- findOracle oracle
 
+If we don't find the oracle, we will just log a message to that effect.
+
+.. code:: haskell
+
+    case m of
+        Nothing           -> logInfo @String "oracle not found"
+        
+If we do find it, we will log a message with the current exchange rate.
+
+.. code:: haskell
+
+    Just (oref, o, x) -> do
+        logInfo @String $ "found oracle, exchange rate " ++ show x    
+
+        
 
 
 
