@@ -889,7 +889,7 @@ Secondly, we want to check that the seller gets paid.
 .. code:: haskell
 
     (traceIfFalse "expected exactly two script inputs" hasTwoScriptInputs &&
-    traceIfFalse "price not paid"                      sellerPaid)    
+     traceIfFalse "price not paid"                     sellerPaid)    
 
 Now, we have our helper function definitions.
 
@@ -947,16 +947,6 @@ Now, let's look at the *hasTwoScriptInputs* helper function.
       in
         length xs == 2
 
-    minPrice :: Integer
-    minPrice =
-      let
-        lovelaceIn = case findOwnInput ctx of
-            Nothing -> traceError "own input not found"
-            Just i  -> lovelaces $ txOutValue $ txInInfoResolved i
-      in
-        price lovelaceIn oracleValue'
-        
-        
 First, we filter, using the composite function
 
 .. code:: haskell
@@ -966,7 +956,45 @@ First, we filter, using the composite function
 Reading right to left, we get the UTxO from the input, then we get the address for this UTxO, then we get the validator hash for that address. Then, finally, we check
 if it is a script output, by seeing if it is a *Just*. If it is a *Nothing*, then this would show that it is a public key, not a script address.
 
-We then use this composite function as a filter against the list of *TxInInfo*\s.
+We then use this composite function as a filter against the list of *TxInInfo*\s. And then we check that the length of the resulting list is exactly two.
+
+Going back to our validation conditions, we now have to deal with checking that the seller is getting paid. So let's write the *sellerPaid* helper function that
+we referenced.
+
+For this we will use another helper function to determine the required price.
+
+.. code:: haskell
+
+    minPrice :: Integer
+    minPrice =
+      let
+        lovelaceIn = case findOwnInput ctx of
+            Nothing -> traceError "own input not found"
+            Just i  -> lovelaces $ txOutValue $ txInInfoResolved i
+      in
+        price lovelaceIn oracleValue'    
+
+First we check that we have an input, and if so, we extract the number of lovelaces and assign that number to *lovelaceIn*. Then, we use the *price* helper function
+to determine the price in USD tokens.
+
+Now, we can define the *sellerPaid* helper function.
+
+.. code:: haskell
+
+    sellerPaid :: Bool
+    sellerPaid =
+      let
+        pricePaid :: Integer
+        pricePaid =  assetClassValueOf (valuePaidTo info pkh) (oAsset oracle)
+      in
+        pricePaid >= minPrice
+
+The function *valuePaidTo* is from the Plutus libraries. Given *info* and a public key hash, it will add up all the values of all the public key outputs that go
+to this address. We then use the *assetClassValueOf* function to check the component of the value that is in USD token.
+
+
+
+
 
 
 
