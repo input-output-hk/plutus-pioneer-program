@@ -1130,8 +1130,16 @@ belong to the operator.
                 awaitTxConfirmed $ txId ledgerTx
                 logInfo @String $ "retrieved " ++ show (length xs) ++ " swap(s)"
                 
-                
+If there are none, then there is nothing to do. If there are some, we construct a transaction that retrieves all of them.
 
+To do that, we create a list of *mustSpendScriptOutput* constraints.
+
+.. code:: haskell
+
+    tx = mconcat [Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | (oref, _, _) <- xs]
+
+The line looks intimidating, but it is just extracting a list of *oref*\s from the *xs* list and using it to construct a constraint for each of them, using *Unit* as
+the *Redeemer* type.
 
 
 
