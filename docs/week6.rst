@@ -850,7 +850,7 @@ Inputs
 ~~~~~~
 
 - The oracle, to check the current exchange rate.
-- The swap output that holds the lovelace.
+- The swap UTxO that holds the lovelace.
 - The source of the buyer's funds.
 
 Outputs
@@ -863,7 +863,8 @@ Outputs
 We also want to support the second use case, the case where the seller can retrieve the ADA tokens in the case that they no longer want to do the swap. If we don't
 support this case, the ADA could be locked there forever, if nobody ever decides to make the swap.
 
-This second case is the condition we check in the validator. If the seller themselves signs the transaction, there are no further constraints.
+This second case is the condition we check in the validator. If the seller themselves signs the transaction, there are no further constraints - we don't need to check 
+the oracle or anything else - the seller can just get back their lovelace.
 
 .. code:: haskell
 
@@ -871,6 +872,10 @@ This second case is the condition we check in the validator. If the seller thems
     mkSwapValidator oracle addr pkh () ctx =
         txSignedBy info pkh ||
     ...            
+
+The more interesting case is the second one, where we check two conditions. There must be two inputs - the oracle and the swap UTxO. All additional inputs (the buyer's funds)
+must be public key inputs. This is because we don't want to worry about interference with other smart contracts.
+
 
 
 
