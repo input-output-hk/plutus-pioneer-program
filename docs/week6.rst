@@ -1109,6 +1109,31 @@ We will see how we use the *findSwaps* function in a moment.
 retrieveSwaps
 ~~~~~~~~~~~~~
 
+The *retrieveSwaps* contract is for the seller if they want to change their mind and get their Ada back.
+
+Here is where we use the *findSwaps* function. We use it with *(== pkh)* as the predicate, meaning that we want only those UTxOs sitting at the swap address that
+belong to the operator.
+
+.. code:: haskell
+
+    retrieveSwaps :: HasBlockchainActions s => Oracle -> Contract w s Text ()
+    retrieveSwaps oracle = do
+        pkh <- pubKeyHash <$> ownPubKey
+        xs <- findSwaps oracle (== pkh)
+        case xs of
+            [] -> logInfo @String "no swaps found"
+            _  -> do
+                let lookups = Constraints.unspentOutputs (Map.fromList [(oref, o) | (oref, o, _) <- xs]) <>
+                              Constraints.otherScript (swapValidator oracle)
+                    tx      = mconcat [Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | (oref, _, _) <- xs]
+                ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
+                awaitTxConfirmed $ txId ledgerTx
+                logInfo @String $ "retrieved " ++ show (length xs) ++ " swap(s)"
+                
+                
+
+
+
 
 
 
