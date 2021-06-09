@@ -1241,10 +1241,17 @@ The function used in the predicate is defined as a helper function.
         f :: Integer -> Integer -> (TxOutRef, TxOutTx, PubKeyHash) -> Bool
         f amt x (_, o, _) = getPrice x o <= amt    
 
-We give it an amount, the current exchange rate, and a UTxO triple. The function determines if we can afford a given swap.
+We give it an amount, the current exchange rate, and a UTxO triple. The function determines if there is a swap that is cheaper to or equal to the amount parameter.
 
+Now, we have searched for a swap that we can afford. If we don't find one, we log a message saying so.
 
+.. code:: haskell
 
+    case find (f amt x) swaps of
+        Nothing                -> logInfo @String "no suitable swap found"
+
+If we *do* find one, we just take the first one. This isn't very realistic, of course. In a real-world example we would probably specify the exact amount we want to swap. Here,
+we are just keeping it simple as we are focussed on oracles rather than swapping.
 
 
 
