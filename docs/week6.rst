@@ -828,7 +828,16 @@ The next helper function, *lovelaces*, combines to functions from the Plutus lib
     lovelaces :: Value -> Integer
     lovelaces = Ada.getLovelace . Ada.fromValue    
 
+Now we will write *mkSwapValidator*. This is a parameterized validator with two parameters. 
+
+The first parameter is the oracle that we are using. To use this, we import the oracle module.
+
+.. code:: haskell
+
+    import Week06.Oracle.core
+
     
+
 
 
 
