@@ -928,7 +928,35 @@ This has now given us the oracle output that we are consuming as an input.
 Now, we want to check the actual exchange rate. For that, we use the *oracleValue* function that we defined in the core module. Here again, it may succeed, or it may 
 fail. If it succeeds we return the value.
 
+.. code:: haskell
 
+    oracleValue' = case oracleValue oracleInput (`findDatum` info) of
+        Nothing -> traceError "oracle value not found"
+        Just x  -> x    
+
+We do not need to check whether the oracle contains the NFT. Due to the way validation works for the oracle, we know that it is present.
+
+Now, let's look at the *hasTwoScriptInputs* helper function.
+
+.. code:: haskell
+
+    hasTwoScriptInputs :: Bool
+    hasTwoScriptInputs =
+      let
+        xs = filter (isJust . toValidatorHash . txOutAddress . txInInfoResolved) $ txInfoInputs info
+      in
+        length xs == 2
+
+    minPrice :: Integer
+    minPrice =
+      let
+        lovelaceIn = case findOwnInput ctx of
+            Nothing -> traceError "own input not found"
+            Just i  -> lovelaces $ txOutValue $ txInInfoResolved i
+      in
+        price lovelaceIn oracleValue'
+        
+        
 
 
 
