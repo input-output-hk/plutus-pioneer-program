@@ -287,8 +287,9 @@ Before looking at the *inputHasToken* function there is another help function to
         Nothing -> traceError "oracle input missing"
         Just i  -> txInInfoResolved i
         
-The *ownInput* function returns the *TxOut* that the script is trying to consume, which in this case is the oracle output. The *Nothing* case here can happen if we are in a different context, such as a minting context, so
-this eventuality will not occur for us. The *findOwnInput* function is provided by Plutus and will, given the context, find the relevant input.
+The *ownInput* function returns the *TxOut* that the script is trying to consume, which in this case is the oracle output. The *Nothing* case here can happen if we are in a 
+different context, such as a minting context, so this eventuality will not occur for us. The *findOwnInput* function is provided by Plutus and will, given the context, 
+find the relevant input. The *txInInfoResolved* function turns a *TxInInfo* into a *TxOut*.
 
 The *inputHashToken* function checks that the token is present. It uses the *assetClassValueOf* function to look for the NFT within the *ownInput* response.
 
@@ -852,12 +853,12 @@ We recall from the diagram, the swap transaction should have three inputs and th
 
    * - Inputs
      - Outputs
-   * - The oracle, to check the current exchange rate.
-     - The oracle.
-   * - The swap UTxO that holds the lovelace.
-     - The tokens for the seller.
-   * - The source of the buyer's funds.
-     - The lovelace for the buyer.
+   * - The oracle, to check the current exchange rate
+     - The oracle, which we don't need to look at in the swap validation
+   * - The swap UTxO that holds the lovelace
+     - The tokens for the seller
+   * - The source of the buyer's funds
+     - The lovelace for the buyer
  
 Note that we don't need to worry about the oracle as an output. The oracle validator takes care of ensuring that the value is not changed and that the fees are added.
 
@@ -874,9 +875,54 @@ the oracle or anything else - the seller can just get back their lovelace.
         txSignedBy info pkh ||
     ...            
 
-The more interesting case is the second one, where we check two conditions. There must be two inputs - the oracle and the swap UTxO. All additional inputs (the buyer's funds)
-must be public key inputs. This is because we don't want to worry about interference with other smart contracts.
+The more interesting case is the second one, where we check two conditions. 
 
+Firstly, there must be two inputs - the oracle and the swap UTxO. All additional inputs (the buyer's funds) must be public key inputs. This is because we don't want to worry about interference with other smart contracts.
+
+Secondly, we want to check that the seller gets paid.
+
+.. code:: haskell
+
+    (traceIfFalse "expected exactly two script inputs" hasTwoScriptInputs &&
+    traceIfFalse "price not paid"                      sellerPaid)    
+
+Now, we have our helper function definitions.
+
+First, the usual.
+
+.. code:: haskell
+
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+    
+Then, we have *oracleInput* to get the UTxO from the oracle.
+
+.. code:: haskell
+
+    oracleInput :: TxOut
+    oracleInput =
+      let
+        ins = [ o
+              | i <- txInfoInputs info
+              , let o = txInInfoResolved i
+              , txOutAddress o == addr
+              ]
+      in
+        case ins of
+            [o] -> o
+            _   -> traceError "expected exactly one oracle input"
+            
+We do this by getting a list of all the inputs. For this we use list comprehension, which allows us to draw from other lists using a filter. In this case we draw
+from the list from *txInfoInputs info*, which is a list of *TxInfo*. We use the *txInInfoResolved* function to look at each element as a *TxOut* type, which we then compare with the
+*addr* parameter. The resulting list will either by empty, or will have the *TxOut* that matches the oracle UTxO.
+
+We then check that there is exactly one element in the resulting list, and, if there is, we return it. We don't return the list, just the *TxOut*.
+
+
+
+
+
+            
 
 
 
