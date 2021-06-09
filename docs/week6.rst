@@ -840,7 +840,21 @@ The second parameter is the address of the oracle. Normally, given the oracle, w
 *oracleAddress* which does this for us. But this is a function that we can't use in the validator, because it can't be compiled to Plutus script. So, here, we explicitly 
 hand the address to the validator.
 
+For the datum, we use the public key hash of the seller. We don't use a redeemer, so we give it a type of Unit.
 
+We recall from the diagram, the swap transaction should have three inputs.
+
+- The oracle, to check the current exchange rate.
+- The swap output that holds the lovelace.
+- The source of the buyer's funds.
+
+And it should have three outputs.
+  
+- The oracle again. We don't need to worry about this, because the oracle validator takes care of ensuring that the value is not changed and that the fees are added.
+- The tokens for the seller.
+- The lovelace for the buyer.
+
+.. figure:: img/week06__00006.png
 
 
 
