@@ -1220,8 +1220,28 @@ If we do find it, we will log a message with the current exchange rate.
     Just (oref, o, x) -> do
         logInfo @String $ "found oracle, exchange rate " ++ show x    
 
-        
+Next, we check our own public key and check for all available swaps where we are *not* the owner.
 
+.. code:: haskell
+
+    pkh   <- pubKeyHash <$> Contract.ownPubKey
+    swaps <- findSwaps oracle (/= pkh)    
+
+Then, we use a function *find* which is from the Haskell prelude, in module *Data.List*. The *find* function takes a predicate and a list and *Maybe* returns one 
+element of that list that satisfies the predicate.
+
+The function used in the predicate is defined as a helper function.
+
+.. code:: haskell
+
+    where
+        getPrice :: Integer -> TxOutTx -> Integer
+        getPrice x o = price (lovelaces $ txOutValue $ txOutTxOut o) x    
+
+        f :: Integer -> Integer -> (TxOutRef, TxOutTx, PubKeyHash) -> Bool
+        f amt x (_, o, _) = getPrice x o <= amt    
+
+We give it an amount, the current exchange rate, and a UTxO triple. The function determines if we can afford a given swap.
 
 
 
