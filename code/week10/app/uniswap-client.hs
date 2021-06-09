@@ -50,6 +50,7 @@ main = do
             Pools                    -> getPools cid
             Create amtA tnA amtB tnB -> createPool cid $ toCreateParams cs amtA tnA amtB tnB
             Add amtA tnA amtB tnB    -> addLiquidity cid $ toAddParams cs amtA tnA amtB tnB
+            Remove amt tnA tnB       -> removeLiquidity cid $ toRemoveParams cs amt tnA tnB
             Swap amtA tnA tnB        -> swap cid $ toSwapParams cs amtA tnA tnB
         go cid cs
 
@@ -58,12 +59,13 @@ data Command =
     | Pools
     | Create Integer Char Integer Char
     | Add Integer Char Integer Char
+    | Remove Integer Char Char
     | Swap Integer Char Char
     deriving (Show, Read, Eq, Ord)
 
 readCommandIO :: IO Command
 readCommandIO = do
-    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Add amtA tnA amtB tnB, Swap amtA tnA tnB"
+    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Add amtA tnA amtB tnB, Remove amt tnA tnB, Swap amtA tnA tnB"
     s <- getLine
     maybe readCommandIO return $ readMaybe s
 
@@ -75,6 +77,9 @@ toCreateParams cs amtA tnA amtB tnB = US.CreateParams (toCoin cs tnA) (toCoin cs
 
 toAddParams :: CurrencySymbol -> Integer -> Char -> Integer -> Char -> US.AddParams
 toAddParams cs amtA tnA amtB tnB = US.AddParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount amtB)
+
+toRemoveParams :: CurrencySymbol -> Integer -> Char -> Char -> US.RemoveParams
+toRemoveParams cs amt tnA tnB = US.RemoveParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amt)
 
 toSwapParams :: CurrencySymbol -> Integer -> Char -> Char -> US.SwapParams
 toSwapParams cs amtA tnA tnB = US.SwapParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount 0)
@@ -147,6 +152,19 @@ addLiquidity cid ap = do
             Right US.Added -> putStrLn "added"
             Left err'      -> putStrLn $ "error: " ++ show err'
             _              -> go
+
+removeLiquidity :: UUID -> US.RemoveParams -> IO ()
+removeLiquidity cid rp = do
+    callEndpoint cid "remove" rp
+    threadDelay 2_000_000
+    go
+  where
+    go = do
+        e <- getStatus cid
+        case e of
+            Right US.Removed -> putStrLn "removed"
+            Left err'        -> putStrLn $ "error: " ++ show err'
+            _                -> go
 
 swap :: UUID -> US.SwapParams -> IO ()
 swap cid sp = do
