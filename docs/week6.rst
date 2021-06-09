@@ -806,8 +806,8 @@ In summary, *runOracle* starts the oracle, *tell*\s the oracle, then loops to al
 And that concludes the code for the oracle itself. What is now missing is an example, a contract that actually uses the oracle - a swap contract. And also using the
 Plutus Application Backend to run this code in the real world or, in our case, in a simulated blockchain.
 
-Swap Contract
--------------
+Swap Validation
+---------------
     
 Our example swap contract can be found in
 
@@ -1022,8 +1022,10 @@ oracle address as a parameter. This is because we will compute this inside the f
 
 Now to define some contracts.
 
-Also in the code, we have the function *offerSwap*. This function will submit a transaction to the swap contract instance. It is for the seller who wants to offer a 
-certain number of lovelace for exchange.
+offerSwap
+~~~~~~~~~
+
+First *offerSwap*. This is for a seller who wants to offer a certain number of lovelace for exchange.
 
 .. code:: haskell
 
@@ -1034,6 +1036,9 @@ certain number of lovelace for exchange.
         ledgerTx <- submitTxConstraints (swapInst oracle) tx
         awaitTxConfirmed $ txId ledgerTx
         logInfo @String $ "offered " ++ show amt ++ " lovelace for swap"    
+
+findSwaps
+~~~~~~~~~
 
 Next, a helper function that will find all swaps that satisfy a given predicate. It takes an oracle plus a predicate based on public key hashes, and returns a list 
 of triples of the UTxOs that satisfy the predicate.
@@ -1098,6 +1103,11 @@ if it exists. After this, function *g* uses the *guard* function with the predic
 The *guard* function is available in some monads, and the *Maybe* monad is one of them. It takes a boolean as a parameter, and, if the boolean is false, the computation 
 fails. In this case, failure means returning *Nothing*. If it is true, it just continues. In this case, that means returning the *Just* of the triple containing the 
 public key hash.
+
+We will see how we use the *findSwaps* function in a moment.
+
+retrieveSwaps
+~~~~~~~~~~~~~
 
 
 
