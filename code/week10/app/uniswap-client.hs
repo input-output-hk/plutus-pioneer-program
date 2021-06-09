@@ -11,14 +11,13 @@ import           Control.Exception
 import           Control.Monad                           (forM_, when)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Data.Aeson                              (Result (..), ToJSON, decode, fromJSON)
-import qualified Data.ByteString.Char8                   as B8
 import qualified Data.ByteString.Lazy                    as LB
 import           Data.Monoid                             (Last (..))
 import           Data.Proxy                              (Proxy (..))
 import           Data.String                             (IsString (..))
 import           Data.Text                               (Text, pack)
 import           Data.UUID                               hiding (fromString)
-import           Ledger.Value                            (AssetClass (..), CurrencySymbol, Value, flattenValue, TokenName (unTokenName))
+import           Ledger.Value                            (AssetClass (..), CurrencySymbol, Value, flattenValue, TokenName)
 import           Network.HTTP.Req
 import qualified Plutus.Contracts.Uniswap                as US
 import           Plutus.PAB.Events.ContractInstanceState (PartiallyDecodedResponse (..))
@@ -50,6 +49,7 @@ main = do
             Funds                    -> getFunds cid
             Pools                    -> getPools cid
             Create amtA tnA amtB tnB -> createPool cid $ toCreateParams cs amtA tnA amtB tnB
+            Add amtA tnA amtB tnB    -> addLiquidity cid $ toAddParams cs amtA tnA amtB tnB
             Swap amtA tnA tnB        -> swap cid $ toSwapParams cs amtA tnA tnB
         go cid cs
 
@@ -57,12 +57,13 @@ data Command =
       Funds
     | Pools
     | Create Integer Char Integer Char
+    | Add Integer Char Integer Char
     | Swap Integer Char Char
     deriving (Show, Read, Eq, Ord)
 
 readCommandIO :: IO Command
 readCommandIO = do
-    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Swap amtA tnA tnB"
+    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Add amtA tnA amtB tnB, Swap amtA tnA tnB"
     s <- getLine
     maybe readCommandIO return $ readMaybe s
 
@@ -71,6 +72,9 @@ toCoin cs tn = US.Coin $ AssetClass (cs, fromString [tn])
 
 toCreateParams :: CurrencySymbol -> Integer -> Char -> Integer -> Char -> US.CreateParams
 toCreateParams cs amtA tnA amtB tnB = US.CreateParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount amtB)
+
+toAddParams :: CurrencySymbol -> Integer -> Char -> Integer -> Char -> US.AddParams
+toAddParams cs amtA tnA amtB tnB = US.AddParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount amtB)
 
 toSwapParams :: CurrencySymbol -> Integer -> Char -> Char -> US.SwapParams
 toSwapParams cs amtA tnA tnB = US.SwapParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount 0)
@@ -130,6 +134,19 @@ createPool cid cp = do
             Right US.Created -> putStrLn "created"
             Left err'        -> putStrLn $ "error: " ++ show err'
             _                -> go
+
+addLiquidity :: UUID -> US.AddParams -> IO ()
+addLiquidity cid ap = do
+    callEndpoint cid "add" ap
+    threadDelay 2_000_000
+    go
+  where
+    go = do
+        e <- getStatus cid
+        case e of
+            Right US.Added -> putStrLn "added"
+            Left err'      -> putStrLn $ "error: " ++ show err'
+            _              -> go
 
 swap :: UUID -> US.SwapParams -> IO ()
 swap cid sp = do
