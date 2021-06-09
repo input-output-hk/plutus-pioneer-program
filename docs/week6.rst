@@ -1139,7 +1139,14 @@ To do that, we create a list of *mustSpendScriptOutput* constraints.
     tx = mconcat [Constraints.mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | (oref, _, _) <- xs]
 
 The line looks intimidating, but it is just extracting a list of *oref*\s from the *xs* list and using it to construct a constraint for each of them, using *Unit* as
-the *Redeemer* type.
+the *Redeemer* type. The function *mconcat* applies the *Semigroup* operator *<>* throughout the list in order to combine them.
+
+As lookups, we must provide all the UTxOs and the swap validator.
+
+We have the list of UTxOs in *xs* and we use list comprehension to turn this list into a list of pairs, and we then use *Map.fromList* to turn those pairs into a 
+map, to which we then apply the *unspentOutputs* constraint.
+
+
 
 
 
