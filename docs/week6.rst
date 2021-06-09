@@ -1253,9 +1253,23 @@ Now, we have searched for a swap that we can afford. If we don't find one, we lo
 If we *do* find one, we just take the first one. This isn't very realistic, of course. In a real-world example we would probably specify the exact amount we want to swap. Here,
 we are just keeping it simple as we are focussed on oracles rather than swapping.
 
+So, now we construct a transaction.
+
+.. code:: haskell
+
+    let v = txOutValue (txOutTxOut o) <> lovelaceValueOf (oFee oracle)                
+
+This is the output for the oracle. It is the same as the input, including any fees that have accumulated there, plus the fee in lovelace that we need to pay.
+
+We then create a *Value* representing the USD Tokens that we need to pay.
+
+.. code:: haskell
+
+    p = assetClassValue (oAsset oracle) $ price (lovelaces $ txOutValue $ txOutTxOut o') x
+
+Now, let's look at the constraints.
 
 
-            
 
 
 
