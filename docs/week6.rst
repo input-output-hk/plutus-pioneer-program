@@ -189,7 +189,7 @@ The *oracleAsset* will be used to identify the NFT - this is not to be confused 
     oracleAsset oracle = AssetClass (oSymbol oracle, oracleTokenName)
 
 We create a little helper function called *oracleValue*. This takes an output transaction and a function which looks up the datum, and then returns an *Integer*. The *Integer* represents the exchange rate (e.g. 1.75) multiplied
-by a million. This avoids potential complicates using real numbers.
+by a million. This avoids potential complications when using real numbers.
 
 .. code:: haskell
 
@@ -339,6 +339,11 @@ And for this we have referenced a new helper function *validOutputDatum*, which 
     validOutputDatum :: Bool
     validOutputDatum = isJust outputDatum
 
+.. note::
+    If you look up *findDatum* in the REPL, you will see it has a type of *DatumHash -> TxInfo -> Maybe Datum*. As we are using its infix notation here, we
+    can pass in *info* as the only parameter, and this will result in the whole expression having the type *DatumHash -> Maybe Datum*, which is the type we
+    need to pass into *oracleValue*.
+    
 This works by trying to get the datum value from the datum hash and then trying to create the oracle value from it. If it succeeds it will return a *Just Integer*,
 otherwise it will return *Nothing*, so the *validOutputDatum* function just needs to check that the return value is not *Nothing*, in other words, that it 
 is a *Just*.
@@ -917,6 +922,11 @@ from the list from *txInfoInputs info*, which is a list of *TxInfo*. We use the 
 *addr* parameter. The resulting list will either by empty, or will have the *TxOut* that matches the oracle UTxO.
 
 We then check that there is exactly one element in the resulting list, and, if there is, we return it. We don't return the list, just the *TxOut*.
+
+This has now given us the oracle output that we are consuming as an input.
+
+Now, we want to check the actual exchange rate. For that, we use the *oracleValue* function that we defined in the core module. Here again, it may succeed, or it may 
+fail. If it succeeds we return the value.
 
 
 
