@@ -966,7 +966,7 @@ First, we filter, using the composite function
 Reading right to left, we get the UTxO from the input, then we get the address for this UTxO, then we get the validator hash for that address. Then, finally, we check
 if it is a script output, by seeing if it is a *Just*. If it is a *Nothing*, then this would show that it is a public key, not a script address.
 
-
+We then use this composite function as a filter against the list of *TxInInfo*\s.
 
 
 
