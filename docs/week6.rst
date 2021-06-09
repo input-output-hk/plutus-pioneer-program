@@ -842,19 +842,37 @@ hand the address to the validator.
 
 For the datum, we use the public key hash of the seller. We don't use a redeemer, so we give it a type of Unit.
 
-We recall from the diagram, the swap transaction should have three inputs.
+We recall from the diagram, the swap transaction should have three inputs and three outputs.
+
+.. figure:: img/week06__00006.png
+
+Inputs
+~~~~~~
 
 - The oracle, to check the current exchange rate.
 - The swap output that holds the lovelace.
 - The source of the buyer's funds.
 
-And it should have three outputs.
-  
+Outputs
+~~~~~~~
+
 - The oracle again. We don't need to worry about this, because the oracle validator takes care of ensuring that the value is not changed and that the fees are added.
 - The tokens for the seller.
 - The lovelace for the buyer.
 
-.. figure:: img/week06__00006.png
+We also want to support the second use case, the case where the seller can retrieve the ADA tokens in the case that they no longer want to do the swap. If we don't
+support this case, the ADA could be locked there forever, if nobody ever decides to make the swap.
+
+This second case is the condition we check in the validator. If the seller themselves signs the transaction, there are no further constraints.
+
+.. code:: haskell
+
+    mkSwapValidator :: Oracle -> Address -> PubKeyHash -> () -> ScriptContext -> Bool
+    mkSwapValidator oracle addr pkh () ctx =
+        txSignedBy info pkh ||
+    ...            
+
+
 
 
 
