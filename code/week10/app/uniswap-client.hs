@@ -48,12 +48,14 @@ main = do
             Funds                    -> getFunds cid
             Pools                    -> getPools cid
             Create amtA tnA amtB tnB -> createPool cid $ toCreateParams cs amtA tnA amtB tnB
+            Swap amtA tnA tnB        -> swap cid $ toSwapParams cs amtA tnA tnB
         go cid cs
 
 data Command =
       Funds
     | Pools
     | Create Integer Char Integer Char
+    | Swap Integer Char Char
     deriving (Show, Read, Eq, Ord)
 
 readCommandIO :: IO Command
@@ -62,11 +64,14 @@ readCommandIO = do
     s <- getLine
     maybe readCommandIO return $ readMaybe s
 
+toCoin :: CurrencySymbol -> Char -> US.Coin c
+toCoin cs tn = US.Coin $ AssetClass (cs, fromString [tn])
+
 toCreateParams :: CurrencySymbol -> Integer -> Char -> Integer -> Char -> US.CreateParams
-toCreateParams cs amtA tnA amtB tnB = US.CreateParams (toCoin tnA) (toCoin tnB) (US.Amount amtA) (US.Amount amtB)
-  where
-    toCoin :: Char -> US.Coin c
-    toCoin tn = US.Coin $ AssetClass (cs, fromString [tn])
+toCreateParams cs amtA tnA amtB tnB = US.CreateParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount amtB)
+
+toSwapParams :: CurrencySymbol -> Integer -> Char -> Char -> US.SwapParams
+toSwapParams cs amtA tnA tnB = US.SwapParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount 0)
 
 getFunds :: UUID -> IO ()
 getFunds cid = do
@@ -93,8 +98,8 @@ getPools cid = do
             _                   -> go
 
 createPool :: UUID -> US.CreateParams -> IO ()
-createPool cid cps = do
-    callEndpoint cid "create" cps
+createPool cid cp = do
+    callEndpoint cid "create" cp
     threadDelay 2_000_000
     go
   where
@@ -102,6 +107,19 @@ createPool cid cps = do
         e <- getStatus cid
         case e of
             Right US.Created -> putStrLn "created"
+            Left err'        -> putStrLn $ "error: " ++ show err'
+            _                -> go
+
+swap :: UUID -> US.SwapParams -> IO ()
+swap cid sp = do
+    callEndpoint cid "swap" sp
+    threadDelay 2_000_000
+    go
+  where
+    go = do
+        e <- getStatus cid
+        case e of
+            Right US.Swapped -> putStrLn "swapped"
             Left err'        -> putStrLn $ "error: " ++ show err'
             _                -> go
 
