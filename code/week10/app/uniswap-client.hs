@@ -51,6 +51,7 @@ main = do
             Create amtA tnA amtB tnB -> createPool cid $ toCreateParams cs amtA tnA amtB tnB
             Add amtA tnA amtB tnB    -> addLiquidity cid $ toAddParams cs amtA tnA amtB tnB
             Remove amt tnA tnB       -> removeLiquidity cid $ toRemoveParams cs amt tnA tnB
+            Close tnA tnB            -> closePool cid $ toCloseParams cs tnA tnB
             Swap amtA tnA tnB        -> swap cid $ toSwapParams cs amtA tnA tnB
         go cid cs
 
@@ -60,12 +61,13 @@ data Command =
     | Create Integer Char Integer Char
     | Add Integer Char Integer Char
     | Remove Integer Char Char
+    | Close Char Char
     | Swap Integer Char Char
     deriving (Show, Read, Eq, Ord)
 
 readCommandIO :: IO Command
 readCommandIO = do
-    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Add amtA tnA amtB tnB, Remove amt tnA tnB, Swap amtA tnA tnB"
+    putStrLn "Enter a command: Funds, Pools, Create amtA tnA amtB tnB, Add amtA tnA amtB tnB, Remove amt tnA tnB, Close tnA tnB, Swap amtA tnA tnB"
     s <- getLine
     maybe readCommandIO return $ readMaybe s
 
@@ -81,6 +83,9 @@ toAddParams cs amtA tnA amtB tnB = US.AddParams (toCoin cs tnA) (toCoin cs tnB) 
 toRemoveParams :: CurrencySymbol -> Integer -> Char -> Char -> US.RemoveParams
 toRemoveParams cs amt tnA tnB = US.RemoveParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amt)
 
+toCloseParams :: CurrencySymbol -> Char -> Char -> US.CloseParams
+toCloseParams cs tnA tnB = US.CloseParams (toCoin cs tnA) (toCoin cs tnB)
+
 toSwapParams :: CurrencySymbol -> Integer -> Char -> Char -> US.SwapParams
 toSwapParams cs amtA tnA tnB = US.SwapParams (toCoin cs tnA) (toCoin cs tnB) (US.Amount amtA) (US.Amount 0)
 
@@ -88,7 +93,7 @@ showCoinHeader :: IO ()
 showCoinHeader = printf "\n                                                 currency symbol                                                         token name          amount\n\n"
 
 showCoin :: CurrencySymbol -> TokenName -> Integer -> IO ()
-showCoin cs tn amt = printf "%64s %66s %15d\n" (show cs) (show tn) amt
+showCoin cs tn = printf "%64s %66s %15d\n" (show cs) (show tn)
 
 getFunds :: UUID -> IO ()
 getFunds cid = do
@@ -165,6 +170,19 @@ removeLiquidity cid rp = do
             Right US.Removed -> putStrLn "removed"
             Left err'        -> putStrLn $ "error: " ++ show err'
             _                -> go
+
+closePool :: UUID -> US.CloseParams -> IO ()
+closePool cid cp = do
+    callEndpoint cid "close" cp
+    threadDelay 2_000_000
+    go
+  where
+    go = do
+        e <- getStatus cid
+        case e of
+            Right US.Closed -> putStrLn "closed"
+            Left err'       -> putStrLn $ "error: " ++ show err'
+            _               -> go
 
 swap :: UUID -> US.SwapParams -> IO ()
 swap cid sp = do
