@@ -401,7 +401,7 @@ Now we have our usual boilerplate. In particular notice that we use the pattern 
 And this concludes the on-chain part of the oracle code.
     
 Off-chain
-+++++++++
+~~~~~~~~~
 
 We also create some off-chain code, namely to start the oracle, and to update it. However, we don't write off-chain code to *use* the oracle. That is not the 
 responsibility of the author of this contract. That will be the responsibility of the person that wants to use the oracle - they will write the code to create the
