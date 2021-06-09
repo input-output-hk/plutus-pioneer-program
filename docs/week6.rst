@@ -1020,7 +1020,7 @@ That's the end of the main part of the code for the swap validator. We just have
 Note that in the *swapInst* function, where we use template haskell to generate the Plutus validator from the *mkSwapValidator* function, we do not need to pass in the 
 oracle address as a parameter. This is because we will compute this inside the function. Remember that we can't use the *oracleAddress* function inside the Plutus validator.
 
-Now we can create some functions that will work with instances of the swap contract.
+Now to define some contracts.
 
 Also in the code, we have the function *offerSwap*. This function will submit a transaction to the swap contract instance. It is for the seller who wants to offer a 
 certain number of lovelace for exchange.
