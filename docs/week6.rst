@@ -2190,17 +2190,151 @@ the one that we are using here is:
             )
 
 This makes use of the popular Haskell library *Servant* to write type safe web applications, but it should be readable more or less without knowledge of the *Servant* 
-library. For example, you can see the following endpoint declared which takes a *ContractActivationArgs* as its body and returns a *ContractInstanceId*.
-
-.. code::
-
-    POST /api/new/contract/activate
+library. For example, you can see the */api/new/contract/activate* endpoint declared to which you can POST a *ContractActivationArgs* as its body and returns a *ContractInstanceId*.
 
 There is also a web socket API, but we have not used that in this example.
 
+So let's try our executable.
 
+.. code::
 
+    cabal run oracle-pab
 
+We get log output similar to what we see with *EmulatorTrace*, but this is now a live server.
+
+The output below is reduced to avoid the full verbosity.
+
+.. code::
+
+    [INFO] Slot 0: TxnValidate af5e6d25b5ecb26185289a03d50786b7ac4425b21849143ed7e18bcd70dc4db8
+    [INFO] Starting Oracle PAB webserver. Press enter to exit.
+    [INFO] Starting PAB backend server on port: 8080
+    [INFO] Activated instance dda39c83-5a0f-484f-b49a-9943b1ff5526 on W1
+    [INFO] Slot 1: W1: Balancing an unbalanced transaction:
+                         Tx:
+                           Tx da767478580878690990b3a22387be9c5b27fabed2c0ca7b9991eb682a6781f8:
+                             {inputs:
+                             outputs:
+                               - Value (Map [(,Map [("",1)])]) addressed to
+                                 addressed to ScriptCredential: e9827f1a9e43109d1c8d4555913734b8c48a467a31061b312959f270850fc8a0 (no staking credential)
+                             forge: Value (Map [])
+                             fee: Value (Map [(,Map [("",10)])])
+                             mps:
+                             signatures:
+                             validity range: Interval {ivFrom = LowerBound NegInf True, ivTo = UpperBound PosInf True}
+                             data:
+                               <>}
+                         Requires signatures:
+    [INFO] Slot 1: TxnValidate b7d6ba18d02898aa5d0814a306e4a05cf153c199aabb175ef9b00328105ab98f
+    [INFO] Slot 2: W1: Balancing an unbalanced transaction:
+     ...
+    [INFO] Slot 6: TxnValidate d690122263521c37f308a0d5ae858aa4807cb1e493c2a3374bf65b934c74782a
+    [INFO] Activated instance deceaa52-f117-46bc-b0f1-eb1f2f529b5a on W1
+    [INFO] Slot 7: W1: Balancing an unbalanced transaction:
+    ...
+    [INFO] Slot 7: TxnValidate a679948d128735ec1f380e9f733d7f4a5e54c81f39c73a656d61b077111840e1
+    [INFO] Slot 8: W1: Balancing an unbalanced transaction:
+    ...
+    [INFO] Slot 8: TxnValidate f0125e685edd6de2d09f9547f53b18d1bad11bd7fad570a057ba74737ab3053e
+    [INFO] deceaa52-f117-46bc-b0f1-eb1f2f529b5a: "started oracle Oracle {oSymbol = b8a1d67cd94acf75d7e00f27015ec5e31242adad0967eee473f49c5d1d686169, oOperator = 21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9, oFee = 1000000, oAsset = (9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,\"USDT\")}"
+    [INFO] Activated instance 5bac6e67-f956-45ef-b386-f1d045cf5e37 on W2
+    [INFO] Activated instance 2c3a2794-2592-4c2b-9a7d-9c810cedf886 on W3
+    [INFO] Activated instance 6f8d611d-a3f6-4794-9048-8ea3201e3c56 on W4
+    [INFO] Activated instance 387d9651-6024-48c1-a72d-5b3c6d3a6b53 on W5
+    
+We can see, for example, where we can find instance IDs of contracts if we want to interact with them via the API.
+
+.. code::
+
+    [INFO] Activated instance deceaa52-f117-46bc-b0f1-eb1f2f529b5a on W1
+
+If we now stop the server and look in the directory, we will see the files where we stored the instance IDs.
+
+.. code::
+
+    [nix-shell:~/git/ada/pioneer-fork/code/week06]$ ls
+    app            dist-newstyle  LICENSE     plutus-pioneer-program-week06.cabal  W2.cid  W4.cid
+    cabal.project  hie.yaml       oracle.cid  src                                  W3.cid  W5.cid
+    
+    [nix-shell:~/git/ada/pioneer-fork/code/week06]$ cat W5.cid 
+    387d9651-6024-48c1-a72d-5b3c6d3a6b53
+    
+With this information - either obtained from the web server log, or from the files we have created, we could use any HTTP tool such as Curl or Postman to interact 
+with the contracts when the web server is running. By default it runs on port 8080. We could also write code in any programming language we like to interact with the 
+web server using the HTTP endpoints.
+
+We will now briefly look at the *oracle-client* and the *swap-client*. We won't go into too much detail because we are not so interested in how to write a front end 
+here.
+
+Oracle Client
+~~~~~~~~~~~~~
+
+We use the Haskell library *Req* to interact with the web server.
+
+We first read the *oracle.cid* file to get the oracle instance ID. Then we have a recursive function *go*.
+
+The function *go* looks up the current exchange rate on CoinMarketCap, checks whether that has changed, and, if it has change, it calls *updateOracle* which calls the 
+update oracle endpoint on our contract. And, whether or not a change is detected, it waits for an arbitrary five seconds, and then goes again. 
+
+The length of the delay would depend on things such as that rate cap imposed by CoinMarketCap. In reality, as blocks on Cardano only appear every twenty seconds, five
+seconds is probably too short.
+
+.. code:: haskell
+
+    main :: IO ()
+    main = do
+        uuid <- read <$> readFile "oracle.cid"
+        putStrLn $ "oracle contract instance id: " ++ show uuid
+        go uuid Nothing
+      where
+        go :: UUID -> Maybe Integer -> IO a
+        go uuid m = do
+            x <- getExchangeRate
+            let y = Just x
+            when (m /= y) $
+                updateOracle uuid x
+            threadDelay 5_000_000
+            go uuid y
+    
+Now, the *updateOracle* function prepares an POST request using the oracle instance ID and a JSON body containing the exchange rate.
+
+.. code:: haskell
+    
+    updateOracle :: UUID -> Integer -> IO ()
+    updateOracle uuid x = runReq defaultHttpConfig $ do
+        v <- req
+            POST
+            (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "update")
+            (ReqBodyJson x)
+            (Proxy :: Proxy (JsonResponse ()))
+            (port 8080)
+        liftIO $ putStrLn $ if responseStatusCode v == 200
+            then "updated oracle to " ++ show x
+            else "error updating oracle"
+    
+And here is the *getExchangeRate* function which is a quick and dirty way of getting the exchange rate from CoinMarketCap. They provide a proper API, but here we 
+are just doing some screen scraping from the web page and using a regex to extract the value we are interested in. This is, of course, very fragile, and could never
+be used as production code.
+
+.. code:: haskell
+
+    getExchangeRate :: IO Integer
+    getExchangeRate = runReq defaultHttpConfig $ do
+        v <- req
+            GET
+            (https "coinmarketcap.com" /: "currencies" /: "cardano")
+            NoReqBody
+            bsResponse
+            mempty
+        let priceRegex      = "priceValue___11gHJ\">\\$([\\.0-9]*)" :: ByteString
+            (_, _, _, [bs]) = responseBody v =~ priceRegex :: (ByteString, ByteString, ByteString, [ByteString])
+            d               = read $ unpack bs :: Double
+            x               = round $ 1_000_000 * d
+        liftIO $ putStrLn $ "queried exchange rate: " ++ show d
+        return x    
+
+Swap Client
+~~~~~~~~~~~
 
 
 
