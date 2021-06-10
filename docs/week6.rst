@@ -1662,20 +1662,14 @@ Test in the REPL
     Prelude Week06.Oracle.Core> import Week06.Oracle.Test
     Prelude Week06.Oracle.Test Week06.Oracle.Core> test
 
+There will be a lot of output.
+
+Let's look at some key parts. First, slot 3, where the oracle is created. Here we get the *oSymbol* value that we can use for everything else.
+
+We also see in slot 3 that *getOracle* is started which will log the value of the oracle, for our information, every slot from now on.
+
 .. code::
 
-    Slot 00000: TxnValidate f7dd8484cdf3285cb1ab9bf42a15a07d4b77c06abd2348de9a0563ece9267e57
-    Slot 00000: SlotAdd Slot 1
-    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Contract instance started
-    Slot 00001: W1: TxSubmit: 067b5830ebca457d3476c967f5ddcb33c223f3caf94a035f1a0b1c21b1f6ad04
-    Slot 00001: TxnValidate 067b5830ebca457d3476c967f5ddcb33c223f3caf94a035f1a0b1c21b1f6ad04
-    Slot 00001: SlotAdd Slot 2
-    Slot 00002: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Sending contract state to Thread 0
-    Slot 00002: W1: TxSubmit: fdefa48c3185e8021266f2226a6971cd202e7ddb7d8f2599eb13654833c4e072
-    Slot 00002: TxnValidate fdefa48c3185e8021266f2226a6971cd202e7ddb7d8f2599eb13654833c4e072
-    Slot 00002: SlotAdd Slot 3
     Slot 00003: *** CONTRACT LOG: "started oracle Oracle {oSymbol = 6122edd57c938cda24066f434da9aee55120b4eb362d4a1bd37547ef6e4a6cbb, oOperator = 21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9, oFee = 1000000, oAsset = (ff,\"USDT\")}"
     Slot 00003: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
       Sending contract state to Thread 0
@@ -1686,12 +1680,19 @@ Test in the REPL
       Receive endpoint call: Object (fromList [("tag",String "update"),("value",Object (fromList [("unEndpointValue",Number 1500000.0)]))])
     Slot 00003: W1: TxSubmit: 93fab1c0845a5b96863a50d248fa2de68bd6702185e3de92ae0c58b869569909
     Slot 00003: TxnValidate 93fab1c0845a5b96863a50d248fa2de68bd6702185e3de92ae0c58b869569909
-    Slot 00003: SlotAdd Slot 4
+
+And, in slot 4, we see the first value that *getOracle* finds is 1,500,000.
+
+.. code::
+
     Slot 00004: *** CONTRACT LOG: "Oracle value: 1500000"
     Slot 00004: *** CONTRACT LOG: "set initial oracle value to 1500000"
-    Slot 00004: SlotAdd Slot 5
-    Slot 00005: *** CONTRACT LOG: "Oracle value: 1500000"
-    Slot 00005: SlotAdd Slot 6
+
+Slot 6 is the result of all the *activateContractWallet* calls. These do not necessarily appear in the same order as in the code. Notice that Wallet 1 has slightly
+fewer Ada than the other wallets. This is because Wallet 1 started the oracle and needed to pay transaction fees for that.
+
+.. code::
+
     Slot 00006: 00000000-0000-4000-8000-000000000002 {Contract instance for wallet 1}:
       Contract instance started
     Slot 00006: 00000000-0000-4000-8000-000000000003 {Contract instance for wallet 3}:
@@ -1719,7 +1720,11 @@ Test in the REPL
     Slot 00006: W4: TxSubmit: 221f86cc1d6087a5967793aaf9eb078d8ec0677b2d6aca586f985f6f2c57a100
     Slot 00006: TxnValidate 221f86cc1d6087a5967793aaf9eb078d8ec0677b2d6aca586f985f6f2c57a100
     Slot 00006: TxnValidate 8274315b83fb8b4d721146a75772cf39be3f96730557bd6021235864f0f37bc6
-    Slot 00006: SlotAdd Slot 7
+    
+In slot 7, the offers of 10 Ada and 20 Ada are made.
+
+.. code::
+    
     Slot 00007: *** CONTRACT LOG: "own funds: [(,\"\",99999970),(ff,\"USDT\",100000000)]"
     Slot 00007: *** CONTRACT LOG: "offered 10000000 lovelace for swap"
     Slot 00007: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
@@ -1727,18 +1732,10 @@ Test in the REPL
     Slot 00007: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",100000000)]"
     Slot 00007: *** CONTRACT LOG: "own funds: [(,\"\",100000000),(ff,\"USDT\",100000000)]"
     Slot 00007: *** CONTRACT LOG: "Oracle value: 1500000"
-    Slot 00007: SlotAdd Slot 8
-    Slot 00008: *** CONTRACT LOG: "own funds: [(,\"\",99999970),(ff,\"USDT\",100000000)]"
-    Slot 00008: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00008: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",100000000)]"
-    Slot 00008: *** CONTRACT LOG: "own funds: [(,\"\",100000000),(ff,\"USDT\",100000000)]"
-    Slot 00008: *** CONTRACT LOG: "Oracle value: 1500000"
-    Slot 00008: SlotAdd Slot 9
-    Slot 00009: *** CONTRACT LOG: "own funds: [(,\"\",99999970),(ff,\"USDT\",100000000)]"
-    Slot 00009: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00009: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",100000000)]"
-    Slot 00009: *** CONTRACT LOG: "own funds: [(,\"\",100000000),(ff,\"USDT\",100000000)]"
-    Slot 00009: *** CONTRACT LOG: "Oracle value: 1500000"
+
+In slot 9, the first *use* is requested.
+
+.. code::
     Slot 00009: 00000000-0000-4000-8000-000000000008 {Contract instance for wallet 5}:
       Receive endpoint call: Object (fromList [("tag",String "use"),("value",Object (fromList [("unEndpointValue",Array [])]))])
     Slot 00009: *** CONTRACT LOG: "own funds: [(,\"\",100000000),(ff,\"USDT\",100000000)]"
@@ -1746,48 +1743,36 @@ Test in the REPL
     Slot 00009: *** CONTRACT LOG: "found oracle, exchange rate 1500000"
     Slot 00009: W5: TxSubmit: 35d38def28dd6f5d016bee056e227501b97b2bb3ed2192e364242f01319e5e56
     Slot 00009: TxnValidate 35d38def28dd6f5d016bee056e227501b97b2bb3ed2192e364242f01319e5e56
-    Slot 00009: SlotAdd Slot 10
+
+And in slot 10, we see the swap happen.
+
+.. code::
+
     Slot 00010: *** CONTRACT LOG: "own funds: [(,\"\",99999970),(ff,\"USDT\",100000000)]"
     Slot 00010: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
     Slot 00010: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
     Slot 00010: *** CONTRACT LOG: "made swap with price [(ff,\"USDT\",30000000)]"
     Slot 00010: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
-    Slot 00010: *** CONTRACT LOG: "Oracle value: 1500000"
-    Slot 00010: SlotAdd Slot 11
-    Slot 00011: *** CONTRACT LOG: "own funds: [(,\"\",99999970),(ff,\"USDT\",100000000)]"
-    Slot 00011: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00011: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00011: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
-    Slot 00011: *** CONTRACT LOG: "Oracle value: 1500000"
-    Slot 00011: SlotAdd Slot 12
-    Slot 00012: *** CONTRACT LOG: "own funds: [(,\"\",99999970),(ff,\"USDT\",100000000)]"
-    Slot 00012: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00012: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00012: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
-    Slot 00012: *** CONTRACT LOG: "Oracle value: 1500000"
+
+The oracle gets and update request in slot 12.
+
+.. code::
+
     Slot 00012: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
       Receive endpoint call: Object (fromList [("tag",String "update"),("value",Object (fromList [("unEndpointValue",Number 1700000.0)]))])
     Slot 00012: W1: TxSubmit: ff7e1fbfb51897b100dcfdf551ad9a03886432af0a9fa92ff8dd986a0f7c90fe
     Slot 00012: TxnValidate ff7e1fbfb51897b100dcfdf551ad9a03886432af0a9fa92ff8dd986a0f7c90fe
-    Slot 00012: SlotAdd Slot 13
-    Slot 00013: *** CONTRACT LOG: "own funds: [(,\"\",100999960),(ff,\"USDT\",100000000)]"
-    Slot 00013: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00013: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00013: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
-    Slot 00013: *** CONTRACT LOG: "Oracle value: 1700000"
+
+And we see it happen in slot 13.
+
+.. code::
+
     Slot 00013: *** CONTRACT LOG: "updated oracle value to 1700000"
-    Slot 00013: SlotAdd Slot 14
-    Slot 00014: *** CONTRACT LOG: "own funds: [(,\"\",100999960),(ff,\"USDT\",100000000)]"
-    Slot 00014: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00014: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00014: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
-    Slot 00014: *** CONTRACT LOG: "Oracle value: 1700000"
-    Slot 00014: SlotAdd Slot 15
-    Slot 00015: *** CONTRACT LOG: "own funds: [(,\"\",100999960),(ff,\"USDT\",100000000)]"
-    Slot 00015: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",100000000)]"
-    Slot 00015: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00015: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
-    Slot 00015: *** CONTRACT LOG: "Oracle value: 1700000"
+
+The second *use* request arrives at slot 15.
+
+.. code::
+
     Slot 00015: 00000000-0000-4000-8000-000000000008 {Contract instance for wallet 5}:
       Receive endpoint call: Object (fromList [("tag",String "use"),("value",Object (fromList [("unEndpointValue",Array [])]))])
     Slot 00015: *** CONTRACT LOG: "own funds: [(,\"\",118999990),(ff,\"USDT\",70000000)]"
@@ -1795,77 +1780,26 @@ Test in the REPL
     Slot 00015: *** CONTRACT LOG: "found oracle, exchange rate 1700000"
     Slot 00015: W5: TxSubmit: 84bec9a9044eee9c5b40029dca5bbc8346214504e5adb4745bbe6e5d7d96078e
     Slot 00015: TxnValidate 84bec9a9044eee9c5b40029dca5bbc8346214504e5adb4745bbe6e5d7d96078e
-    Slot 00015: SlotAdd Slot 16
-    Slot 00016: *** CONTRACT LOG: "own funds: [(,\"\",100999960),(ff,\"USDT\",100000000)]"
-    Slot 00016: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00016: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
+
+And the swap happens at slot 16.
+
+.. code::
+
     Slot 00016: *** CONTRACT LOG: "made swap with price [(ff,\"USDT\",17000000)]"
-    Slot 00016: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00016: *** CONTRACT LOG: "Oracle value: 1700000"
-    Slot 00016: SlotAdd Slot 17
-    Slot 00017: *** CONTRACT LOG: "own funds: [(,\"\",100999960),(ff,\"USDT\",100000000)]"
-    Slot 00017: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00017: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00017: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00017: *** CONTRACT LOG: "Oracle value: 1700000"
-    Slot 00017: SlotAdd Slot 18
-    Slot 00018: *** CONTRACT LOG: "own funds: [(,\"\",100999960),(ff,\"USDT\",100000000)]"
-    Slot 00018: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00018: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00018: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00018: *** CONTRACT LOG: "Oracle value: 1700000"
-    Slot 00018: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Receive endpoint call: Object (fromList [("tag",String "update"),("value",Object (fromList [("unEndpointValue",Number 1800000.0)]))])
-    Slot 00018: W1: TxSubmit: a78ceb8c92150bc6aed826101141962ce1418529bbd3c50d2b3ceb183ef895df
-    Slot 00018: TxnValidate a78ceb8c92150bc6aed826101141962ce1418529bbd3c50d2b3ceb183ef895df
-    Slot 00018: SlotAdd Slot 19
-    Slot 00019: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00019: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00019: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00019: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00019: *** CONTRACT LOG: "Oracle value: 1800000"
-    Slot 00019: *** CONTRACT LOG: "updated oracle value to 1800000"
-    Slot 00019: SlotAdd Slot 20
-    Slot 00020: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00020: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00020: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00020: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00020: *** CONTRACT LOG: "Oracle value: 1800000"
-    Slot 00020: SlotAdd Slot 21
-    Slot 00021: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00021: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00021: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00021: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00021: *** CONTRACT LOG: "Oracle value: 1800000"
-    Slot 00021: 00000000-0000-4000-8000-000000000006 {Contract instance for wallet 3}:
-      Receive endpoint call: Object (fromList [("tag",String "retrieve"),("value",Object (fromList [("unEndpointValue",Array [])]))])
-    Slot 00021: *** CONTRACT LOG: "no swaps found"
-    Slot 00021: 00000000-0000-4000-8000-000000000007 {Contract instance for wallet 4}:
-      Receive endpoint call: Object (fromList [("tag",String "retrieve"),("value",Object (fromList [("unEndpointValue",Array [])]))])
-    Slot 00021: *** CONTRACT LOG: "no swaps found"
-    Slot 00021: SlotAdd Slot 22
-    Slot 00022: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00022: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00022: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00022: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00022: *** CONTRACT LOG: "Oracle value: 1800000"
-    Slot 00022: SlotAdd Slot 23
-    Slot 00023: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00023: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00023: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00023: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00023: *** CONTRACT LOG: "Oracle value: 1800000"
-    Slot 00023: SlotAdd Slot 24
-    Slot 00024: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00024: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00024: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00024: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
-    Slot 00024: *** CONTRACT LOG: "Oracle value: 1800000"
-    Slot 00024: SlotAdd Slot 25
-    Slot 00025: *** CONTRACT LOG: "own funds: [(,\"\",101999950),(ff,\"USDT\",100000000)]"
-    Slot 00025: *** CONTRACT LOG: "own funds: [(,\"\",89999990),(ff,\"USDT\",117000000)]"
-    Slot 00025: *** CONTRACT LOG: "own funds: [(,\"\",79999990),(ff,\"USDT\",130000000)]"
-    Slot 00025: *** CONTRACT LOG: "own funds: [(,\"\",127999980),(ff,\"USDT\",53000000)]"
+
+And at the bottom, we see the final balances.
+
+Wallet 2 still has all its funds. All Wallet 2 has done is the oracle checking, which doesn't cost anything, as it is purely an off-chain matter.
+
+Wallet 1 paid some transaction fees but ends up with roughly 2 Ada more than it started with. This is because it collected the 2 Ada in fees for the use of the oracle.
+
+Wallets 3 and 4 both made offers, and their balances reflect the exchange rates at which their offers were accepted.
+
+Wallet 5 was the one accepting the offers, and so has the additional Ada, but a reduced USD Token balance. Note that Wallet 5 has also had some fees deducted from its
+Ada balance.
+
+.. code::
+
     Final balances
     Wallet 1: 
         {, ""}: 101999950
@@ -1897,6 +1831,11 @@ Test in the REPL
     Wallet 10: 
         {, ""}: 100000000
         {ff, "USDT"}: 100000000
+
+And finally, as well as the wallets, we see that the oracle is still going, and still owns the NFT.
+
+.. code::
+    
     Script cc6a43073dce46eebc7b309223904c7a8033ffab7d9b239cf013342d4c69a5d6: 
         {6122edd57c938cda24066f434da9aee55120b4eb362d4a1bd37547ef6e4a6cbb, ""}: 1
     
