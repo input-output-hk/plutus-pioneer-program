@@ -1372,7 +1372,7 @@ For *offer*, for example, we block until we are provided with an *amt* and then 
 
 It is the same for the *retrieve* and *use* endpoints, except that they require no parameters.
 
-For the *funds* endpoint it is a little different. The *ownFunds* function comes from a module that we have not yet looked at - it gives us the *Value* that we own. We
+For the *funds* endpoint it is a little different. The *ownFunds* function comes from the *Funds* module, which, as we noted earlier, we have not yet looked at. It gives us the *Value* that we own. We
 then *tell* this value as a way of reporting to the outside world how much we have.
 
 The *h* in each of the endpoints is an error handler. Each of the endpoints is wrapped inside the error handler, which just logs the error, but does not halt execution.
@@ -1382,13 +1382,39 @@ And that concludes the swap example.
 Funds Module
 ------------
 
-Now let's quickly look at the *Funds* module.
+Now let's quickly look at the *Funds* module. It's a short module that provides two contracts.
 
+The *ownFunds* function is tasked with summing up all the *Value* in our own UTxOs.
 
+.. code:: haskell
 
+    ownFunds :: HasBlockchainActions s => Contract w s Text Value
+    ownFunds = do
+        pk    <- ownPubKey
+        utxos <- utxoAt $ pubKeyAddress pk
+        let v = mconcat $ Map.elems $ txOutValue . txOutTxOut <$> utxos
+        logInfo @String $ "own funds: " ++ show (Value.flattenValue v)
+        return v
+        
+It does this by looking up our public key, then getting all the UTxOs at that public key address. The *utxos* are then a map from UTxO references to UTxOs. 
 
+As *map* implements *Functor* we can map over the map to change the elements to something else. In this case, we change them to *Value*\s by applying the composite
+function *txOutValue* . *txOutTxOut*.
 
+The *Map.elems* function ignores the keys and just gives us the values. And, as we saw before, *mconcat*, when given a *Semigroup* or *Monoid* type, will combine the 
+list of values into one value.
 
+So *v* is not the sum of all the values of all the UTxOs that we own. Our *ownFunds* function is a contract that has a return type of *Value*, we return *v*.
+
+The function *ownFunds'* is a variation that, instead of returning the value, permanently tells it.
+
+.. code:: haskell
+    
+    ownFunds' :: Contract (Last Value) BlockchainActions Text ()
+    ownFunds' = do
+        handleError logError $ ownFunds >>= tell . Last . Just
+        void $ Contract.waitNSlots 1
+        ownFunds'
 
 
 
