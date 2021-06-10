@@ -1419,9 +1419,52 @@ The function *ownFunds'* is a variation that, instead of returning the value, pe
 This calls the *ownFunds* function, performs a monadic bind to the composite function *tell . Last . Just* which tells the value, then it waits for a slot, and then
 calls itself. So, every block, it writes the value into the log.
 
+Testing
+-------
 
+We will now write code, using the *EmulatorTrace* monad, that tests the contracts we have written.
 
+This code can be found in the following module
 
+.. code:: haskell
+
+    module Week06.Oracle.Test
+
+First, we need to define a token that we can test with. The *assetSymbol* is an arbitrary hash, which is fine for test purposes.
+
+.. code:: haskell
+
+    assetSymbol :: CurrencySymbol
+    assetSymbol = "ff"
+    
+    assetToken :: TokenName
+    assetToken = "USDT"
+
+This time we are going to use the primed version of *runEmulatorTraceIO*, which takes two more arguments and gives more fine-grained over the emulation environment.
+
+.. code:: haskell
+
+    test :: IO ()
+    test = runEmulatorTraceIO' def emCfg myTrace
+      where
+        emCfg :: EmulatorConfig
+        emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
+    
+        v :: Value
+        v = Ada.lovelaceValueOf                    100_000_000 <>
+            Value.singleton assetSymbol assetToken 100_000_000    
+    
+The first argument to *runEmulatorTraceIO'* determines how the various log messages are displayed. Using *def*, we have selected the default, which is the same as
+in the unprimed version.
+
+The reason we are using the primed version is that we want to configure the initial distribution, and we can do that with the second argument, which here we have
+labelled *emCfg*.
+
+.. code:: haskell
+
+    emCfg :: EmulatorConfig
+    emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
+    
 
 
 
