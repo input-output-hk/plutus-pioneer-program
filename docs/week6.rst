@@ -1269,14 +1269,100 @@ We then create a *Value* representing the USD Tokens that we need to pay.
 
 Now, let's look at the constraints.
 
+The first constraint is that we must consume the oracle as an input. And here we see the first use of the *Use* redeemer. We never used this redeemer in the oracle 
+core itself, as the oracle provider is only responsible for updating values, which uses the *Update* redeemer.
 
+.. code:: haskell
 
+    Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Use)
 
+The second constraint is to consume the swap input, which just uses a *Unit* redeeemer.
 
+.. code:: haskell
 
+    Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ())
 
+The third constraint is to pay the oracle.
 
+.. code:: haskell
 
+    Constraints.mustPayToOtherScript
+        (validatorHash $ oracleValidator oracle)
+        (Datum $ PlutusTx.toData x)
+        v
+
+Here we use *mustPayToOtherScript*, specifying the oracle script, because now we have two scripts in play - the oracle script and the swap script. As *Datum* we use 
+the exist datum - we mustn't change it - and as *Value* we use the value *v* that we computed earlier.
+
+The final constraint is that we must pay the seller of the lovelace - and the payment is the price *p* that we calculated before.
+
+.. code:: haskell
+
+    Constraints.mustPayToPubKey pkh' p
+
+For lookups, we must provide the validators of the oracle and swap contracts, and we must provide the two UTxOs that we want to consume.
+
+.. code:: haskell
+
+    lookups = Constraints.otherScript (swapValidator oracle)               <>
+        Constraints.otherScript (oracleValidator oracle)                   <>
+        Constraints.unspentOutputs (Map.fromList [(oref, o), (oref', o')])
+
+Now, the usual - we submit it, wait for confirmation, then log a message.
+
+.. code:: haskell
+
+    ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
+    awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ "made swap with price " ++ show (Value.flattenValue p)    
+
+Contract bundle
+~~~~~~~~~~~~~~~
+
+That defines the raw contracts. Now, we provide a bundle that contains all of them.
+
+First, we define, as always, a schema, which defines the endpoints.
+
+.. code:: haskell
+
+    type SwapSchema =
+        BlockchainActions
+            .\/ Endpoint "offer"    Integer
+            .\/ Endpoint "retrieve" ()
+            .\/ Endpoint "use"      ()
+            .\/ Endpoint "funds"    ()    
+
+Next, we see the *select* operator. This use of this operator will cause our code to wait until one of the endpoints is picked, and then executes the 
+associated code.
+
+.. code:: haskell
+
+    swap :: Oracle -> Contract (Last Value) SwapSchema Text ()
+    swap oracle = (offer `select` retrieve `select` use `select` funds) >> swap oracle
+        where
+            offer :: Contract (Last Value) SwapSchema Text ()
+            offer = h $ do
+                amt <- endpoint @"offer"
+                offerSwap oracle amt
+
+            retrieve :: Contract (Last Value) SwapSchema Text ()
+            retrieve = h $ do
+                endpoint @"retrieve"
+                retrieveSwaps oracle
+
+            use :: Contract (Last Value) SwapSchema Text ()
+            use = h $ do
+                endpoint @"use"
+                useSwap oracle
+
+            funds :: Contract (Last Value) SwapSchema Text ()
+            funds = h $ do
+                endpoint @"funds"
+                v <- ownFunds
+                tell $ Last $ Just v
+
+            h :: Contract (Last Value) SwapSchema Text () -> Contract (Last Value) SwapSchema Text ()
+            h = handleError logError    
 
 
 
