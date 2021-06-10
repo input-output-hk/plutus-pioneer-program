@@ -2031,7 +2031,7 @@ And here is the *initContract* function we mentioned just a moment ago.
         amount :: Integer
         amount = 100_000_000
       
-This function is simply used for the demo and so is not so important. But basically, it mints USD Tokens and distributes them to the wallets.
+The *initContract* function mints USD Tokens and distributes them to the wallets, then it *tell*\s the currency symbol for the USD Token.
 
 The wallets are hardcoded earlier in the code. The number of wallets and the tokens given to them are completely arbitrary.
 
@@ -2040,4 +2040,61 @@ The wallets are hardcoded earlier in the code. The number of wallets and the tok
     wallets :: [Wallet]
     wallets = [Wallet i | i <- [1 .. 5]]
 
+Now we can look at the actual PAB code.
+
+For the first time, we see a *main* function, which is the entry point for the executable.
+
+.. code:: haskell
+
+    main :: IO ()
+    main = void $ Simulator.runSimulationWith handlers $ do
+        Simulator.logString @(Builtin OracleContracts) "Starting Oracle PAB webserver. Press enter to exit."
+        shutdown <- PAB.Server.startServerDebug
     
+        cidInit <- Simulator.activateContract (Wallet 1) Init
+        cs      <- waitForLast cidInit
+        _       <- Simulator.waitUntilFinished cidInit
+    
+        cidOracle <- Simulator.activateContract (Wallet 1) $ Oracle cs
+        liftIO $ writeFile "oracle.cid" $ show $ unContractInstanceId cidOracle
+        oracle <- waitForLast cidOracle
+    
+        forM_ wallets $ \w ->
+            when (w /= Wallet 1) $ do
+                cid <- Simulator.activateContract w $ Swap oracle
+                liftIO $ writeFile ('W' : show (getWallet w) ++ ".cid") $ show $ unContractInstanceId cid
+    
+        void $ liftIO getLine
+        shutdown
+        
+The *main* function makes use of another monad that we haven't seen before and is specific to the PAB - the *Simulator* monad. 
+
+The *Simulator* monad is very similar to the *EmulatorTrace* monad. In principle it has the same capabilities. You can start contracts on wallets, you can inspect 
+the state using the log, you can call endpoints, and so on.
+
+It is a bit unfortunate that there are two monads for this as they are so similar. The Plutus team plan to align them and maybe turn them into one. So it may not be
+worth learning the intricacies of the *Simulator* monad as it will probably change soon.
+
+Similar to the *runEmulatorTraceIO*, we have *runSimulationWith* to which we pass the *handlers* boilerplate.
+
+One significant difference to the *EmulatorTrace* monad though is that the *EmulatorTrace* monad was pure code - there were no real world side-effects, no IO involved. In particular there is a pure interpreter *runEmulatorTrace* that is a pure Haskell function with no side-effects.
+
+*Simulator* s different - you can do IO. The way it works is using *MonadIO*, which has one method, *liftIO*, which takes an *IO* action and *lifts* it into the monad
+in question. So, if you have some arbitrary IO action that you can do in Haskell, then by applying *liftIO* to it, you can move it into this *Simulator* monad.
+
+Apart from that, if you squint, it looks very similar to an *EmulatorTrace*.
+
+The first thing we do is use *logString* to log that we are starting the PAB server. We then call the *startServerDebug* function, and the return value of that 
+function which gets bound to *shutdown* can be used later to shut down the server.
+
+
+
+
+
+
+
+
+
+
+
+
