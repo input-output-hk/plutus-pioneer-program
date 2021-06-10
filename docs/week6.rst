@@ -1886,3 +1886,67 @@ going to be used for the USD Token.
 
 Finally, the *Swap*, parameterized by *Oracle* will be used to run the swap contract, which provides various endpoints like *offer*, *retrieve*, *use* and *funds*.
 
+We need to put the *OracleContracts* definition in a separate module because we will use it both from the PAB and also from the front end.
+
+We are going to look at the Cabal file.
+
+.. code::
+
+    plutus-pioneer-program-week06.cabal
+
+In it we have definitions for various executables.
+
+The *oracle-pab* executable will set up a simulated wallet, initialize all the contracts and setup a web server that allows the outside world 
+to interact with these contracts.
+
+.. code::
+
+    executable oracle-pab
+    main-is: oracle-pab.hs
+    hs-source-dirs:      app
+    ghc-options:         -Wall -threaded
+    build-depends:       aeson
+                       , base ^>= 4.14.1.0
+                       , freer-extras
+                       , freer-simple
+                       , plutus-contract
+                       , plutus-ledger
+                       , plutus-pab
+                       , plutus-pioneer-program-week06
+                       , plutus-use-cases
+                       , text
+                       
+The *oracle-client* executable will be run by the oracle provider, so that will interact with the *runOracle* contract. It will also fetch exchange rates from the 
+internet and feed them into the system.
+
+.. code::
+
+    executable oracle-client
+    main-is: oracle-client.hs
+    hs-source-dirs:      app
+    ghc-options:         -Wall
+    build-depends:       base ^>= 4.14.1.0
+                       , bytestring
+                       , regex-tdfa ^>= 1.3.1.0
+                       , req ^>= 3.9.0
+                       , text
+                       , uuid
+                       
+Then there is the *swap-client* executable that will be run by the clients who want to make use of the swap contract.
+
+.. code::
+
+    executable swap-client
+    main-is: swap-client.hs
+    hs-source-dirs:      app
+    ghc-options:         -Wall
+    build-depends:       aeson
+                       , base ^>= 4.14.1.0
+                       , plutus-ledger
+                       , plutus-pab
+                       , plutus-pioneer-program-week06
+                       , req ^>= 3.9.0
+                       , text
+                       , uuid
+                       
+                       
