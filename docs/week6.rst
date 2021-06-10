@@ -2333,8 +2333,217 @@ be used as production code.
         liftIO $ putStrLn $ "queried exchange rate: " ++ show d
         return x    
 
+Let us run it.
+
+First we need to make sure the PAB is running.
+
+.. code::
+
+    cabal run oracle-pab 
+
+Then, in another terminal
+
+.. code::
+
+    cabal run oracle-client
+    ...
+    queried exchange rate: 1.54
+    updated oracle to 1540000
+    queried exchange rate: 1.54
+    
+We can see the exchange rate that it has obtained from CoinMarketCap, and its request to update the oracle.
+
+And if we wait long enough, we see 
+
+.. code::
+
+    queried exchange rate: 1.55
+    updated oracle to 1550000
+    queried exchange rate: 1.55
+
+And we see that we are mooning.
+
+If you switch back to the PAB, you will also see additional log messages.
+
+.. code::
+
+    [INFO] Slot 16: W1: Balancing an unbalanced transaction:
+        Tx:
+        Tx c5b384f75f93ebc8f1e6b514237aa70d0d982e9b035eececa27af0b3e72568e4:
+            {inputs:
+            outputs:
+            - Value (Map [(b8a1d67cd94acf75d7e00f27015ec5e31242adad0967eee473f49c5d1d686169,Map [("",1)])]) addressed to
+                addressed to ScriptCredential: 04a718132f7ca493a011c40926e191a76bd84cbf8e7c14b6c99bbea8b8bc0bba (no staking credential)
+            forge: Value (Map [])
+            fee: Value (Map [(,Map [("",10)])])
+            mps:
+            signatures:
+            validity range: Interval {ivFrom = LowerBound NegInf True, ivTo = UpperBound PosInf True}
+            data:
+            1540000}
+        Requires signatures:
+    [INFO] Slot 16: TxnValidate 40c5dbb5e7c8de390a6943d8f0a84d218cf86dd81af1fd7cfc62612e6b616c2c
+    [INFO] 5d9d778e-55f9-45ab-89a6-2ba9aa18045e: "set initial oracle value to 1540000"
+
 Swap Client
 ~~~~~~~~~~~
+
+The swap client is very similar.
+
+Here, we are just giving a simple console interface, so we didn't bother with graphics or a nice web UI.
+
+.. code:: haskell
+
+    main :: IO ()
+    main = do
+        [i :: Int] <- map read <$> getArgs
+        uuid       <- read <$> readFile ('W' : show i ++ ".cid")
+        hSetBuffering stdout NoBuffering
+        putStrLn $ "swap contract instance id for Wallet " ++ show i ++ ": " ++ show uuid
+        go uuid
+      where
+        go :: UUID -> IO a
+        go uuid = do
+            cmd <- readCommand
+            case cmd of
+                Offer amt -> offer uuid amt
+                Retrieve  -> retrieve uuid
+                Use       -> use uuid
+                Funds     -> getFunds uuid
+            go uuid
+    
+        readCommand :: IO Command
+        readCommand = do
+            putStr "enter command (Offer amt, Retrieve, Use or Funds): "
+            s <- getLine
+            maybe readCommand return $ readMaybe s
+
+The idea is to take a command from the console and the call the appropriate endpoint.
+
+.. code:: haskell
+
+    case cmd of
+        Offer amt -> offer uuid amt
+        Retrieve  -> retrieve uuid
+        Use       -> use uuid
+        Funds     -> getFunds uuid
+
+The endpoint calling uses the same method for each endpoint, creating an HTTP call in the same way that we did for the oracle client.
+
+The *getFunds* function is slightly more complicated than the other three as it needs to get information out of the server. For this it needs to make
+two requests. The second request is to read the state that was *told* by the first call.
+
+.. code:: haskell
+
+    getFunds :: UUID -> IO ()
+    getFunds uuid = handle h $ runReq defaultHttpConfig $ do
+        v <- req
+            POST
+            (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "endpoint" /: "funds")
+            (ReqBodyJson ())
+            (Proxy :: Proxy (JsonResponse ()))
+            (port 8080)
+        if responseStatusCode v /= 200
+            then liftIO $ putStrLn "error getting funds"
+            else do
+                w <- req
+                    GET
+                    (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show uuid) /: "status")
+                    NoReqBody
+                    (Proxy :: Proxy (JsonResponse (ContractInstanceClientState OracleContracts)))
+                    (port 8080)
+                liftIO $ putStrLn $ case fromJSON $ observableState $ cicCurrentState $ responseBody w of
+                    Success (Last (Just f)) -> "funds: " ++ show (flattenValue f)
+                    _                       -> "error decoding state"
+      where
+        h :: HttpException -> IO ()
+        h _ = threadDelay 1_000_000 >> getFunds uuid
+
+Let's run the swap client. We will leave the web server and the oracle client running.
+
+When using cabal, we pass parameters in following a *--*. For the swap client we pass the wallet number in as a parameter.
+
+We will launch the swap client for wallets 2 and 3, each in a separate window, and query their respective funds.
+
+.. code::
+
+    cabal run swap-client -- 2
+
+    swap contract instance id for Wallet 2: ab65f248-450d-4988-ab2a-651ad5697596
+    enter command (Offer amt, Retrieve, Use or Funds): Funds
+    funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,"USDT",100000000),(,"",100000000)]
+    enter command (Offer amt, Retrieve, Use or Funds): 
+    
+.. code::
+
+    cabal run swap-client -- 3
+
+    swap contract instance id for Wallet 3: 2dc4f6f2-142e-40a2-a1b8-c431eb29a3a2
+    enter command (Offer amt, Retrieve, Use or Funds): Funds
+    funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,"USDT",100000000),(,"",100000000)]
+    enter command (Offer amt, Retrieve, Use or Funds): 
+
+Wallet 2 now offers 10 Ada as a swap, and we check the funds, and we see that the Ada balance has gone down (by the 10 Ada plus the transaction fee), 
+but the USD Token balance remains the same.
+
+.. code::
+
+    enter command (Offer amt, Retrieve, Use or Funds): Offer 10000000
+    offered swap of 10000000 lovelace
+    enter command (Offer amt, Retrieve, Use or Funds): Funds
+    funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,"USDT",100000000),(,"",89999990)]
+
+While these commands are running, you can also see the calls being made in the PAB output.
+
+.. code::
+
+    INFO] Slot 1662: TxnValidate 17f640f03e4dc7d0a4c246129454aa19daa8d9d674bfebeeee486d6143c6648e
+    [INFO] ab65f248-450d-4988-ab2a-651ad5697596: "offered 10000000 lovelace for swap"
+    [INFO] ab65f248-450d-4988-ab2a-651ad5697596: "own funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,\"USDT\",100000000),(,\"\",89999990)]"    
+
+Now, Wallet 3 is going to take up the offer of the swap.
+
+.. code::
+
+    enter command (Offer amt, Retrieve, Use or Funds): Use
+    used swap
+    enter command (Offer amt, Retrieve, Use or Funds): Funds
+    funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,"USDT",100000000),(,"",100000000)]
+
+It takes a little while for the funds to update, so let's try the *Funds* command again.
+
+.. code::
+
+    enter command (Offer amt, Retrieve, Use or Funds): Funds
+    funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,"USDT",84400000),(,"",108999990)]
+    
+That's better. And we can see that wallet 3 has received the 10 Ada, minus the oracle fee of 1 Ada and minus the transaction fees.
+
+In the PAB output, we see something like 
+
+.. code::
+
+    [INFO] Slot 1868: TxnValidate 00afd25af063d58b4f290e43057f4738483098f26ff0134bc14c9d54b9b94090
+    [INFO] 2dc4f6f2-142e-40a2-a1b8-c431eb29a3a2: "made swap with price [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,\"USDT\",15600000)]"
+    [INFO] 2dc4f6f2-142e-40a2-a1b8-c431eb29a3a2: "own funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,\"USDT\",84400000),(,\"\",108999990)]"
+    
+Let's look at wallet 2's funds.
+
+.. code::
+
+    enter command (Offer amt, Retrieve, Use or Funds): Funds
+    funds: [(9a91216e55e5369b926acc07c70a11d9ae7fef454e43e3e5c0aa1733f48c798a,"USDT",115600000),(,"",89999990)]
+    
+And we see that wallet 2 has lost some Ada, but gained some USD Tokens. The swap is complete, using the exchange rate as it is live, right now, which was injected 
+into the mock blockchain via the oracle.
+
+So now we have seen an end-to-end example of a Plutus dApp. It has a front end, it talks to the outside world, goes on the internet, gets information and interacts with Plutus smart contracts.
+The smart contracts submit transactions to the blockchain where the validation logic kicks in and makes sure that everything follows the business rules.
+
+In this example, as we have no real blockchain to play with, all wallets use the same PAB server, which, of course, in real life would be silly. Obviously, different
+wallets will have different instances of PAB running.
+
+But, apart from that, it is almost exactly, end-to-end, how such a system would work.
 
 
 
