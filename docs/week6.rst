@@ -1949,4 +1949,63 @@ Then there is the *swap-client* executable that will be run by the clients who w
                        , text
                        , uuid
                        
-                       
+We will look at each of these in turn.
+
+The code for each of these apps can be found in the *app* directory.
+
+.. code::
+
+    app/oracle-client.hs
+    app/oracle-pab.hs
+    app/swap-client.hs
+
+Oracle PAB
+~~~~~~~~~~
+
+First some boilerplate to hook up the data type we just defined - the reified contract instances - with the schemas and contracts that we defined earlier.
+
+.. code:: haskell
+
+    handleOracleContracts ::
+        ( Member (Error PABError) effs
+        , Member (LogMsg (PABMultiAgentMsg (Builtin OracleContracts))) effs
+        )
+        => ContractEffect (Builtin OracleContracts)
+        ~> Eff effs
+    handleOracleContracts = handleBuiltin getSchema getContract where
+        getSchema = \case
+            Init     -> endpointsToSchemas @Empty
+            Oracle _ -> endpointsToSchemas @(Oracle.OracleSchema .\\ BlockchainActions)
+            Swap _   -> endpointsToSchemas @(Oracle.SwapSchema   .\\ BlockchainActions)
+        getContract = \case
+            Init        -> SomeBuiltin   initContract
+            Oracle cs   -> SomeBuiltin $ Oracle.runOracle $ oracleParams cs
+            Swap oracle -> SomeBuiltin $ Oracle.swap oracle
+
+*Init* won't have any schema, so it just has *BlockChainActions*. *Oracle* uses the *OracleSchema* and *Swap* uses the *SwapSchema*. No surprise there.
+
+*Init* will run the *initContract*, which we will see in a moment. 
+
+*Oracle* will run the *runOracle* contract with *oracleParams* which takes the currency symbol of the USD Token and defines example oracle params.
+
+.. code:: haskell
+
+    oracleParams :: CurrencySymbol -> Oracle.OracleParams
+    oracleParams cs = Oracle.OracleParams
+        { Oracle.opFees   = 1_000_000
+        , Oracle.opSymbol = cs
+        , Oracle.opToken  = usdt
+        }
+        
+And finally *Swap* will run our swap contract with an oracle value.
+
+Here is some more copy/paste boilerplate.
+
+.. code:: haskell
+
+    handlers :: SimulatorEffectHandlers (Builtin OracleContracts)
+    handlers =
+        Simulator.mkSimulatorHandlers @(Builtin OracleContracts) []
+        $ interpret handleOracleContracts        
+
+        
