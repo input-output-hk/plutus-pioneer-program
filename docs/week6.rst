@@ -2008,4 +2008,36 @@ Here is some more copy/paste boilerplate.
         Simulator.mkSimulatorHandlers @(Builtin OracleContracts) []
         $ interpret handleOracleContracts        
 
-        
+And here is the *initContract* function we mentioned just a moment ago.
+
+.. code:: haskell
+
+    initContract :: Contract (Last CurrencySymbol) BlockchainActions Text ()
+    initContract = do
+        ownPK <- pubKeyHash <$> ownPubKey
+        cur   <-
+            mapError (pack . show)
+            (Currency.forgeContract ownPK [(usdt, fromIntegral (length wallets) * amount)]
+            :: Contract (Last CurrencySymbol) BlockchainActions Currency.CurrencyError Currency.OneShotCurrency)
+        let cs = Currency.currencySymbol cur
+            v  = Value.singleton cs usdt amount
+        forM_ wallets $ \w -> do
+            let pkh = pubKeyHash $ walletPubKey w
+            when (pkh /= ownPK) $ do
+                tx <- submitTx $ mustPayToPubKey pkh v
+                awaitTxConfirmed $ txId tx
+        tell $ Last $ Just cs
+      where
+        amount :: Integer
+        amount = 100_000_000
+      
+This function is simply used for the demo and so is not so important. But basically, it mints USD Tokens and distributes them to the wallets.
+
+The wallets are hardcoded earlier in the code. The number of wallets and the tokens given to them are completely arbitrary.
+
+.. code:: haskell
+
+    wallets :: [Wallet]
+    wallets = [Wallet i | i <- [1 .. 5]]
+
+    
