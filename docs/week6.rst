@@ -1832,12 +1832,57 @@ Ada balance.
         {, ""}: 100000000
         {ff, "USDT"}: 100000000
 
-And finally, as well as the wallets, we see that the oracle is still going, and still owns the NFT.
+And finally, as well as the wallets, we see that the oracle is still going, and still owns the NFT. Note that, in this log, we don't see the datum value.
 
 .. code::
-    
+
     Script cc6a43073dce46eebc7b309223904c7a8033ffab7d9b239cf013342d4c69a5d6: 
         {6122edd57c938cda24066f434da9aee55120b4eb362d4a1bd37547ef6e4a6cbb, ""}: 1
     
+Plutus Application Backend
+--------------------------
 
+Apart from the idea of how to implement an oracle in Plutus, nothing we have done in this lecture so far is new, except for a few library functions and Haskell
+techniques. In principle, we are familiar with the way validators are written for off-chain code and how contracts are written for on-chain code, and how we 
+can test our code with the *EmulatorTrace* monad.
+
+But now we will talk about something new - the Plutus Application Backend (PAB), which allows us to take all the stuff we have done and turn it into an executable that 
+runs the contracts.
+
+If the testnet or the mainnet were available with Plutus support, we could deploy such an application, but for now we will need to be happy with a simulated blockchain. 
+But, the process of turning the code into a dApp is practically the same as it would be on a real blockchain.
+
+We need one more tiny module, which is basically just a type definition. It is so small, we can include the entire file contents here.
+
+.. code:: haskell
+
+    {-# LANGUAGE DeriveAnyClass     #-}
+    {-# LANGUAGE DeriveGeneric      #-}
+    
+    module Week06.Oracle.PAB
+        ( OracleContracts (..)
+        ) where
+    
+    import           Data.Aeson                (FromJSON, ToJSON)
+    import           Data.Text.Prettyprint.Doc (Pretty (..), viaShow)
+    import           GHC.Generics              (Generic)
+    import           Ledger
+    
+    import qualified Week06.Oracle.Core        as Oracle
+    
+    data OracleContracts = Init | Oracle CurrencySymbol | Swap Oracle.Oracle
+        deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON)
+    
+    instance Pretty OracleContracts where
+        pretty = viaShow
+    
+The idea is that it reifies the contract instances that we want to run. We have various contracts, and we want to have a data type where each value of the data type 
+corresponds to a contact that we eventually want to run.
+
+The *Init* constructor will be used to setup an environment where there is a USD Token available and where the wallets have an initial supply of those.
+
+The *Oracle* constructor corresponds to the *runOracle* contract that will start the oracle and provide the *update* endpoint, and the *CurrencySymbol* parameter is
+going to be used for the USD Token.
+
+Finally, the *Swap*, parameterized by *Oracle* will be used to run the swap contract, which provides various endpoints like *offer*, *retrieve*, *use* and *funds*.
 
