@@ -1464,12 +1464,117 @@ labelled *emCfg*.
 
     emCfg :: EmulatorConfig
     emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
+
+We use this with the helper function *v* to give everyone 100,000,000 lovelace (100 Ada) to begin with.
+
+.. code:: haskell
+
+    v :: Value
+    v = Ada.lovelaceValueOf                    100_000_000 <>
+        Value.singleton assetSymbol assetToken 100_000_000
+
+We define a helper contract, *checkOracle*, that will continually check the oracle value and log it.
+
+.. code:: haskell
+
+    checkOracle :: Oracle -> Contract () BlockchainActions Text a
+    checkOracle oracle = do
+        m <- findOracle oracle
+        case m of
+            Nothing        -> return ()
+            Just (_, _, x) -> Contract.logInfo $ "Oracle value: " ++ show x
+        Contract.waitNSlots 1 >> checkOracle oracle
+        
+And now we can define our trace.
+
+.. code:: haskell
+
+    myTrace :: EmulatorTrace ()
+    myTrace = do
+        let op = OracleParams
+                    { opFees = 1_000_000
+                    , opSymbol = assetSymbol
+                    , opToken  = assetToken
+                    }
     
+        h1 <- activateContractWallet (Wallet 1) $ runOracle op
+        void $ Emulator.waitNSlots 1
+        oracle <- getOracle h1
+    
+        void $ activateContractWallet (Wallet 2) $ checkOracle oracle
+    
+        callEndpoint @"update" h1 1_500_000
+        void $ Emulator.waitNSlots 3
+    
+        void $ activateContractWallet (Wallet 1) ownFunds'
+        void $ activateContractWallet (Wallet 3) ownFunds'
+        void $ activateContractWallet (Wallet 4) ownFunds'
+        void $ activateContractWallet (Wallet 5) ownFunds'
+    
+        h3 <- activateContractWallet (Wallet 3) $ swap oracle
+        h4 <- activateContractWallet (Wallet 4) $ swap oracle
+        h5 <- activateContractWallet (Wallet 5) $ swap oracle
+    
+        callEndpoint @"offer" h3 10_000_000
+        callEndpoint @"offer" h4 20_000_000
+        void $ Emulator.waitNSlots 3
+    
+        callEndpoint @"use" h5 ()
+        void $ Emulator.waitNSlots 3
+    
+        callEndpoint @"update" h1 1_700_000
+        void $ Emulator.waitNSlots 3
+    
+        callEndpoint @"use" h5 ()
+        void $ Emulator.waitNSlots 3
+    
+        callEndpoint @"update" h1 1_800_000
+        void $ Emulator.waitNSlots 3
+    
+        callEndpoint @"retrieve" h3 ()
+        callEndpoint @"retrieve" h4 ()
+        void $ Emulator.waitNSlots 3
+      where
+        getOracle :: ContractHandle (Last Oracle) OracleSchema Text -> EmulatorTrace Oracle
+        getOracle h = do
+            l <- observableState h
+            case l of
+                Last Nothing       -> Emulator.waitNSlots 1 >> getOracle h
+                Last (Just oracle) -> Extras.logInfo (show oracle) >> return oracle
 
+This is all stuff that we have already seen. We define our oracle parameters, setting the oracle fee at 1 million lovelace, and our arbitrary asset class defined earlier.
 
+.. code:: haskell
 
+    let op = OracleParams
+        { opFees = 1_000_000
+        , opSymbol = assetSymbol
+        , opToken  = assetToken
+        }    
 
+Then, we start the oracle and wait for one slot.
 
+.. code:: haskell
+
+    h1 <- activateContractWallet (Wallet 1) $ runOracle op
+    void $ Emulator.waitNSlots 1
+    oracle <- getOracle h1
+    
+We have grabbed a handle to the oracle using the helper function defined in the *where* clause.
+
+.. code:: haskell
+
+    getOracle :: ContractHandle (Last Oracle) OracleSchema Text -> EmulatorTrace Oracle
+    getOracle h = do
+        l <- observableState h
+        case l of
+            Last Nothing       -> Emulator.waitNSlots 1 >> getOracle h
+            Last (Just oracle) -> Extras.logInfo (show oracle) >> return oracle
+
+We need this because the swap contract is parameterized with the oracle value. And this is why we used *tell* in the *runOracle* function.
+
+We use the *observableState* function to get hold of this information. If it does not exist, we wait for a slot, and try again. Otherwise, we log it for debugging 
+purposes, and the return it.
 
 
         
