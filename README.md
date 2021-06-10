@@ -51,16 +51,32 @@
   - Property based testing with `QuickCheck`.
   - Testing Plutus contracts with property based testing.
 
+- [Lecture #9](https://youtu.be/-RpCqHuxfQQ)
+
+  - Marlowe overview ([slides](Marlowe_Plutus_Pioneers_June_2021.pdf)).
+  - Marlowe in Plutus.
+  - Marlowe Playground demo.
+
+- [Lecture #10](https://youtu.be/Dg36h9YPMz4)
+
+  - Uniswap overview.
+  - Uniswap implementation in Plutus.
+  - Deploying Uniswap with the PAB.
+  - Demo.
+  - Using `curl` to interact with the PAB.
+
 ## Code Examples
 
-- Lecture #1: [English Auction](code/week01)
-- Lecture #2: [Simple Validation](code/week02)
-- Lecture #3: [Validation Context & Parameterized Contracts](code/week03)
-- Lecture #4: [Monads, `EmulatorTrace` & `Contract`](code/week04)
-- Lecture #5: [Minting Policies](code/week05)
-- Lecture #6: [Oracles](code/week06)
-- Lecture #7: [State Machines](code/week07)
-- Lecture #8: [Testing](code/week08)
+- Lecture #1:  [English Auction](code/week01)
+- Lecture #2:  [Simple Validation](code/week02)
+- Lecture #3:  [Validation Context & Parameterized Contracts](code/week03)
+- Lecture #4:  [Monads, `EmulatorTrace` & `Contract`](code/week04)
+- Lecture #5:  [Minting Policies](code/week05)
+- Lecture #6:  [Oracles](code/week06)
+- Lecture #7:  [State Machines](code/week07)
+- Lecture #8:  [Testing](code/week08)
+- Lecture #9:  [Marlowe](code/week09)
+- Lecture #10: [Uniswap](code/week10)
 
 ## Exercises
 
@@ -112,6 +128,15 @@
     retrieve all remaining funds (including the NFT).
   - Modify the tests accordingly.
 
+- Week #9
+
+  - Modify the example Marlowe contract, so that Charlie must put down twice the deposit in the very beginning,
+    which gets split between Alice and Bob if Charlie refuses to make his choice.
+
+- Week #10
+
+  - Get the Uniswap demo running and extend it in some way.
+
 ## Solutions
 
 - Week #2
@@ -150,9 +175,11 @@
 
 ## Some Plutus Modules
 
+- [`Language.Marlowe.Semantics`](https://github.com/input-output-hk/plutus/blob/master/marlowe/src/Language/Marlowe/Semantics.hs), contains Marlowe types and semantics.
 - [`Plutus.Contract.StateMachine`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/StateMachine.hs), contains types and functions for using state machines.
 - [`Plutus.Contract.Test`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test.hs), provides various ways to write tests for Plutus contracts.
 - [`Plutus.Contract.Test.ContractModel`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test/ContractModel.hs), support for property based testing of Plutus contracts.
+- [`Plutus.Contracts.Uniswap`](https://github.com/input-output-hk/plutus/blob/master/plutus-use-cases/src/Plutus/Contracts/Uniswap.hs), an implementation of Uniswap in Plutus.
 - [`Plutus.PAB.Webserver.API`](https://github.com/input-output-hk/plutus/blob/master/plutus-pab/src/Plutus/PAB/Webserver/API.hs), contains the HTTP-interface provided by the PAB.
 - [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
 - [`Plutus.V1.Ledger.Ada`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs), contains support for the Ada currency.
