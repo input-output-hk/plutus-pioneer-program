@@ -2119,6 +2119,94 @@ provided predicate. If the result is *Nothing*, it simply waits until the state 
 There are two ways it could be *Nothing* - either the JSON parsing could fail, or we could get a *Last Nothing*. So, the end result is that the function waits until 
 the state of the contract has told a *Just* value.
 
+At this point we have the currency symbol bound to *cs*. And then we wait until *initContract* has finished.
+
+.. code:: haskell
+
+    _ <- Simulator.waitUntilFinished cidInit
+
+The next step is to start the oracle on Wallet 1, using the *cs* value we have recently obtained.
+
+.. code:: haskell
+
+    cidOracle <- Simulator.activateContract (Wallet 1) $ Oracle cs
+
+In order to interact with the oracle contract from the outside world, e.g. from the web interface, we need to get our hands on the *cidOracle* handle.
+
+So what we do is write this into a file called *oracle.cid*.
+
+.. code:: haskell
+
+    liftIO $ writeFile "oracle.cid" $ show $ unContractInstanceId cidOracle
+
+This is just quick and dirty for the demonstration. In production code you would use a safer mechanism.
+
+Now we use *waitForLast* again to get the oracle value, which we have provided from the *runOracle* contract via a *tell*. We need this because the swap contract 
+is parameterized by this value.
+
+At this stage the NFT is minted and we know what the oracle value is.
+
+Next, we loop over all the wallets, except wallet 1 which runs the oracle, and we activate the swap contract on each of them. Here we use a similar file-writing method 
+to get hold of the contract handles.
+
+.. code:: haskell
+
+    forM_ wallets $ \w ->
+        when (w /= Wallet 1) $ do
+            cid <- Simulator.activateContract w $ Swap oracle
+            liftIO $ writeFile ('W' : show (getWallet w) ++ ".cid") $ show $ unContractInstanceId cid
+            
+Now we just block until the user presses enter, and then we shutdown the server.
+
+.. code:: haskell
+
+    void $ liftIO getLine
+    shutdown
+
+It is not actually necessary to do all of this, because you can also start and stop contract instances from the web interface. It was easier for us here to do it in a 
+scripted way for the demo, but in principle you could just start the simulator and then wait until you shutdown.
+
+If you are curious about the API provided by the PAB, you can check that in the *plutus-pab* package, in the module *Plutus.PAB.Webserver.API*. There are several, but
+the one that we are using here is:
+
+.. code:: haskell
+
+    -- | PAB client API for contracts of type @t@. Examples of @t@ are
+    --   * Contract executables that reside in the user's file system
+    --   * "Builtin" contracts that run in the same process as the PAB (ie. the PAB is compiled & distributed with these contracts)
+    type NewAPI t walletId -- see note [WalletID type in wallet API]
+        = "api" :> "new" :> "contract" :>
+            ("activate" :> ReqBody '[ JSON] (ContractActivationArgs t) :> Post '[JSON] ContractInstanceId -- start a new instance
+                :<|> "instance" :>
+                        (Capture "contract-instance-id" Text :>
+                            ( "status" :> Get '[JSON] (ContractInstanceClientState t) -- Current status of contract instance
+                            :<|> "endpoint" :> Capture "endpoint-name" String :> ReqBody '[JSON] JSON.Value :> Post '[JSON] () -- Call an endpoint. Make
+                            :<|> "stop" :> Put '[JSON] () -- Terminate the instance.
+                            )
+                        )
+                :<|> "instances" :> "wallet" :> Capture "wallet-id" walletId :> Get '[JSON] [ContractInstanceClientState t]
+                :<|> "instances" :> Get '[ JSON] [ContractInstanceClientState t] -- list of all active contract instances
+                :<|> "definitions" :> Get '[JSON] [ContractSignatureResponse t] -- list of available contracts
+            )
+
+This makes use of the popular Haskell library *Servant* to write type safe web applications, but it should be readable more or less without knowledge of the *Servant* 
+library. For example, you can see the following endpoint declared which takes a *ContractActivationArgs* as its body and returns a *ContractInstanceId*.
+
+.. code::
+
+    POST /api/new/contract/activate
+
+There is also a web socket API, but we have not used that in this example.
+
+
+
+
+
+
+
+
+
+
 
 
 
