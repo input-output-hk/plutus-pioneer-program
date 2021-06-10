@@ -1230,7 +1230,7 @@ Next, we check our own public key and check for all available swaps where we are
 Then, we use a function *find* which is from the Haskell prelude, in module *Data.List*. The *find* function takes a predicate and a list and *Maybe* returns one 
 element of that list that satisfies the predicate.
 
-The function used in the predicate is defined as a helper function.
+The function used in the predicate is defined as the helper function *f*.
 
 .. code:: haskell
 
@@ -1415,6 +1415,9 @@ The function *ownFunds'* is a variation that, instead of returning the value, pe
         handleError logError $ ownFunds >>= tell . Last . Just
         void $ Contract.waitNSlots 1
         ownFunds'
+
+This calls the *ownFunds* function, performs a monadic bind to the composite function *tell . Last . Just* which tells the value, then it waits for a slot, and then
+calls itself. So, every block, it writes the value into the log.
 
 
 
