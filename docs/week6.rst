@@ -2087,12 +2087,37 @@ Apart from that, if you squint, it looks very similar to an *EmulatorTrace*.
 The first thing we do is use *logString* to log that we are starting the PAB server. We then call the *startServerDebug* function, and the return value of that 
 function which gets bound to *shutdown* can be used later to shut down the server.
 
+Now we use something called *activateContract* which is the equivalent of *activateContractWallet* from the *EmulatorTrace* monad.
 
+.. code:: haskell
 
+    cidInit <- Simulator.activateContract (Wallet 1) Init
 
+It takes a wallet where we want to start that instance, and then a value of the reified contract type. Remember that we associated the *Init* constructor with the
+*initContract* function.
 
+Now we need the currency symbol. This is an example of how we get information out of a contract using *tell*.
 
+.. code:: haskell
 
+    cs <- waitForLast cidInit
+
+The function *cidInit* uses a function from the *Simulator* monad called *waitForState*, which takes a contract instance and a predicate. The predicate gets a 
+JSON expression and returns a *Maybe a*.
+
+.. code:: haskell
+
+    waitForLast :: FromJSON a => ContractInstanceId -> Simulator.Simulation t a
+    waitForLast cid =
+        flip Simulator.waitForState cid $ \json -> case fromJSON json of
+            Success (Last (Just x)) -> Just x
+            _                       -> Nothing
+            
+The idea is that it will read the state of the contract which we wrote using *tell*. This is serialized as a JSON value, and it applies this JSON value to the 
+provided predicate. If the result is *Nothing*, it simply waits until the state changes again. But, if it is *Just x*, it will return the *x*.
+
+There are two ways it could be *Nothing* - either the JSON parsing could fail, or we could get a *Last Nothing*. So, the end result is that the function waits until 
+the state of the contract has told a *Just* value.
 
 
 
