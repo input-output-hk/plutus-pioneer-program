@@ -1465,7 +1465,7 @@ labelled *emCfg*.
     emCfg :: EmulatorConfig
     emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
 
-We use this with the helper function *v* to give everyone 100,000,000 lovelace (100 Ada) to begin with.
+We use this with the helper function *v* to give everyone 100 million lovelace (100 Ada) and 100 million USD Tokens to begin with.
 
 .. code:: haskell
 
@@ -1576,15 +1576,85 @@ We need this because the swap contract is parameterized with the oracle value. A
 We use the *observableState* function to get hold of this information. If it does not exist, we wait for a slot, and try again. Otherwise, we log it for debugging 
 purposes, and the return it.
 
+Next, we use Wallet 2 to execute the *checkOracle* function which we saw earlier.
 
+.. code:: haskell
+
+    void $ activateContractWallet (Wallet 2) $ checkOracle oracle
+
+We then initialize the oracle to an exchange rate of 1.5 Ada, and wait for 3 slots.
+
+.. code:: haskell
+
+    callEndpoint @"update" h1 1_500_000
+    void $ Emulator.waitNSlots 3
+    
+We now call the *ownFunds'* function on Wallets 1, 3, 4 and 5 to check the initial balances.
+
+.. code:: haskell
+
+    void $ activateContractWallet (Wallet 1) ownFunds'
+    void $ activateContractWallet (Wallet 3) ownFunds'
+    void $ activateContractWallet (Wallet 4) ownFunds'
+    void $ activateContractWallet (Wallet 5) ownFunds'    
         
+Then we start the swap contract on Wallets 3, 4, and 5.
 
+.. code:: haskell
 
+    h3 <- activateContractWallet (Wallet 3) $ swap oracle
+    h4 <- activateContractWallet (Wallet 4) $ swap oracle
+    h5 <- activateContractWallet (Wallet 5) $ swap oracle
 
+Then we try some scenarios. First, Wallets 3 and 4 offer 10 and 20 Ada for swap respectively.
 
+.. code:: haskell
 
+    callEndpoint @"offer" h3 10_000_000
+    callEndpoint @"offer" h4 20_000_000
+    void $ Emulator.waitNSlots 3
+    
+And now Wallet 5 uses the swap. It will pick one of the two. It is not obvious which one, whichever it finds first. Remember that we only wrote code that would find 
+the first affordable slot. It will then pay USD Token for it. The amount paid will depend on the current value of the oracle.
 
+.. code:: haskell
 
+    callEndpoint @"use" h5 ()
+    void $ Emulator.waitNSlots 3    
 
+Now, Wallet 1 updates the oracle value to 1.7. This also results in the accumulated fees (1 Ada) being paid to Wallet 1.
+
+    callEndpoint @"update" h1 1_700_000
+    void $ Emulator.waitNSlots 3
+
+Then, Wallet 5 tries again, grabbing the remaining swap, but now paying a different USD Token price.
+
+.. code:: haskell
+
+    callEndpoint @"use" h5 ()
+    void $ Emulator.waitNSlots 3
+    
+We then set the oracle value to 1.8.    
+
+.. code:: haskell
+
+    callEndpoint @"update" h1 1_800_000
+    void $ Emulator.waitNSlots 3
+    
+This will allow Wallet 1 to collect the fees. The oracle value didn't actually need to change for this to happen.
+
+Wallets 3 and 4 now issues *retrieve* requests to get back any funds that have not been bought. This will result in no funds being returned because all the swaps 
+have been used.
+
+.. code:: haskell
+
+    callEndpoint @"retrieve" h3 ()
+    callEndpoint @"retrieve" h4 ()
+    void $ Emulator.waitNSlots 3
+
+And that's it. So let's run it in the REPL.
+
+Test in the REPL
+~~~~~~~~~~~~~~~~
 
 
