@@ -1333,7 +1333,9 @@ First, we define, as always, a schema, which defines the endpoints.
             .\/ Endpoint "funds"    ()    
 
 Next, we see the *select* operator. This use of this operator will cause our code to wait until one of the endpoints is picked, and then executes the 
-associated code.
+associated code. 
+
+The *swap* function recursively calls itself, offering again and again the same choice of endpoints.
 
 .. code:: haskell
 
@@ -1363,6 +1365,25 @@ associated code.
 
             h :: Contract (Last Value) SwapSchema Text () -> Contract (Last Value) SwapSchema Text ()
             h = handleError logError    
+
+The code for the four endpoints are wrappers for the code we have already written. 
+
+For *offer*, for example, we block until we are provided with an *amt* and then we call the *offerSwap* contract.
+
+It is the same for the *retrieve* and *use* endpoints, except that they require no parameters.
+
+For the *funds* endpoint it is a little different. The *ownFunds* function comes from a module that we have not yet looked at - it gives us the *Value* that we own. We
+then *tell* this value as a way of reporting to the outside world how much we have.
+
+The *h* in each of the endpoints is an error handler. Each of the endpoints is wrapped inside the error handler, which just logs the error, but does not halt execution.
+
+And that concludes the swap example.
+
+Funds Module
+------------
+
+Now let's quickly look at the *Funds* module.
+
 
 
 
