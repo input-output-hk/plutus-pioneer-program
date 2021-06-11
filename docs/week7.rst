@@ -66,6 +66,24 @@ Alice has to send her actual choice to Bob in clear text. Bob then has to check 
 
 .. figure:: img/week07__00007.png
 
+If it is, then he knows sees that Alice is not lying and that indeed he lost. If it does not match, then he knows that Alice is cheating and he would win.
+
+This all sounds promising, but there is one big problem with it.
+
+In this game there are only two choices, 0 and 1. Which means that there are only two possible hashes. They may look very cryptic to Bob the first time they play, 
+but before long he will notice that he always sees one of only two possible hashes, and then he can know which choice Alice made.
+
+This is almost as bad as if Alice had just sent her choice in clear text.
+
+What we can do about this is that, instead of sending the hash of her choice, she instead first selects an arbitrary byte string and then hashes the
+concatenated of this byte string and her choice. The arbitrary byte string that Alice chooses is called a *nonce* - a number to be used just once.
+
+.. figure:: img/week07__00008.png
+
+
+
+
+
 
 
 
