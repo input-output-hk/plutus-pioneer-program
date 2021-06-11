@@ -161,7 +161,16 @@ Next, we define the two moves that the players can make.
     data GameChoice = Zero | One
         deriving (Show, Generic, FromJSON, ToJSON, ToSchema, Prelude.Eq, Prelude.Ord)    
 
-        
+    instance Eq GameChoice where
+        {-# INLINABLE (==) #-}
+        Zero == Zero = True
+        One  == One  = True
+        _    == _    = False
+
+Notice that in both *GameChoice* and *Game*, we derive the Haskell Prelude versions of *Eq* and *Ord*. This is because we can't use the Plutus versions of *Eq* and *Ord* 
+in the *deriving* clause. However, we do need the Plutus versions of those functions elsewhere, which is why we qualify them manually here.
+
+
 
         
 
