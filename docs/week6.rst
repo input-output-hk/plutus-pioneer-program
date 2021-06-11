@@ -2544,13 +2544,3 @@ In this example, as we have no real blockchain to play with, all wallets use the
 wallets will have different instances of PAB running.
 
 But, apart from that, it is almost exactly, end-to-end, how such a system would work.
-
-
-
-
-
-
-
-
-
-
