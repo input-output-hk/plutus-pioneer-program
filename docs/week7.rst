@@ -163,10 +163,10 @@ Next, we define the two moves that the players can make.
         One  == One  = True
         _    == _    = False
 
-Notice that in both *GameChoice* and *Game*, we derive the Haskell Prelude versions of *Eq* and *Ord*. This is because we can't use the Plutus versions of *Eq* and *Ord* 
-in the *deriving* clause. However, we do need the Plutus versions of those functions elsewhere, which is why we qualify them manually here.
+We need Plutus *Eq* for the instance, but it is not possible to declare that in the deriving clause, which is why the *Eq* in the deriving clause is qualified as being
+from the standard Haskell Prelude.
 
-Note also that we have used the *INLINABLE* pragma on the *Eq* instance for *GameChoice*. This is again to make it compatible with the Template Haskell we will need to
+Note that we have used the *INLINABLE* pragma on the *Eq* instance for *GameChoice*. This is again to make it compatible with the Template Haskell we will need to
 use.
 
 For state, we will use a type called *GameDatum*.
@@ -180,8 +180,15 @@ For state, we will use a type called *GameDatum*.
         {-# INLINABLE (==) #-}
         GameDatum bs mc == GameDatum bs' mc' = (bs == bs') && (mc == mc')    
 
-Here, the *ByteString* is the move of the first player, and *Maybe GameChoice* is either *Just* the move of the second player, or *Nothing*, if they have not yet moved.
+Here, the *ByteString* is the hash that the first player submits, and *Maybe GameChoice* is either *Just* the move of the second player, or *Nothing*, if they have not yet moved.
 
+Now we come to the redeemer, and we will use a custom type for this as well.
 
+.. code:: haskell
+
+    data GameRedeemer = Play GameChoice | Reveal ByteString | ClaimFirst | ClaimSecond
+    deriving Show
+
+    
 
 
