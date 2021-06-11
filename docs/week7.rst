@@ -203,7 +203,23 @@ We then have our *lovelaces* helper function which we have used in other scripts
     lovelaces :: Value -> Integer
     lovelaces = Ada.getLovelace . Ada.fromValue
 
+And we have a helper function *gameDatum* which behaves exactly the same way as the function *oracleValue*, which you can find in the notes from lecture 6.
+
+.. code:: haskell
+
+    gameDatum :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe GameDatum
+    gameDatum o f = do
+        dh      <- txOutDatum o
+        Datum d <- f dh
+        PlutusTx.fromData d    
+
+Now we come to the core business logic in the *mkGameValidator* function.
+
+.. code:: haskell
+
+    mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
+    mkGameValidator game bsZero' bsOne' dat red ctx =
+    ...
     
-
-
+    
 
