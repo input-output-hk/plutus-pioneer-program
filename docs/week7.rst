@@ -187,8 +187,14 @@ Now we come to the redeemer, and we will use a custom type for this as well.
 .. code:: haskell
 
     data GameRedeemer = Play GameChoice | Reveal ByteString | ClaimFirst | ClaimSecond
-    deriving Show
+        deriving Show
 
-    
+Here *Play* is where the second player moves and, as an argument, it has a *GameChoice*. *Reveal* is for the case where the first player has won and must prove that
+by revealing their nonce, and the nonce is represented by the *ByteString* argument. We don't need to include the move for the *Reveal*, as they will only reveal if they
+have won, and we know what move makes them win.
+
+*ClaimFirst* is when the first player claims back the stake in the even that the second player does not make a move by the play deadline. *ClaimSecond* is for the 
+case when the first player does not reveal by the reveal deadline.
+
 
 
