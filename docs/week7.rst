@@ -52,6 +52,21 @@ public key hashes.
 
 A hash function is a one-way function. Given a hash, tt is difficult, or impossible, to reconstruct the original byte string that was hashed.
 
+So, one way we could try to make this work is that, instead of Alice sending her choice to Bob, she instead sends the hash of her choice.
+
+.. figure:: img/week07__00006.png
+
+Bob then sees this cryptic byte string and he has no idea whether Alice picked 0 or 1.
+
+Bob then replies with his move, picking, for example 0. There is no need for him to use a hash, he can just send his response in clear text. 
+
+Now, Alice would have won. But perhaps Bob doesn't believe her. So there is one additional step that Alice has to take.
+
+Alice has to send her actual choice to Bob in clear text. Bob then has to check that the hash of her choice is indeed the same as the hash Alice sent earlier.
+
+.. figure:: img/week07__00007.png
+
+
 
 
 
