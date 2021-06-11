@@ -96,13 +96,9 @@ state machines, the code can be much clearer and much shorter.
 Code Example 1
 ~~~~~~~~~~~~~~
 
-Let's define the game, and then code it.
+We can imagine that, at the start of the game, Alice and Bob have put down the same amount of money each and that the winner will take it all.
 
-We can imagine that, at the start of the game, Alice and Bob have put down a certain amount of money. The winner takes it all.
-
-The game starts with Alice posting her hash, as described above. Bob, if he plays along, will post his own choice.
-
-At this point, we have Alice's hash and Bob's choice, which we will call *cBob*.
+The game starts with Alice posting her hash, as described above. Bob, if he plays along, will post his own choice. At this point, we have Alice's hash and Bob's choice.
 
 .. figure:: img/week07__00011.png
 
@@ -170,7 +166,22 @@ Next, we define the two moves that the players can make.
 Notice that in both *GameChoice* and *Game*, we derive the Haskell Prelude versions of *Eq* and *Ord*. This is because we can't use the Plutus versions of *Eq* and *Ord* 
 in the *deriving* clause. However, we do need the Plutus versions of those functions elsewhere, which is why we qualify them manually here.
 
+Note also that we have used the *INLINABLE* pragma on the *Eq* instance for *GameChoice*. This is again to make it compatible with the Template Haskell we will need to
+use.
+
+For state, we will use a type called *GameDatum*.
+
+.. code:: haskell
+
+    data GameDatum = GameDatum ByteString (Maybe GameChoice)
+    deriving Show
+
+    instance Eq GameDatum where
+        {-# INLINABLE (==) #-}
+        GameDatum bs mc == GameDatum bs' mc' = (bs == bs') && (mc == mc')    
+
+Here, the *ByteString* is the move of the first player, and *Maybe GameChoice* is either *Just* the move of the second player, or *Nothing*, if they have not yet moved.
 
 
-        
+
 
