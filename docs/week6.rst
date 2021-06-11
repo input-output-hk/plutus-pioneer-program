@@ -35,7 +35,7 @@ are going to use the ADA/USD exchange rate.
 
 There are lots of problems with this approach, as we have to trust the data source. There are ways to mitigate the risk
 that the data source is either untrustworthy or unreliable. For example, we could ask the provider to put down some
-collateral that is lost if data is not provided or is inaccurate. Or, you could combine several oracles into One
+collateral that is lost if data is not provided or is inaccurate. Or, you could combine several oracles into one
 and only accept the result if they all agree, or take the median, or average value of various sources. You could also
 come up with more sophisticated mechanisms.
 
