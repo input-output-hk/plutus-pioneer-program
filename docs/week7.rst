@@ -196,5 +196,14 @@ have won, and we know what move makes them win.
 *ClaimFirst* is when the first player claims back the stake in the even that the second player does not make a move by the play deadline. *ClaimSecond* is for the 
 case when the first player does not reveal by the reveal deadline.
 
+We then have our *lovelaces* helper function which we have used in other scripts, which gets the number of lovelaces held in a *Value*.
+
+.. code:: haskell
+
+    lovelaces :: Value -> Integer
+    lovelaces = Ada.getLovelace . Ada.fromValue
+
+    
+
 
 
