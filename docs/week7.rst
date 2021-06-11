@@ -80,11 +80,14 @@ concatenated of this byte string and her choice. The arbitrary byte string that 
 
 .. figure:: img/week07__00008.png
 
+So now, it is not always the same byte string if she picks 0, provided she chooses some random, unpredictable nonce.
 
+Now, Bob receives this and we proceed as before - Bob sends his choice, and then, in the third message Alice needs to send not only her original choice, but she also 
+has to send the nonce as well.
 
+.. figure:: img/week07__00010.png
 
-
-
+And then Bob checks that the hash of Alice's claimed nonce concatenated with her choice is indeed the hash that he originally received.
 
 
 
