@@ -19,3 +19,44 @@ Alice and Bob both have two options, they can either play 0 or 1.
 
 .. figure:: img/week07__00000.png
 
+If there were to play this game while being physically in the same room, they would make their moves at the same time. There would be one gesture for 0 and one
+gesture for 1, they would raise their hands simultaneously, and, depending on what they play, one of them wins.
+
+If they both play the same number, Alice wins. If they play different numbers, Bob wins.
+
+.. figure:: img/week07__00001.png
+
+Now let's imagine that Alice and Bob can't meet in person but that they still want to play the game. So, they decide to play it via mail - email or snail mail, it doesn't
+matter. How would that work?
+
+Alice could send her move to Bob.
+
+.. figure:: img/week07__00004.png
+
+This, however, gives a very unfair advantage to Bob, because now he opens Alice's mail, see that she has played 0, and he can simply reply with 1, and he wins.
+
+.. figure:: img/week07__00003.png
+
+And, if Alice plays 1, Bob can simply respond with 1. So Bob always wins, at least if he is unfair.
+
+.. figure:: img/week07__00005.png
+
+What can we do about that? 
+
+There's a very clever trick which is often used in cryptographic protocols, and that is commit schemes. The idea is that Alice doesn't reveal her choice to Bob, but she commits to it, so that she cannot later change her mind.
+
+One way to make that work is using hash functions.
+
+Hashes are all over the place in the blockchain world. We have seen that script addresses are just the hash of the Plutus code script, and we have seen lots of examples of
+public key hashes.
+
+A hash function is a one-way function. Given a hash, tt is difficult, or impossible, to reconstruct the original byte string that was hashed.
+
+
+
+
+
+
+
+
+
