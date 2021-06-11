@@ -3,11 +3,10 @@ Overview
 
 These are my notes from the `series of videos by Lars Brünjes <https://github.com/input-output-hk/plutus-pioneer-program>`_ for the Plutus Pioneers Program.
 
-I have tried to transcribe as closely as possible to the source material. I hope that this will complement the videos.
-
 The source code for the lectures can be found `here <https://github.com/input-output-hk/plutus-pioneer-program/tree/main/code>`_.
 
-These notes can be downloaded in PDF or ePub formats using the links at the bottom left of the page.
+These notes can be downloaded in PDF or ePub formats using the links at the bottom left of the page. Both formats are auto-generated and probably look ok, but I've
+not yet spent any time making adjustments to work on any issues with their presentation.
 
 .. note::
     The Plutus Pioneer lectures were created at a time when Plutus was going through rapid development. As a result, earlier lectures rely on earlier versions of the Plutus
