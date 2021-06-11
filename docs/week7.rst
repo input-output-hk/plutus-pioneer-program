@@ -108,8 +108,14 @@ If, at this point, Alice realizes that she has won, based on Bob's choice, she c
 
 .. figure:: img/week07__00012.png
 
+If, however, after Bob makes his move, Alice sees that she has lost, there is no need for her to do anything. After a certain deadline has been reached, if Alice has
+not responded, Bob will be able to claim the funds.
 
+.. figure:: img/week07__00013.png
 
+There is a scenario. Perhaps, after Alice starts playing, Bob simply isn't interested. In this case, there must be a way for Alice to get her own money back.
+
+.. figure:: img/week07__00014.png
 
 
 
