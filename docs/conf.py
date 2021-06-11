@@ -19,8 +19,8 @@ import sphinx_rtd_theme
 
 # -- Project information -----------------------------------------------------
 
-project = 'Plutus Pioneer Program'
-author = 'Chris Moreton'
+project = 'Plutus Pioneer Program Lecture Notes'
+author = 'Transcribed by Chris Moreton'
 
 
 # -- General configuration ---------------------------------------------------
