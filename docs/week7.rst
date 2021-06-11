@@ -93,7 +93,20 @@ if it is not, he knows that she tried to cheat him.
 This works very nicely and this is what we will try to implement in Cardano. First we will do it using techniques we have already seen, and then we will see how, by using 
 state machines, the code can be much clearer and much shorter.
 
+Code Example 1
+~~~~~~~~~~~~~~
 
+Let's imagine that, at the start of the game, Alice and Bob have put down a certain amount of money. The winner takes it all.
+
+The game starts with Alice posting her hash, as described above. Bob, if he plays along, will post his own choice.
+
+At this point, we have Alice's hash and Bob's choice, which we will call *cBob*.
+
+.. figure:: img/week07__00011.png
+
+If, at this point, Alice realizes that she has won, based on Bob's choice, she can reveal her secret, the game ends, and she has won.
+
+.. figure:: img/week07__00012.png
 
 
 
