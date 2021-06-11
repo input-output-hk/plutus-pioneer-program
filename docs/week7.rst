@@ -7,8 +7,8 @@ Week 07 - State Machines
 
     It covers commit schemes and state machines.
 
-Overview
---------
+Introduction
+------------
 
 In this lecture we will look at state machines. State machines can be very useful to shorter and more concise contracts, both on-chain and off-chain. There is higher level support for state machines in the Plutus libraries that builds on top of the lower level mechanisms we have seen so far.
 
@@ -87,7 +87,11 @@ has to send the nonce as well.
 
 .. figure:: img/week07__00010.png
 
-And then Bob checks that the hash of Alice's claimed nonce concatenated with her choice is indeed the hash that he originally received.
+And then Bob checks that the hash of Alice's claimed nonce concatenated with her choice is indeed the hash that he originally received. If it is, he knows he lost, and 
+if it is not, he knows that she tried to cheat him.
+
+This works very nicely and this is what we will try to implement in Cardano. First we will do it using techniques we have already seen, and then we will see how, by using 
+state machines, the code can be much clearer and much shorter.
 
 
 
