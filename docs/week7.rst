@@ -96,7 +96,9 @@ state machines, the code can be much clearer and much shorter.
 Code Example 1
 ~~~~~~~~~~~~~~
 
-Let's imagine that, at the start of the game, Alice and Bob have put down a certain amount of money. The winner takes it all.
+Let's define the game, and then code it.
+
+We can imagine that, at the start of the game, Alice and Bob have put down a certain amount of money. The winner takes it all.
 
 The game starts with Alice posting her hash, as described above. Bob, if he plays along, will post his own choice.
 
@@ -117,5 +119,49 @@ There is a scenario. Perhaps, after Alice starts playing, Bob simply isn't inter
 
 .. figure:: img/week07__00016.png
 
+As mentioned, our first attempt at coding this in Plutus will be using the techniques we have learned in previous lectures.
 
+The code we are working with is in the following module
+
+.. code:: haskell
+
+    module Week07.EvenOdd
+
+We call the game *EvenOdd* due to the fact that if the sum of the numbers is even, then the first player wins, and if the sum is odd, the second player wins.
+
+In our code we will call the players *first* and *second* rather than Alice and Bob.
+
+We define a data type *Game* which will be used as a parameter for the contract.
+
+.. code:: haskell
+
+    data Game = Game
+        { gFirst          :: !PubKeyHash
+        , gSecond         :: !PubKeyHash
+        , gStake          :: !Integer
+        , gPlayDeadline   :: !Slot
+        , gRevealDeadline :: !Slot
+        , gToken          :: !AssetClass
+        } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)    
+
+The players are identified by their public key hashes as *gFirst* and *gSecond*. 
+
+The number of lovelace to be used as stake in the game is represented by *gStake* - This stake must be provided by each player.
+
+There are two deadlines. The *gPlayDeadline* is the slot by which the second player must make their move. In the case where the second player has made a move,
+the *gRevealDeadline* is the slot by which player 1 must claim victory by revealing his nonce.
+
+Finally we have a token represented by *gToken*. This will be the same trick that we used for the oracle. It will be an arbitrary NFT, used to identify the right 
+instance of the UTxO that we are using. The idea is to use the datum sitting at a UTxO in this contract's script address to keep track of where we are in the game.
+
+Next, we define the two moves that the players can make.
+
+.. code:: haskell
+
+    data GameChoice = Zero | One
+        deriving (Show, Generic, FromJSON, ToJSON, ToSchema, Prelude.Eq, Prelude.Ord)    
+
+        
+
+        
 
