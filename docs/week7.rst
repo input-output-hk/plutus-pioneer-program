@@ -221,5 +221,14 @@ Now we come to the core business logic in the *mkGameValidator* function.
     mkGameValidator game bsZero' bsOne' dat red ctx =
     ...
     
-    
+The first argument is the *Game* parameter discussed above. 
+
+The second and the third arguments are somewhat of a nuisance. We just need them due to the fact that it is not possible to use string literals to 
+get *ByteStrings* in Haskell that is compiled to Plutus core. And, we want string literals representing the 0 and 1 choices. So *bsZero'* will hold "0" and 
+*beOne'* will hold "1". You will see how we pass these in as auxiliary arguments later.
+
+
+
+
+
 
