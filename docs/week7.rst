@@ -354,4 +354,4 @@ And finally, the NFT must be passed on in the output UTxO.
 
     traceIfFalse "token missing from output" (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)    
 
-
+The second situation is where both players have moved, and the second player discovers that they have won.
