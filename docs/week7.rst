@@ -354,4 +354,19 @@ And finally, the NFT must be passed on in the output UTxO.
 
     traceIfFalse "token missing from output" (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)    
 
-The second situation is where both players have moved, and the second player discovers that they have won.
+The second situation is where both players have moved, and the second player discovers that they have won. In order to prove that and get the winnings, they have 
+to reveal their nonce.
+
+So, the transaction must be signed by the first player, the nonce must indeed agree with the hash submitted earlier, it must be done before the reveal deadline,
+the input must contain both players' stakes and, finally, the NFT must go back to the first player.
+
+.. code:: haskell
+
+    (GameDatum bs (Just c), Reveal nonce) ->
+        traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+        traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
+        traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)       &&
+        traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+        traceIfFalse "NFT must go to first player"   nftToFirst    
+
+        
