@@ -402,3 +402,37 @@ These four cases are all the legitimate cases that we can have, so in all other 
     _ -> False
 
 So now let's look at the rest of the on-chain code.
+
+As usual, we define a date type that holds the information about the types the datum and redeemer.
+
+.. code:: haskell
+
+    data Gaming
+    instance Scripts.ScriptType Gaming where
+        type instance DatumType Gaming = GameDatum
+        type instance RedeemerType Gaming = GameRedeemer    
+
+And we define the *ByteStrings* that will be used to represent the two choices. These values are completely arbitrary - they just can't be the same as each other.
+
+.. code:: haskell
+
+    bsZero, bsOne :: ByteString
+    bsZero = "0"
+    bsOne  = "1"
+
+Boilerplate to compile our parameterized *mkGameValidator* to Plutus code. We apply the three parameters, *Game* and the two *ByteStrings*\s. Remember that, we need
+to pass in these *ByteString* parameters because we can't refer to *ByteString*\s as string literals within Plutus.
+
+.. code:: haskell
+
+    gameInst :: Game -> Scripts.ScriptInstance Gaming
+    gameInst game = Scripts.validator @Gaming
+        ($$(PlutusTx.compile [|| mkGameValidator ||])
+            `PlutusTx.applyCode` PlutusTx.liftCode game
+            `PlutusTx.applyCode` PlutusTx.liftCode bsZero
+            `PlutusTx.applyCode` PlutusTx.liftCode bsOne)
+        $$(PlutusTx.compile [|| wrap ||])
+      where
+        wrap = Scripts.wrapValidator @GameDatum @GameRedeemer
+        
+        
