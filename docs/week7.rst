@@ -227,6 +227,29 @@ The second and the third arguments are somewhat of a nuisance. We just need them
 get *ByteStrings* in Haskell that is compiled to Plutus core. And, we want string literals representing the 0 and 1 choices. So *bsZero'* will hold "0" and 
 *beOne'* will hold "1". You will see how we pass these in as auxiliary arguments later.
 
+Then we pass in the usual arguments for datum, redeemer and context.
+
+Let's look at some helper functions first. There are three functions we have used before and discussed in lecture 6.
+
+.. code:: haskell
+
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    ownInput :: TxOut
+    ownInput = case findOwnInput ctx of
+        Nothing -> traceError "game input missing"
+        Just i  -> txInInfoResolved i
+
+    ownOutput :: TxOut
+    ownOutput = case getContinuingOutputs ctx of
+        [o] -> o
+        _   -> traceError "expected exactly one game output"
+        
+Note the *ownInput* should never fail as we are in the process of validating a UTxO.
+
+
+
 
 
 
