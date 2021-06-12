@@ -279,5 +279,13 @@ one is a *GameChoice* and one is a *ByteString*.
             Zero -> bsZero'
             One  -> bsOne'    
 
+Finally, there is the question of what happens to the NFT once the game is over and there is no game address anymore. The way we have implemented it here, is that the NFT goes back to the first player. The first player needs it in the beginning to kick off the game and put the NFT 
+into the correct UTxO, so it is reasonable to give it back the player 1 in the end.
 
-            
+To verify that this condition is met, we have created a helper function called *nftToFirst*.
+
+.. code:: haskell
+
+    nftToFirst :: Bool
+    nftToFirst = assetClassValueOf (valuePaidTo info $ gFirst game) (gToken game) == 1
+
