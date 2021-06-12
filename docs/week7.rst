@@ -289,3 +289,30 @@ To verify that this condition is met, we have created a helper function called *
     nftToFirst :: Bool
     nftToFirst = assetClassValueOf (valuePaidTo info $ gFirst game) (gToken game) == 1
 
+Now that we have covered the helper functions, let's look at the conditions.
+
+There is one condition that covers all the cases, and that is that the input we are validating must contain the NFT.
+
+.. code:: haskell
+
+    traceIfFalse "token missing from input" (assetClassValueOf (txOutValue ownInput) (gToken game) == 1) &&
+
+After that, the rules depend on the situation.    
+
+.. code:: haskell
+
+    case (dat, red) of
+
+The first situation is the one where the second player has not yet moved, and they are just now making their move.
+
+.. code:: haskell
+
+    (GameDatum bs Nothing, Play c) ->
+        traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+        traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+        traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))            &&
+        traceIfFalse "wrong output datum"            (outputDatum == GameDatum bs (Just c))                             &&
+        traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)         &&
+        traceIfFalse "token missing from output"     (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)    
+
+        
