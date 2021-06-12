@@ -369,4 +369,25 @@ the input must contain both players' stakes and, finally, the NFT must go back t
         traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
         traceIfFalse "NFT must go to first player"   nftToFirst    
 
-        
+Next we have the case where the second player doesn't move within the deadline, and the first player is reclaiming their stake. Here, the first player must have signed 
+the transaction, the play deadline must have passed, their stake must be present, and the NFT must go back to the first player.
+
+.. code:: haskell
+
+    (GameDatum _ Nothing, ClaimFirst) ->
+        traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+        traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)   &&
+        traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+        traceIfFalse "NFT must go to first player"   nftToFirst
+
+Finally, the case where both players have moved and the first player has either lost or not revealed in time, so the second player is claiming the winnings. This time, the
+transaction must be signed by the second player, the reveal deadline must have passed, both players' stakes must be present, and the NFT must, as usual, go back
+to the first player.
+
+.. code:: haskell
+
+    (GameDatum _ (Just _), ClaimSecond) ->
+        traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+        traceIfFalse "too early"                     (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
+        traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+        traceIfFalse "NFT must go to first player"   nftToFirst
