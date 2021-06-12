@@ -7,6 +7,8 @@ Week 07 - State Machines
 
     It covers commit schemes and state machines.
 
+    This week we were using Plutus commit 530cc134364ae186f39fb2b54239fb7c5e2986e9
+
 Introduction
 ------------
 
@@ -248,10 +250,17 @@ Let's look at some helper functions first. There are three functions we have use
         
 Note the *ownInput* should never fail as we are in the process of validating a UTxO.
 
+The *outputDatum* helper makes use of the *GameDatum* type which we defined earlier. Given the case we have exactly one output (the return from *ownOutput*), it will
+give us the datum.
 
+.. code:: haskell
 
-
-
+    outputDatum :: GameDatum
+    outputDatum = case gameDatum ownOutput (`findDatum` info) of
+        Nothing -> traceError "game output datum not found"
+        Just d  -> d
+        
+        
 
 
 
