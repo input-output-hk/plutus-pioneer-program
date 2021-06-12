@@ -129,6 +129,9 @@ We call the game *EvenOdd* due to the fact that if the sum of the numbers is eve
 
 In our code we will call the players *first* and *second* rather than Alice and Bob.
 
+On chain
+~~~~~~~~
+
 We define a data type *Game* which will be used as a parameter for the contract.
 
 .. code:: haskell
@@ -391,3 +394,11 @@ to the first player.
         traceIfFalse "too early"                     (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
         traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
         traceIfFalse "NFT must go to first player"   nftToFirst
+
+These four cases are all the legitimate cases that we can have, so in all other cases we fail validation.
+
+.. code:: haskell
+
+    _ -> False
+
+So now let's look at the rest of the on-chain code.
