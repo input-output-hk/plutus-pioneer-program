@@ -315,4 +315,43 @@ The first situation is the one where the second player has not yet moved, and th
         traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)         &&
         traceIfFalse "token missing from output"     (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)    
 
-        
+Here, the first part is the *GameDatum* and it contains the first player's hash and a *Nothing* which shows that the second player has not yet moved. The second part is the *GameRedeemer* and has been determined
+to be of type *Play GameChoice*. We assign the *GameChoice* part to *c* using pattern matching.
+
+We check that the second player has signed the transaction. 
+
+.. code:: haskell
+
+    traceIfFalse "not signed by second player" (txSignedBy info (gSecond game))
+
+Then, we check that the first player's stake is present in the input.
+
+.. code:: haskell
+
+    traceIfFalse "first player's stake missing" (lovelaces (txOutValue ownInput) == gStake game)
+
+The output should have the second player's stake added to the total stake.
+
+.. code:: haskell
+
+    traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))
+
+We now exactly what the datum of the output must be. It must be the same hash, plus the move made by the second player.
+
+.. code:: haskell
+    
+    traceIfFalse "wrong output datum" (outputDatum == GameDatum bs (Just c))
+
+The, the move must happen before the play deadline.
+
+.. code:: haskell
+
+    traceIfFalse "missed deadline" (to (gPlayDeadline game) `contains` txInfoValidRange info)
+
+And finally, the NFT must be passed on in the output UTxO.
+
+.. code:: haskell
+
+    traceIfFalse "token missing from output" (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)    
+
+
