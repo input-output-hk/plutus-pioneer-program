@@ -260,11 +260,14 @@ give us the datum.
         Nothing -> traceError "game output datum not found"
         Just d  -> d
         
-The *checkNonce* function is for the case where the first player as won and wants to prove it by revealing their nonce. The first argument is hash that was originall sent, 
-the second argument is the nonce that is being revealed. For the *GameChoice*-typed parameter, we will be passing in the move made by player 2. This should be the same
-as the move made by player 1, and this is what this function will determine using the hash and the nonce.
+The *checkNonce* function is for the case where the first player as won and wants to prove it by revealing their nonce. The first argument is hash that was original sent, 
+the second argument is the nonce that is being revealed. 
 
-In order to check the hash of the nonce concatenated with the *GameChoice*, we use a helper function to convert the *GameChoice* to a *ByteString*.
+For the *GameChoice*-typed parameter, we will be passing in the move made by player 2. This should be the same as the move made by player 1, and this is what this function will determine using the hash and the nonce.
+
+In order to check the hash of the nonce concatenated with the *GameChoice*, we use a helper function to convert the *GameChoice* to a *ByteString*. Note that the use 
+of the *cFirst* and *cSecond* in the *checkNonce* function could be swapped around, and the function would work just the same - the difference between the two is that
+one is a *GameChoice* and one is a *ByteString*.
 
 .. code:: haskell
 
@@ -276,3 +279,5 @@ In order to check the hash of the nonce concatenated with the *GameChoice*, we u
             Zero -> bsZero'
             One  -> bsOne'    
 
+
+            
