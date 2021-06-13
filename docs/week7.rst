@@ -784,3 +784,8 @@ called *endpoints* which offers a choice between these two *Endpoint*\s, and rec
       where
         first  = endpoint @"first"  >>= firstGame
         second = endpoint @"second" >>= secondGame
+
+So this concludes the first version of the game - the version that does not use state machines.
+
+Now, let's test it.
+
