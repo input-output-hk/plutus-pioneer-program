@@ -130,7 +130,7 @@ We call the game *EvenOdd* due to the fact that if the sum of the numbers is eve
 In our code we will call the players *first* and *second* rather than Alice and Bob.
 
 On chain
-~~~~~~~~
+++++++++
 
 We define a data type *Game* which will be used as a parameter for the contract.
 
@@ -486,13 +486,11 @@ The logic is that if it finds an element that satisfies the predicate, it will r
     Prelude Data.List Week07.EvenOdd> find even [1 :: Int, 3, 5, 11]
     Nothing
 
-Contracts
-+++++++++
-
-We have two contracts, one for each of the players.
-
 The *firstGame* contract
 ________________________
+    
+We have two contracts, one for each of the players.
+
 
 Each contract has its own params type. For the *firstGame* contract, we call this type *FirstParams*.
 
