@@ -579,7 +579,12 @@ only thing that the second player should be able to do is create a new one.
         case m of
             Nothing             -> throwError "game output not found"
 
-            
+So, assuming we find it, the first case we define is the one where the second player hasn't moved. So we can use the *ClaimFirst* redeemer to get the stake back.
+
+As lookups we need to provide the UTxO and the validator of the game.
+
+.. code:: haskell
+
             Just (oref, o, dat) -> case dat of
                 GameDatum _ Nothing -> do
                     logInfo @String "second player did not play"
@@ -589,6 +594,12 @@ only thing that the second player should be able to do is create a new one.
                     ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                     void $ awaitTxConfirmed $ txId ledgerTx'
                     logInfo @String "reclaimed stake"
+
+The second case is that the second player did move, and they lost. In which case we must now reveal our nonce, which we do using the *Reveal* redeemer.
+
+We must put an additional constraint that the transaction must be submitted before the reveal deadline has passed.
+
+.. code:: haskell
 
                 GameDatum _ (Just c') | c' == c -> do
                     logInfo @String "second player played and lost"
@@ -600,8 +611,26 @@ only thing that the second player should be able to do is create a new one.
                     void $ awaitTxConfirmed $ txId ledgerTx'
                     logInfo @String "victory"
 
-                _ -> logInfo @String "second player played and won"
+If the second player moved and won, there is nothing for use to do.
 
+.. code:: haskell
+
+                _ -> logInfo @String "second player played and won"
 
 The *secondGame* contract
 _________________________
+
+The params for the second player are similar to those of the first player. This time we don't need the second player's public key hash, because that is ours, and we already 
+know what it is. Instead we need the first player's public key hash. Also, we don't need the nonce.
+
+.. code:: haskell
+
+    data SecondParams = SecondParams
+        { spFirst          :: !PubKeyHash
+        , spStake          :: !Integer
+        , spPlayDeadline   :: !Slot
+        , spRevealDeadline :: !Slot
+        , spCurrency       :: !CurrencySymbol
+        , spTokenName      :: !TokenName
+        , spChoice         :: !GameChoice
+        } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)    
