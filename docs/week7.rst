@@ -494,5 +494,33 @@ We have two contracts, one for each of the players.
 The *firstGame* contract
 ________________________
 
+Each contract has its own params type. For the *firstGame* contract, we call this type *FirstParams*.
+
+.. code:: haskell
+
+    data FirstParams = FirstParams
+        { fpSecond         :: !PubKeyHash
+        , fpStake          :: !Integer
+        , fpPlayDeadline   :: !Slot
+        , fpRevealDeadline :: !Slot
+        , fpNonce          :: !ByteString
+        , fpCurrency       :: !CurrencySymbol
+        , fpTokenName      :: !TokenName
+        , fpChoice         :: !GameChoice
+        } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
+
+We don't need a *fpFirst* field here, as the first player is the owner of the wallet, so we know their public key hash. But we need *fpSecond* and also the familiar
+fields for stake, play deadline and reveal deadline.
+
+Then we need the nonce, the NFT (split into *fpCurrency* and *fpTokenName*), and finally the move that the player wants to make.
+
+Now, for the contract
+
+.. code:: haskell
+
+    firstGame :: forall w s. HasBlockchainActions s => FirstParams -> Contract w s Text ()
+
+
+
 The *secondGame* contract
 _________________________
