@@ -589,7 +589,7 @@ As lookups we need to provide the UTxO and the validator of the game.
                 GameDatum _ Nothing -> do
                     logInfo @String "second player did not play"
                     let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
-                                Constraints.otherScript (gameValidator game)
+                                  Constraints.otherScript (gameValidator game)
                         tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData ClaimFirst)
                     ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                     void $ awaitTxConfirmed $ txId ledgerTx'
@@ -604,9 +604,9 @@ We must put an additional constraint that the transaction must be submitted befo
                 GameDatum _ (Just c') | c' == c -> do
                     logInfo @String "second player played and lost"
                     let lookups = Constraints.unspentOutputs (Map.singleton oref o)                                         <>
-                                Constraints.otherScript (gameValidator game)
+                                  Constraints.otherScript (gameValidator game)
                         tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Reveal $ fpNonce fp) <>
-                                Constraints.mustValidateIn (to $ fpRevealDeadline fp)
+                                  Constraints.mustValidateIn (to $ fpRevealDeadline fp)
                     ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                     void $ awaitTxConfirmed $ txId ledgerTx'
                     logInfo @String "victory"
@@ -731,17 +731,35 @@ Then we wait until the reveal deadline has passed.
 .. code:: haskell
 
     void $ awaitSlot $ 1 + spRevealDeadline sp
-                
+          
+And we again try to find the UTxO, which could now be a different one.
+
+.. code:: haskell
+
     m' <- findGameOutput game
+
+If *m'* is *Nothing* - in other words, if we did not find a UTxO, then that means that while we were waiting, the first player revealed and won. So there is nothing 
+for us to do.
+
+.. code:: haskell
+
     case m' of
         Nothing             -> logInfo @String "first player won"
+
+However, if we do find the UTxO, it means the first player didn't reveal, which means that either they decided not to play, probably because they lost. In any case, we 
+can now claim the winnings.   
+
+Our constraints are that we must spend the UTxO that we found after the deadline has passed, and we must hand back the NFT to the first player.
+
+.. code:: haskell
+
         Just (oref', o', _) -> do
             logInfo @String "first player didn't reveal"
             let lookups' = Constraints.unspentOutputs (Map.singleton oref' o')                              <>
-                        Constraints.otherScript (gameValidator game)
+                           Constraints.otherScript (gameValidator game)
                 tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ClaimSecond) <>
-                        Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)                      <>
-                        Constraints.mustPayToPubKey (spFirst sp) token
+                           Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)                      <>
+                           Constraints.mustPayToPubKey (spFirst sp) token
             ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
             void $ awaitTxConfirmed $ txId ledgerTx'
             logInfo @String "second player won"
@@ -751,3 +769,18 @@ If we didn't find the NFT, then there is nothing for use to do.
 .. code:: haskell
     
             _ -> logInfo @String "no running game found"            
+
+That is all the code we need for the two on-chain contracts.
+
+To make them more accessible, we define two *Endpoint*\s, one for the first player, and one for the second. And then we define a contract 
+called *endpoints* which offers a choice between these two *Endpoint*\s, and recursively calls itself.
+
+.. code:: haskell
+
+    type GameSchema = BlockchainActions .\/ Endpoint "first" FirstParams .\/ Endpoint "second" SecondParams
+
+    endpoints :: Contract () GameSchema Text ()
+    endpoints = (first `select` second) >> endpoints
+      where
+        first  = endpoint @"first"  >>= firstGame
+        second = endpoint @"second" >>= secondGame
