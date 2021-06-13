@@ -464,7 +464,8 @@ called *findGameOutput*.
 The *findGameOutput* function takes the *Game*, then uses the *Contract* monad to try to find the UTxO with the NFT. It returns a *Maybe*, because it may not find one.
 If we find it, we return a *Just* of a triple containing the transaction reference, the transaction itself, and the *GameDatum*.
 
-First we get a list of all the UTxOs at the game address, then we use the *find* function, passing in a helper function *f*.
+First we get a list of all the UTxOs at the game address, then we use the *find* function, passing in a helper function *f*, which checks whether the output contains the
+NFT.
 
 The *find* function is found in module *Data.List* and is defined as
 
@@ -475,5 +476,23 @@ The *find* function is found in module *Data.List* and is defined as
 This works for more general containers than just lists, but you can think of lists in this example. It gets a predicate for an element of the *Foldable* type - the list in 
 this case, and also takes a container of *a*\s - again a list in this example, and returns a *Maybe a*.
 
-The logic is that if it finds an element that satisfies the predicate, it will return it as a *Just*, otherwise it will return *Nothing*.
+The logic is that if it finds an element that satisfies the predicate, it will return it as a *Just*, otherwise it will return *Nothing*. For example
 
+.. code:: haskell
+
+    Prelude Data.List Week07.EvenOdd> find even [1 :: Int, 3, 5, 8, 11, 12]
+    Just 8
+
+    Prelude Data.List Week07.EvenOdd> find even [1 :: Int, 3, 5, 11]
+    Nothing
+
+Contracts
++++++++++
+
+We have two contracts, one for each of the players.
+
+The *firstGame* contract
+________________________
+
+The *secondGame* contract
+_________________________
