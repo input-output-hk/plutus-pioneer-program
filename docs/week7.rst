@@ -517,7 +517,90 @@ Now, for the contract
 .. code:: haskell
 
     firstGame :: forall w s. HasBlockchainActions s => FirstParams -> Contract w s Text ()
+    firstGame fp = do
+    ...
 
+The first thing we do is to get our own public key hash.
+
+.. code:: haskell
+
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+
+Then we populate the fields of the game.
+
+.. code:: haskell
+
+        let game = Game
+                { gFirst          = pkh
+                , gSecond         = fpSecond fp
+                , gStake          = fpStake fp
+                , gPlayDeadline   = fpPlayDeadline fp
+                , gRevealDeadline = fpRevealDeadline fp
+                , gToken          = AssetClass (fpCurrency fp, fpTokenName fp)
+                }
+
+The *v* value is our stake plus the NFT, which must both go into the UTxO.
+
+.. code:: haskell
+
+        let ...
+            v    = lovelaceValueOf (fpStake fp) <> assetClassValue (gToken game) 1
+
+We then calculate the hash that we need to send as our disguised move.
+
+.. code:: haskell
+
+        let ...
+            c    = fpChoice fp
+            bs   = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+
+We then submit the transaction and wait as usual. The constraints are very simple. We just need to create a UTxI with the datum of our move (nothing yet for the second player), and the value *v* we defined above.
+
+.. code:: haskell
+
+        let ...
+            tx   = Constraints.mustPayToTheScript (GameDatum bs Nothing) v
+        ledgerTx <- submitTxConstraints (gameInst game) tx
+        void $ awaitTxConfirmed $ txId ledgerTx
+        logInfo @String $ "made first move: " ++ show (fpChoice fp)
+
+And we wait for the play deadline slot, at which point the winner can be determined.
+
+.. code:: haskell
+    
+        void $ awaitSlot $ 1 + fpPlayDeadline fp
+
+Once the deadline passed, we get hold of the UTxO. If, at this point, the UTxO is not found, something has gone very wrong. We know that we have produced the UTxO, and the 
+only thing that the second player should be able to do is create a new one.
+        
+.. code:: haskell
+
+        m <- findGameOutput game
+        case m of
+            Nothing             -> throwError "game output not found"
+
+            
+            Just (oref, o, dat) -> case dat of
+                GameDatum _ Nothing -> do
+                    logInfo @String "second player did not play"
+                    let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
+                                Constraints.otherScript (gameValidator game)
+                        tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData ClaimFirst)
+                    ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
+                    void $ awaitTxConfirmed $ txId ledgerTx'
+                    logInfo @String "reclaimed stake"
+
+                GameDatum _ (Just c') | c' == c -> do
+                    logInfo @String "second player played and lost"
+                    let lookups = Constraints.unspentOutputs (Map.singleton oref o)                                         <>
+                                Constraints.otherScript (gameValidator game)
+                        tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Reveal $ fpNonce fp) <>
+                                Constraints.mustValidateIn (to $ fpRevealDeadline fp)
+                    ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
+                    void $ awaitTxConfirmed $ txId ledgerTx'
+                    logInfo @String "victory"
+
+                _ -> logInfo @String "second player played and won"
 
 
 The *secondGame* contract
