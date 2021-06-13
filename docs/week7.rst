@@ -634,3 +634,68 @@ know what it is. Instead we need the first player's public key hash. Also, we do
         , spTokenName      :: !TokenName
         , spChoice         :: !GameChoice
         } deriving (Show, Generic, FromJSON, ToJSON, ToSchema)    
+
+First we get our own public key hash then we set up the game values, in a similar way as we did for the first player.
+
+.. code:: haskell
+
+    secondGame :: forall w s. HasBlockchainActions s => SecondParams -> Contract w s Text ()
+    secondGame sp = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let game = Game
+                { gFirst          = spFirst sp
+                , gSecond         = pkh
+                , gStake          = spStake sp
+                , gPlayDeadline   = spPlayDeadline sp
+                , gRevealDeadline = spRevealDeadline sp
+                , gToken          = AssetClass (spCurrency sp, spTokenName sp)
+                }
+
+Now, we try to find the UTxO that contains the NFT
+
+.. code:: haskell
+
+        m <- findGameOutput game
+
+If we find it, then we need to take further action.
+
+.. code:: haskell
+    
+        case m of
+            Just (oref, o, GameDatum bs Nothing) -> do
+                logInfo @String "running game found"
+                let token   = assetClassValue (gToken game) 1
+                let v       = let x = lovelaceValueOf (spStake sp) in x <> x <> token
+                    c       = spChoice sp
+                    lookups = Constraints.unspentOutputs (Map.singleton oref o)                            <>
+                            Constraints.otherScript (gameValidator game)                                 <>
+                            Constraints.scriptInstanceLookups (gameInst game)
+                    tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Play c) <>
+                            Constraints.mustPayToTheScript (GameDatum bs $ Just c) v                     <>
+                            Constraints.mustValidateIn (to $ spPlayDeadline sp)
+                ledgerTx <- submitTxConstraintsWith @Gaming lookups tx
+                let tid = txId ledgerTx
+                void $ awaitTxConfirmed tid
+                logInfo @String $ "made second move: " ++ show (spChoice sp)
+
+                void $ awaitSlot $ 1 + spRevealDeadline sp
+
+                m' <- findGameOutput game
+                case m' of
+                    Nothing             -> logInfo @String "first player won"
+                    Just (oref', o', _) -> do
+                        logInfo @String "first player didn't reveal"
+                        let lookups' = Constraints.unspentOutputs (Map.singleton oref' o')                              <>
+                                    Constraints.otherScript (gameValidator game)
+                            tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ClaimSecond) <>
+                                    Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)                      <>
+                                    Constraints.mustPayToPubKey (spFirst sp) token
+                        ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
+                        void $ awaitTxConfirmed $ txId ledgerTx'
+                        logInfo @String "second player won"
+
+If we didn't find the NFT, then there is nothing for use to do.
+                        
+.. code:: haskell
+    
+            _ -> logInfo @String "no running game found"            
