@@ -657,42 +657,94 @@ Now, we try to find the UTxO that contains the NFT
 
         m <- findGameOutput game
 
-If we find it, then we need to take further action.
+If we don't find it, then there is nothing to do, but if we do find it...
 
 .. code:: haskell
     
         case m of
             Just (oref, o, GameDatum bs Nothing) -> do
                 logInfo @String "running game found"
-                let token   = assetClassValue (gToken game) 1
-                let v       = let x = lovelaceValueOf (spStake sp) in x <> x <> token
-                    c       = spChoice sp
-                    lookups = Constraints.unspentOutputs (Map.singleton oref o)                            <>
-                            Constraints.otherScript (gameValidator game)                                 <>
-                            Constraints.scriptInstanceLookups (gameInst game)
-                    tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Play c) <>
-                            Constraints.mustPayToTheScript (GameDatum bs $ Just c) v                     <>
-                            Constraints.mustValidateIn (to $ spPlayDeadline sp)
-                ledgerTx <- submitTxConstraintsWith @Gaming lookups tx
-                let tid = txId ledgerTx
-                void $ awaitTxConfirmed tid
-                logInfo @String $ "made second move: " ++ show (spChoice sp)
 
-                void $ awaitSlot $ 1 + spRevealDeadline sp
+Then we want to call the script with the *Play* redeemer.
 
-                m' <- findGameOutput game
-                case m' of
-                    Nothing             -> logInfo @String "first player won"
-                    Just (oref', o', _) -> do
-                        logInfo @String "first player didn't reveal"
-                        let lookups' = Constraints.unspentOutputs (Map.singleton oref' o')                              <>
-                                    Constraints.otherScript (gameValidator game)
-                            tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ClaimSecond) <>
-                                    Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)                      <>
-                                    Constraints.mustPayToPubKey (spFirst sp) token
-                        ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
-                        void $ awaitTxConfirmed $ txId ledgerTx'
-                        logInfo @String "second player won"
+We assign the NFT to *token*.
+
+.. code:: haskell
+    
+    let token   = assetClassValue (gToken game) 1
+
+We now calculate the value that we must put in the new output. Remember, if we decide to play, we must consume the existing UTxO and create a new one at the same address. The 
+first will contain the stake that the first player added, and now we must add our own stake, and we must keep the NFT in there.
+
+.. code:: haskell
+
+    let v = let x = lovelaceValueOf (spStake sp) in x <> x <> token
+
+Next, our choice.
+
+.. code:: haskell
+
+    let c = spChoice sp
+
+Then the constraints and their required lookups.
+
+We must consume the existing UTxO using the Play redeemer with our choice
+
+.. code:: haskell
+
+    let tx = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Play c) <>
+
+.. code:: haskell
+
+And create a new UTxO with the updated datum (the same *bs*, but with our choice), and with the *v* that we computed.
+
+.. code:: haskell
+    
+    Constraints.mustPayToTheScript (GameDatum bs $ Just c) v <>
+
+And it must be done before the deadline passes.
+
+.. code:: haskell
+
+    
+    Constraints.mustValidateIn (to $ spPlayDeadline sp)
+
+For lookups, we need the UTxO, the validator, and, because we are producing a UTxO for the script, we need the script instance.
+
+.. code:: haskell
+
+    let lookups = Constraints.unspentOutputs (Map.singleton oref o)                            <>
+                  Constraints.otherScript (gameValidator game)                                 <>
+                  Constraints.scriptInstanceLookups (gameInst game)
+
+Then we do the usual thing, we submit, we wait for confirmation and we log.
+
+.. code:: haskell
+
+    ledgerTx <- submitTxConstraintsWith @Gaming lookups tx
+    let tid = txId ledgerTx
+    void $ awaitTxConfirmed tid
+    logInfo @String $ "made second move: " ++ show (spChoice sp)
+    
+Then we wait until the reveal deadline has passed.
+
+.. code:: haskell
+
+    void $ awaitSlot $ 1 + spRevealDeadline sp
+                
+    m' <- findGameOutput game
+    case m' of
+        Nothing             -> logInfo @String "first player won"
+        Just (oref', o', _) -> do
+            logInfo @String "first player didn't reveal"
+            let lookups' = Constraints.unspentOutputs (Map.singleton oref' o')                              <>
+                        Constraints.otherScript (gameValidator game)
+                tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toData ClaimSecond) <>
+                        Constraints.mustValidateIn (from $ 1 + spRevealDeadline sp)                      <>
+                        Constraints.mustPayToPubKey (spFirst sp) token
+            ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
+            void $ awaitTxConfirmed $ txId ledgerTx'
+            logInfo @String "second player won"
 
 If we didn't find the NFT, then there is nothing for use to do.
                         
