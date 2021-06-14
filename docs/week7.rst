@@ -694,8 +694,6 @@ We must consume the existing UTxO using the Play redeemer with our choice
 
     let tx = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Play c) <>
 
-.. code:: haskell
-
 And create a new UTxO with the updated datum (the same *bs*, but with our choice), and with the *v* that we computed.
 
 .. code:: haskell
@@ -787,5 +785,24 @@ called *endpoints* which offers a choice between these two *Endpoint*\s, and rec
 
 So this concludes the first version of the game - the version that does not use state machines.
 
-Now, let's test it.
+Now, let's test it using the *EmulatorTrace* monad.
 
+Testing
+_______
+
+The *test* function tests each of the four combinations by calling the *test'* function which takes the first and second players' choices respectively.        
+
+.. code:: haskell
+
+    test' :: GameChoice -> GameChoice -> IO ()
+    test' c1 c2 = runEmulatorTraceIO' def emCfg $ myTrace c1 c2
+      where
+        emCfg :: EmulatorConfig
+        emCfg = EmulatorConfig $ Left $ Map.fromList
+            [ (Wallet 1, v <> assetClassValue (AssetClass (gameTokenCurrency, gameTokenName)) 1)
+            , (Wallet 2, v)
+            ]
+    
+        v :: Value
+        v = Ada.lovelaceValueOf 1000_000_000
+        
