@@ -792,7 +792,16 @@ _______
 
 The *test* function tests each of the four combinations by calling the *test'* function which takes the first and second players' choices respectively.        
 
+The *test'* function uses the *runEmulatorTraceIO'* variant which allows us to set up the initial wallet distributions using an *EmulatorConfig*.
+
 .. code:: haskell
+
+    test :: IO ()
+    test = do
+        test' Zero Zero
+        test' Zero One
+        test' One Zero
+        test' One One
 
     test' :: GameChoice -> GameChoice -> IO ()
     test' c1 c2 = runEmulatorTraceIO' def emCfg $ myTrace c1 c2
@@ -806,3 +815,5 @@ The *test* function tests each of the four combinations by calling the *test'* f
         v :: Value
         v = Ada.lovelaceValueOf 1000_000_000
         
+We have provided a test NFT. In a real world scenario, we would need to mint a real NFT, using one of the methods we have seen before.
+
