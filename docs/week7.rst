@@ -923,7 +923,8 @@ While the first wallet is waiting, the second wallet kicks in and finds the UTxO
     Slot 00004: SlotAdd Slot 5
     Slot 00005: *** CONTRACT LOG: "made second move: Zero"
 
-The first player realizes that they have won, and so must reveal.
+The first player realizes that they have won, and so must reveal. And we see in the final balances that Wallet 1 does indeed have the NFT back and it also has
+almost 5 ada more than it started with. The difference is, of course, due to transaction fees. And the second wallet has a little more than 5 ada less.
 
 .. code:: haskell
     
@@ -952,9 +953,18 @@ The first player realizes that they have won, and so must reveal.
 Test 2
 ......
 
+In the second case, Wallet 1 again plays Zero, but this time Wallet 2 plays One.
+
+.. code:: haskell
+
     Slot 00000: TxnValidate 9fbe753823edc9d69538ae9a03702708ccac2b9ae58b8426bcfcf99e274dd552
     Slot 00000: SlotAdd Slot 1
     Slot 00001: *** USER LOG: first move: Zero, second move: One
+
+The beginning is the same.
+
+.. code:: haskell
+    
     Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
       Contract instance started
     Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
@@ -967,6 +977,11 @@ Test 2
     Slot 00002: *** CONTRACT LOG: "made first move: Zero"
     Slot 00002: SlotAdd Slot 3
     Slot 00003: SlotAdd Slot 4
+
+Now the second wallet finds the game, and makes its move, but now the move is One.
+
+.. code:: haskell
+
     Slot 00004: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
       Receive endpoint call: Object (fromList [("tag",String "second"),("value",Object (fromList [("unEndpointValue",Object (fromList [("spChoice",String "One"),("spCurrency",Object (fromList [("unCurrencySymbol",String "ff")])),("spFirst",Object (fromList [("getPubKeyHash",String "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9")])),("spPlayDeadline",Object (fromList [("getSlot",Number 5.0)])),("spRevealDeadline",Object (fromList [("getSlot",Number 10.0)])),("spStake",Number 5000000.0),("spTokenName",Object (fromList [("unTokenName",String "STATE TOKEN")]))]))]))])
     Slot 00004: *** CONTRACT LOG: "running game found"
@@ -974,6 +989,11 @@ Test 2
     Slot 00004: TxnValidate 3200aab18d986869a7e9aa65ff45a635e0bc2dff9b04df26a0864355990f9c10
     Slot 00004: SlotAdd Slot 5
     Slot 00005: *** CONTRACT LOG: "made second move: One"
+
+Now the first wallet realizes it has lost and does nothing.
+
+.. code:: haskell
+
     Slot 00005: SlotAdd Slot 6
     Slot 00006: *** CONTRACT LOG: "second player played and won"
     Slot 00006: SlotAdd Slot 7
@@ -981,6 +1001,12 @@ Test 2
     Slot 00008: SlotAdd Slot 9
     Slot 00009: SlotAdd Slot 10
     Slot 00010: SlotAdd Slot 11
+
+The second wallet detects that the deadline has passed without a reveal, and invokes the *ClaimSecond* endpoint to get the money. When we look at the final balances,
+Wallet 1 again has the NFT back, but the Ada balance situation is reversed.
+
+.. code:: haskell
+
     Slot 00011: *** CONTRACT LOG: "first player didn't reveal"
     Slot 00011: W2: TxSubmit: a66744d7b4692db9457d9c3a5d832db7d1471299bd36ffe27827f41ec3e999f1
     Slot 00011: TxnValidate a66744d7b4692db9457d9c3a5d832db7d1471299bd36ffe27827f41ec3e999f1
