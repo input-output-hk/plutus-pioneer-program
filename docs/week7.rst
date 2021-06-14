@@ -815,5 +815,62 @@ The *test'* function uses the *runEmulatorTraceIO'* variant which allows us to s
         v :: Value
         v = Ada.lovelaceValueOf 1000_000_000
         
-We have provided a test NFT. In a real world scenario, we would need to mint a real NFT, using one of the methods we have seen before.
+As NFTs are not the focus of this lecture, we have conjured a test NFT out of thin air. In a real world scenario, we would need to mint a real NFT, using one of the methods we have seen before.
 
+Now the trace. We pass the two game choices into the *myTrace* function.
+
+.. code:: haskell
+
+    myTrace :: GameChoice -> GameChoice -> EmulatorTrace ()
+    myTrace c1 c2 = do
+        Extras.logInfo $ "first move: " ++ show c1 ++ ", second move: " ++ show c2
+    
+Then we start two instances of the contract, one for wallet 1 and one for wallet 2.
+
+.. code:: haskell
+
+        h1 <- activateContractWallet (Wallet 1) endpoints
+        h2 <- activateContractWallet (Wallet 2) endpoints
+
+We look up the two public key hashes.
+
+.. code:: haskell
+
+        let pkh1 = pubKeyHash $ walletPubKey $ Wallet 1
+            pkh2 = pubKeyHash $ walletPubKey $ Wallet 2
+    
+Then we define the parameters that we are going to use for the contracts. In reality *fpNonce* would be some random string, but here we just hardcode as "SECRETNONCE".
+
+.. code:: haskell
+
+            fp = FirstParams
+                    { fpSecond         = pkh2
+                    , fpStake          = 5000000
+                    , fpPlayDeadline   = 5
+                    , fpRevealDeadline = 10
+                    , fpNonce          = "SECRETNONCE"
+                    , fpCurrency       = gameTokenCurrency
+                    , fpTokenName      = gameTokenName
+                    , fpChoice         = c1
+                    }
+            sp = SecondParams
+                    { spFirst          = pkh1
+                    , spStake          = 5000000
+                    , spPlayDeadline   = 5
+                    , spRevealDeadline = 10
+                    , spCurrency       = gameTokenCurrency
+                    , spTokenName      = gameTokenName
+                    , spChoice         = c2
+                    }
+
+And then we call the endpoints.
+
+.. code:: haskell
+
+        callEndpoint @"first" h1 fp
+    
+        void $ Emulator.waitNSlots 3
+    
+        callEndpoint @"second" h2 sp
+    
+        void $ Emulator.waitNSlots 10
