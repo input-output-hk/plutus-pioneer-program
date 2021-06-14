@@ -1022,97 +1022,20 @@ Wallet 1 again has the NFT back, but the Ada balance situation is reversed.
     Wallet 2: 
         {, ""}: 1004999980
 
-Test 3
-......
-        
-    Slot 00000: TxnValidate 9fbe753823edc9d69538ae9a03702708ccac2b9ae58b8426bcfcf99e274dd552
-    Slot 00000: SlotAdd Slot 1
-    Slot 00001: *** USER LOG: first move: One, second move: Zero
-    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Contract instance started
-    Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
-      Contract instance started
-    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Receive endpoint call: Object (fromList [("tag",String "first"),("value",Object (fromList [("unEndpointValue",Object (fromList [("fpChoice",String "One"),("fpCurrency",Object (fromList [("unCurrencySymbol",String "ff")])),("fpNonce",String "5345435245544e4f4e4345"),("fpPlayDeadline",Object (fromList [("getSlot",Number 5.0)])),("fpRevealDeadline",Object (fromList [("getSlot",Number 10.0)])),("fpSecond",Object (fromList [("getPubKeyHash",String "39f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f")])),("fpStake",Number 5000000.0),("fpTokenName",Object (fromList [("unTokenName",String "STATE TOKEN")]))]))]))])
-    Slot 00001: W1: TxSubmit: dee963c5999a89ffd34f9f58dfb385cba915ef2c9942e31f6a38009d9a0ba148
-    Slot 00001: TxnValidate dee963c5999a89ffd34f9f58dfb385cba915ef2c9942e31f6a38009d9a0ba148
-    Slot 00001: SlotAdd Slot 2
-    Slot 00002: *** CONTRACT LOG: "made first move: One"
-    Slot 00002: SlotAdd Slot 3
-    Slot 00003: SlotAdd Slot 4
-    Slot 00004: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
-      Receive endpoint call: Object (fromList [("tag",String "second"),("value",Object (fromList [("unEndpointValue",Object (fromList [("spChoice",String "Zero"),("spCurrency",Object (fromList [("unCurrencySymbol",String "ff")])),("spFirst",Object (fromList [("getPubKeyHash",String "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9")])),("spPlayDeadline",Object (fromList [("getSlot",Number 5.0)])),("spRevealDeadline",Object (fromList [("getSlot",Number 10.0)])),("spStake",Number 5000000.0),("spTokenName",Object (fromList [("unTokenName",String "STATE TOKEN")]))]))]))])
-    Slot 00004: *** CONTRACT LOG: "running game found"
-    Slot 00004: W2: TxSubmit: 5a5494708d510e904ab22dad12f7642949f216f8634a214a81e0224fbed89f8a
-    Slot 00004: TxnValidate 5a5494708d510e904ab22dad12f7642949f216f8634a214a81e0224fbed89f8a
-    Slot 00004: SlotAdd Slot 5
-    Slot 00005: *** CONTRACT LOG: "made second move: Zero"
-    Slot 00005: SlotAdd Slot 6
-    Slot 00006: *** CONTRACT LOG: "second player played and won"
-    Slot 00006: SlotAdd Slot 7
-    Slot 00007: SlotAdd Slot 8
-    Slot 00008: SlotAdd Slot 9
-    Slot 00009: SlotAdd Slot 10
-    Slot 00010: SlotAdd Slot 11
-    Slot 00011: *** CONTRACT LOG: "first player didn't reveal"
-    Slot 00011: W2: TxSubmit: 30f96c32ea835ece6f3b2d390a679cd08f9e7614190d0bceff26bde5dfbf5760
-    Slot 00011: TxnValidate 30f96c32ea835ece6f3b2d390a679cd08f9e7614190d0bceff26bde5dfbf5760
-    Slot 00011: SlotAdd Slot 12
-    Slot 00012: *** CONTRACT LOG: "second player won"
-    Slot 00012: SlotAdd Slot 13
-    Slot 00013: SlotAdd Slot 14
-    Slot 00014: SlotAdd Slot 15
-    Final balances
-    Wallet 1: 
-        {, ""}: 994999990
-        {ff, "STATE TOKEN"}: 1
-    Wallet 2: 
-        {, ""}: 1004999980
+The remaining two cases are very similar, so we won't post the logs here.
 
-Test 4
-......
-        
-    Slot 00000: TxnValidate 9fbe753823edc9d69538ae9a03702708ccac2b9ae58b8426bcfcf99e274dd552
-    Slot 00000: SlotAdd Slot 1
-    Slot 00001: *** USER LOG: first move: One, second move: One
-    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Contract instance started
-    Slot 00001: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
-      Contract instance started
-    Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
-      Receive endpoint call: Object (fromList [("tag",String "first"),("value",Object (fromList [("unEndpointValue",Object (fromList [("fpChoice",String "One"),("fpCurrency",Object (fromList [("unCurrencySymbol",String "ff")])),("fpNonce",String "5345435245544e4f4e4345"),("fpPlayDeadline",Object (fromList [("getSlot",Number 5.0)])),("fpRevealDeadline",Object (fromList [("getSlot",Number 10.0)])),("fpSecond",Object (fromList [("getPubKeyHash",String "39f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f")])),("fpStake",Number 5000000.0),("fpTokenName",Object (fromList [("unTokenName",String "STATE TOKEN")]))]))]))])
-    Slot 00001: W1: TxSubmit: dee963c5999a89ffd34f9f58dfb385cba915ef2c9942e31f6a38009d9a0ba148
-    Slot 00001: TxnValidate dee963c5999a89ffd34f9f58dfb385cba915ef2c9942e31f6a38009d9a0ba148
-    Slot 00001: SlotAdd Slot 2
-    Slot 00002: *** CONTRACT LOG: "made first move: One"
-    Slot 00002: SlotAdd Slot 3
-    Slot 00003: SlotAdd Slot 4
-    Slot 00004: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 2}:
-      Receive endpoint call: Object (fromList [("tag",String "second"),("value",Object (fromList [("unEndpointValue",Object (fromList [("spChoice",String "One"),("spCurrency",Object (fromList [("unCurrencySymbol",String "ff")])),("spFirst",Object (fromList [("getPubKeyHash",String "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9")])),("spPlayDeadline",Object (fromList [("getSlot",Number 5.0)])),("spRevealDeadline",Object (fromList [("getSlot",Number 10.0)])),("spStake",Number 5000000.0),("spTokenName",Object (fromList [("unTokenName",String "STATE TOKEN")]))]))]))])
-    Slot 00004: *** CONTRACT LOG: "running game found"
-    Slot 00004: W2: TxSubmit: ba0644893c396e26fb027edbf585e8b04addc69cb115e4a1a8f7769a37c901c5
-    Slot 00004: TxnValidate ba0644893c396e26fb027edbf585e8b04addc69cb115e4a1a8f7769a37c901c5
-    Slot 00004: SlotAdd Slot 5
-    Slot 00005: *** CONTRACT LOG: "made second move: One"
-    Slot 00005: SlotAdd Slot 6
-    Slot 00006: *** CONTRACT LOG: "second player played and lost"
-    Slot 00006: W1: TxSubmit: 912ee19dc21180f67133d63598ca35a00011e41f8731fe8f791f726d4d1cc0f1
-    Slot 00006: TxnValidate 912ee19dc21180f67133d63598ca35a00011e41f8731fe8f791f726d4d1cc0f1
-    Slot 00006: SlotAdd Slot 7
-    Slot 00007: *** CONTRACT LOG: "victory"
-    Slot 00007: SlotAdd Slot 8
-    Slot 00008: SlotAdd Slot 9
-    Slot 00009: SlotAdd Slot 10
-    Slot 00010: SlotAdd Slot 11
-    Slot 00011: *** CONTRACT LOG: "first player won"
-    Slot 00011: SlotAdd Slot 12
-    Slot 00012: SlotAdd Slot 13
-    Slot 00013: SlotAdd Slot 14
-    Slot 00014: SlotAdd Slot 15
-    Final balances
-    Wallet 1: 
-        {, ""}: 1004999980
-        {ff, "STATE TOKEN"}: 1
-    Wallet 2: 
-        {, ""}: 994999990
-    
+So, this all seems to work as expected.
+
+Code Example 2
+~~~~~~~~~~~~~~
+
+Now we will rewrite this code using state machines.
+
+A state machine has nothing in particular to do with blockchain. It is a system that starts with some sort of state, there are one or more transitions to other states,
+and from those states there are further transitions, and so on, like a directed graph. Some states can be *final* states, from which there can be no further
+transitions.
+
+.. figure:: img/week07__00014.png
+
+
+
