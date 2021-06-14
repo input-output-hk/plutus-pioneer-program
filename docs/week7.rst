@@ -113,7 +113,7 @@ not responded, Bob will be able to claim the funds.
 
 .. figure:: img/week07__00013.png
 
-There is a scenario. Perhaps, after Alice starts playing, Bob simply isn't interested. In this case, there must be a way for Alice to get her own money back.
+There is a another scenario. Perhaps, after Alice starts playing, Bob simply isn't interested. In this case, there must be a way for Alice to get her own money back.
 
 .. figure:: img/week07__00016.png
 
@@ -1031,11 +1031,25 @@ Code Example 2
 
 Now we will rewrite this code using state machines.
 
+What is a state machine?
+++++++++++++++++++++++++
+
 A state machine has nothing in particular to do with blockchain. It is a system that starts with some sort of state, there are one or more transitions to other states,
 and from those states there are further transitions, and so on, like a directed graph. Some states can be *final* states, from which there can be no further
 transitions.
 
 .. figure:: img/week07__00014.png
 
+If we look again at how our games works, then we can consider it to be a state machine.
 
+.. figure:: img/week07__00016.png
 
+The initial state would be [Hash], where the first player has made the move.
+
+From the initial state, there are two possible transitions. One where Bob plays, and the other where Bob does not player and Alice can reclaim.
+
+In the diagram, all the nodes correspond to states, and all the arrows correspond to transitions.
+
+In the blockchain, the state machine will be represented by a UTxO sitting at the state machine address. The state of the machine will be the datum of that UTxO.
+A transition will be a transaction that consumes the current state, using a redeemer that characterizes the transition, and then produces a new UTxO at the same 
+address, where the datum now reflects the new state.
