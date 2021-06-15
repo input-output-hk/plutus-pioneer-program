@@ -1076,7 +1076,7 @@ If it is allowed, we return a tuple.
 The second component of the tuple is the new state (the new datum and value), which is the new UTxO sitting at the same address, with the 
 first UTxO having been consumed.
 
-The first component of the tuple specifies additional constraints that the transaction that does this must satisify. Until now, we have only seen constraints in off-chain 
+The first component of the tuple specifies additional constraints that the transaction that does this must satisfy. Until now, we have only seen constraints in off-chain 
 code.
 
 We then have a function *setFinal* which is predicated on the state which tells us whether it is a final state or not. Final states are special in that the resulting 
@@ -1089,9 +1089,35 @@ Finally, *smThreadToken* allows us to identify the UTxO which represents the cur
 of the state machine. It uses the same trick that we have seen before of using an NFT sitting in the value of the correct UTxO. You could, however, always return *Nothing* 
 from *smThreadToken* and use some other mechanism to identify the correct UTxO.
 
+The same game from example 1 has been implemented using a state machine, in the following module.
 
+.. code:: haskell
 
+    module Week07.StateMachine
 
+The first parts of the code are the same - we have the same *Game* type and the same *GameChoice*. The first change we notice is with *GameDatum*.
+
+We have added a second constructor to *GameDatum* called *Finished*. This will represent the final state of the state machine. It won't correspond to a UTxO, but we 
+need it for the state machine mechanism to work.
+
+.. code:: haskell
+
+    data GameDatum = GameDatum ByteString (Maybe GameChoice) | Finished
+    deriving Show
+
+And this adds a little more complexity to the definition of equality.
+
+.. code:: haskell
+
+    instance Eq GameDatum where
+    {-# INLINABLE (==) #-}
+    GameDatum bs mc == GameDatum bs' mc' = (bs == bs') && (mc == mc')
+    Finished        == Finished          = True
+    _               == _                 = False
+
+The redeemer is exactly the same as before. The *lovelaces* and *gameDatum* helper functions are also exactly the same as before.
+
+    
 
 
 
