@@ -1299,4 +1299,33 @@ All other states with arbitrary transitions are invalid, and we indicate that by
 
     _ -> Nothing
 
+In the end we see that while the conditions themselves may not be much shorter in the new version than those in the old version, we also see that we only need one helper 
+function.
+
+.. code:: haskell
+
+    token :: Value
+    token = assetClassValue (gToken game) 1
+    
+But we are not yet finished defining the state machine. There are some other fields in the *StateMachine* record.
+
+One is *final*, which lets us define what the final states are. For us, it is just the *Finished* state.
+
+.. code:: haskell
+
+    final :: GameDatum -> Bool
+    final Finished = True
+    final _        = False
+
+Another field to define is *check*. Recall that this is where we can put conditions that cannot be expressed as *Constraint*\s. So this is where we can put our nonce check.
+
+.. code:: haskell
+
+    check :: ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
+    check bsZero' bsOne' (GameDatum bs (Just c)) (Reveal nonce) _ =
+        sha2_256 (nonce `concatenate` if c == Zero then bsZero' else bsOne') == bs
+    check _       _      _                       _              _ = True
+    
+    
+    
     
