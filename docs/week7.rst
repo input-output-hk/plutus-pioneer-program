@@ -1247,8 +1247,56 @@ We can also match up the deadline check from each code sample, with it being def
 In the old code, when the game was over, we returned the NFT to the first player. In the new code, we also make sure the NFT goes back to the first player, but 
 we also specify the *Finished* state and say that there is no money left in the contract using *mempty*.
 
+Now we compare the old and the new code for the third case where the first player reclaims their stake when the second player does not play by the deadline.
 
+.. code:: haskell
 
+    -- old version
+    (GameDatum _ Nothing, ClaimFirst) ->
+        traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+        traceIfFalse "too early"                     (from (1 + gPlayDeadline game) `contains` txInfoValidRange info)   &&
+        traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+        traceIfFalse "NFT must go to first player"   nftToFirst    
 
+.. code:: haskell
 
+    -- new version
 
+    (v, GameDatum _ Nothing, ClaimFirst)
+    | lovelaces v == gStake game         -> Just ( Constraints.mustBeSignedBy (gFirst game)                     <>
+                                                   Constraints.mustValidateIn (from $ 1 + gPlayDeadline game)   <>
+                                                   Constraints.mustPayToPubKey (gFirst game) token
+                                                 , State Finished mempty
+                                                 )
+
+These two match up fairly easily, with the lovelaces being the condition on the left in the new code, and the remaining conditions on the right in the new code matching up with 
+corresponding conditions in the old code. Again we add the *Finished* state in the new code.
+
+The last case, where the second player has played and the first player does not reveal by the deadline, probably because they lost.
+
+.. code:: haskell
+
+    (GameDatum _ (Just _), ClaimSecond) ->
+        traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+        traceIfFalse "too early"                     (from (1 + gRevealDeadline game) `contains` txInfoValidRange info) &&
+        traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+        traceIfFalse "NFT must go to first player"   nftToFirst
+
+.. code:: haskell
+
+        (v, GameDatum _ (Just _), ClaimSecond)
+            | lovelaces v == (2 * gStake game)   -> Just ( Constraints.mustBeSignedBy (gSecond game)                    <>
+                                                           Constraints.mustValidateIn (from $ 1 + gRevealDeadline game) <>
+                                                           Constraints.mustPayToPubKey (gFirst game) token
+                                                         , State Finished mempty
+                                                         )
+
+The conditions in the old and the new code for this last case can be matched up in a very similar way to those for the third case.
+
+All other states with arbitrary transitions are invalid, and we indicate that by returning *Nothing*.
+
+.. code:: haskell
+
+    _ -> Nothing
+
+    
