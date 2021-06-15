@@ -1053,3 +1053,46 @@ In the diagram, all the nodes correspond to states, and all the arrows correspon
 In the blockchain, the state machine will be represented by a UTxO sitting at the state machine address. The state of the machine will be the datum of that UTxO.
 A transition will be a transaction that consumes the current state, using a redeemer that characterizes the transition, and then produces a new UTxO at the same 
 address, where the datum now reflects the new state.
+
+This pattern fits a lot of situations very nicely, and there is special support in the Plutus libraries to implement such state machines. We will see that when we use 
+this approach, our code will be much shorter.
+
+The support for state machines is in the package *plutus-contract*, in module `Language.Plutus.Contract.StateMachine <https://playground.plutus.iohkdev.io/tutorial/haddock/plutus-contract/html/Language-Plutus-Contract-StateMachine.html>`__
+
+A StateMachine has two type parameters, *s* and *i*, which stand for state and input. These correspond to datum and redeemer, respectively.
+
+.. figure:: img/week07__00017.png
+
+It is a record type with four fields. Probably the most important one is *smTransition*, which defines which transitions can move which states which other states.
+
+The *State s* type is basically the datum. It consists of the state itself and a value. Remember that the state of the state machine is represented by a UTxO, which has 
+a datum and a value.
+
+.. figure:: img/week07__00018.png
+
+Given the state type *s*, and a transaction that tries to consume this UTxO with a redeemer *i*, we can indicate that this transition is not allowed by returning *Nothing*.
+If it is allowed, we return a tuple. 
+
+The second component of the tuple is the new state (the new datum and value), which is the new UTxO sitting at the same address, with the 
+first UTxO having been consumed.
+
+The first component of the tuple specifies additional constraints that the transaction that does this must satisify. Until now, we have only seen constraints in off-chain 
+code.
+
+We then have a function *setFinal* which is predicated on the state which tells us whether it is a final state or not. Final states are special in that the resulting 
+*State* from the *setTransition* function must have no value attached to it, and the output does not get produced. The machine ends there.
+
+The function *smCheck* is very similar to the *setTransition* function. It gets the datum, the redeemer and the context and returns a bool. 
+It provides additional checks that can't be expressed by the *TxConstraints* in *setTransition*.
+
+Finally, *smThreadToken* allows us to identify the UTxO which represents the current state. This is in the even that there us more than one UTxO sitting at the address
+of the state machine. It uses the same trick that we have seen before of using an NFT sitting in the value of the correct UTxO. You could, however, always return *Nothing* 
+from *smThreadToken* and use some other mechanism to identify the correct UTxO.
+
+
+
+
+
+
+
+
