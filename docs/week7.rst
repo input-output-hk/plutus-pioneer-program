@@ -96,7 +96,7 @@ This works very nicely and this is what we will try to implement in Cardano. Fir
 state machines, the code can be much clearer and much shorter.
 
 Code Example 1
-~~~~~~~~~~~~~~
+--------------
 
 We can imagine that, at the start of the game, Alice and Bob have put down the same amount of money each and that the winner will take it all.
 
@@ -130,7 +130,7 @@ We call the game *EvenOdd* due to the fact that if the sum of the numbers is eve
 In our code we will call the players *first* and *second* rather than Alice and Bob.
 
 On chain
-++++++++
+~~~~~~~~
 
 We define a data type *Game* which will be used as a parameter for the contract.
 
@@ -487,7 +487,7 @@ The logic is that if it finds an element that satisfies the predicate, it will r
     Nothing
 
 The *firstGame* contract
-________________________
+++++++++++++++++++++++++
     
 We have two contracts, one for each of the players.
 
@@ -618,7 +618,7 @@ If the second player moved and won, there is nothing for use to do.
                 _ -> logInfo @String "second player played and won"
 
 The *secondGame* contract
-_________________________
++++++++++++++++++++++++++
 
 The params for the second player are similar to those of the first player. This time we don't need the second player's public key hash, because that is ours, and we already 
 know what it is. Instead we need the first player's public key hash. Also, we don't need the nonce.
@@ -788,7 +788,7 @@ So this concludes the first version of the game - the version that does not use 
 Now, let's test it using the *EmulatorTrace* monad.
 
 Testing
-_______
++++++++
 
 The *test* function tests each of the four combinations by calling the *test'* function which takes the first and second players' choices respectively.        
 
@@ -884,7 +884,7 @@ Now, we can run this test from the REPL.
     Prelude Week07.Test> test
 
 Test 1
-......
+______
 
 The first scenario is that both play zero, so the first wallet should win.
 
@@ -951,7 +951,7 @@ almost 5 ada more than it started with. The difference is, of course, due to tra
         {, ""}: 994999990
 
 Test 2
-......
+______
 
 In the second case, Wallet 1 again plays Zero, but this time Wallet 2 plays One.
 
@@ -1027,12 +1027,12 @@ The remaining two cases are very similar, so we won't post the logs here.
 So, this all seems to work as expected.
 
 Code Example 2
-~~~~~~~~~~~~~~
+--------------
 
 Now we will rewrite this code using state machines.
 
 What is a state machine?
-++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 A state machine has nothing in particular to do with blockchain. It is a system that starts with some sort of state, there are one or more transitions to other states,
 and from those states there are further transitions, and so on, like a directed graph. Some states can be *final* states, from which there can be no further
@@ -1601,6 +1601,14 @@ and that is just that instead of importing *Week07.EvenOdd*, it imports *Week07.
 have written a script that was parameterized over the contract we want to use.
 
 If you load *Week07.TestStateMachine* in the REPL and run *test*, you should get exactly the same results as before.
+
+Conclusion
+----------
+
+State machines are not always appropriate, but when they are, you should definitely use them. They dramatically reduce the amount of code you have to write, and also 
+reduce sources of errors. 
+
+The state machine mechanism automatically ensures that you have on-chain and off-chain code that are working correctly together. Until now, we have always had to take care of that ourselves.
 
 
 
