@@ -1127,5 +1127,70 @@ business logic.
 The *transition* function takes the *Game*, then a *State GameDatum*, which, as we saw in the definition of *StateMachine*, is a pair consisting of the datum and the value.
 Thirdly, it takes the redeemer, and then returns a *Maybe* of the new state and constraints on the transaction.
 
+Let's compare the *transition* function of the state machine with the *mkGameValidator* function from our first game version.
 
+.. code:: haskell
 
+    transition :: Game -> State GameDatum -> GameRedeemer -> Maybe (TxConstraints Void Void, State GameDatum)
+    transition game s r = case (stateValue s, stateData s, r) of
+        (v, GameDatum bs Nothing, Play c)
+            | lovelaces v == gStake game         -> Just ( Constraints.mustBeSignedBy (gSecond game)                    <>
+                                                           Constraints.mustValidateIn (to $ gPlayDeadline game)
+                                                         , State (GameDatum bs $ Just c) (lovelaceValueOf $ 2 * gStake game)
+                                                         )
+        (v, GameDatum _ (Just _), Reveal _)
+            | lovelaces v == (2 * gStake game)   -> Just ( Constraints.mustBeSignedBy (gFirst game)                     <>
+                                                           Constraints.mustValidateIn (to $ gRevealDeadline game)       <>
+                                                           Constraints.mustPayToPubKey (gFirst game) token
+                                                         , State Finished mempty
+                                                         )
+        (v, GameDatum _ Nothing, ClaimFirst)
+            | lovelaces v == gStake game         -> Just ( Constraints.mustBeSignedBy (gFirst game)                     <>
+                                                           Constraints.mustValidateIn (from $ 1 + gPlayDeadline game)   <>
+                                                           Constraints.mustPayToPubKey (gFirst game) token
+                                                         , State Finished mempty
+                                                         )
+        (v, GameDatum _ (Just _), ClaimSecond)
+            | lovelaces v == (2 * gStake game)   -> Just ( Constraints.mustBeSignedBy (gSecond game)                    <>
+                                                           Constraints.mustValidateIn (from $ 1 + gRevealDeadline game) <>
+                                                           Constraints.mustPayToPubKey (gFirst game) token
+                                                         , State Finished mempty
+                                                         )
+        _                                        -> Nothing
+      where
+        token :: Value
+        token = assetClassValue (gToken game) 1
+        
+The first thing to notice is that, in the *transition* function we do not need to do our initial check for the presence of the NFT. This is because the state machine 
+takes care of that, so long as we set the last field of the *StateMachine* to some NFT asset class.
+
+.. code:: haskell
+
+    -- we no longer need something like this for our state machine version
+    traceIfFalse "token missing from input" (assetClassValueOf (txOutValue ownInput) (gToken game) == 1) &&
+
+Let's remind ourselves how we defined the first case where the first player had moved, the second player had not yet moved, and now the second player wants to make a move.
+We had six conditions.
+
+.. code:: haskell
+
+    (GameDatum bs Nothing, Play c) ->
+        traceIfFalse "not signed by second player"   (txSignedBy info (gSecond game))                                   &&
+        traceIfFalse "first player's stake missing"  (lovelaces (txOutValue ownInput) == gStake game)                   &&
+        traceIfFalse "second player's stake missing" (lovelaces (txOutValue ownOutput) == (2 * gStake game))            &&
+        traceIfFalse "wrong output datum"            (outputDatum == GameDatum bs (Just c))                             &&
+        traceIfFalse "missed deadline"               (to (gPlayDeadline game) `contains` txInfoValidRange info)         &&
+        traceIfFalse "token missing from output"     (assetClassValueOf (txOutValue ownOutput) (gToken game) == 1)    
+
+Let's see how these conditions are reflected in the state machine version.
+
+.. code:: haskell
+
+    transition game s r = case (stateValue s, stateData s, r) of
+        (v, GameDatum bs Nothing, Play c)
+            | lovelaces v == gStake game -> Just ( Constraints.mustBeSignedBy (gSecond game)                    <>
+                                                   Constraints.mustValidateIn (to $ gPlayDeadline game)
+                                                 , State (GameDatum bs $ Just c) (lovelaceValueOf $ 2 * gStake game)
+                                                 )    
+
+                                                 
