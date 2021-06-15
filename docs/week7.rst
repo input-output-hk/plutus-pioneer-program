@@ -1193,4 +1193,26 @@ Let's see how these conditions are reflected in the state machine version.
                                                  , State (GameDatum bs $ Just c) (lovelaceValueOf $ 2 * gStake game)
                                                  )    
 
-                                                 
+We can access the value and datum components of our *State* parameter using *stateValue* and *stateData*, which gives us the triple for our *case* statement of 
+value, datum and redeemer.
+
+Our matching case is now
+
+.. code:: haskell
+
+    (v, GameDatum bs Nothing, Play c)
+
+First we check that the number of lovelaces in the value matches the stake of the game, which was our second condition in our code for this case from example 1. If this
+condition is satisfied, we return a *Just* pair. The first component of the pair is the constraints on the transaction (formulated from the *Constraints* module that we know from off-chain code). The 
+two constraints that comprise this part of the pair correspond to the first and fifth conditions in our old code.
+
+The second component of the pair is the new state - the resulting UTxO - which again is given by datum and value. So here we are specifying that the datum of the new 
+UTxO will contain both players' choices, and the value of the UTxO will contain both players' stakes. We leave the NFT out of this condition, even though it will be
+present in the UTxO, and that is again because the state machine implicitly takes care of this for us.
+
+This second component corresponds with the third and fourth conditions from our old code.
+
+The sixth condition from our old code related to the NFT which, as we have seen, we do not need to worry about.
+
+
+
