@@ -1235,3 +1235,20 @@ Now let's compare the code from the second interesting case, where the second pl
                                                    Constraints.mustPayToPubKey (gFirst game) token
                                                  , State Finished mempty
                                                  )    
+
+Again, we see that the first thing we do is to check that the correct stake exists, and if it does, we again return a *Just*. So, this takes care of
+condition four from the old code. Condition one from the old code is taken care of by the *Constraints.mustBeSignedBy* constraint in the new code.
+
+Note that we do not check the nonce in the new code. The reason for this is that this check cannot be expressed in terms of a constraint. And this is exactly what 
+the *smCheck* function is for, and we will see how this is used for this in a moment.
+
+We can also match up the deadline check from each code sample, with it being defined using *Constraints.mustValidateIn* in the new code.
+
+In the old code, when the game was over, we returned the NFT to the first player. In the new code, we also make sure the NFT goes back to the first player, but 
+we also specify the *Finished* state and say that there is no money left in the contract using *mempty*.
+
+
+
+
+
+
