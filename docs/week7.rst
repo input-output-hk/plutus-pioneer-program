@@ -1420,8 +1420,183 @@ type into a *Text* type. Recall that *show* will return a *String* and *pack* wi
     mapError' :: Contract w s SMContractError a -> Contract w s Text a
     mapError' = mapError $ pack . show
     
+So now the first player contract becomes much shorter and more compact.
+
+The beginning is the same.
+
+.. code:: haskell
+
+    firstGame :: forall w s. HasBlockchainActions s => FirstParams -> Contract w s Text ()
+    firstGame fp = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let game   = Game
+                { gFirst          = pkh
+                , gSecond         = fpSecond fp
+                , gStake          = fpStake fp
+                , gPlayDeadline   = fpPlayDeadline fp
+                , gRevealDeadline = fpRevealDeadline fp
+                , gToken          = AssetClass (fpCurrency fp, fpTokenName fp)
+                }
+
+Now, we take the client along with some values that we get as before.
+
+.. code:: haskell
+
+            client = gameClient game
+            v      = lovelaceValueOf (fpStake fp)
+            c      = fpChoice fp
+            bs     = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+
+There is a function *runIntialise* that starts a state machine and creates a UTxO at the state machine address. It takes the client as its first argument and then 
+it needs the initial datum and the initial value for the UTxO sitting at that address. And it will automatically put the NFT there as well.
+
+.. code:: Haskell
+
+        void $ mapError' $ runInitialise client (GameDatum bs Nothing) v
+        logInfo @String $ "made first move: " ++ show (fpChoice fp)
     
+Now, the state machine is setup and the first player has made their move.
+
+We wait until the play deadline.
+
+.. code:: haskell
+
+        void $ awaitSlot $ 1 + fpPlayDeadline fp
+
+In our first example, we defined a helper function *findGameOutput* to get the current *UTxO*, but this can now be done in a simpler way using *getOnChainState*.
+
+.. figure:: img/week07__00021.png
+
+The function *getOnChainState* will return a *Just OnChainState* if it finds the state machine, or a *Nothing* if it does not find it.
+
+.. figure:: img/week07__00022.png
+
+So what is *OnChainState*? It is a tuple consisting of *TypedScriptTxOut* and *TypedScriptTxOutRef*. This is similar to what *utxoAt* gives us, which was a map of
+*TxOutRefs*\s to *TxOuts*\s. This is similar in that it is a output and its reference, but it is this *Typed* version that we haven't seen before.
+
+All that does is bundle what we know from before, *TxOut*, but additionally it provides the datum. You'll recall that in our off-chain code we always have to scramble
+and write helper functions to access the datum once we had found the UTxO. We had to look up the datum hash, which could fail, and so on. *TypedScriptTxOut* hides all 
+this from us.
+
+.. figure:: img/week07__00023.png
+
+.. code:: haskell
+
+        m <- mapError' $ getOnChainState client
+
+As before, we should never get *Nothing* for *m*.
+
+        case m of
+            Nothing             -> throwError "game output not found"
+
+Now, we are only interested in the *TypedScriptTxOut* parameter, which we assign to *o*, and use it to lookup the datum using *tyTxOutData*.
+
+.. code:: haskell
     
+            Just ((o, _), _) -> case tyTxOutData o of
+    
+As before we have the two cases. Either the second player has moved, or they haven't moved.
+
+If they haven't moved, we must reclaim. Earlier we had lots of code to setup the lookups and constraints that we needed. How we only need one line, and the important 
+function here is *runStep*, which creates and submits a transaction that will transition the state machine.
+
+It takes as input the client and the redeemer. It then returns a *TransitionResult*, which we are not using in this example, but basically encodes whether it succeeded
+or failed.
+
+.. figure:: img/week07__00024.png
+
+Which means, that we can use *runStep* with just the client and redeemer to replace all the lookups, the constraints, the transaction submissions and the waiting.
+
+The way it works it that the *transition* function is that all the necessary constraints have been defined as part of the state machine.
+
+.. code:: haskell
+    
+                GameDatum _ Nothing -> do
+                    logInfo @String "second player did not play"
+                    void $ mapError' $ runStep client ClaimFirst
+                    logInfo @String "first player reclaimed stake"
+    
+The second case is that the first player did reveal, and we again use the *runStep* function to transition the state machine.
+
+.. code:: haskell
+
+                GameDatum _ (Just c') | c' == c -> do
+                    logInfo @String "second player played and lost"
+                    void $ mapError' $ runStep client $ Reveal $ fpNonce fp
+                    logInfo @String "first player revealed and won"
+    
+And in all other situations, the second player wins.
+
+.. code:: haskell
+    
+                _ -> logInfo @String "second player played and won"
+                
+The second player's contract is very similar, and just as simple.
+
+.. code:: haskell
+
+    secondGame :: forall w s. HasBlockchainActions s => SecondParams -> Contract w s Text ()
+    secondGame sp = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let game   = Game
+                { gFirst          = spFirst sp
+                , gSecond         = pkh
+                , gStake          = spStake sp
+                , gPlayDeadline   = spPlayDeadline sp
+                , gRevealDeadline = spRevealDeadline sp
+                , gToken          = AssetClass (spCurrency sp, spTokenName sp)
+                }
+            client = gameClient game
+        m <- mapError' $ getOnChainState client
+        case m of
+            Nothing          -> logInfo @String "no running game found"
+            Just ((o, _), _) -> case tyTxOutData o of
+
+The only case we need to address is where we haven't played yet, and so should play. And, in order to play, we again use the *runStep* function.
+
+.. code:: haskell
+
+                    GameDatum _ Nothing -> do
+                        logInfo @String "running game found"
+                        void $ mapError' $ runStep client $ Play $ spChoice sp
+                        logInfo @String $ "made second move: " ++ show (spChoice sp)
+        
+We then wait until the reveal deadline has passed, then get the new state.
+
+.. code:: haskell
+
+                        void $ awaitSlot $ 1 + spRevealDeadline sp
+                        m' <- mapError' $ getOnChainState client
+                        case m' of
+
+If there is no state, the first player has won and claimed their winnings.
+
+.. code:: haskell
+
+                        Nothing -> logInfo @String "first player won"
+
+Otherwise, we have won, and we claim our winnings using the *runStep* function, giving the *ClaimSecond* redeemer.
+
+.. code:: haskell
+
+                            Just _  -> do
+                                logInfo @String "first player didn't reveal"
+                                void $ mapError' $ runStep client ClaimSecond
+                                logInfo @String "second player won"
+        
+And a final catch all.
+
+.. code:: haskell
+    
+                    _ -> throwError "unexpected datum"
+
+That concludes the state machine version of the code.
+
+What is particularly nice about this approach is that we don't need to replicate logic anymore. We have discussed how off-chain code is used for construction and 
+on-chain code is used for checking. When we use the state machine approach, we define logic that can be used for both, so we do not need to write it explicitly for the 
+off-chain part and the on-chain part of the code.
+
+
 
 
 
