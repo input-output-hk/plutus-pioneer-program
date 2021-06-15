@@ -1596,6 +1596,16 @@ What is particularly nice about this approach is that we don't need to replicate
 on-chain code is used for checking. When we use the state machine approach, we define logic that can be used for both, so we do not need to write it explicitly for the 
 off-chain part and the on-chain part of the code.
 
+In order to test this, there is a module called *Week07.TestStateMachine* in the example code. It is exactly the same as the test for the old code, with one exception,
+and that is just that instead of importing *Week07.EvenOdd*, it imports *Week07.StateMachine*. This is a quick and dirty way of doing things - we could, of course, 
+have written a script that was parameterized over the contract we want to use.
+
+If you load *Week07.TestStateMachine* in the REPL and run *test*, you should get exactly the same results as before.
+
+
+
+
+
 
 
 
