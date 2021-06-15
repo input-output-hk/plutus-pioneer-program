@@ -1214,5 +1214,24 @@ This second component corresponds with the third and fourth conditions from our 
 
 The sixth condition from our old code related to the NFT which, as we have seen, we do not need to worry about.
 
+Now let's compare the code from the second interesting case, where the second player has played and the first player sees that they have won.
 
+.. code:: haskell
 
+    -- old version
+    (GameDatum bs (Just c), Reveal nonce) ->
+        traceIfFalse "not signed by first player"    (txSignedBy info (gFirst game))                                    &&
+        traceIfFalse "commit mismatch"               (checkNonce bs nonce c)                                            &&
+        traceIfFalse "missed deadline"               (to (gRevealDeadline game) `contains` txInfoValidRange info)       &&
+        traceIfFalse "wrong stake"                   (lovelaces (txOutValue ownInput) == (2 * gStake game))             &&
+        traceIfFalse "NFT must go to first player"   nftToFirst    
+
+.. code:: haskell
+
+    -- new version
+    (v, GameDatum _ (Just _), Reveal _)
+    | lovelaces v == (2 * gStake game)   -> Just ( Constraints.mustBeSignedBy (gFirst game)                     <>
+                                                   Constraints.mustValidateIn (to $ gRevealDeadline game)       <>
+                                                   Constraints.mustPayToPubKey (gFirst game) token
+                                                 , State Finished mempty
+                                                 )    
