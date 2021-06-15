@@ -1309,7 +1309,7 @@ function.
     
 But we are not yet finished defining the state machine. There are some other fields in the *StateMachine* record.
 
-One is *final*, which lets us define what the final states are. For us, it is just the *Finished* state.
+One is *smFinal*, which lets us define what the final states are. For us, it is just the *Finished* state. We define a helper function that we can use for this field.
 
 .. code:: haskell
 
@@ -1317,15 +1317,40 @@ One is *final*, which lets us define what the final states are. For us, it is ju
     final Finished = True
     final _        = False
 
-Another field to define is *check*. Recall that this is where we can put conditions that cannot be expressed as *Constraint*\s. So this is where we can put our nonce check.
+Another field to define is *smCheck*. Recall that this is where we can put conditions that cannot be expressed as *Constraint*\s. So this is where we can put our nonce check.
+
+We define another helper function *check*, with two auxiliary *ByteString* parameters to represent the zero and one choices, for reasons that we have seen before. We also 
+pass it the datum, redeemer and context, and it will return us a boolean.
+
+We don't need the script context, but we need the datum to get the second player's choice (which the first player is claiming is the same as theirs), and the redeemer 
+to get the nonce that the first player is claiming to have used. We can then check that the hash of the choice and the nonce match the original hash from the datum.
 
 .. code:: haskell
 
     check :: ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
     check bsZero' bsOne' (GameDatum bs (Just c)) (Reveal nonce) _ =
         sha2_256 (nonce `concatenate` if c == Zero then bsZero' else bsOne') == bs
-    check _       _      _                       _              _ = True
+
+In all other situations, those that are not checking the revealed nonce, we don't need to perform any checks.
+
+.. code:: haskell
+
+    check _ _ _ _ _ = True
     
-    
+Now we can define our state machine.
+
+.. code:: haskell
+
+    gameStateMachine :: Game -> ByteString -> ByteString -> StateMachine GameDatum GameRedeemer
+    gameStateMachine game bsZero' bsOne' = StateMachine
+        { smTransition  = transition game
+        , smFinal       = final
+        , smCheck       = check bsZero' bsOne'
+        , smThreadToken = Just $ gToken game
+        }
+        
+        
+
+
     
     
