@@ -1068,7 +1068,7 @@ It is a record type with four fields. Probably the most important one is *smTran
 The *State s* type is basically the datum. It consists of the state itself and a value. Remember that the state of the state machine is represented by a UTxO, which has 
 a datum and a value.
 
-.. figure:: img/week07__00018.png
+.. figure:: img/week07__00019.png
 
 Given the state type *s*, and a transaction that tries to consume this UTxO with a redeemer *i*, we can indicate that this transition is not allowed by returning *Nothing*.
 If it is allowed, we return a tuple. 
@@ -1117,8 +1117,15 @@ And this adds a little more complexity to the definition of equality.
 
 The redeemer is exactly the same as before. The *lovelaces* and *gameDatum* helper functions are also exactly the same as before.
 
-    
+Now we get to the *transition* function, which sort of corresponds to the *mkGameValidator* function that we used in the previous example. It is basically the core 
+business logic.
 
+.. code:: haskell
+
+    transition :: Game -> State GameDatum -> GameRedeemer -> Maybe (TxConstraints Void Void, State GameDatum)
+
+The *transition* function takes the *Game*, then a *State GameDatum*, which, as we saw in the definition of *StateMachine*, is a pair consisting of the datum and the value.
+Thirdly, it takes the redeemer, and then returns a *Maybe* of the new state and constraints on the transaction.
 
 
 

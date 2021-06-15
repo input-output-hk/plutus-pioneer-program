@@ -1003,7 +1003,52 @@ A transition will be a transaction that consumes the current state, using a rede
 address, where the datum now reflects the new state.</p>
 <p>This pattern fits a lot of situations very nicely, and there is special support in the Plutus libraries to implement such state machines. We will see that when we use
 this approach, our code will be much shorter.</p>
-<p>The support for state machines is in the package <a class="reference external" href="https://playground.plutus.iohkdev.io/tutorial/haddock/plutus-contract/html/Language-Plutus-Contract-StateMachine.html">plutus-contract, in module Language.Plutus.Contract.StateMachine</a></p>
+<p>The support for state machines is in the package <em>plutus-contract</em>, in module <a class="reference external" href="https://playground.plutus.iohkdev.io/tutorial/haddock/plutus-contract/html/Language-Plutus-Contract-StateMachine.html">Language.Plutus.Contract.StateMachine</a></p>
+<p>A StateMachine has two type parameters, <em>s</em> and <em>i</em>, which stand for state and input. These correspond to datum and redeemer, respectively.</p>
+<div class="figure align-default">
+<img alt="_images/week07__00017.png" src="_images/week07__00017.png" />
+</div>
+<p>It is a record type with four fields. Probably the most important one is <em>smTransition</em>, which defines which transitions can move which states which other states.</p>
+<p>The <em>State s</em> type is basically the datum. It consists of the state itself and a value. Remember that the state of the state machine is represented by a UTxO, which has
+a datum and a value.</p>
+<div class="figure align-default">
+<img alt="_images/week07__00018.png" src="_images/week07__00018.png" />
+</div>
+<p>Given the state type <em>s</em>, and a transaction that tries to consume this UTxO with a redeemer <em>i</em>, we can indicate that this transition is not allowed by returning <em>Nothing</em>.
+If it is allowed, we return a tuple.</p>
+<p>The second component of the tuple is the new state (the new datum and value), which is the new UTxO sitting at the same address, with the
+first UTxO having been consumed.</p>
+<p>The first component of the tuple specifies additional constraints that the transaction that does this must satisfy. Until now, we have only seen constraints in off-chain
+code.</p>
+<p>We then have a function <em>setFinal</em> which is predicated on the state which tells us whether it is a final state or not. Final states are special in that the resulting
+<em>State</em> from the <em>setTransition</em> function must have no value attached to it, and the output does not get produced. The machine ends there.</p>
+<p>The function <em>smCheck</em> is very similar to the <em>setTransition</em> function. It gets the datum, the redeemer and the context and returns a bool.
+It provides additional checks that can’t be expressed by the <em>TxConstraints</em> in <em>setTransition</em>.</p>
+<p>Finally, <em>smThreadToken</em> allows us to identify the UTxO which represents the current state. This is in the even that there us more than one UTxO sitting at the address
+of the state machine. It uses the same trick that we have seen before of using an NFT sitting in the value of the correct UTxO. You could, however, always return <em>Nothing</em>
+from <em>smThreadToken</em> and use some other mechanism to identify the correct UTxO.</p>
+<p>The same game from example 1 has been implemented using a state machine, in the following module.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">module</span> <span class="nn">Week07.StateMachine</span>
+</pre></div>
+</div>
+<p>The first parts of the code are the same - we have the same <em>Game</em> type and the same <em>GameChoice</em>. The first change we notice is with <em>GameDatum</em>.</p>
+<p>We have added a second constructor to <em>GameDatum</em> called <em>Finished</em>. This will represent the final state of the state machine. It won’t correspond to a UTxO, but we
+need it for the state machine mechanism to work.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">GameDatum</span> <span class="ow">=</span> <span class="kt">GameDatum</span> <span class="kt">ByteString</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="kt">GameChoice</span><span class="p">)</span> <span class="o">|</span> <span class="kt">Finished</span>
+<span class="kr">deriving</span> <span class="kt">Show</span>
+</pre></div>
+</div>
+<p>And this adds a little more complexity to the definition of equality.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">instance</span> <span class="kt">Eq</span> <span class="kt">GameDatum</span> <span class="kr">where</span>
+<span class="cm">{-# INLINABLE (==) #-}</span>
+<span class="kt">GameDatum</span> <span class="n">bs</span> <span class="n">mc</span> <span class="o">==</span> <span class="kt">GameDatum</span> <span class="n">bs&#39;</span> <span class="n">mc&#39;</span> <span class="ow">=</span> <span class="p">(</span><span class="n">bs</span> <span class="o">==</span> <span class="n">bs&#39;</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="n">mc</span> <span class="o">==</span> <span class="n">mc&#39;</span><span class="p">)</span>
+<span class="kt">Finished</span>        <span class="o">==</span> <span class="kt">Finished</span>          <span class="ow">=</span> <span class="kt">True</span>
+<span class="kr">_</span>               <span class="o">==</span> <span class="kr">_</span>                 <span class="ow">=</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<p>The redeemer is exactly the same as before. The <em>lovelaces</em> and <em>gameDatum</em> helper functions are also exactly the same as before.</p>
+<p>Now we get to the <em>transition</em> function, which sort of corresponds to the <em>mkGameValidator</em> function that we used in the previous example. It is basically the core
+business logic.</p>
 </div>
 </div>
 </div>
