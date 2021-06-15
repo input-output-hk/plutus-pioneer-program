@@ -1012,7 +1012,7 @@ this approach, our code will be much shorter.</p>
 <p>The <em>State s</em> type is basically the datum. It consists of the state itself and a value. Remember that the state of the state machine is represented by a UTxO, which has
 a datum and a value.</p>
 <div class="figure align-default">
-<img alt="_images/week07__00018.png" src="_images/week07__00018.png" />
+<img alt="_images/week07__00019.png" src="_images/week07__00019.png" />
 </div>
 <p>Given the state type <em>s</em>, and a transaction that tries to consume this UTxO with a redeemer <em>i</em>, we can indicate that this transition is not allowed by returning <em>Nothing</em>.
 If it is allowed, we return a tuple.</p>
@@ -1049,6 +1049,217 @@ need it for the state machine mechanism to work.</p>
 <p>The redeemer is exactly the same as before. The <em>lovelaces</em> and <em>gameDatum</em> helper functions are also exactly the same as before.</p>
 <p>Now we get to the <em>transition</em> function, which sort of corresponds to the <em>mkGameValidator</em> function that we used in the previous example. It is basically the core
 business logic.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">transition</span> <span class="ow">::</span> <span class="kt">Game</span> <span class="ow">-&gt;</span> <span class="kt">State</span> <span class="kt">GameDatum</span> <span class="ow">-&gt;</span> <span class="kt">GameRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span><span class="p">,</span> <span class="kt">State</span> <span class="kt">GameDatum</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The <em>transition</em> function takes the <em>Game</em>, then a <em>State GameDatum</em>, which, as we saw in the definition of <em>StateMachine</em>, is a pair consisting of the datum and the value.
+Thirdly, it takes the redeemer, and then returns a <em>Maybe</em> of the new state and constraints on the transaction.</p>
+<p>Let’s compare the <em>transition</em> function of the state machine with the <em>mkGameValidator</em> function from our first game version.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">transition</span> <span class="ow">::</span> <span class="kt">Game</span> <span class="ow">-&gt;</span> <span class="kt">State</span> <span class="kt">GameDatum</span> <span class="ow">-&gt;</span> <span class="kt">GameRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span><span class="p">,</span> <span class="kt">State</span> <span class="kt">GameDatum</span><span class="p">)</span>
+<span class="nf">transition</span> <span class="n">game</span> <span class="n">s</span> <span class="n">r</span> <span class="ow">=</span> <span class="kr">case</span> <span class="p">(</span><span class="n">stateValue</span> <span class="n">s</span><span class="p">,</span> <span class="n">stateData</span> <span class="n">s</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="kr">of</span>
+    <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="n">bs</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">Play</span> <span class="n">c</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="n">gStake</span> <span class="n">game</span>         <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gSecond</span> <span class="n">game</span><span class="p">)</span>                    <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">to</span> <span class="o">$</span> <span class="n">gPlayDeadline</span> <span class="n">game</span><span class="p">)</span>
+                                                     <span class="p">,</span> <span class="kt">State</span> <span class="p">(</span><span class="kt">GameDatum</span> <span class="n">bs</span> <span class="o">$</span> <span class="kt">Just</span> <span class="n">c</span><span class="p">)</span> <span class="p">(</span><span class="n">lovelaceValueOf</span> <span class="o">$</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>
+                                                     <span class="p">)</span>
+    <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="kr">_</span><span class="p">),</span> <span class="kt">Reveal</span> <span class="kr">_</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>   <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span>                     <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">to</span> <span class="o">$</span> <span class="n">gRevealDeadline</span> <span class="n">game</span><span class="p">)</span>       <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustPayToPubKey</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span> <span class="n">token</span>
+                                                     <span class="p">,</span> <span class="kt">State</span> <span class="kt">Finished</span> <span class="n">mempty</span>
+                                                     <span class="p">)</span>
+    <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="kr">_</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">ClaimFirst</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="n">gStake</span> <span class="n">game</span>         <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span>                     <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="o">$</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">gPlayDeadline</span> <span class="n">game</span><span class="p">)</span>   <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustPayToPubKey</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span> <span class="n">token</span>
+                                                     <span class="p">,</span> <span class="kt">State</span> <span class="kt">Finished</span> <span class="n">mempty</span>
+                                                     <span class="p">)</span>
+    <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="kr">_</span><span class="p">),</span> <span class="kt">ClaimSecond</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>   <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gSecond</span> <span class="n">game</span><span class="p">)</span>                    <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="o">$</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">gRevealDeadline</span> <span class="n">game</span><span class="p">)</span> <span class="o">&lt;&gt;</span>
+                                                       <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustPayToPubKey</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span> <span class="n">token</span>
+                                                     <span class="p">,</span> <span class="kt">State</span> <span class="kt">Finished</span> <span class="n">mempty</span>
+                                                     <span class="p">)</span>
+    <span class="kr">_</span>                                        <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+  <span class="kr">where</span>
+    <span class="n">token</span> <span class="ow">::</span> <span class="kt">Value</span>
+    <span class="n">token</span> <span class="ow">=</span> <span class="n">assetClassValue</span> <span class="p">(</span><span class="n">gToken</span> <span class="n">game</span><span class="p">)</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>The first thing to notice is that, in the <em>transition</em> function we do not need to do our initial check for the presence of the NFT. This is because the state machine
+takes care of that, so long as we set the last field of the <em>StateMachine</em> to some NFT asset class.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- we no longer need something like this for our state machine version</span>
+<span class="nf">traceIfFalse</span> <span class="s">&quot;token missing from input&quot;</span> <span class="p">(</span><span class="n">assetClassValueOf</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="p">(</span><span class="n">gToken</span> <span class="n">game</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+</pre></div>
+</div>
+<p>Let’s remind ourselves how we defined the first case where the first player had moved, the second player had not yet moved, and now the second player wants to make a move.
+We had six conditions.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="kt">GameDatum</span> <span class="n">bs</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">Play</span> <span class="n">c</span><span class="p">)</span> <span class="ow">-&gt;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;not signed by second player&quot;</span>   <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="p">(</span><span class="n">gSecond</span> <span class="n">game</span><span class="p">))</span>                                   <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;first player&#39;s stake missing&quot;</span>  <span class="p">(</span><span class="n">lovelaces</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="o">==</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>                   <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;second player&#39;s stake missing&quot;</span> <span class="p">(</span><span class="n">lovelaces</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownOutput</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">))</span>            <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;wrong output datum&quot;</span>            <span class="p">(</span><span class="n">outputDatum</span> <span class="o">==</span> <span class="kt">GameDatum</span> <span class="n">bs</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">c</span><span class="p">))</span>                             <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;missed deadline&quot;</span>               <span class="p">(</span><span class="n">to</span> <span class="p">(</span><span class="n">gPlayDeadline</span> <span class="n">game</span><span class="p">)</span> <span class="p">`</span><span class="n">contains</span><span class="p">`</span> <span class="n">txInfoValidRange</span> <span class="n">info</span><span class="p">)</span>         <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;token missing from output&quot;</span>     <span class="p">(</span><span class="n">assetClassValueOf</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownOutput</span><span class="p">)</span> <span class="p">(</span><span class="n">gToken</span> <span class="n">game</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Let’s see how these conditions are reflected in the state machine version.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">transition</span> <span class="n">game</span> <span class="n">s</span> <span class="n">r</span> <span class="ow">=</span> <span class="kr">case</span> <span class="p">(</span><span class="n">stateValue</span> <span class="n">s</span><span class="p">,</span> <span class="n">stateData</span> <span class="n">s</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="kr">of</span>
+    <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="n">bs</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">Play</span> <span class="n">c</span><span class="p">)</span>
+        <span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="n">gStake</span> <span class="n">game</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gSecond</span> <span class="n">game</span><span class="p">)</span>                    <span class="o">&lt;&gt;</span>
+                                               <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">to</span> <span class="o">$</span> <span class="n">gPlayDeadline</span> <span class="n">game</span><span class="p">)</span>
+                                             <span class="p">,</span> <span class="kt">State</span> <span class="p">(</span><span class="kt">GameDatum</span> <span class="n">bs</span> <span class="o">$</span> <span class="kt">Just</span> <span class="n">c</span><span class="p">)</span> <span class="p">(</span><span class="n">lovelaceValueOf</span> <span class="o">$</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>
+                                             <span class="p">)</span>
+</pre></div>
+</div>
+<p>We can access the value and datum components of our <em>State</em> parameter using <em>stateValue</em> and <em>stateData</em>, which gives us the triple for our <em>case</em> statement of
+value, datum and redeemer.</p>
+<p>Our matching case is now</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="n">bs</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">Play</span> <span class="n">c</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>First we check that the number of lovelaces in the value matches the stake of the game, which was our second condition in our code for this case from example 1. If this
+condition is satisfied, we return a <em>Just</em> pair. The first component of the pair is the constraints on the transaction (formulated from the <em>Constraints</em> module that we know from off-chain code). The
+two constraints that comprise this part of the pair correspond to the first and fifth conditions in our old code.</p>
+<p>The second component of the pair is the new state - the resulting UTxO - which again is given by datum and value. So here we are specifying that the datum of the new
+UTxO will contain both players’ choices, and the value of the UTxO will contain both players’ stakes. We leave the NFT out of this condition, even though it will be
+present in the UTxO, and that is again because the state machine implicitly takes care of this for us.</p>
+<p>This second component corresponds with the third and fourth conditions from our old code.</p>
+<p>The sixth condition from our old code related to the NFT which, as we have seen, we do not need to worry about.</p>
+<p>Now let’s compare the code from the second interesting case, where the second player has played and the first player sees that they have won.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- old version</span>
+<span class="p">(</span><span class="kt">GameDatum</span> <span class="n">bs</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">c</span><span class="p">),</span> <span class="kt">Reveal</span> <span class="n">nonce</span><span class="p">)</span> <span class="ow">-&gt;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;not signed by first player&quot;</span>    <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">))</span>                                    <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;commit mismatch&quot;</span>               <span class="p">(</span><span class="n">checkNonce</span> <span class="n">bs</span> <span class="n">nonce</span> <span class="n">c</span><span class="p">)</span>                                            <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;missed deadline&quot;</span>               <span class="p">(</span><span class="n">to</span> <span class="p">(</span><span class="n">gRevealDeadline</span> <span class="n">game</span><span class="p">)</span> <span class="p">`</span><span class="n">contains</span><span class="p">`</span> <span class="n">txInfoValidRange</span> <span class="n">info</span><span class="p">)</span>       <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;wrong stake&quot;</span>                   <span class="p">(</span><span class="n">lovelaces</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">))</span>             <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;NFT must go to first player&quot;</span>   <span class="n">nftToFirst</span>
+</pre></div>
+</div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- new version</span>
+<span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="kr">_</span><span class="p">),</span> <span class="kt">Reveal</span> <span class="kr">_</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>   <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span>                     <span class="o">&lt;&gt;</span>
+                                               <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">to</span> <span class="o">$</span> <span class="n">gRevealDeadline</span> <span class="n">game</span><span class="p">)</span>       <span class="o">&lt;&gt;</span>
+                                               <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustPayToPubKey</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span> <span class="n">token</span>
+                                             <span class="p">,</span> <span class="kt">State</span> <span class="kt">Finished</span> <span class="n">mempty</span>
+                                             <span class="p">)</span>
+</pre></div>
+</div>
+<p>Again, we see that the first thing we do is to check that the correct stake exists, and if it does, we again return a <em>Just</em>. So, this takes care of
+condition four from the old code. Condition one from the old code is taken care of by the <em>Constraints.mustBeSignedBy</em> constraint in the new code.</p>
+<p>Note that we do not check the nonce in the new code. The reason for this is that this check cannot be expressed in terms of a constraint. And this is exactly what
+the <em>smCheck</em> function is for, and we will see how this is used for this in a moment.</p>
+<p>We can also match up the deadline check from each code sample, with it being defined using <em>Constraints.mustValidateIn</em> in the new code.</p>
+<p>In the old code, when the game was over, we returned the NFT to the first player. In the new code, we also make sure the NFT goes back to the first player, but
+we also specify the <em>Finished</em> state and say that there is no money left in the contract using <em>mempty</em>.</p>
+<p>Now we compare the old and the new code for the third case where the first player reclaims their stake when the second player does not play by the deadline.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- old version</span>
+<span class="p">(</span><span class="kt">GameDatum</span> <span class="kr">_</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">ClaimFirst</span><span class="p">)</span> <span class="ow">-&gt;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;not signed by first player&quot;</span>    <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">))</span>                                    <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;too early&quot;</span>                     <span class="p">(</span><span class="n">from</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">gPlayDeadline</span> <span class="n">game</span><span class="p">)</span> <span class="p">`</span><span class="n">contains</span><span class="p">`</span> <span class="n">txInfoValidRange</span> <span class="n">info</span><span class="p">)</span>   <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;first player&#39;s stake missing&quot;</span>  <span class="p">(</span><span class="n">lovelaces</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="o">==</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>                   <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;NFT must go to first player&quot;</span>   <span class="n">nftToFirst</span>
+</pre></div>
+</div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- new version</span>
+
+<span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="kr">_</span> <span class="kt">Nothing</span><span class="p">,</span> <span class="kt">ClaimFirst</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="n">gStake</span> <span class="n">game</span>         <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span>                     <span class="o">&lt;&gt;</span>
+                                               <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="o">$</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">gPlayDeadline</span> <span class="n">game</span><span class="p">)</span>   <span class="o">&lt;&gt;</span>
+                                               <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustPayToPubKey</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span> <span class="n">token</span>
+                                             <span class="p">,</span> <span class="kt">State</span> <span class="kt">Finished</span> <span class="n">mempty</span>
+                                             <span class="p">)</span>
+</pre></div>
+</div>
+<p>These two match up fairly easily, with the lovelaces being the condition on the left in the new code, and the remaining conditions on the right in the new code matching up with
+corresponding conditions in the old code. Again we add the <em>Finished</em> state in the new code.</p>
+<p>The last case, where the second player has played and the first player does not reveal by the deadline, probably because they lost.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="kt">GameDatum</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="kr">_</span><span class="p">),</span> <span class="kt">ClaimSecond</span><span class="p">)</span> <span class="ow">-&gt;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;not signed by second player&quot;</span>   <span class="p">(</span><span class="n">txSignedBy</span> <span class="n">info</span> <span class="p">(</span><span class="n">gSecond</span> <span class="n">game</span><span class="p">))</span>                                   <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;too early&quot;</span>                     <span class="p">(</span><span class="n">from</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">gRevealDeadline</span> <span class="n">game</span><span class="p">)</span> <span class="p">`</span><span class="n">contains</span><span class="p">`</span> <span class="n">txInfoValidRange</span> <span class="n">info</span><span class="p">)</span> <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;wrong stake&quot;</span>                   <span class="p">(</span><span class="n">lovelaces</span> <span class="p">(</span><span class="n">txOutValue</span> <span class="n">ownInput</span><span class="p">)</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">))</span>             <span class="o">&amp;&amp;</span>
+    <span class="n">traceIfFalse</span> <span class="s">&quot;NFT must go to first player&quot;</span>   <span class="n">nftToFirst</span>
+</pre></div>
+</div>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kt">GameDatum</span> <span class="kr">_</span> <span class="p">(</span><span class="kt">Just</span> <span class="kr">_</span><span class="p">),</span> <span class="kt">ClaimSecond</span><span class="p">)</span>
+    <span class="o">|</span> <span class="n">lovelaces</span> <span class="n">v</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">gStake</span> <span class="n">game</span><span class="p">)</span>   <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">gSecond</span> <span class="n">game</span><span class="p">)</span>                    <span class="o">&lt;&gt;</span>
+                                                   <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="o">$</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">gRevealDeadline</span> <span class="n">game</span><span class="p">)</span> <span class="o">&lt;&gt;</span>
+                                                   <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustPayToPubKey</span> <span class="p">(</span><span class="n">gFirst</span> <span class="n">game</span><span class="p">)</span> <span class="n">token</span>
+                                                 <span class="p">,</span> <span class="kt">State</span> <span class="kt">Finished</span> <span class="n">mempty</span>
+                                                 <span class="p">)</span>
+</pre></div>
+</div>
+<p>The conditions in the old and the new code for this last case can be matched up in a very similar way to those for the third case.</p>
+<p>All other states with arbitrary transitions are invalid, and we indicate that by returning <em>Nothing</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>In the end we see that while the conditions themselves may not be much shorter in the new version than those in the old version, we also see that we only need one helper
+function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">token</span> <span class="ow">::</span> <span class="kt">Value</span>
+<span class="nf">token</span> <span class="ow">=</span> <span class="n">assetClassValue</span> <span class="p">(</span><span class="n">gToken</span> <span class="n">game</span><span class="p">)</span> <span class="mi">1</span>
+</pre></div>
+</div>
+<p>But we are not yet finished defining the state machine. There are some other fields in the <em>StateMachine</em> record.</p>
+<p>One is <em>smFinal</em>, which lets us define what the final states are. For us, it is just the <em>Finished</em> state. We define a helper function that we can use for this field.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">final</span> <span class="ow">::</span> <span class="kt">GameDatum</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">final</span> <span class="kt">Finished</span> <span class="ow">=</span> <span class="kt">True</span>
+<span class="nf">final</span> <span class="kr">_</span>        <span class="ow">=</span> <span class="kt">False</span>
+</pre></div>
+</div>
+<p>Another field to define is <em>smCheck</em>. Recall that this is where we can put conditions that cannot be expressed as <em>Constraint</em>s. So this is where we can put our nonce check.</p>
+<p>We define another helper function <em>check</em>, with two auxiliary <em>ByteString</em> parameters to represent the zero and one choices, for reasons that we have seen before. We also
+pass it the datum, redeemer and context, and it will return us a boolean.</p>
+<p>We don’t need the script context, but we need the datum to get the second player’s choice (which the first player is claiming is the same as theirs), and the redeemer
+to get the nonce that the first player is claiming to have used. We can then check that the hash of the choice and the nonce match the original hash from the datum.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">check</span> <span class="ow">::</span> <span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">GameDatum</span> <span class="ow">-&gt;</span> <span class="kt">GameRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">check</span> <span class="n">bsZero&#39;</span> <span class="n">bsOne&#39;</span> <span class="p">(</span><span class="kt">GameDatum</span> <span class="n">bs</span> <span class="p">(</span><span class="kt">Just</span> <span class="n">c</span><span class="p">))</span> <span class="p">(</span><span class="kt">Reveal</span> <span class="n">nonce</span><span class="p">)</span> <span class="kr">_</span> <span class="ow">=</span>
+    <span class="n">sha2_256</span> <span class="p">(</span><span class="n">nonce</span> <span class="p">`</span><span class="n">concatenate</span><span class="p">`</span> <span class="kr">if</span> <span class="n">c</span> <span class="o">==</span> <span class="kt">Zero</span> <span class="kr">then</span> <span class="n">bsZero&#39;</span> <span class="kr">else</span> <span class="n">bsOne&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="n">bs</span>
+</pre></div>
+</div>
+<p>In all other situations, those that are not checking the revealed nonce, we don’t need to perform any checks.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">check</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="kt">True</span>
+</pre></div>
+</div>
+<p>Now we can define our state machine.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">gameStateMachine</span> <span class="ow">::</span> <span class="kt">Game</span> <span class="ow">-&gt;</span> <span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">StateMachine</span> <span class="kt">GameDatum</span> <span class="kt">GameRedeemer</span>
+<span class="nf">gameStateMachine</span> <span class="n">game</span> <span class="n">bsZero&#39;</span> <span class="n">bsOne&#39;</span> <span class="ow">=</span> <span class="kt">StateMachine</span>
+    <span class="p">{</span> <span class="n">smTransition</span>  <span class="ow">=</span> <span class="n">transition</span> <span class="n">game</span>
+    <span class="p">,</span> <span class="n">smFinal</span>       <span class="ow">=</span> <span class="n">final</span>
+    <span class="p">,</span> <span class="n">smCheck</span>       <span class="ow">=</span> <span class="n">check</span> <span class="n">bsZero&#39;</span> <span class="n">bsOne&#39;</span>
+    <span class="p">,</span> <span class="n">smThreadToken</span> <span class="ow">=</span> <span class="kt">Just</span> <span class="o">$</span> <span class="n">gToken</span> <span class="n">game</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>Our old <em>mkGameValidator</em> can now be replaced by using machinery provided by the state machine. There is a <em>mkValidator</em> function which will take our
+state machine, generated by the <em>gameStateMachine</em> function and turn it into a validator with exactly the same type as we had in the old code.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkGameValidator</span> <span class="ow">::</span> <span class="kt">Game</span> <span class="ow">-&gt;</span> <span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">ByteString</span> <span class="ow">-&gt;</span> <span class="kt">GameDatum</span> <span class="ow">-&gt;</span> <span class="kt">GameRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">mkGameValidator</span> <span class="n">game</span> <span class="n">bsZero&#39;</span> <span class="n">bsOne&#39;</span> <span class="ow">=</span> <span class="n">mkValidator</span> <span class="o">$</span> <span class="n">gameStateMachine</span> <span class="n">game</span> <span class="n">bsZero&#39;</span> <span class="n">bsOne&#39;</span>
+</pre></div>
+</div>
+<p>In the old code we had this mechanism to bundle datum and redeemer into a <em>Gaming</em> type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- old code</span>
+<span class="kr">data</span> <span class="kt">Gaming</span>
+<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptType</span> <span class="kt">Gaming</span> <span class="kr">where</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Gaming</span> <span class="ow">=</span> <span class="kt">GameDatum</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Gaming</span> <span class="ow">=</span> <span class="kt">GameRedeemer</span>
+</pre></div>
+</div>
+<p>But now we can define this as.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">type</span> <span class="kt">Gaming</span> <span class="ow">=</span> <span class="kt">StateMachine</span> <span class="kt">GameDatum</span> <span class="kt">GameRedeemer</span>
+</pre></div>
+</div>
+<p>We also provide an alternate version of <em>gameStateMachine</em>, which doesn’t take the two auxiliary <em>ByteString</em>s. This won’t work for on-chain code, but for off-chain
+code it works just fine.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">gameStateMachine&#39;</span> <span class="ow">::</span> <span class="kt">Game</span> <span class="ow">-&gt;</span> <span class="kt">StateMachine</span> <span class="kt">GameDatum</span> <span class="kt">GameRedeemer</span>
+<span class="nf">gameStateMachine&#39;</span> <span class="n">game</span> <span class="ow">=</span> <span class="n">gameStateMachine</span> <span class="n">game</span> <span class="n">bsZero</span> <span class="n">bsOne</span>
+</pre></div>
+</div>
+<p>We have the same boilerplate as before for <em>gameInst</em>, <em>gameValidator</em> and <em>gameAddress</em>, which we won’t copy again here.</p>
+<p>The function <em>gameClient</em> is new. It is a <em>StateMachineClient</em>.</p>
+<div class="figure align-default">
+<img alt="_images/week07__00018.png" src="_images/week07__00018.png" />
+</div>
 </div>
 </div>
 </div>
