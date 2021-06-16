@@ -1,5 +1,5 @@
-Week 07 - State Machines
-========================
+Week 08 - Property Based Testing
+================================
 
 .. note::
     This is a written version of `Lecture
