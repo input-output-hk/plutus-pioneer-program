@@ -36,7 +36,7 @@ a transaction which has the current UTxO as input and the updated UTxO as output
 Another thing that the seller can do is to lock some tokens in the contract. In order to do that they have to create another transaction which has as input the UTxO of
 the contract and a UTxO containing some tokens and, as output, the updated UTxO at the contract address which now contains the provided tokens.
 
-.. figure:: img/week08__00002.png
+.. figure:: img/week08__00003.png
 
 In this example, the seller provides five tokens to the contract.
 
@@ -47,3 +47,4 @@ So, if a buyer wants to buy two tokens, they will create a transaction that has,
 the updated contract state where now the tokens are taken out and the Ada has been added, and one output going to the buyer with the tokens that they have just
 bought.
 
+.. figure:: img/week08__00004.png
