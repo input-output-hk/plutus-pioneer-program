@@ -37,3 +37,13 @@ Another thing that the seller can do is to lock some tokens in the contract. In 
 the contract and a UTxO containing some tokens and, as output, the updated UTxO at the contract address which now contains the provided tokens.
 
 .. figure:: img/week08__00002.png
+
+In this example, the seller provides five tokens to the contract.
+
+In order to buy tokens, there needs to be a transaction created by the buyer. This transaction has as input the UTxO sitting at the TS script address, 
+and the buying price in Ada.
+
+So, if a buyer wants to buy two tokens, they will create a transaction that has, as input, 12 Ada, and the UTxO at the script address. Then, two outputs. One
+the updated contract state where now the tokens are taken out and the Ada has been added, and one output going to the buyer with the tokens that they have just
+bought.
+
