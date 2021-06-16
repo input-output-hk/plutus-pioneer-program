@@ -56,11 +56,21 @@ retrieved funds.
 The diagram just shows one scenario, but these operations can be performed in any order - tokens can be added, the price can be changed, tokens can be bought, and so on,
 in an arbitrary order.
 
-This week's code is in
+This week's first example is implemented in
 
 .. code:: haskell
 
     module Week08.TokenSale
 
-    
+Let's first look at the type that we will use as the parameter that we will use for the contract.    
+
+.. code:: haskell
+
+    data TokenSale = TokenSale
+        { tsSeller :: !PubKeyHash
+        , tsToken  :: !AssetClass
+        , tsNFT    :: !AssetClass
+        } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)    
+
+This has three fields - the seller's public key has, the token being sold, and the NFT used to identify the UTxO.
 
