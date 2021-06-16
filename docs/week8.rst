@@ -29,8 +29,11 @@ use a simple integer, which will represent the price of the token we are selling
 .. figure:: img/week08__00001.png
 
 There will be several operations that the seller can do. One of those will be setting the price to a different value. In order to do that the seller will submit
-a transaction which has the current UTxO as input and the updated UTxO as output, where the datum has been changed to a different price.
+a transaction which has the current UTxO as input and the updated UTxO as output, where the datum has been changed to a different price per token.
 
 .. figure:: img/week08__00002.png
 
+Another thing that the seller can do is to lock some tokens in the contract. In order to do that they have to create another transaction which has as input the UTxO of
+the contract and a UTxO containing some tokens and, as output, the updated UTxO at the contract address which now contains the provided tokens.
 
+.. figure:: img/week08__00002.png
