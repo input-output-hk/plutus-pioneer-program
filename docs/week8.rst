@@ -49,3 +49,7 @@ bought.
 
 .. figure:: img/week08__00004.png
 
+Finally, there must be a way for the seller to retrieve tokens and Ada. In this example if, after the sale, the seller wants to retrieve all the Ada and one token, they 
+would create a transaction that, again, has the script UTxO as input, and, as output, the updated script UTxO with the reduced balances, and one to themselves with the 
+retrieved funds.
+
