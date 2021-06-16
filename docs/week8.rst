@@ -48,3 +48,4 @@ the updated contract state where now the tokens are taken out and the Ada has be
 bought.
 
 .. figure:: img/week08__00004.png
+
