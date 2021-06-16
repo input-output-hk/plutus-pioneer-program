@@ -23,10 +23,14 @@ other people can buy them.
 
 To begin, the seller starts with an NFT. It can be an arbitrary NFT and it will just be used, as before, to identify the correct UTxO that contains the contract state.
 
-The first step is to lock the NFT at the script address of the smart contract that we are about to write. We'll call that contract *TS* for Token Sale.
+The first step is to lock the NFT at the script address of the smart contract that we are about to write. We'll call that contract *TS* for Token Sale. As a datum, we will 
+use a simple integer, which will represent the price of the token we are selling, and this will start off as zero.
 
 .. figure:: img/week08__00001.png
 
+There will be several operations that the seller can do. One of those will be setting the price to a different value. In order to do that the seller will submit
+a transaction which has the current UTxO as input and the updated UTxO as output, where the datum has been changed to a different price.
 
+.. figure:: img/week08__00002.png
 
 
