@@ -12,7 +12,7 @@ Week 07 - State Machines
 Introduction
 ------------
 
-In this lecture we will look at state machines. State machines can be very useful to shorter and more concise contracts, both on-chain and off-chain. There is higher level support for state machines in the Plutus libraries that builds on top of the lower level mechanisms we have seen so far.
+In this lecture we will look at state machines. State machines can be very useful for writing shorter and more concise contracts, both on-chain and off-chain. There is higher level support for state machines in the Plutus libraries that builds on top of the lower level mechanisms we have seen so far.
 
 As a running example, we are going to implement a little game, played between Alice and Bob. It's a bit like Rock, Paper, Scissors, but even simpler, because there are 
 only two options.
@@ -96,7 +96,7 @@ This works very nicely and this is what we will try to implement in Cardano. Fir
 state machines, the code can be much clearer and much shorter.
 
 Code Example 1
-~~~~~~~~~~~~~~
+--------------
 
 We can imagine that, at the start of the game, Alice and Bob have put down the same amount of money each and that the winner will take it all.
 
@@ -130,7 +130,7 @@ We call the game *EvenOdd* due to the fact that if the sum of the numbers is eve
 In our code we will call the players *first* and *second* rather than Alice and Bob.
 
 On chain
-++++++++
+~~~~~~~~
 
 We define a data type *Game* which will be used as a parameter for the contract.
 
@@ -487,7 +487,7 @@ The logic is that if it finds an element that satisfies the predicate, it will r
     Nothing
 
 The *firstGame* contract
-________________________
+++++++++++++++++++++++++
     
 We have two contracts, one for each of the players.
 
@@ -618,7 +618,7 @@ If the second player moved and won, there is nothing for use to do.
                 _ -> logInfo @String "second player played and won"
 
 The *secondGame* contract
-_________________________
++++++++++++++++++++++++++
 
 The params for the second player are similar to those of the first player. This time we don't need the second player's public key hash, because that is ours, and we already 
 know what it is. Instead we need the first player's public key hash. Also, we don't need the nonce.
@@ -788,7 +788,7 @@ So this concludes the first version of the game - the version that does not use 
 Now, let's test it using the *EmulatorTrace* monad.
 
 Testing
-_______
++++++++
 
 The *test* function tests each of the four combinations by calling the *test'* function which takes the first and second players' choices respectively.        
 
@@ -884,7 +884,7 @@ Now, we can run this test from the REPL.
     Prelude Week07.Test> test
 
 Test 1
-......
+______
 
 The first scenario is that both play zero, so the first wallet should win.
 
@@ -951,7 +951,7 @@ almost 5 ada more than it started with. The difference is, of course, due to tra
         {, ""}: 994999990
 
 Test 2
-......
+______
 
 In the second case, Wallet 1 again plays Zero, but this time Wallet 2 plays One.
 
@@ -1027,12 +1027,12 @@ The remaining two cases are very similar, so we won't post the logs here.
 So, this all seems to work as expected.
 
 Code Example 2
-~~~~~~~~~~~~~~
+--------------
 
 Now we will rewrite this code using state machines.
 
 What is a state machine?
-++++++++++++++++++++++++
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 A state machine has nothing in particular to do with blockchain. It is a system that starts with some sort of state, there are one or more transitions to other states,
 and from those states there are further transitions, and so on, like a directed graph. Some states can be *final* states, from which there can be no further
@@ -1383,9 +1383,238 @@ code it works just fine.
 
 We have the same boilerplate as before for *gameInst*, *gameValidator* and *gameAddress*, which we won't copy again here.
 
-The function *gameClient* is new. It is a *StateMachineClient*.
+The function *gameClient* is new. It is a *StateMachineClient*, and this is what we need to interact with our state machine from our wallet in the *Contract* monad.
 
 .. figure:: img/week07__00018.png
+
+As you can see from the definition, it contains a *StateMachineInstance*. And the *StateMachineInstance* in turn is just a *StateMachine* and the corresponding script 
+instance.
+
+.. figure:: img/week07__00020.png
+
+Once we have that, the *StateMachineClient* still needs to be bundled with a so called *chooser*, which is the mechanism, from the off-chain code, for finding the UTxO that represents our
+state machine. In general there will be a list of UTxOs at the address of the state machine, and *scChooser* is a function that specifies which to pick.
+
+We don't have to worry about that, because we are using the NFT approach, which means that the choosing is taken care of for us automatically.
+
+There is a function *mkStateMachineClient* that takes a *StateMachineInstance* and returns a *StateMachineClient*, and this uses the default implementation of the chooser.
+And this will do the right thing and pick the UTxO that contains our NFT.
+
+.. code:: haskell
+
+    gameClient :: Game -> StateMachineClient GameDatum GameRedeemer
+    gameClient game = mkStateMachineClient $ StateMachineInstance (gameStateMachine' game) (gameInst game)
+    
+Now, *gameClient* can be used to interact with the state machine from off-chain code.
+
+*FirstParams* is exactly the same, so we won't repeat it here.
+
+There is one small nuisance. The state machine contracts provided by the state machine module have a specific constraint on the error type. One error type that works 
+is *SMContractError*.
+
+But we want to do what we did in the last lectures and always use *Text* as the error type. To achieve this we will use a helper function to convert the *SMContractError* 
+type into a *Text* type. Recall that *show* will return a *String* and *pack* will convert a *String* into a *Text*.
+
+.. code:: haskell
+
+    mapError' :: Contract w s SMContractError a -> Contract w s Text a
+    mapError' = mapError $ pack . show
+    
+So now the first player contract becomes much shorter and more compact.
+
+The beginning is the same.
+
+.. code:: haskell
+
+    firstGame :: forall w s. HasBlockchainActions s => FirstParams -> Contract w s Text ()
+    firstGame fp = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let game   = Game
+                { gFirst          = pkh
+                , gSecond         = fpSecond fp
+                , gStake          = fpStake fp
+                , gPlayDeadline   = fpPlayDeadline fp
+                , gRevealDeadline = fpRevealDeadline fp
+                , gToken          = AssetClass (fpCurrency fp, fpTokenName fp)
+                }
+
+Now, we take the client along with some values that we get as before.
+
+.. code:: haskell
+
+            client = gameClient game
+            v      = lovelaceValueOf (fpStake fp)
+            c      = fpChoice fp
+            bs     = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+
+There is a function *runIntialise* that starts a state machine and creates a UTxO at the state machine address. It takes the client as its first argument and then 
+it needs the initial datum and the initial value for the UTxO sitting at that address. And it will automatically put the NFT there as well.
+
+.. code:: Haskell
+
+        void $ mapError' $ runInitialise client (GameDatum bs Nothing) v
+        logInfo @String $ "made first move: " ++ show (fpChoice fp)
+    
+Now, the state machine is setup and the first player has made their move.
+
+We wait until the play deadline.
+
+.. code:: haskell
+
+        void $ awaitSlot $ 1 + fpPlayDeadline fp
+
+In our first example, we defined a helper function *findGameOutput* to get the current *UTxO*, but this can now be done in a simpler way using *getOnChainState*.
+
+.. figure:: img/week07__00021.png
+
+The function *getOnChainState* will return a *Just OnChainState* if it finds the state machine, or a *Nothing* if it does not find it.
+
+.. figure:: img/week07__00022.png
+
+So what is *OnChainState*? It is a tuple consisting of *TypedScriptTxOut* and *TypedScriptTxOutRef*. This is similar to what *utxoAt* gives us, which was a map of
+*TxOutRefs*\s to *TxOuts*\s. This is similar in that it is a output and its reference, but it is this *Typed* version that we haven't seen before.
+
+All that does is bundle what we know from before, *TxOut*, but additionally it provides the datum. You'll recall that in our off-chain code we always have to scramble
+and write helper functions to access the datum once we had found the UTxO. We had to look up the datum hash, which could fail, and so on. *TypedScriptTxOut* hides all 
+this from us.
+
+.. figure:: img/week07__00023.png
+
+.. code:: haskell
+
+        m <- mapError' $ getOnChainState client
+
+As before, we should never get *Nothing* for *m*.
+
+        case m of
+            Nothing             -> throwError "game output not found"
+
+Now, we are only interested in the *TypedScriptTxOut* parameter, which we assign to *o*, and use it to lookup the datum using *tyTxOutData*.
+
+.. code:: haskell
+    
+            Just ((o, _), _) -> case tyTxOutData o of
+    
+As before we have the two cases. Either the second player has moved, or they haven't moved.
+
+If they haven't moved, we must reclaim. Earlier we had lots of code to setup the lookups and constraints that we needed. How we only need one line, and the important 
+function here is *runStep*, which creates and submits a transaction that will transition the state machine.
+
+It takes as input the client and the redeemer. It then returns a *TransitionResult*, which we are not using in this example, but basically encodes whether it succeeded
+or failed.
+
+.. figure:: img/week07__00024.png
+
+Which means, that we can use *runStep* with just the client and redeemer to replace all the lookups, the constraints, the transaction submissions and the waiting.
+
+The way it works it that the *transition* function is that all the necessary constraints have been defined as part of the state machine.
+
+.. code:: haskell
+    
+                GameDatum _ Nothing -> do
+                    logInfo @String "second player did not play"
+                    void $ mapError' $ runStep client ClaimFirst
+                    logInfo @String "first player reclaimed stake"
+    
+The second case is that the first player did reveal, and we again use the *runStep* function to transition the state machine.
+
+.. code:: haskell
+
+                GameDatum _ (Just c') | c' == c -> do
+                    logInfo @String "second player played and lost"
+                    void $ mapError' $ runStep client $ Reveal $ fpNonce fp
+                    logInfo @String "first player revealed and won"
+    
+And in all other situations, the second player wins.
+
+.. code:: haskell
+    
+                _ -> logInfo @String "second player played and won"
+                
+The second player's contract is very similar, and just as simple.
+
+.. code:: haskell
+
+    secondGame :: forall w s. HasBlockchainActions s => SecondParams -> Contract w s Text ()
+    secondGame sp = do
+        pkh <- pubKeyHash <$> Contract.ownPubKey
+        let game   = Game
+                { gFirst          = spFirst sp
+                , gSecond         = pkh
+                , gStake          = spStake sp
+                , gPlayDeadline   = spPlayDeadline sp
+                , gRevealDeadline = spRevealDeadline sp
+                , gToken          = AssetClass (spCurrency sp, spTokenName sp)
+                }
+            client = gameClient game
+        m <- mapError' $ getOnChainState client
+        case m of
+            Nothing          -> logInfo @String "no running game found"
+            Just ((o, _), _) -> case tyTxOutData o of
+
+The only case we need to address is where we haven't played yet, and so should play. And, in order to play, we again use the *runStep* function.
+
+.. code:: haskell
+
+                    GameDatum _ Nothing -> do
+                        logInfo @String "running game found"
+                        void $ mapError' $ runStep client $ Play $ spChoice sp
+                        logInfo @String $ "made second move: " ++ show (spChoice sp)
+        
+We then wait until the reveal deadline has passed, then get the new state.
+
+.. code:: haskell
+
+                        void $ awaitSlot $ 1 + spRevealDeadline sp
+                        m' <- mapError' $ getOnChainState client
+                        case m' of
+
+If there is no state, the first player has won and claimed their winnings.
+
+.. code:: haskell
+
+                        Nothing -> logInfo @String "first player won"
+
+Otherwise, we have won, and we claim our winnings using the *runStep* function, giving the *ClaimSecond* redeemer.
+
+.. code:: haskell
+
+                            Just _  -> do
+                                logInfo @String "first player didn't reveal"
+                                void $ mapError' $ runStep client ClaimSecond
+                                logInfo @String "second player won"
+        
+And a final catch all.
+
+.. code:: haskell
+    
+                    _ -> throwError "unexpected datum"
+
+That concludes the state machine version of the code.
+
+What is particularly nice about this approach is that we don't need to replicate logic anymore. We have discussed how off-chain code is used for construction and 
+on-chain code is used for checking. When we use the state machine approach, we define logic that can be used for both, so we do not need to write it explicitly for the 
+off-chain part and the on-chain part of the code.
+
+In order to test this, there is a module called *Week07.TestStateMachine* in the example code. It is exactly the same as the test for the old code, with one exception,
+and that is just that instead of importing *Week07.EvenOdd*, it imports *Week07.StateMachine*. This is a quick and dirty way of doing things - we could, of course, 
+have written a script that was parameterized over the contract we want to use.
+
+If you load *Week07.TestStateMachine* in the REPL and run *test*, you should get exactly the same results as before.
+
+Conclusion
+----------
+
+State machines are not always appropriate, but when they are, you should definitely use them. They dramatically reduce the amount of code you have to write, and also 
+reduce sources of errors. 
+
+The state machine mechanism automatically ensures that you have on-chain and off-chain code that are working correctly together. Until now, we have always had to take care of that ourselves.
+
+
+
+
+
+
 
 
 
