@@ -53,3 +53,14 @@ Finally, there must be a way for the seller to retrieve tokens and Ada. In this 
 would create a transaction that, again, has the script UTxO as input, and, as output, the updated script UTxO with the reduced balances, and one to themselves with the 
 retrieved funds.
 
+The diagram just shows one scenario, but these operations can be performed in any order - tokens can be added, the price can be changed, tokens can be bought, and so on,
+in an arbitrary order.
+
+This week's code is in
+
+.. code:: haskell
+
+    module Week08.TokenSale
+
+    
+
