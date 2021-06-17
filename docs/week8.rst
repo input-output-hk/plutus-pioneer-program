@@ -243,6 +243,7 @@ contracts are able to discover it. In addition, we return the created token sale
 
   startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text TokenSale
   startTS mcs token = do
+  
       pkh <- pubKeyHash <$> Contract.ownPubKey
       cs  <- case mcs of
           Nothing  -> C.currencySymbol <$> mapErrorC (C.forgeContract pkh [(nftName, 1)])
@@ -258,7 +259,12 @@ contracts are able to discover it. In addition, we return the created token sale
       logInfo $ "started token sale " ++ show ts
       return ts
       
-      
+To begin, we lookup the seller's public key hash. We then need to get hold of the NFT. So, we determine if we need to mint the NFT, and, if we do, we mint it, otherwise we just use the one that was 
+passed into the function.
+
+
+
+
 
 
 
