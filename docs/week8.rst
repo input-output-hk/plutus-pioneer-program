@@ -117,6 +117,12 @@ add it again. This is perhaps not an ideal design, but that is how it currently 
                                                           nft (negate 1)
                                                         )
 
+When adding tokens, we could check that the seller has signed the transaction, but this contract would be provided by the seller, and the seller doesn't mind if someone 
+wants to give them a free gift! Therefore, once we have the *AddTokens* redeemer and *n* is greater than zero, we are happy to return the 
+new state without constraints.
+
+The state that we return is untouched, except for the unfortunate trick we need to do with the NFT, and the addition of the new tokens.
+
 .. code:: haskell
 
         (v, p, AddTokens n)  | n > 0            -> Just ( mempty
