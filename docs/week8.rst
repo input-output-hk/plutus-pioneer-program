@@ -56,6 +56,9 @@ retrieved funds.
 The diagram just shows one scenario, but these operations can be performed in any order - tokens can be added, the price can be changed, tokens can be bought, and so on,
 in an arbitrary order.
 
+On-chain code 
+~~~~~~~~~~~~~
+
 This week's first example is implemented in
 
 .. code:: haskell
@@ -183,4 +186,81 @@ function. The last one is to indicate which states are final. In this case, ther
 
   tsStateMachine :: TokenSale -> StateMachine Integer TSRedeemer
   tsStateMachine ts = mkStateMachine (Just $ tsNFT ts) (transition ts) (const False)
-    
+
+We can now use the usual boilerplate to turn it into a Plutus smart contract.
+
+.. code:: haskell
+
+  type TS = StateMachine Integer TSRedeemer
+
+  tsInst :: TokenSale -> Scripts.ScriptInstance TS
+  tsInst ts = Scripts.validator @TS
+      ($$(PlutusTx.compile [|| mkTSValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode ts)
+      $$(PlutusTx.compile [|| wrap ||])
+    where
+      wrap = Scripts.wrapValidator @Integer @TSRedeemer
+  
+  tsValidator :: TokenSale -> Validator
+  tsValidator = Scripts.validatorScript . tsInst
+  
+  tsAddress :: TokenSale -> Ledger.Address
+  tsAddress = scriptAddress . tsValidator
+  
+  tsClient :: TokenSale -> StateMachineClient Integer TSRedeemer
+  tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsInst ts)
+  
+There are two helper functions to convert specialised error types to *Text*.
+
+.. code:: haskell
+
+  mapErrorC :: Contract w s C.CurrencyError a -> Contract w s Text a
+  mapErrorC = mapError $ pack . show
+  
+  mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
+  mapErrorSM = mapError $ pack . show
+  
+  Off-chain code 
+  ~~~~~~~~~~~~~~
+  
+  For the off-chain code, we start by defining a constant for the token name of the NFT.
+
+  .. code:: haskell
+
+    nftName :: TokenName
+    nftName = "NFT"
+
+The first contract we define is to start the token sale. This contract is designed to be invoked by the seller.
+
+This first argument is a *Maybe CurrencySymbol*. The idea here is that if you pass in *Nothing*, the contract will mint a new NFT. Alternatively, you can provide a 
+*Just CurrencySymbol* if the token already exists. We have done it this way mainly to make testing easier.
+
+The *AssetClass* argument is the token the seller wants to trade.
+
+For the return type, we are using the writer monad type with the *Last* type. The ideas is that once the token sale has been setup, it will get written here so that other 
+contracts are able to discover it. In addition, we return the created token sale.
+
+.. code:: haskell
+
+  startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text TokenSale
+  startTS mcs token = do
+      pkh <- pubKeyHash <$> Contract.ownPubKey
+      cs  <- case mcs of
+          Nothing  -> C.currencySymbol <$> mapErrorC (C.forgeContract pkh [(nftName, 1)])
+          Just cs' -> return cs'
+      let ts = TokenSale
+              { tsSeller = pkh
+              , tsToken  = token
+              , tsNFT    = AssetClass (cs, nftName)
+              }
+          client = tsClient ts
+      void $ mapErrorSM $ runInitialise client 0 mempty
+      tell $ Last $ Just ts
+      logInfo $ "started token sale " ++ show ts
+      return ts
+      
+      
+
+
+
+  
+  
