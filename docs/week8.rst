@@ -92,3 +92,44 @@ Again we have the helper function that we have used in previous examples
     lovelaces :: Value -> Integer
     lovelaces = Ada.getLovelace . Ada.fromValue
     
+Now, we get to the *transition* function of the state machine. We see the *TokenSale* parameter which holds the state machines configuration values, the *State* 
+object with an *Integer* value to represent the price of the token, then the redeemer *TsRedeemer*. Again, we return a *Maybe*, which will be *Nothing* if the 
+corresponding transition is illegal, or, if it is legal, a *Just* containing constraints and the new state.
+
+.. code:: haskell
+
+    transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
+    transition ts s r = case (stateValue s, stateData s, r) of
+
+
+        (v, _, SetPrice p)   | p >= 0           -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                        , State p $
+                                                          v <>
+                                                          nft (negate 1)
+                                                        )
+        (v, p, AddTokens n)  | n > 0            -> Just ( mempty
+                                                        , State p $
+                                                          v                                       <>
+                                                          nft (negate 1)                          <>
+                                                          assetClassValue (tsToken ts) n
+                                                        )
+        (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
+                                                        , State p $
+                                                          v                                       <>
+                                                          nft (negate 1)                          <>
+                                                          assetClassValue (tsToken ts) (negate n) <>
+                                                          lovelaceValueOf (n * p)
+                                                        )
+        (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                        , State p $
+                                                          v                                       <>
+                                                          nft (negate 1)                          <>
+                                                          assetClassValue (tsToken ts) (negate n) <>
+                                                          lovelaceValueOf (negate l)
+                                                        )
+        _                                       -> Nothing
+      where
+        nft :: Integer -> Value
+        nft = assetClassValue (tsNFT ts)
+        
+        
