@@ -132,6 +132,10 @@ The state that we return is untouched, except for the unfortunate trick we need 
                                               assetClassValue (tsToken ts) n
                                             )
 
+For the *BuyTokens* redeemer, again we check the number of tokens is positive, and again we don't need any constraints, because anybody can buy tokens.
+
+For the new state, we don't touch the price. We again correct for the NFT. Then we subtract the tokens that were bought, and we add the lovelace that were paid for them.
+
 .. code:: haskell
                                                                 
         (v, p, BuyTokens n) | n > 0 -> Just ( mempty
