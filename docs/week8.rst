@@ -101,18 +101,33 @@ corresponding transition is illegal, or, if it is legal, a *Just* containing con
     transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
     transition ts s r = case (stateValue s, stateData s, r) of
 
+If the *SetPrice* redeemer is provided, then we only consider it to be legal if the price is not negative. We then return a *Just* with the constraint that the 
+transaction must be signed by the token seller, and with the new state. The new state will be the new price *p*, and the *Value* in the contract 
+remains the same, except for one thing. 
+
+It is a little unfortunate, but there is a discrepancy between the *v* on the left and the *v* on the right. On the left it does not contain the NFT, but 
+on the right it does not. So, even though we want to say that we don't want the value changed, in fact we have to remove the NFT, because the Plutus libraries will
+add it again. This is perhaps not an ideal design, but that is how it currently is.
+
+.. code:: haskell
 
         (v, _, SetPrice p)   | p >= 0           -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
                                                         , State p $
                                                           v <>
                                                           nft (negate 1)
                                                         )
+
+.. code:: haskell
+
         (v, p, AddTokens n)  | n > 0            -> Just ( mempty
                                                         , State p $
                                                           v                                       <>
                                                           nft (negate 1)                          <>
                                                           assetClassValue (tsToken ts) n
                                                         )
+
+.. code:: haskell
+                                                                
         (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
                                                         , State p $
                                                           v                                       <>
@@ -120,6 +135,9 @@ corresponding transition is illegal, or, if it is legal, a *Just* containing con
                                                           assetClassValue (tsToken ts) (negate n) <>
                                                           lovelaceValueOf (n * p)
                                                         )
+
+.. code:: haskell
+                                                           
         (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
                                                         , State p $
                                                           v                                       <>
