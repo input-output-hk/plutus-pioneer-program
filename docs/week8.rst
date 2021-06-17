@@ -111,11 +111,11 @@ add it again. This is perhaps not an ideal design, but that is how it currently 
 
 .. code:: haskell
 
-        (v, _, SetPrice p)   | p >= 0           -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                                        , State p $
-                                                          v <>
-                                                          nft (negate 1)
-                                                        )
+        (v, _, SetPrice p) | p >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                            , State p $
+                                              v <>
+                                              nft (negate 1)
+                                            )
 
 When adding tokens, we could check that the seller has signed the transaction, but this contract would be provided by the seller, and the seller doesn't mind if someone 
 wants to give them a free gift! Therefore, once we have the *AddTokens* redeemer and *n* is greater than zero, we are happy to return the 
@@ -125,22 +125,22 @@ The state that we return is untouched, except for the unfortunate trick we need 
 
 .. code:: haskell
 
-        (v, p, AddTokens n)  | n > 0            -> Just ( mempty
-                                                        , State p $
-                                                          v                                       <>
-                                                          nft (negate 1)                          <>
-                                                          assetClassValue (tsToken ts) n
-                                                        )
+        (v, p, AddTokens n) | n > 0 -> Just ( mempty
+                                            , State p $
+                                              v                                       <>
+                                              nft (negate 1)                          <>
+                                              assetClassValue (tsToken ts) n
+                                            )
 
 .. code:: haskell
                                                                 
-        (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
-                                                        , State p $
-                                                          v                                       <>
-                                                          nft (negate 1)                          <>
-                                                          assetClassValue (tsToken ts) (negate n) <>
-                                                          lovelaceValueOf (n * p)
-                                                        )
+        (v, p, BuyTokens n) | n > 0 -> Just ( mempty
+                                            , State p $
+                                              v                                       <>
+                                              nft (negate 1)                          <>
+                                              assetClassValue (tsToken ts) (negate n) <>
+                                              lovelaceValueOf (n * p)
+                                            )
 
 .. code:: haskell
                                                            
