@@ -117,6 +117,13 @@ add it again. This is perhaps not an ideal design, but that is how it currently 
                                               nft (negate 1)
                                             )
 
+We use a helper function to reference the NFT.
+
+.. code:: haskell
+
+  nft :: Integer -> Value
+  nft = assetClassValue (tsNFT ts)  
+                                            
 When adding tokens, we could check that the seller has signed the transaction, but this contract would be provided by the seller, and the seller doesn't mind if someone 
 wants to give them a free gift! Therefore, once we have the *AddTokens* redeemer and *n* is greater than zero, we are happy to return the 
 new state without constraints.
@@ -146,6 +153,10 @@ For the new state, we don't touch the price. We again correct for the NFT. Then 
                                               lovelaceValueOf (n * p)
                                             )
 
+Finally, for *WithDraw*, we insist that the token amount and the lovelace amount are both nonnegative. This time we again add a constraint that the seller must sign 
+the transaction. We modify the state in a similar way to the way we did for the *BuyTokens* redeemer, but this time we adjust the token and lovelace amounts according 
+to how much has been withdrawn.
+
 .. code:: haskell
                                                            
         (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
@@ -155,9 +166,11 @@ For the new state, we don't touch the price. We again correct for the NFT. Then 
                                                           assetClassValue (tsToken ts) (negate n) <>
                                                           lovelaceValueOf (negate l)
                                                         )
-        _                                       -> Nothing
-      where
-        nft :: Integer -> Value
-        nft = assetClassValue (tsNFT ts)
+
+All other state transitions are illegal.
+
+.. code:: haskell
+        _ -> Nothing
+
         
         
