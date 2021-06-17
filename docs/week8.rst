@@ -239,6 +239,9 @@ The *AssetClass* argument is the token the seller wants to trade.
 For the return type, we are using the writer monad type with the *Last* type. The ideas is that once the token sale has been setup, it will get written here so that other 
 contracts are able to discover it. In addition, we return the created token sale.
 
+To begin, we lookup the seller's public key hash. We then need to get hold of the NFT. So, we determine if we need to mint the NFT, and, if we do, we mint it, otherwise we just use the one that was 
+passed into the function.
+
 .. code:: haskell
 
   startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text TokenSale
@@ -248,19 +251,29 @@ contracts are able to discover it. In addition, we return the created token sale
       cs  <- case mcs of
           Nothing  -> C.currencySymbol <$> mapErrorC (C.forgeContract pkh [(nftName, 1)])
           Just cs' -> return cs'
+
+And now we can define the *TokenSale* and create the state machine client.
+
+.. code:: haskell
+  
       let ts = TokenSale
               { tsSeller = pkh
               , tsToken  = token
               , tsNFT    = AssetClass (cs, nftName)
               }
           client = tsClient ts
+
+We then use the *runInitialise* function that we discussed in the last lecture, using the client, an initial price of zero, and no initial funds, except for the NFT 
+which will be automatically added.
+
+.. code:: haskell
+
       void $ mapErrorSM $ runInitialise client 0 mempty
       tell $ Last $ Just ts
       logInfo $ "started token sale " ++ show ts
       return ts
       
-To begin, we lookup the seller's public key hash. We then need to get hold of the NFT. So, we determine if we need to mint the NFT, and, if we do, we mint it, otherwise we just use the one that was 
-passed into the function.
+
 
 
 
