@@ -266,6 +266,8 @@ And now we can define the *TokenSale* and create the state machine client.
 We then use the *runInitialise* function that we discussed in the last lecture, using the client, an initial price of zero, and no initial funds, except for the NFT 
 which will be automatically added.
 
+We write the *ts* into the log, then log a message, and return the *ts*.
+
 .. code:: haskell
 
       void $ mapErrorSM $ runInitialise client 0 mempty
@@ -273,7 +275,33 @@ which will be automatically added.
       logInfo $ "started token sale " ++ show ts
       return ts
       
+The functions for all the other operations are extremely short. This example is ideal for the state machine approach.
 
+They are all very similar. They all invoke *runStep* and then invoke the correct transition from the state machine.
+
+For example, for *setPrice*, we need the *TokenSale* argument to identify the correct contract and the new value of the price. Then we use *runStep* using the client and 
+*SetPrice* as the redeemer. We wrap that using *mapErrorSM* to convert to *Text* error messages, and we ignore the result.
+
+.. code:: haskell
+
+  setPrice :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
+  setPrice ts p = void $ mapErrorSM $ runStep (tsClient ts) $ SetPrice p
+
+The remaining three follow the same pattern.
+
+.. code:: haskell
+
+  addTokens :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
+  addTokens ts n = void (mapErrorSM $ runStep (tsClient ts) $ AddTokens n)
+  
+  buyTokens :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
+  buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
+  
+  withdraw :: HasBlockchainActions s => TokenSale -> Integer -> Integer -> Contract w s Text ()
+  withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
+
+  
+  
 
 
 
