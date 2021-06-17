@@ -74,3 +74,21 @@ Let's first look at the type that we will use as the parameter that we will use 
 
 This has three fields - the seller's public key has, the token being sold, and the NFT used to identify the UTxO.
 
+For the redeemer, we provide exactly the operations we saw in the diagram
+
+.. code:: haskell
+
+    data TSRedeemer =
+          SetPrice Integer         -- the price
+        | AddTokens Integer        -- the number of tokens to add
+        | BuyTokens Integer        -- the number of tokens to buy
+        | Withdraw Integer Integer -- first argument is the number of tokens, the second is the number of lovelace
+        deriving (Show, Prelude.Eq)    
+
+Again we have the helper function that we have used in previous examples
+
+.. code:: haskell
+
+    lovelaces :: Value -> Integer
+    lovelaces = Ada.getLovelace . Ada.fromValue
+    
