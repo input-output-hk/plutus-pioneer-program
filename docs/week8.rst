@@ -170,7 +170,17 @@ to how much has been withdrawn.
 All other state transitions are illegal.
 
 .. code:: haskell
+  
         _ -> Nothing
 
-        
-        
+In this example we are able to construct our state machine more simply that we could in the previous lecture. This is because, in the previous lecture we had one 
+condition that could not be expressed in the regular constraints.        
+
+In these situations, there is a helper function called *mkStateMachine* that takes three arguments. The first one is the state token, the second is the transition 
+function. The last one is to indicate which states are final. In this case, there is no final state. Once this token sale has been setup, it will always be there.
+
+.. code:: haskell
+
+  tsStateMachine :: TokenSale -> StateMachine Integer TSRedeemer
+  tsStateMachine ts = mkStateMachine (Just $ tsNFT ts) (transition ts) (const False)
+    
