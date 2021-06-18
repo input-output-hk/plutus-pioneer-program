@@ -326,8 +326,26 @@ Lastly we have a *use* schema, with endpoints for the four operations - set pric
     .\/ Endpoint "buy tokens" Integer
     .\/ Endpoint "withdraw"   (Integer, Integer)  
 
+Now to implement the start endpoint. It simply calls *startTs'* and recurses. *startTs'* blocks until the parameters are provided and then calls *startTs* with 
+*Nothing*, indicating that the NFT has to be minted. We wrap it in *handleError* and if there is an error, we simply log that error.
 
+.. code:: haskell
 
+  startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
+  startEndpoint = startTS' >> startEndpoint
+    where
+      startTS' = handleError logError $ endpoint @"start"  >>= void . startTS Nothing . AssetClass
+
+The *startEndpoint'* function is very similar, but we add the NFT parameter, as per *TSStartSchema'*.
+
+.. code:: haskell
+
+  startEndpoint' :: Contract (Last TokenSale) TSStartSchema' Text ()
+  startEndpoint' = startTS' >> startEndpoint'
+    where
+      startTS' = handleError logError $ endpoint @"start"  >>= \(cs1, cs2, tn) ->  void $ startTS (Just cs1) $ AssetClass (cs2, tn)
+      
+      
 
 
 
