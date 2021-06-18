@@ -9,8 +9,8 @@ Week 08 - Property Based Testing
 
     This week we were using Plutus commit 530cc134364ae186f39fb2b54239fb7c5e2986e9, the same commit as we used in the last lecture.
 
-Introduction
-------------
+Token Sale
+----------
 
 In the last lecture we looked at state machines, and saw how they often allow us to write much less code to express the logic of a smart contract, partly because  
 there is a lot of sharing between on-chain and off-chain code and partly because a lot of boilerplate is encapsulated in the state machine machinery.
@@ -219,15 +219,15 @@ There are two helper functions to convert specialised error types to *Text*.
   mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
   mapErrorSM = mapError $ pack . show
   
-  Off-chain code 
-  ~~~~~~~~~~~~~~
+Off-chain code 
+~~~~~~~~~~~~~~
   
-  For the off-chain code, we start by defining a constant for the token name of the NFT.
+For the off-chain code, we start by defining a constant for the token name of the NFT.
 
-  .. code:: haskell
+.. code:: haskell
 
-    nftName :: TokenName
-    nftName = "NFT"
+  nftName :: TokenName
+  nftName = "NFT"
 
 The first contract we define is to start the token sale. This contract is designed to be invoked by the seller.
 
@@ -345,6 +345,52 @@ The *startEndpoint'* function is very similar, but we add the NFT parameter, as 
     where
       startTS' = handleError logError $ endpoint @"start"  >>= \(cs1, cs2, tn) ->  void $ startTS (Just cs1) $ AssetClass (cs2, tn)
       
+No surprises in the *use* endpoints. We give a choice between the four endpoints and just call the functions we defined earlier with the arguments fed in 
+from the endpoint call, and with everything wrapped inside an error handler so that the contract won't crash in the event of an error.
+
+.. code:: haskell
+
+  useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
+  useEndpoints ts = (setPrice' `select` addTokens' `select` buyTokens' `select` withdraw') >> useEndpoints ts
+    where
+      setPrice'  = handleError logError $ endpoint @"set price"  >>= setPrice ts
+      addTokens' = handleError logError $ endpoint @"add tokens" >>= addTokens ts
+      buyTokens' = handleError logError $ endpoint @"buy tokens" >>= buyTokens ts
+      withdraw'  = handleError logError $ endpoint @"withdraw"   >>= uncurry (withdraw ts)
+
+Testing
+~~~~~~~
+
+In order to try it out, let's run it in the emulator.
+
+We define a *runMyTrace* function which uses *runEmulatorTraceIO'* with a custom emulator configuration and a *myTrace* function.
+
+.. code:: haskell
+
+  runMyTrace :: IO ()
+  runMyTrace = runEmulatorTraceIO' def emCfg myTrace
+
+Let's first look at the *emCfg* function. Recall that this is where we can give custom initial distributions to wallets. Here we give 1000 Ada and 1000 *aa* token to 
+three wallets.
+
+.. code:: haskell
+
+  emCfg :: EmulatorConfig
+  emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet w, v) | w <- [1 .. 3]]
+    where
+      v :: Value
+      v = Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
+      
+  currency :: CurrencySymbol
+  currency = "aa"
+  
+  name :: TokenName
+  name = "A"
+  
+  token :: AssetClass
+  token = AssetClass (currency, name)      
+
+
       
 
 
