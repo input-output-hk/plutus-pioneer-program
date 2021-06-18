@@ -394,14 +394,16 @@ token to three wallets.
   token :: AssetClass
   token = AssetClass (currency, name)      
 
-For the trace, first we activate the start endpoint using the non-primed function which mints the NFT is minted automatically.
+For the trace, first we activate Wallet 1 using the non-primed *startEndpoint* function which mints the NFT is minted automatically. Then, we call the start endpoint, giving it 
+the symbol and name of the token we want to sell, and then wait for five slots.
 
 .. code:: haskell
 
   myTrace :: EmulatorTrace ()
   myTrace = do
       h <- activateContractWallet (Wallet 1) startEndpoint  
-
+      callEndpoint @"start" h (currency, name)
+      void $ Emulator.waitNSlots 5
 
 
 
