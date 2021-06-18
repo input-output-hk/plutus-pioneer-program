@@ -394,6 +394,14 @@ token to three wallets.
   token :: AssetClass
   token = AssetClass (currency, name)      
 
+For the trace, first we activate the start endpoint using the non-primed function which mints the NFT is minted automatically.
+
+.. code:: haskell
+
+  myTrace :: EmulatorTrace ()
+  myTrace = do
+      h <- activateContractWallet (Wallet 1) startEndpoint  
+
 
 
 
