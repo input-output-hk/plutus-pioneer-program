@@ -95,7 +95,10 @@
 <li class="toctree-l1"><a class="reference internal" href="week6.html">7. Week 06 - Oracles</a></li>
 <li class="toctree-l1"><a class="reference internal" href="week7.html">8. Week 07 - State Machines</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">9. Week 08 - Property Based Testing</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#introduction">9.1. Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#introduction">9.1. Introduction</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#on-chain-code">9.1.1. On-chain code</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -212,6 +215,8 @@ would create a transaction that, again, has the script UTxO as input, and, as ou
 retrieved funds.</p>
 <p>The diagram just shows one scenario, but these operations can be performed in any order - tokens can be added, the price can be changed, tokens can be bought, and so on,
 in an arbitrary order.</p>
+<div class="section" id="on-chain-code">
+<h3><span class="section-number">9.1.1. </span>On-chain code<a class="headerlink" href="#on-chain-code" title="Permalink to this headline">¶</a></h3>
 <p>This week’s first example is implemented in</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">module</span> <span class="nn">Week08.TokenSale</span>
 </pre></div>
@@ -227,12 +232,182 @@ in an arbitrary order.</p>
 <p>This has three fields - the seller’s public key has, the token being sold, and the NFT used to identify the UTxO.</p>
 <p>For the redeemer, we provide exactly the operations we saw in the diagram</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">TSRedeemer</span> <span class="ow">=</span>
-      <span class="kt">SetPrice</span> <span class="kt">Integer</span>         <span class="c1">-- argument is the price</span>
-    <span class="o">|</span> <span class="kt">AddTokens</span> <span class="kt">Integer</span>        <span class="c1">-- argument represents the number of tokens to add</span>
-    <span class="o">|</span> <span class="kt">BuyTokens</span> <span class="kt">Integer</span>        <span class="c1">-- argument represents the number of tokens to buy</span>
+      <span class="kt">SetPrice</span> <span class="kt">Integer</span>         <span class="c1">-- the price</span>
+    <span class="o">|</span> <span class="kt">AddTokens</span> <span class="kt">Integer</span>        <span class="c1">-- the number of tokens to add</span>
+    <span class="o">|</span> <span class="kt">BuyTokens</span> <span class="kt">Integer</span>        <span class="c1">-- the number of tokens to buy</span>
     <span class="o">|</span> <span class="kt">Withdraw</span> <span class="kt">Integer</span> <span class="kt">Integer</span> <span class="c1">-- first argument is the number of tokens, the second is the number of lovelace</span>
     <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span> <span class="kt">Prelude</span><span class="o">.</span><span class="kt">Eq</span><span class="p">)</span>
 </pre></div>
+</div>
+<p>Again we have the helper function that we have used in previous examples</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">lovelaces</span> <span class="ow">::</span> <span class="kt">Value</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span>
+<span class="nf">lovelaces</span> <span class="ow">=</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">getLovelace</span> <span class="o">.</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">fromValue</span>
+</pre></div>
+</div>
+<p>Now, we get to the <em>transition</em> function of the state machine. We see the <em>TokenSale</em> parameter which holds the state machines configuration values, the <em>State</em>
+object with an <em>Integer</em> value to represent the price of the token, then the redeemer <em>TsRedeemer</em>. Again, we return a <em>Maybe</em>, which will be <em>Nothing</em> if the
+corresponding transition is illegal, or, if it is legal, a <em>Just</em> containing constraints and the new state.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">transition</span> <span class="ow">::</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">State</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">TSRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="p">(</span><span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span><span class="p">,</span> <span class="kt">State</span> <span class="kt">Integer</span><span class="p">)</span>
+<span class="nf">transition</span> <span class="n">ts</span> <span class="n">s</span> <span class="n">r</span> <span class="ow">=</span> <span class="kr">case</span> <span class="p">(</span><span class="n">stateValue</span> <span class="n">s</span><span class="p">,</span> <span class="n">stateData</span> <span class="n">s</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="kr">of</span>
+</pre></div>
+</div>
+<p>If the <em>SetPrice</em> redeemer is provided, then we only consider it to be legal if the price is not negative. We then return a <em>Just</em> with the constraint that the
+transaction must be signed by the token seller, and with the new state. The new state will be the new price <em>p</em>, and the <em>Value</em> in the contract
+remains the same, except for one thing.</p>
+<p>It is a little unfortunate, but there is a discrepancy between the <em>v</em> on the left and the <em>v</em> on the right. On the left it does not contain the NFT, but
+on the right it does not. So, even though we want to say that we don’t want the value changed, in fact we have to remove the NFT, because the Plutus libraries will
+add it again. This is perhaps not an ideal design, but that is how it currently is.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="kr">_</span><span class="p">,</span> <span class="kt">SetPrice</span> <span class="n">p</span><span class="p">)</span> <span class="o">|</span> <span class="n">p</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">tsSeller</span> <span class="n">ts</span><span class="p">)</span>
+                                    <span class="p">,</span> <span class="kt">State</span> <span class="n">p</span> <span class="o">$</span>
+                                      <span class="n">v</span> <span class="o">&lt;&gt;</span>
+                                      <span class="n">nft</span> <span class="p">(</span><span class="n">negate</span> <span class="mi">1</span><span class="p">)</span>
+                                    <span class="p">)</span>
+</pre></div>
+</div>
+<p>We use a helper function to reference the NFT.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">nft</span> <span class="ow">::</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Value</span>
+<span class="nf">nft</span> <span class="ow">=</span> <span class="n">assetClassValue</span> <span class="p">(</span><span class="n">tsNFT</span> <span class="n">ts</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>When adding tokens, we could check that the seller has signed the transaction, but this contract would be provided by the seller, and the seller doesn’t mind if someone
+wants to give them a free gift! Therefore, once we have the <em>AddTokens</em> redeemer and <em>n</em> is greater than zero, we are happy to return the
+new state without constraints.</p>
+<p>The state that we return is untouched, except for the unfortunate trick we need to do with the NFT, and the addition of the new tokens.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="kt">AddTokens</span> <span class="n">n</span><span class="p">)</span> <span class="o">|</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="n">mempty</span>
+                                    <span class="p">,</span> <span class="kt">State</span> <span class="n">p</span> <span class="o">$</span>
+                                      <span class="n">v</span>                                       <span class="o">&lt;&gt;</span>
+                                      <span class="n">nft</span> <span class="p">(</span><span class="n">negate</span> <span class="mi">1</span><span class="p">)</span>                          <span class="o">&lt;&gt;</span>
+                                      <span class="n">assetClassValue</span> <span class="p">(</span><span class="n">tsToken</span> <span class="n">ts</span><span class="p">)</span> <span class="n">n</span>
+                                    <span class="p">)</span>
+</pre></div>
+</div>
+<p>For the <em>BuyTokens</em> redeemer, again we check the number of tokens is positive, and again we don’t need any constraints, because anybody can buy tokens.</p>
+<p>For the new state, we don’t touch the price. We again correct for the NFT. Then we subtract the tokens that were bought, and we add the lovelace that were paid for them.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="kt">BuyTokens</span> <span class="n">n</span><span class="p">)</span> <span class="o">|</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="n">mempty</span>
+                                    <span class="p">,</span> <span class="kt">State</span> <span class="n">p</span> <span class="o">$</span>
+                                      <span class="n">v</span>                                       <span class="o">&lt;&gt;</span>
+                                      <span class="n">nft</span> <span class="p">(</span><span class="n">negate</span> <span class="mi">1</span><span class="p">)</span>                          <span class="o">&lt;&gt;</span>
+                                      <span class="n">assetClassValue</span> <span class="p">(</span><span class="n">tsToken</span> <span class="n">ts</span><span class="p">)</span> <span class="p">(</span><span class="n">negate</span> <span class="n">n</span><span class="p">)</span> <span class="o">&lt;&gt;</span>
+                                      <span class="n">lovelaceValueOf</span> <span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">p</span><span class="p">)</span>
+                                    <span class="p">)</span>
+</pre></div>
+</div>
+<p>Finally, for <em>WithDraw</em>, we insist that the token amount and the lovelace amount are both nonnegative. This time we again add a constraint that the seller must sign
+the transaction. We modify the state in a similar way to the way we did for the <em>BuyTokens</em> redeemer, but this time we adjust the token and lovelace amounts according
+to how much has been withdrawn.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="kt">Withdraw</span> <span class="n">n</span> <span class="n">l</span><span class="p">)</span> <span class="o">|</span> <span class="n">n</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">l</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="ow">-&gt;</span> <span class="kt">Just</span> <span class="p">(</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">mustBeSignedBy</span> <span class="p">(</span><span class="n">tsSeller</span> <span class="n">ts</span><span class="p">)</span>
+                                                <span class="p">,</span> <span class="kt">State</span> <span class="n">p</span> <span class="o">$</span>
+                                                  <span class="n">v</span>                                       <span class="o">&lt;&gt;</span>
+                                                  <span class="n">nft</span> <span class="p">(</span><span class="n">negate</span> <span class="mi">1</span><span class="p">)</span>                          <span class="o">&lt;&gt;</span>
+                                                  <span class="n">assetClassValue</span> <span class="p">(</span><span class="n">tsToken</span> <span class="n">ts</span><span class="p">)</span> <span class="p">(</span><span class="n">negate</span> <span class="n">n</span><span class="p">)</span> <span class="o">&lt;&gt;</span>
+                                                  <span class="n">lovelaceValueOf</span> <span class="p">(</span><span class="n">negate</span> <span class="n">l</span><span class="p">)</span>
+                                                <span class="p">)</span>
+</pre></div>
+</div>
+<p>All other state transitions are illegal.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">_</span> <span class="ow">-&gt;</span> <span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>In this example we are able to construct our state machine more simply that we could in the previous lecture. This is because, in the previous lecture we had one
+condition that could not be expressed in the regular constraints.</p>
+<p>In these situations, there is a helper function called <em>mkStateMachine</em> that takes three arguments. The first one is the state token, the second is the transition
+function. The last one is to indicate which states are final. In this case, there is no final state. Once this token sale has been setup, it will always be there.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">tsStateMachine</span> <span class="ow">::</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">StateMachine</span> <span class="kt">Integer</span> <span class="kt">TSRedeemer</span>
+<span class="nf">tsStateMachine</span> <span class="n">ts</span> <span class="ow">=</span> <span class="n">mkStateMachine</span> <span class="p">(</span><span class="kt">Just</span> <span class="o">$</span> <span class="n">tsNFT</span> <span class="n">ts</span><span class="p">)</span> <span class="p">(</span><span class="n">transition</span> <span class="n">ts</span><span class="p">)</span> <span class="p">(</span><span class="n">const</span> <span class="kt">False</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We can now use the usual boilerplate to turn it into a Plutus smart contract.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">type</span> <span class="kt">TS</span> <span class="ow">=</span> <span class="kt">StateMachine</span> <span class="kt">Integer</span> <span class="kt">TSRedeemer</span>
+
+<span class="nf">tsInst</span> <span class="ow">::</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptInstance</span> <span class="kt">TS</span>
+<span class="nf">tsInst</span> <span class="n">ts</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validator</span> <span class="o">@</span><span class="kt">TS</span>
+    <span class="p">(</span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkTSValidator</span> <span class="o">||</span><span class="p">])</span> <span class="p">`</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">applyCode</span><span class="p">`</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">liftCode</span> <span class="n">ts</span><span class="p">)</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
+  <span class="kr">where</span>
+    <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="kt">Integer</span> <span class="o">@</span><span class="kt">TSRedeemer</span>
+
+<span class="nf">tsValidator</span> <span class="ow">::</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Validator</span>
+<span class="nf">tsValidator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorScript</span> <span class="o">.</span> <span class="n">tsInst</span>
+
+<span class="nf">tsAddress</span> <span class="ow">::</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Address</span>
+<span class="nf">tsAddress</span> <span class="ow">=</span> <span class="n">scriptAddress</span> <span class="o">.</span> <span class="n">tsValidator</span>
+
+<span class="nf">tsClient</span> <span class="ow">::</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">StateMachineClient</span> <span class="kt">Integer</span> <span class="kt">TSRedeemer</span>
+<span class="nf">tsClient</span> <span class="n">ts</span> <span class="ow">=</span> <span class="n">mkStateMachineClient</span> <span class="o">$</span> <span class="kt">StateMachineInstance</span> <span class="p">(</span><span class="n">tsStateMachine</span> <span class="n">ts</span><span class="p">)</span> <span class="p">(</span><span class="n">tsInst</span> <span class="n">ts</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>There are two helper functions to convert specialised error types to <em>Text</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mapErrorC</span> <span class="ow">::</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">C</span><span class="o">.</span><span class="kt">CurrencyError</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">Text</span> <span class="n">a</span>
+<span class="nf">mapErrorC</span> <span class="ow">=</span> <span class="n">mapError</span> <span class="o">$</span> <span class="n">pack</span> <span class="o">.</span> <span class="n">show</span>
+
+<span class="nf">mapErrorSM</span> <span class="ow">::</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">SMContractError</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">Text</span> <span class="n">a</span>
+<span class="nf">mapErrorSM</span> <span class="ow">=</span> <span class="n">mapError</span> <span class="o">$</span> <span class="n">pack</span> <span class="o">.</span> <span class="n">show</span>
+
+<span class="kt">Off</span><span class="o">-</span><span class="n">chain</span> <span class="n">code</span>
+<span class="o">~~~~~~~~~~~~~~</span>
+
+<span class="kt">For</span> <span class="n">the</span> <span class="n">off</span><span class="o">-</span><span class="n">chain</span> <span class="n">code</span><span class="p">,</span> <span class="n">we</span> <span class="n">start</span> <span class="n">by</span> <span class="n">defining</span> <span class="n">a</span> <span class="n">constant</span> <span class="n">for</span> <span class="n">the</span> <span class="n">token</span> <span class="n">name</span> <span class="kr">of</span> <span class="n">the</span> <span class="kt">NFT</span><span class="o">.</span>
+
+<span class="o">..</span> <span class="n">code</span><span class="ow">::</span> <span class="n">haskell</span>
+
+  <span class="n">nftName</span> <span class="ow">::</span> <span class="kt">TokenName</span>
+  <span class="n">nftName</span> <span class="ow">=</span> <span class="s">&quot;NFT&quot;</span>
+</pre></div>
+</div>
+<p>The first contract we define is to start the token sale. This contract is designed to be invoked by the seller.</p>
+<p>This first argument is a <em>Maybe CurrencySymbol</em>. The idea here is that if you pass in <em>Nothing</em>, the contract will mint a new NFT. Alternatively, you can provide a
+<em>Just CurrencySymbol</em> if the token already exists. We have done it this way mainly to make testing easier.</p>
+<p>The <em>AssetClass</em> argument is the token the seller wants to trade.</p>
+<p>For the return type, we are using the writer monad type with the <em>Last</em> type. The ideas is that once the token sale has been setup, it will get written here so that other
+contracts are able to discover it. In addition, we return the created token sale.</p>
+<p>To begin, we lookup the seller’s public key hash. We then need to get hold of the NFT. So, we determine if we need to mint the NFT, and, if we do, we mint it, otherwise we just use the one that was
+passed into the function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">startTS</span> <span class="ow">::</span> <span class="kt">HasBlockchainActions</span> <span class="n">s</span> <span class="ow">=&gt;</span> <span class="kt">Maybe</span> <span class="kt">CurrencySymbol</span> <span class="ow">-&gt;</span> <span class="kt">AssetClass</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="p">(</span><span class="kt">Last</span> <span class="kt">TokenSale</span><span class="p">)</span> <span class="n">s</span> <span class="kt">Text</span> <span class="kt">TokenSale</span>
+<span class="nf">startTS</span> <span class="n">mcs</span> <span class="n">token</span> <span class="ow">=</span> <span class="kr">do</span>
+
+    <span class="n">pkh</span> <span class="ow">&lt;-</span> <span class="n">pubKeyHash</span> <span class="o">&lt;$&gt;</span> <span class="kt">Contract</span><span class="o">.</span><span class="n">ownPubKey</span>
+    <span class="n">cs</span>  <span class="ow">&lt;-</span> <span class="kr">case</span> <span class="n">mcs</span> <span class="kr">of</span>
+        <span class="kt">Nothing</span>  <span class="ow">-&gt;</span> <span class="kt">C</span><span class="o">.</span><span class="n">currencySymbol</span> <span class="o">&lt;$&gt;</span> <span class="n">mapErrorC</span> <span class="p">(</span><span class="kt">C</span><span class="o">.</span><span class="n">forgeContract</span> <span class="n">pkh</span> <span class="p">[(</span><span class="n">nftName</span><span class="p">,</span> <span class="mi">1</span><span class="p">)])</span>
+        <span class="kt">Just</span> <span class="n">cs&#39;</span> <span class="ow">-&gt;</span> <span class="n">return</span> <span class="n">cs&#39;</span>
+</pre></div>
+</div>
+<p>And now we can define the <em>TokenSale</em> and create the state machine client.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">let</span> <span class="n">ts</span> <span class="ow">=</span> <span class="kt">TokenSale</span>
+        <span class="p">{</span> <span class="n">tsSeller</span> <span class="ow">=</span> <span class="n">pkh</span>
+        <span class="p">,</span> <span class="n">tsToken</span>  <span class="ow">=</span> <span class="n">token</span>
+        <span class="p">,</span> <span class="n">tsNFT</span>    <span class="ow">=</span> <span class="kt">AssetClass</span> <span class="p">(</span><span class="n">cs</span><span class="p">,</span> <span class="n">nftName</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="n">client</span> <span class="ow">=</span> <span class="n">tsClient</span> <span class="n">ts</span>
+</pre></div>
+</div>
+<p>We then use the <em>runInitialise</em> function that we discussed in the last lecture, using the client, an initial price of zero, and no initial funds, except for the NFT
+which will be automatically added.</p>
+<p>We write the <em>ts</em> into the log, then log a message, and return the <em>ts</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">void</span> <span class="o">$</span> <span class="n">mapErrorSM</span> <span class="o">$</span> <span class="n">runInitialise</span> <span class="n">client</span> <span class="mi">0</span> <span class="n">mempty</span>
+<span class="nf">tell</span> <span class="o">$</span> <span class="kt">Last</span> <span class="o">$</span> <span class="kt">Just</span> <span class="n">ts</span>
+<span class="nf">logInfo</span> <span class="o">$</span> <span class="s">&quot;started token sale &quot;</span> <span class="o">++</span> <span class="n">show</span> <span class="n">ts</span>
+<span class="nf">return</span> <span class="n">ts</span>
+</pre></div>
+</div>
+<p>The functions for all the other operations are extremely short. This example is ideal for the state machine approach.</p>
+<p>They are all very similar. They all invoke <em>runStep</em> and then invoke the correct transition from the state machine.</p>
+<p>For example, for <em>setPrice</em>, we need the <em>TokenSale</em> argument to identify the correct contract and the new value of the price. Then we use <em>runStep</em> using the client and
+<em>SetPrice</em> as the redeemer. We wrap that using <em>mapErrorSM</em> to convert to <em>Text</em> error messages, and we ignore the result.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">setPrice</span> <span class="ow">::</span> <span class="kt">HasBlockchainActions</span> <span class="n">s</span> <span class="ow">=&gt;</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">setPrice</span> <span class="n">ts</span> <span class="n">p</span> <span class="ow">=</span> <span class="n">void</span> <span class="o">$</span> <span class="n">mapErrorSM</span> <span class="o">$</span> <span class="n">runStep</span> <span class="p">(</span><span class="n">tsClient</span> <span class="n">ts</span><span class="p">)</span> <span class="o">$</span> <span class="kt">SetPrice</span> <span class="n">p</span>
+</pre></div>
+</div>
+<p>The remaining three follow the same pattern.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">addTokens</span> <span class="ow">::</span> <span class="kt">HasBlockchainActions</span> <span class="n">s</span> <span class="ow">=&gt;</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">addTokens</span> <span class="n">ts</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">void</span> <span class="p">(</span><span class="n">mapErrorSM</span> <span class="o">$</span> <span class="n">runStep</span> <span class="p">(</span><span class="n">tsClient</span> <span class="n">ts</span><span class="p">)</span> <span class="o">$</span> <span class="kt">AddTokens</span> <span class="n">n</span><span class="p">)</span>
+
+<span class="nf">buyTokens</span> <span class="ow">::</span> <span class="kt">HasBlockchainActions</span> <span class="n">s</span> <span class="ow">=&gt;</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">buyTokens</span> <span class="n">ts</span> <span class="n">n</span> <span class="ow">=</span> <span class="n">void</span> <span class="o">$</span> <span class="n">mapErrorSM</span> <span class="o">$</span> <span class="n">runStep</span> <span class="p">(</span><span class="n">tsClient</span> <span class="n">ts</span><span class="p">)</span> <span class="o">$</span> <span class="kt">BuyTokens</span> <span class="n">n</span>
+
+<span class="nf">withdraw</span> <span class="ow">::</span> <span class="kt">HasBlockchainActions</span> <span class="n">s</span> <span class="ow">=&gt;</span> <span class="kt">TokenSale</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">withdraw</span> <span class="n">ts</span> <span class="n">n</span> <span class="n">l</span> <span class="ow">=</span> <span class="n">void</span> <span class="o">$</span> <span class="n">mapErrorSM</span> <span class="o">$</span> <span class="n">runStep</span> <span class="p">(</span><span class="n">tsClient</span> <span class="n">ts</span><span class="p">)</span> <span class="o">$</span> <span class="kt">Withdraw</span> <span class="n">n</span> <span class="n">l</span>
+</pre></div>
+</div>
 </div>
 </div>
 </div>

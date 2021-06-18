@@ -56,6 +56,9 @@ retrieved funds.
 The diagram just shows one scenario, but these operations can be performed in any order - tokens can be added, the price can be changed, tokens can be bought, and so on,
 in an arbitrary order.
 
+On-chain code 
+~~~~~~~~~~~~~
+
 This week's first example is implemented in
 
 .. code:: haskell
@@ -79,9 +82,232 @@ For the redeemer, we provide exactly the operations we saw in the diagram
 .. code:: haskell
 
     data TSRedeemer =
-          SetPrice Integer         -- argument is the price
-        | AddTokens Integer        -- argument represents the number of tokens to add
-        | BuyTokens Integer        -- argument represents the number of tokens to buy
+          SetPrice Integer         -- the price
+        | AddTokens Integer        -- the number of tokens to add
+        | BuyTokens Integer        -- the number of tokens to buy
         | Withdraw Integer Integer -- first argument is the number of tokens, the second is the number of lovelace
         deriving (Show, Prelude.Eq)    
 
+Again we have the helper function that we have used in previous examples
+
+.. code:: haskell
+
+    lovelaces :: Value -> Integer
+    lovelaces = Ada.getLovelace . Ada.fromValue
+    
+Now, we get to the *transition* function of the state machine. We see the *TokenSale* parameter which holds the state machines configuration values, the *State* 
+object with an *Integer* value to represent the price of the token, then the redeemer *TsRedeemer*. Again, we return a *Maybe*, which will be *Nothing* if the 
+corresponding transition is illegal, or, if it is legal, a *Just* containing constraints and the new state.
+
+.. code:: haskell
+
+    transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
+    transition ts s r = case (stateValue s, stateData s, r) of
+
+If the *SetPrice* redeemer is provided, then we only consider it to be legal if the price is not negative. We then return a *Just* with the constraint that the 
+transaction must be signed by the token seller, and with the new state. The new state will be the new price *p*, and the *Value* in the contract 
+remains the same, except for one thing. 
+
+It is a little unfortunate, but there is a discrepancy between the *v* on the left and the *v* on the right. On the left it does not contain the NFT, but 
+on the right it does not. So, even though we want to say that we don't want the value changed, in fact we have to remove the NFT, because the Plutus libraries will
+add it again. This is perhaps not an ideal design, but that is how it currently is.
+
+.. code:: haskell
+
+        (v, _, SetPrice p) | p >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                            , State p $
+                                              v <>
+                                              nft (negate 1)
+                                            )
+
+We use a helper function to reference the NFT.
+
+.. code:: haskell
+
+  nft :: Integer -> Value
+  nft = assetClassValue (tsNFT ts)  
+                                            
+When adding tokens, we could check that the seller has signed the transaction, but this contract would be provided by the seller, and the seller doesn't mind if someone 
+wants to give them a free gift! Therefore, once we have the *AddTokens* redeemer and *n* is greater than zero, we are happy to return the 
+new state without constraints.
+
+The state that we return is untouched, except for the unfortunate trick we need to do with the NFT, and the addition of the new tokens.
+
+.. code:: haskell
+
+        (v, p, AddTokens n) | n > 0 -> Just ( mempty
+                                            , State p $
+                                              v                                       <>
+                                              nft (negate 1)                          <>
+                                              assetClassValue (tsToken ts) n
+                                            )
+
+For the *BuyTokens* redeemer, again we check the number of tokens is positive, and again we don't need any constraints, because anybody can buy tokens.
+
+For the new state, we don't touch the price. We again correct for the NFT. Then we subtract the tokens that were bought, and we add the lovelace that were paid for them.
+
+.. code:: haskell
+                                                                
+        (v, p, BuyTokens n) | n > 0 -> Just ( mempty
+                                            , State p $
+                                              v                                       <>
+                                              nft (negate 1)                          <>
+                                              assetClassValue (tsToken ts) (negate n) <>
+                                              lovelaceValueOf (n * p)
+                                            )
+
+Finally, for *WithDraw*, we insist that the token amount and the lovelace amount are both nonnegative. This time we again add a constraint that the seller must sign 
+the transaction. We modify the state in a similar way to the way we did for the *BuyTokens* redeemer, but this time we adjust the token and lovelace amounts according 
+to how much has been withdrawn.
+
+.. code:: haskell
+                                                           
+        (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                        , State p $
+                                                          v                                       <>
+                                                          nft (negate 1)                          <>
+                                                          assetClassValue (tsToken ts) (negate n) <>
+                                                          lovelaceValueOf (negate l)
+                                                        )
+
+All other state transitions are illegal.
+
+.. code:: haskell
+  
+        _ -> Nothing
+
+In this example we are able to construct our state machine more simply that we could in the previous lecture. This is because, in the previous lecture we had one 
+condition that could not be expressed in the regular constraints.        
+
+In these situations, there is a helper function called *mkStateMachine* that takes three arguments. The first one is the state token, the second is the transition 
+function. The last one is to indicate which states are final. In this case, there is no final state. Once this token sale has been setup, it will always be there.
+
+.. code:: haskell
+
+  tsStateMachine :: TokenSale -> StateMachine Integer TSRedeemer
+  tsStateMachine ts = mkStateMachine (Just $ tsNFT ts) (transition ts) (const False)
+
+We can now use the usual boilerplate to turn it into a Plutus smart contract.
+
+.. code:: haskell
+
+  type TS = StateMachine Integer TSRedeemer
+
+  tsInst :: TokenSale -> Scripts.ScriptInstance TS
+  tsInst ts = Scripts.validator @TS
+      ($$(PlutusTx.compile [|| mkTSValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode ts)
+      $$(PlutusTx.compile [|| wrap ||])
+    where
+      wrap = Scripts.wrapValidator @Integer @TSRedeemer
+  
+  tsValidator :: TokenSale -> Validator
+  tsValidator = Scripts.validatorScript . tsInst
+  
+  tsAddress :: TokenSale -> Ledger.Address
+  tsAddress = scriptAddress . tsValidator
+  
+  tsClient :: TokenSale -> StateMachineClient Integer TSRedeemer
+  tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsInst ts)
+  
+There are two helper functions to convert specialised error types to *Text*.
+
+.. code:: haskell
+
+  mapErrorC :: Contract w s C.CurrencyError a -> Contract w s Text a
+  mapErrorC = mapError $ pack . show
+  
+  mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
+  mapErrorSM = mapError $ pack . show
+  
+  Off-chain code 
+  ~~~~~~~~~~~~~~
+  
+  For the off-chain code, we start by defining a constant for the token name of the NFT.
+
+  .. code:: haskell
+
+    nftName :: TokenName
+    nftName = "NFT"
+
+The first contract we define is to start the token sale. This contract is designed to be invoked by the seller.
+
+This first argument is a *Maybe CurrencySymbol*. The idea here is that if you pass in *Nothing*, the contract will mint a new NFT. Alternatively, you can provide a 
+*Just CurrencySymbol* if the token already exists. We have done it this way mainly to make testing easier.
+
+The *AssetClass* argument is the token the seller wants to trade.
+
+For the return type, we are using the writer monad type with the *Last* type. The ideas is that once the token sale has been setup, it will get written here so that other 
+contracts are able to discover it. In addition, we return the created token sale.
+
+To begin, we lookup the seller's public key hash. We then need to get hold of the NFT. So, we determine if we need to mint the NFT, and, if we do, we mint it, otherwise we just use the one that was 
+passed into the function.
+
+.. code:: haskell
+
+  startTS :: HasBlockchainActions s => Maybe CurrencySymbol -> AssetClass -> Contract (Last TokenSale) s Text TokenSale
+  startTS mcs token = do
+  
+      pkh <- pubKeyHash <$> Contract.ownPubKey
+      cs  <- case mcs of
+          Nothing  -> C.currencySymbol <$> mapErrorC (C.forgeContract pkh [(nftName, 1)])
+          Just cs' -> return cs'
+
+And now we can define the *TokenSale* and create the state machine client.
+
+.. code:: haskell
+  
+      let ts = TokenSale
+              { tsSeller = pkh
+              , tsToken  = token
+              , tsNFT    = AssetClass (cs, nftName)
+              }
+          client = tsClient ts
+
+We then use the *runInitialise* function that we discussed in the last lecture, using the client, an initial price of zero, and no initial funds, except for the NFT 
+which will be automatically added.
+
+We write the *ts* into the log, then log a message, and return the *ts*.
+
+.. code:: haskell
+
+      void $ mapErrorSM $ runInitialise client 0 mempty
+      tell $ Last $ Just ts
+      logInfo $ "started token sale " ++ show ts
+      return ts
+      
+The functions for all the other operations are extremely short. This example is ideal for the state machine approach.
+
+They are all very similar. They all invoke *runStep* and then invoke the correct transition from the state machine.
+
+For example, for *setPrice*, we need the *TokenSale* argument to identify the correct contract and the new value of the price. Then we use *runStep* using the client and 
+*SetPrice* as the redeemer. We wrap that using *mapErrorSM* to convert to *Text* error messages, and we ignore the result.
+
+.. code:: haskell
+
+  setPrice :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
+  setPrice ts p = void $ mapErrorSM $ runStep (tsClient ts) $ SetPrice p
+
+The remaining three follow the same pattern.
+
+.. code:: haskell
+
+  addTokens :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
+  addTokens ts n = void (mapErrorSM $ runStep (tsClient ts) $ AddTokens n)
+  
+  buyTokens :: HasBlockchainActions s => TokenSale -> Integer -> Contract w s Text ()
+  buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
+  
+  withdraw :: HasBlockchainActions s => TokenSale -> Integer -> Integer -> Contract w s Text ()
+  withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
+
+  
+  
+
+
+
+
+
+
+
+  
+  
