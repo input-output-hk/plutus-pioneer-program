@@ -370,8 +370,12 @@ We define a *runMyTrace* function which uses *runEmulatorTraceIO'* with a custom
   runMyTrace :: IO ()
   runMyTrace = runEmulatorTraceIO' def emCfg myTrace
 
-Let's first look at the *emCfg* function. Recall that this is where we can give custom initial distributions to wallets. Here we give 1000 Ada and 1000 *aa* token to 
-three wallets.
+Let's first look at the *emCfg* function. Recall that this is where we can give custom initial distributions to wallets. Here we give 1000 Ada and 1000 of a custom 
+token to three wallets.
+
+.. note::
+  
+  The ability to use underscores in large numbers such as 1000_000_000 is provided by a GHC extension *NumericUnderscores*
 
 .. code:: haskell
 
@@ -389,6 +393,8 @@ three wallets.
   
   token :: AssetClass
   token = AssetClass (currency, name)      
+
+
 
 
       
