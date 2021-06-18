@@ -300,8 +300,31 @@ The remaining three follow the same pattern.
   withdraw :: HasBlockchainActions s => TokenSale -> Integer -> Integer -> Contract w s Text ()
   withdraw ts n l = void $ mapErrorSM $ runStep (tsClient ts) $ Withdraw n l
 
+Now we define three schemas.
+
+One for the seller which just has one endpoint which takes the *CurrencySymbol* and the *TokenName* of the asset to be traded.
+
+.. code:: haskell
+
+  type TSStartSchema = BlockchainActions
+      .\/ Endpoint "start"      (CurrencySymbol, TokenName)
+
+For testing purposes, we create *TSStartSchema'* which additionally takes the *CurrencySymbol* of the NFT.
+
+.. code:: haskell
+
+  type TSStartSchema' = BlockchainActions
+      .\/ Endpoint "start"      (CurrencySymbol, CurrencySymbol, TokenName)  
   
-  
+Lastly we have a *use* schema, with endpoints for the four operations - set price, add tokens, buy tokens and withdraw. 
+
+.. code:: haskell
+
+  type TSUseSchema = BlockchainActions
+    .\/ Endpoint "set price"  Integer
+    .\/ Endpoint "add tokens" Integer
+    .\/ Endpoint "buy tokens" Integer
+    .\/ Endpoint "withdraw"   (Integer, Integer)  
 
 
 
