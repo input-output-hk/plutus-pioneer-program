@@ -469,6 +469,103 @@ Let's run this in the REPL.
   Ok, one module loaded.
   Prelude Spec.Trace> runMyTrace
 
+  Slot 00000: TxnValidate 2125c8770581c6140c3c71276889f6353830744191de0184b6aa00b185004500
+  Slot 00000: SlotAdd Slot 1
+  Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Contract instance started
+
+The first endpoint call is to *start*. This creates three transaction. Two of these are from the forge contract to create the NFT, and the third one is to set up our 
+initial UTxO for the token sale.
+
+.. code::
+
+  Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "start"),("value",Object (fromList [("unEndpointValue",Array [Object (fromList [("unCurrencySymbol",String "aa")]),Object (fromList [("unTokenName",String "A")])])]))])
+  Slot 00001: W1: TxSubmit: cccba8b2abc3e82a735735c2346aa3fcac58152f17854b1745306e5b63a0b965
+  Slot 00001: TxnValidate cccba8b2abc3e82a735735c2346aa3fcac58152f17854b1745306e5b63a0b965
+  Slot 00001: SlotAdd Slot 2
+  Slot 00002: W1: TxSubmit: e23e19192aea3304a989ab98f05e70bc01fe43f3ea940da78a92ab7cebec9bbb
+  Slot 00002: TxnValidate e23e19192aea3304a989ab98f05e70bc01fe43f3ea940da78a92ab7cebec9bbb
+  Slot 00002: SlotAdd Slot 3
+  Slot 00003: W1: TxSubmit: 4cae1c5115eb4128243ce029dcd4d6c23d6497d3ab5e71a79f4dc34e9b8cd763
+  Slot 00003: TxnValidate 4cae1c5115eb4128243ce029dcd4d6c23d6497d3ab5e71a79f4dc34e9b8cd763
+  Slot 00003: SlotAdd Slot 4
+  Slot 00004: *** CONTRACT LOG: "started token sale TokenSale {tsSeller = 21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9, tsToken = (aa,\"A\"), tsNFT = (65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55,\"NFT\")}"
+  Slot 00004: SlotAdd Slot 5
+  Slot 00005: SlotAdd Slot 6
+
+.. code::
+    
+  Slot 00006: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Sending contract state to Thread 0
+  Slot 00006: SlotAdd Slot 7
+  Slot 00007: *** USER LOG: started token sale TokenSale {tsSeller = 21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9, tsToken = (aa,"A"), tsNFT = (65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55,"NFT")}
+  Slot 00007: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Contract instance started
+  Slot 00007: 00000000-0000-4000-8000-000000000002 {Contract instance for wallet 2}:
+    Contract instance started
+  Slot 00007: 00000000-0000-4000-8000-000000000003 {Contract instance for wallet 3}:
+    Contract instance started
+  Slot 00007: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "set price"),("value",Object (fromList [("unEndpointValue",Number 1000000.0)]))])
+  Slot 00007: W1: TxSubmit: 2de6dd820e6939b4b1f9e162c0e2cc878cc38ea1231a9be610315da4eda06714
+  Slot 00007: TxnValidate 2de6dd820e6939b4b1f9e162c0e2cc878cc38ea1231a9be610315da4eda06714
+  Slot 00007: SlotAdd Slot 8
+  Slot 00008: SlotAdd Slot 9
+  Slot 00009: SlotAdd Slot 10
+  Slot 00010: SlotAdd Slot 11
+  Slot 00011: SlotAdd Slot 12
+  Slot 00012: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "add tokens"),("value",Object (fromList [("unEndpointValue",Number 100.0)]))])
+  Slot 00012: W1: TxSubmit: 42f1bebe285d1ea23bd90683d110866bb438eede8ef62eaf5e9e3d65eec18e90
+  Slot 00012: TxnValidate 42f1bebe285d1ea23bd90683d110866bb438eede8ef62eaf5e9e3d65eec18e90
+  Slot 00012: SlotAdd Slot 13
+  Slot 00013: SlotAdd Slot 14
+  Slot 00014: SlotAdd Slot 15
+  Slot 00015: SlotAdd Slot 16
+  Slot 00016: SlotAdd Slot 17
+  Slot 00017: 00000000-0000-4000-8000-000000000002 {Contract instance for wallet 2}:
+    Receive endpoint call: Object (fromList [("tag",String "buy tokens"),("value",Object (fromList [("unEndpointValue",Number 20.0)]))])
+  Slot 00017: W2: TxSubmit: 30d28ca855a14accbb11deee682b174adffb548922e1d4257242880f28328f8e
+  Slot 00017: TxnValidate 30d28ca855a14accbb11deee682b174adffb548922e1d4257242880f28328f8e
+  Slot 00017: SlotAdd Slot 18
+  Slot 00018: SlotAdd Slot 19
+  Slot 00019: SlotAdd Slot 20
+  Slot 00020: SlotAdd Slot 21
+  Slot 00021: SlotAdd Slot 22
+  Slot 00022: 00000000-0000-4000-8000-000000000003 {Contract instance for wallet 3}:
+    Receive endpoint call: Object (fromList [("tag",String "buy tokens"),("value",Object (fromList [("unEndpointValue",Number 5.0)]))])
+  Slot 00022: W3: TxSubmit: 708b0c4117ad3b38b69254a714e4695c574af404c3fff0eda859b571218b003c
+  Slot 00022: TxnValidate 708b0c4117ad3b38b69254a714e4695c574af404c3fff0eda859b571218b003c
+  Slot 00022: SlotAdd Slot 23
+  Slot 00023: SlotAdd Slot 24
+  Slot 00024: SlotAdd Slot 25
+  Slot 00025: SlotAdd Slot 26
+  Slot 00026: SlotAdd Slot 27
+  Slot 00027: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "withdraw"),("value",Object (fromList [("unEndpointValue",Array [Number 40.0,Number 1.0e7])]))])
+  Slot 00027: W1: TxSubmit: a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+  Slot 00027: TxnValidate a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+  Slot 00027: SlotAdd Slot 28
+  Slot 00028: SlotAdd Slot 29
+  Slot 00029: SlotAdd Slot 30
+  Slot 00030: SlotAdd Slot 31
+  Slot 00031: SlotAdd Slot 32
+  Slot 00032: SlotAdd Slot 33
+  Final balances
+  Wallet 1: 
+      {aa, "A"}: 940
+      {, ""}: 1009942570
+  Wallet 2: 
+      {aa, "A"}: 1020
+      {, ""}: 979985260
+  Wallet 3: 
+      {aa, "A"}: 1005
+      {, ""}: 994985211
+  Script fb3eca878d177b6d9264c7c36845fb1e28935553812ed2b56e39c9c4564b85ad: 
+      {65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55, "NFT"}: 1
+      {aa, "A"}: 35
+      {, ""}: 15000000
   
   
   
