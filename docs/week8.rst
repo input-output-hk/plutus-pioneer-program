@@ -395,7 +395,7 @@ token to three wallets.
   token = AssetClass (currency, name)      
 
 For the trace, first we activate Wallet 1 using the non-primed *startEndpoint* function which mints the NFT is minted automatically. Then, we call the start endpoint, giving it 
-the symbol and name of the token we want to sell, and then wait for five slots.
+the symbol and name of the token we want to sell, and then wait for five slots, although two would be enough in this case.
 
 .. code:: haskell
 
@@ -404,8 +404,24 @@ the symbol and name of the token we want to sell, and then wait for five slots.
       h <- activateContractWallet (Wallet 1) startEndpoint  
       callEndpoint @"start" h (currency, name)
       void $ Emulator.waitNSlots 5
+      Last m <- observableState h
 
+We then read the state, which we wrote using *tell*, and check to see if it is valid. If it is not, we log an error. If it is, we proceed with the test.
 
+.. code:: haskell
+
+  case m of
+    Nothing -> Extras.logError @String "error starting token sale"
+    Just ts -> do  
+        Extras.logInfo $ "started token sale " ++ show ts
+
+We can now activate the endpoints for the three wallets.
+
+.. code:: haskell
+
+    h1 <- activateContractWallet (Wallet 1) $ useEndpoints ts
+    h2 <- activateContractWallet (Wallet 2) $ useEndpoints ts
+    h3 <- activateContractWallet (Wallet 3) $ useEndpoints ts  
 
       
 
