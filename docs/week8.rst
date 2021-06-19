@@ -629,3 +629,26 @@ where you can have sub groups and sub-sub groups and so on.
 
   tests :: TestTree
   tests = testGroup "Tests" [properties, unitTests]
+
+There is special support for tests in Plutus in the *plutus-contract* package in
+
+.. code:: haskell
+
+  module Plutus.Contract.Test
+
+There are various types of tests that are supported, but here we will only look at two of those. One that works with emulator traces, and one which is much more 
+sophisticated and uses so-called property-based testing.
+
+This module gives us functions for checking predicates, for example
+
+.. code:: haskell
+
+  checkPredicate :: String -> TracePredicate -> EmulatorTrace () -> TestTree 
+
+Here we see the connection with Tasty. It takes, as arguments, the descriptive name of the test, then a *TracePredicate* which we will get to in a moment, and an 
+*EmulatorTrace* like the one we have used to test our contracts previously. And the result is a *TestTree* which, as we have seen, is the type of tests that Tasty
+uses. So, using this *checkPredicate* function we can produce something that the Tasty framework can understand.
+
+
+
+
