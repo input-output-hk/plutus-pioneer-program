@@ -7,7 +7,7 @@ Week 08 - Property Based Testing
 
     In this lecture we cover another state machine example, automatic testing using emulator traces, optics, and property-based testing.
 
-    This week we were using Plutus commit 530cc134364ae186f39fb2b54239fb7c5e2986e9, the same commit as we used in the last lecture.
+    This week we were using Plutus commit ae35c4b8fe66dd626679bd2951bd72190e09a123, the same commit as we used in the last lecture.
 
 Token Sale
 ----------
@@ -415,7 +415,8 @@ We then read the state, which we wrote using *tell*, and check to see if it is v
     Just ts -> do  
         Extras.logInfo $ "started token sale " ++ show ts
 
-We can now activate the endpoints for the three wallets.
+We can now activate the endpoints for the three wallets. Recall that the *useEndpoints* function is parameterised by the *TokenSale* data, which is why we needed to 
+get that value.
 
 .. code:: haskell
 
@@ -423,9 +424,47 @@ We can now activate the endpoints for the three wallets.
     h2 <- activateContractWallet (Wallet 2) $ useEndpoints ts
     h3 <- activateContractWallet (Wallet 3) $ useEndpoints ts  
 
-      
+Wallet 1 sets the price to 1 Ada and we again wait for a generous amount of time.
+
+.. code:: haskell
+
+  callEndpoint @"set price" h1 1_000_000
+  void $ Emulator.waitNSlots 5  
+
+Wallet 1 adds 100 tokens.
+
+.. code:: haskell
+
+  callEndpoint @"add tokens" h1 100
+  void $ Emulator.waitNSlots 5
+  
+Wallet 2 buys 20 tokens. So now the contract should contain 80 tokens and 20 Ada.
+
+.. code:: haskell
+
+  callEndpoint @"buy tokens" h2 20
+  void $ Emulator.waitNSlots 5
+  
+Wallet 3 buys 5 tokens. Now there should be 75 tokens in the contract and 25 Ada.
+
+.. code:: haskell
+
+  callEndpoint @"buy tokens" h3 5
+  void $ Emulator.waitNSlots 5
+
+Finally, Wallet 1 calls the withdraw endpoint, taking out 40 tokens and 10 Ada. At this point, there should be 35 tokens and 10 Ada in the contract.
+
+.. code:: haskell
+
+  callEndpoint @"withdraw" h1 (40, 10_000_000)
+  void $ Emulator.waitNSlots 5
+  
+Let's run this in the REPL.
 
 
+  
+  
+  
 
 
   
