@@ -494,8 +494,10 @@ initial UTxO for the token sale.
   Slot 00004: SlotAdd Slot 5
   Slot 00005: SlotAdd Slot 6
 
+We successfully read the *TokenSale* value from the observable state, and start the three contract instances for the use contract.
+
 .. code::
-    
+
   Slot 00006: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
     Sending contract state to Thread 0
   Slot 00006: SlotAdd Slot 7
@@ -506,6 +508,11 @@ initial UTxO for the token sale.
     Contract instance started
   Slot 00007: 00000000-0000-4000-8000-000000000003 {Contract instance for wallet 3}:
     Contract instance started
+
+Then we set the price.
+
+.. code::
+
   Slot 00007: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
     Receive endpoint call: Object (fromList [("tag",String "set price"),("value",Object (fromList [("unEndpointValue",Number 1000000.0)]))])
   Slot 00007: W1: TxSubmit: 2de6dd820e6939b4b1f9e162c0e2cc878cc38ea1231a9be610315da4eda06714
@@ -515,6 +522,11 @@ initial UTxO for the token sale.
   Slot 00009: SlotAdd Slot 10
   Slot 00010: SlotAdd Slot 11
   Slot 00011: SlotAdd Slot 12
+
+Then add some tokens.
+
+.. code::
+
   Slot 00012: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
     Receive endpoint call: Object (fromList [("tag",String "add tokens"),("value",Object (fromList [("unEndpointValue",Number 100.0)]))])
   Slot 00012: W1: TxSubmit: 42f1bebe285d1ea23bd90683d110866bb438eede8ef62eaf5e9e3d65eec18e90
@@ -524,6 +536,11 @@ initial UTxO for the token sale.
   Slot 00014: SlotAdd Slot 15
   Slot 00015: SlotAdd Slot 16
   Slot 00016: SlotAdd Slot 17
+
+Then the two buys by Wallets 2 and 3.
+
+.. code::
+
   Slot 00017: 00000000-0000-4000-8000-000000000002 {Contract instance for wallet 2}:
     Receive endpoint call: Object (fromList [("tag",String "buy tokens"),("value",Object (fromList [("unEndpointValue",Number 20.0)]))])
   Slot 00017: W2: TxSubmit: 30d28ca855a14accbb11deee682b174adffb548922e1d4257242880f28328f8e
@@ -542,6 +559,11 @@ initial UTxO for the token sale.
   Slot 00024: SlotAdd Slot 25
   Slot 00025: SlotAdd Slot 26
   Slot 00026: SlotAdd Slot 27
+
+And finally, the withdraw by Wallet 1.
+
+.. code::
+
   Slot 00027: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
     Receive endpoint call: Object (fromList [("tag",String "withdraw"),("value",Object (fromList [("unEndpointValue",Array [Number 40.0,Number 1.0e7])]))])
   Slot 00027: W1: TxSubmit: a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
@@ -552,16 +574,38 @@ initial UTxO for the token sale.
   Slot 00030: SlotAdd Slot 31
   Slot 00031: SlotAdd Slot 32
   Slot 00032: SlotAdd Slot 33
+
+All wallets initially owned 1000 tokens and 1000 Ada. Wallet 1 added 100 tokens to the contract, but then in the last step retrieved 40 tokens and 10 Ada,
+and so we see its final balance as 940 tokens and 1010 Ada minus transaction fees.
+
+.. code::
+
   Final balances
   Wallet 1: 
       {aa, "A"}: 940
       {, ""}: 1009942570
+
+Wallet 2 bought 20 tokens and paid 20 Ada for them, plus some transaction fees.
+
+.. code::
+
   Wallet 2: 
       {aa, "A"}: 1020
       {, ""}: 979985260
+
+Wallet 3 bought 5 tokens for 5 Ada.
+
+.. code::
+
   Wallet 3: 
       {aa, "A"}: 1005
       {, ""}: 994985211
+
+Finally, the script still contains the NFT, which will forever stay there, plus 35 tokens and 15 Ada. There were, at one point, 75 tokens and 25 Ada, before Wallet 1 
+made a withdrawal.
+
+.. code::
+
   Script fb3eca878d177b6d9264c7c36845fb1e28935553812ed2b56e39c9c4564b85ad: 
       {65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55, "NFT"}: 1
       {aa, "A"}: 35
