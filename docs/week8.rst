@@ -461,6 +461,13 @@ Finally, Wallet 1 calls the withdraw endpoint, taking out 40 tokens and 10 Ada. 
   
 Let's run this in the REPL.
 
+.. code::
+
+  cabal repl plutus-pioneer-program-week08-tests
+  Ok, five modules loaded.
+  Prelude Main> :l Spec.Trace
+  Ok, one module loaded.
+  Prelude Spec.Trace> runMyTrace
 
   
   
