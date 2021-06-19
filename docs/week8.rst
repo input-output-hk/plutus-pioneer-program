@@ -611,9 +611,21 @@ made a withdrawal.
       {aa, "A"}: 35
       {, ""}: 15000000
   
-  
-  
+Tasty
+-----
 
+You can find *tasty* on Hackage.
+  
+.. figure:: img/pic__000001.png
 
-  
-  
+There is also some example code on the same page.
+
+Basically you have a main program that references some *tests* of type *TestTree*. As the name suggests, this allows for a tree of tests,
+where you can have sub groups and sub-sub groups and so on.
+
+.. code:: haskell
+
+  main = defaultMain tests
+
+  tests :: TestTree
+  tests = testGroup "Tests" [properties, unitTests]
