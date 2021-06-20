@@ -872,7 +872,119 @@ Now, let's apply the *goTo* function to it, and see the changes.
   Prelude Week08.Lens> goTo "Athens" iohk
   Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Athens"}},Person {_name = "Lars", _address = Address {_city = "Athens"}}]}
 
-So, dealing with nested record types, even though it is quite simple conceptually, can be quite messy.
+So, dealing with nested record types, even though it is quite simple conceptually, can be quite messy. 
+
+This is what optics try to make easier with the idea of providing first-class field accessors. In the end it's very similar to dealing with such data types in an imperative 
+language such as C# or Java.
+
+We saw in lecture four how monads can be viewed as a programmable semi-colon, where the semi-colon is the statement separator in many imperative languages. In a similar way, optics can be thought of as providing a programmable dot, 
+where a dot is the accessor dot as in Python or Java.
+
+You could implement lenses by hand, but the *lens* library provides some Template Haskell magic to do it automatically, so long as we follow the underscore convention mentioned above.
+
+.. code:: haskell
+
+  makeLenses ''Company
+  makeLenses ''Person
+  makeLenses ''Address
+
+The names of the lenses will be the names of the original fields without the underscore.
+
+There is a way, within the REPL, to inspect what code Template Haskell writes at compile time.
+
+First, enable the following flag
+
+.. code::
+
+  Prelude Week08.Lens> :set -ddump-splices
+
+Then, reload the module. If nothing happens, you'll need to make a minor change to the code, perhaps by adding some whitespace, before reloading.
+
+.. code::
+
+  Prelude Week08.Lens> :r
+  [4 of 4] Compiling Week08.Lens      ( src/Week08/Lens.hs, /home/chris/git/ada/pioneer-fork/code/week08/dist-newstyle/build/x86_64-linux/ghc-8.10.4.20210212/plutus-pioneer-program-week08-0.1.0.0/build/Week08/Lens.o )
+  src/Week08/Lens.hs:35:1-20: Splicing declarations
+      makeLenses ''Company
+    ======>
+      staff :: Iso' Company [Person]
+      staff = (iso (\ (Company x_abBO) -> x_abBO)) Company
+      {-# INLINE staff #-}
+  src/Week08/Lens.hs:36:1-19: Splicing declarations
+      makeLenses ''Person
+    ======>
+      address :: Lens' Person Address
+      address f_abEJ (Person x1_abEK x2_abEL)
+        = (fmap (\ y1_abEM -> (Person x1_abEK) y1_abEM)) (f_abEJ x2_abEL)
+      {-# INLINE address #-}
+      name :: Lens' Person String
+      name f_abEN (Person x1_abEO x2_abEP)
+        = (fmap (\ y1_abEQ -> (Person y1_abEQ) x2_abEP)) (f_abEN x1_abEO)
+      {-# INLINE name #-}
+  src/Week08/Lens.hs:37:1-20: Splicing declarations
+      makeLenses ''Address
+    ======>
+      city :: Iso' Address String
+      city = (iso (\ (Address x_abFw) -> x_abFw)) Address
+      {-# INLINE city #-}
+  
+This now shows us what Template Haskell does.
+
+We see that *makeLenses* for *Company* creates a function *staff*, which returns an *Iso'* - a type of optic - from *Company* to *[Person]*.
+
+For *makeLenses Person* we get an *address* function which returns a *Lens'* from *Person* to *Address*, and we also get a *name* lens from *Person* to *String*.
+
+For *makeLenses Address* we get a *city* function which returns an *Iso'* from *Address* to *String*.
+
+*Iso* and *Lens* are two different types of optics but the order of type arguments is always the same. 
+You always have two type arguments, at least for these primed versions (there are more general optics which take four type parameters). The first argument is always the 
+big data type and the second parameter is the part you are zooming into. The name optics relates to the mental image of zooming into a datatype.
+
+Let's try them out in the REPL.
+
+.. code::
+
+  Prelude Week08.Lens> lars
+  Person {_name = "Lars", _address = Address {_city = "Regensburg"}}
+
+  Prelude Week08.Lens> import Control.Lens
+
+  Prelude Control.Lens Week08.Lens> lars ^. name
+  "Lars"
+  
+  Prelude Control.Lens Week08.Lens> lars ^. address
+  Address {_city = "Regensburg"}
+
+A very powerful feature of lenses is that you can compose them.  
+
+Where we have, above, something going from *Person* to *Address* and we have something else going from *Address* to *String*, then we can combine them using the
+function composition dot. There is some advanced type-level machinery going on behind the scenes to make that work, but it works.
+
+.. code::
+
+  Prelude Control.Lens Week08.Lens> lars ^. address . city
+  "Regensburg"
+
+Not only can you view the contents of record types like this, but you can also manipulate them.
+
+.. code::
+
+  Prelude Control.Lens Week08.Lens> lars & name .~ "LARS"
+  Person {_name = "LARS", _address = Address {_city = "Regensburg"}}
+
+The *&* symbol here is function application, but the other way around - the argument comes first and then the function.
+
+
+
+  
+
+
+
+
+
+
+
+
 
 
 
