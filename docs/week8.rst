@@ -611,8 +611,11 @@ made a withdrawal.
       {aa, "A"}: 35
       {, ""}: 15000000
   
+Testing
+-------
+
 Tasty
------
+~~~~~
 
 You can find *tasty* on Hackage.
   
@@ -782,9 +785,20 @@ We see a nice error message, followed by the emulator log, which we didn't get w
 This is probably the simplest way to write automated tests for Plutus contracts. You simply write one or more emulator traces, and then use *checkPredicate* in association
 with the appropriate test predicates, to check that the trace leads to the desired result. This lets us write more or less traditional unit tests.
 
+Optics and Lenses 
+~~~~~~~~~~~~~~~~~
 
+Before we get to the second way of testing Plutus contracts, we will take a brief look at optics and lenses.
 
+There are various competing optics libraries on Hackage, but the most prominent, and the most infamous one, and the one that the Plutus team decided to use is called *Lens*.
 
+*Lens* is authored by Edward Kmett, who is probably the most prolific contributor to Haskell libraries.
 
+.. figure:: img/pic__000002.png
 
+You can see on the Hackage page there is a scary diagram. There is a whole zoo of optics. There are lenses and prisms and traversals and isos and whatnot. This diagram 
+shows some of the operations that the library provides.
 
+.. figure:: img/pic__000003.png
+
+Optics are all about reaching deeply into hierarchical data types.
