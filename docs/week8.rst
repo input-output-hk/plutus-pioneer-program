@@ -680,42 +680,18 @@ And we see various checks that we can do, for example
 
 .. code:: haskell
 
-  endpointAvailable
-    :: forall (l :: Symbol) w s e a.
-      ( HasType l Endpoints.ActiveEndpoint (Output s)
-      , KnownSymbol l
-      , ContractConstraints s
-      , Monoid w
-      )
-    => Contract w s e a
-    -> ContractInstanceTag
-    -> TracePredicate  
+  endpointAvailable :: forall (l :: Symbol) w s e a. ( HasType l Endpoints.ActiveEndpoint (Output s), KnownSymbol l, ContractConstraints s, Monoid w )
+    => Contract w s e a -> ContractInstanceTag -> TracePredicate  
 
 .. code:: haskell
 
-  queryingUtxoAt
-    :: forall w s e a.
-       ( UtxoAt.HasUtxoAt s
-       , ContractConstraints s
-       , Monoid w
-       )
-    => Contract w s e a
-    -> ContractInstanceTag
-    -> Address
-    -> TracePredicate      
+  queryingUtxoAt :: forall w s e a. ( UtxoAt.HasUtxoAt s, ContractConstraints s, Monoid w )
+    => Contract w s e a -> ContractInstanceTag -> Address -> TracePredicate      
 
 .. code:: haskell
 
-  assertDone
-    :: forall w s e a.
-    ( ContractConstraints s
-    , Monoid w
-    )
-    => Contract w s e a
-    -> ContractInstanceTag
-    -> (a -> Bool)
-    -> String
-    -> TracePredicate 
+  assertDone :: forall w s e a. ( ContractConstraints s, Monoid w )
+    => Contract w s e a -> ContractInstanceTag -> (a -> Bool) -> String -> TracePredicate 
 
 For our example, we will only use one of the available checks, *walletFundsChange*, which checks funds.
 
