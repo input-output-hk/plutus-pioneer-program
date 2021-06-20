@@ -974,9 +974,50 @@ Not only can you view the contents of record types like this, but you can also m
 
 The *&* symbol here is function application, but the other way around - the argument comes first and then the function.
 
+Again, we can compose.
 
+.. code:: haskell
 
+  Prelude Control.Lens Week08.Lens> lars & address . city .~ "Munich"
+  Person {_name = "Lars", _address = Address {_city = "Munich"}}
   
+There is another type of optics called *Traversables*, that zooms not only into one field, but into many simultaneously. If you had a list it would zoom into each 
+element. So, for example, we could use a list of integers, with the *each* traversable that works with many container types, including lists, and set every element to 42.
+
+.. code:: haskell
+
+  Prelude Control.Lens Week08.Lens> [1 :: Int, 3, 4] & each .~ 42
+  [42,42,42]
+
+You may see a *type-defaults* warning when you run the above, but it is removed here.
+
+A cool thing is that various types of lenses can be combined, again with the dot operator. For example
+
+.. code:: haskell
+
+  Prelude Control.Lens Week08.Lens> iohk & staff . each . address . city .~ "Athens"
+  Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Athens"}},Person {_name = "Lars", _address = Address {_city = "Athens"}}]}
+
+And this is exactly what our *goTo* function achieved, so we can write *goTo'* as
+
+.. code:: haskell
+
+  goTo' :: String -> Company -> Company
+  goTo' there c = c & staff . each . address . city .~ there
+  
+And this is actually what we did when we configured our test.
+
+.. code:: haskell
+
+  tests :: TestTree
+  tests = checkPredicateOptions
+      (defaultCheckOptions & emulatorConfig .~ emCfg)
+      
+The function *defaultCheckOptions* is of type *CheckOptions* and there is a lens from *CheckOptions* to *EmulatorConfig*, and this is the part that we wanted to change.
+
+
+
+
 
 
 
