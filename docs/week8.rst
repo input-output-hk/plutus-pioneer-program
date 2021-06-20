@@ -676,7 +676,7 @@ First of all we see some logical combinators - a logical *not* and a logical *an
 
   (.&&.) :: TracePredicate -> TracePredicate -> TracePredicate
   
-And we see various checks that we can do, for example
+There are lots of functions for producing *TracePredicate*\s. A few example are
 
 .. code:: haskell
 
@@ -697,7 +697,12 @@ For our example, we will only use one of the available checks, *walletFundsChang
 
 .. code:: haskell
 
+  -- | Check that the funds in the wallet have changed by the given amount, exluding fees.
   walletFundsChange :: Wallet -> Value -> TracePredicate
 
-The *walletFundsChange* creates a *TracePredicate* that checks whether the funds in a *Wallet* have changed by a given *Value*.
+The *walletFundsChange* creates a *TracePredicate* that checks whether the funds in a *Wallet* have changed by a given *Value*. Interestingly, here, fees are ignored.
+We would have a hard time writing precise tests if this were not the case - we would find ourselves needing to approximate the costs of fees without knowing exactly what 
+they would be.
+
+There is a variation *walletFundsExactChange*, which *does* take fees into account.
 
