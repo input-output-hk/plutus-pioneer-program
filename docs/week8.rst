@@ -706,3 +706,30 @@ they would be.
 
 There is a variation *walletFundsExactChange*, which *does* take fees into account.
 
+If we go back to our test module *Spec.Trace* there is a function that we have not looked at yet, *tests*, and it uses this *checkPredicateOptions*.
+
+.. code:: haskell
+
+  tests :: TestTree
+  tests = checkPredicateOptions
+      (defaultCheckOptions & emulatorConfig .~ emCfg)
+      "token sale trace"
+      (     walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-60))
+      .&&. walletFundsChange (Wallet 2) (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)
+      .&&. walletFundsChange (Wallet 3) (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
+      )
+      myTrace
+
+The first argument, as we have seen is of type *CheckOptions*. This is where we have to use optics, but we won't go into the details of that here. It is sufficient for now
+to note that we use the same *EmulatorConfig* as we used for *runMyTrace*. 
+
+The second argument is the descriptive name of the trace.
+
+For the third argument, we use the (.&&.) combinator to chain together three different trace predicates, each of which uses the *walletFundsChange* function we saw above. Here 
+we specify the changes that we expect to see in each of the wallets at the end of the trace - for example, we expect Wallet 1 to have gained 10 Ada and 
+lost 60 Tokens.
+
+
+
+
+
