@@ -729,6 +729,55 @@ For the third argument, we use the (.&&.) combinator to chain together three dif
 we specify the changes that we expect to see in each of the wallets at the end of the trace - for example, we expect Wallet 1 to have gained 10 Ada and 
 lost 60 Tokens.
 
+We can now run this in the REPL.
+
+.. code::
+
+  Prelude Spec.Trace> import Test.Tasty
+  Prelude Test.Tasty Spec.Trace> defaultMain tests
+  token sale trace: OK (1.22s)
+  
+  All 1 tests passed (1.22s)
+  *** Exception: ExitSuccess
+  
+This passes. Let's see what happens if it doesn't pass. We can change one of the values.
+
+.. code:: haskell
+
+  ( walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-50) )
+
+.. code::
+  
+  Prelude Test.Tasty Spec.Trace> :l Spec.Trace
+  [1 of 1] Compiling Spec.Trace       ( test/Spec/Trace.hs, /home/chris/git/ada/pioneer-fork/code/week08/dist-newstyle/build/x86_64-linux/ghc-8.10.4.20210212/plutus-pioneer-program-week08-0.1.0.0/t/plutus-pioneer-program-week08-tests/build/plutus-pioneer-program-week08-tests/plutus-pioneer-program-week08-tests-tmp/Spec/Trace.o )
+  Ok, one module loaded.
+  Prelude Test.Tasty Spec.Trace> defaultMain tests
+  token sale trace: FAIL (1.32s)
+    Expected funds of W1 to change by
+      Value (Map [(,Map [("",10000000)]),(aa,Map [("A",-50)])])
+      (excluding 57430 lovelace in fees)
+    but they changed by
+      Value (Map [(,Map [("",10000000)]),(aa,Map [("A",-60)])])
+    Test failed.
+    Emulator log:
+    
+    [INFO] Slot 0: TxnValidate 2125c8770581c6140c3c71276889f6353830744191de0184b6aa00b185004500
+    [INFO] Slot 1: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+                     Contract instance started
+    [INFO] Slot 1: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+                     Receive endpoint call: Object (fromList [("tag",String "start"),("value",Object (fromList [("unEndpointValue",Array [Object (fromList [("unCurrencySymbol",String "aa")]),Object (fromList [("unTokenName",String "A")])])]))])
+    [INFO] Slot 1: W1: Balancing an unbalanced transaction:
+    ...
+    ...
+    [INFO] Slot 27: W1: TxSubmit: a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+    [INFO] Slot 27: TxnValidate a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+      src/Plutus/Contract/Test.hs:245:
+      token sale trace
+  
+  1 out of 1 tests failed (1.32s)
+  *** Exception: ExitFailure 1
+    
+We see a nice error message, followed by the emulator log.
 
 
 
