@@ -1023,12 +1023,139 @@ Property Based Testing
 Property Based Testing is quite a revolutionary approach to testing that is much more powerful than simple unit testing. It originated from Haskell, which, with its
 pureness and immutable data structures is particularly suited to this approach. It has now been copied by almost all other programming languages.
 
+QuickCheck
+~~~~~~~~~~
+
 One of the inventors of *QuickCheck*, which is the most prominent and was the first library using this approach, is John Hughes, who is also one of the original inventors 
 of Haskell. He and his company work with IOHK to provide special support of this approach to testing Plutus contracts.
 
+Before we look at using QuickCheck for Plutus contracts, let's first look at its use for pur Haskell programs.
 
+Property based testing subsumes unit tests. Let's write a very simple and silly unit test.
 
+.. code:: haskell
 
+  prop_simple :: Bool
+  prop_simple = 2 + 2 == (4 :: Int)
+  
+This function is available in the module.
+
+.. code:: haskell
+
+  module Week08.QuickCheck
+
+After loading this module, and the *Test.QuickCheck* module, we can test our unit test in the REPL.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_simple
+  +++ OK, passed 1 test.
+  
+This is not very exciting. For a more interesting example, the same module contains a buggy implementation of an insertion sort.
+
+.. code:: haskell
+
+  sort :: [Int] -> [Int] -- not correct
+  sort []     =  []
+  sort (x:xs) =  insert x xs
+  
+  insert :: Int -> [Int] -> [Int] -- not correct
+  insert x []                     =  [x]
+  insert x (y:ys)  | x <= y       =  x : ys
+                   | otherwise    =  y : insert x ys
+
+To test it, a property that would could test would be that after applying sort to a list of integers, the resulting list is sorted.
+
+.. code:: haskell
+
+  isSorted :: [Int] -> Bool
+  isSorted []           = True
+  isSorted [_]          = True
+  isSorted (x : y : ys) = x <= y && isSorted (y : ys)  
+
+Using this, we can now provide a QuickCheck property that is not just simply of type *Bool*, but instead is a function from a list of *Int*\s to *Bool*.
+
+.. code:: haskell
+
+  prop_sort_sorts :: [Int] -> Bool
+  prop_sort_sorts xs = isSorted $ sort xs  
+
+You can read that like a specification, which says "for all the lists of integers *xs*, if you apply *sort* to it, then the result should be sorted."
+
+QuickCheck can deal with such properties.
+
+In the REPL
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_sorts 
+  *** Failed! Falsified (after 8 tests and 4 shrinks):    
+  [0,0,-1]
+ 
+It fails, and gives us an example where the property does not hold. We can test that example.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> sort [0, 0, -1]
+  [0,-1]
+
+And can see that, indeed, it is not correct.  
+
+How does QuickCheck do this? If you provide a function with one or more arguments, it will generate random arguments for the function. In our example, QuickCheck 
+has generated 100 random lists of integers and, for each of those lists, has checked whether the property holds, until it hit a failure.
+
+Note that the failure was reported as 
+
+.. code::
+
+  *** Failed! Falsified (after 8 tests and 4 shrinks):    
+
+This means that after 8 tests the property was falsified, but at this point, rather than just report the failure, it has tried to shrink it - to simplify it. 
+
+This is a powerful feature of QuickCheck, because the random counter examples that QuickCheck finds are very complicated - long lists with long numbers. But once a counter
+example has been found, QuickCheck tries to simplify it, perhaps by dropping some elements from the list, or by making some of the numbers smaller, until it doesn't
+find a way to get an even simpler example.
+
+It is this combination of random test generation and shrinking that makes QuickCheck so tremendously useful.
+
+We can see what type of random lists QuickCheck generates.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> sample (arbitrary :: Gen [Int])
+  []
+  [0]
+  [2,4,-1,3]
+  [3,-1,4,3,-5]
+  [3,-1,-8,-4,-6]
+  [4,5,-1,4,-7,2,8,4,-5]
+  [-8,-8,-11,-12,2,-4,-12,2,4]
+  [7,9,3,-5,5,-9,3,1,11]
+  [12,-7,-9,9,-11,-15,5,-10,-7,4,8,8,-12,-6,16]
+  [-11,11,-1,-6]
+  [14,2,-5,9,13,-8,-8,-17,-1,-11,-19,15,9,8,-19,-4,16,4,4,19]
+
+The way QuickCheck does this random generation is by using a type class called *Arbitrary*
+
+.. code::
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> :i Arbitrary
+  type Arbitrary :: * -> Constraint
+  class Arbitrary a where
+    arbitrary :: Gen a
+    shrink :: a -> [a]
+
+There are many more lines to the above output, but the important ones are shown. We can see that it has two methods. One is called *arbitrary* and one is called *shrink*.
+
+*Gen* is yet another monad. The monad provides various methods that allow for random number generation for values of type *a*.
+  
+The second method is *shrink*, which, when given an *a* will provide a list of simpler versions of *a*. This, of course, depends on the type of *a*.
+
+If we look at the output above that provides some random integer lists, we see something interesting. The further we go down the list, the more complicated the list becomes. The 
+first is just the empty list, then we get single-element lists, then some longer lists, and it tends towards greater complexity over time.
+
+In addition to just providing random generation in the *Gen* monad, there is also a concept of complexity. If you implement an instance of *Gen* you are expected not only 
+to generate a random *a* but also a random *a* of some given complexity.
 
 
 
