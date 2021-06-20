@@ -777,7 +777,13 @@ This passes. Let's see what happens if it doesn't pass. We can change one of the
   1 out of 1 tests failed (1.32s)
   *** Exception: ExitFailure 1
     
-We see a nice error message, followed by the emulator log.
+We see a nice error message, followed by the emulator log, which we didn't get when the tests passed.
+
+This is probably the simplest way to write automated tests for Plutus contracts. You simply write one or more emulator traces, and then use *checkPredicate* in association
+with the appropriate test predicates, to check that the trace leads to the desired result. This lets us write more or less traditional unit tests.
+
+
+
 
 
 
