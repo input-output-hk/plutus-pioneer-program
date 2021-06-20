@@ -1015,6 +1015,11 @@ And this is actually what we did when we configured our test.
       
 The function *defaultCheckOptions* is of type *CheckOptions* and there is a lens from *CheckOptions* to *EmulatorConfig*, and this is the part that we wanted to change.
 
+And that concludes our brief excursion into optics and lenses.
+
+Property Based Testing 
+~~~~~~~~~~~~~~~~~~~~~~
+
 
 
 
