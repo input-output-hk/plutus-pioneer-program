@@ -794,12 +794,12 @@ There are various competing optics libraries on Hackage, but the most prominent,
 
 *Lens* is authored by Edward Kmett, who is probably the most prolific contributor to Haskell libraries.
 
-.. figure:: img/pic__000002.png
+.. figure:: img/pic__00002.png
 
 You can see on the Hackage page there is a scary diagram. There is a whole zoo of optics. There are lenses and prisms and traversals and isos and whatnot. This diagram 
 shows some of the operations that the library provides.
 
-.. figure:: img/pic__000003.png
+.. figure:: img/pic__00003.png
 
 Optics are all about reaching deeply into hierarchical data types to inspect parts that are hidden deeply in the data type and to manipulate them.
 
