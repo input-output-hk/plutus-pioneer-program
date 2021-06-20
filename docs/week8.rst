@@ -611,8 +611,8 @@ made a withdrawal.
       {aa, "A"}: 35
       {, ""}: 15000000
   
-Testing
--------
+Unit Testing
+------------
 
 Tasty
 ~~~~~
@@ -786,7 +786,7 @@ This is probably the simplest way to write automated tests for Plutus contracts.
 with the appropriate test predicates, to check that the trace leads to the desired result. This lets us write more or less traditional unit tests.
 
 Optics and Lenses 
-~~~~~~~~~~~~~~~~~
+-----------------
 
 Before we get to the second way of testing Plutus contracts, we will take a brief look at optics and lenses.
 
@@ -1018,10 +1018,13 @@ The function *defaultCheckOptions* is of type *CheckOptions* and there is a lens
 And that concludes our brief excursion into optics and lenses.
 
 Property Based Testing 
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
+Property Based Testing is quite a revolutionary approach to testing that is much more powerful than simple unit testing. It originated from Haskell, which, with its
+pureness and immutable data structures is particularly suited to this approach. It has now been copied by almost all other programming languages.
 
-
+One of the inventors of *QuickCheck*, which is the most prominent and was the first library using this approach, is John Hughes, who is also one of the original inventors 
+of Haskell. He and his company work with IOHK to provide special support of this approach to testing Plutus contracts.
 
 
 
