@@ -649,6 +649,79 @@ Here we see the connection with Tasty. It takes, as arguments, the descriptive n
 *EmulatorTrace* like the one we have used to test our contracts previously. And the result is a *TestTree* which, as we have seen, is the type of tests that Tasty
 uses. So, using this *checkPredicate* function we can produce something that the Tasty framework can understand.
 
+There's also a variant with one additional argument of *CheckOptions*
 
+.. code:: haskell
 
+  checkPredicateOptions :: CheckOptions -> String -> TracePredicate -> EmulatorTrace () -> TestTree 
+
+*CheckOptions* has no constructors. This is a bit unfortunate, as we are forced to interact with it via three operations that take a type *Lens'*. *Lens'* is related to something called *optics* in Haskell. Optics is a huge topic 
+in itself, with whole books haven been written about it, so we will just touch on it for now and just learn how to use the emulator trace.
+
+One of its operations is *emulatorConfig* which allows us to specify initial distributions of funds, in a way similar to that which we have done in previous testing examples.
+
+.. code:: haskell
+
+  emulatorConfig :: Lens' CheckOptions EmulatorConfig
+
+Now let's look at *TracePredicate*. This specifies some condition that the emulator trace should satisfy. This is what will be tested when we run the test.
+
+First of all we see some logical combinators - a logical *not* and a logical *and*.
+
+.. code:: haskell
+
+  not :: TracePredicate -> TracePredicate
+
+.. code:: haskell
+
+  (.&&.) :: TracePredicate -> TracePredicate -> TracePredicate
+  
+And we see various checks that we can do, for example
+
+.. code:: haskell
+
+  endpointAvailable
+    :: forall (l :: Symbol) w s e a.
+      ( HasType l Endpoints.ActiveEndpoint (Output s)
+      , KnownSymbol l
+      , ContractConstraints s
+      , Monoid w
+      )
+    => Contract w s e a
+    -> ContractInstanceTag
+    -> TracePredicate  
+
+.. code:: haskell
+
+  queryingUtxoAt
+    :: forall w s e a.
+       ( UtxoAt.HasUtxoAt s
+       , ContractConstraints s
+       , Monoid w
+       )
+    => Contract w s e a
+    -> ContractInstanceTag
+    -> Address
+    -> TracePredicate      
+
+.. code:: haskell
+
+  assertDone
+    :: forall w s e a.
+    ( ContractConstraints s
+    , Monoid w
+    )
+    => Contract w s e a
+    -> ContractInstanceTag
+    -> (a -> Bool)
+    -> String
+    -> TracePredicate 
+
+For our example, we will only use one of the available checks, *walletFundsChange*, which checks funds.
+
+.. code:: haskell
+
+  walletFundsChange :: Wallet -> Value -> TracePredicate
+
+The *walletFundsChange* creates a *TracePredicate* that checks whether the funds in a *Wallet* have changed by a given *Value*.
 
