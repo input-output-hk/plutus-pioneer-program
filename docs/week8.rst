@@ -619,7 +619,7 @@ Tasty
 
 You can find *tasty* on Hackage.
   
-.. figure:: img/pic__000001.png
+.. figure:: img/pic__00001.png
 
 There is also some example code on the same page.
 
