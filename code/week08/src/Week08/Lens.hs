@@ -6,7 +6,6 @@ import Control.Lens
 
 newtype Company = Company {_staff :: [Person]} deriving Show
 
-
 data Person  = Person
     { _name    :: String
     , _address :: Address

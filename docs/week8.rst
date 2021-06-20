@@ -801,4 +801,80 @@ shows some of the operations that the library provides.
 
 .. figure:: img/pic__000003.png
 
-Optics are all about reaching deeply into hierarchical data types.
+Optics are all about reaching deeply into hierarchical data types to inspect parts that are hidden deeply in the data type and to manipulate them.
+
+Let's look at a very simple example in
+
+.. code:: haskell
+
+  module Week08.Lens
+
+We have a type *Company* which is a wrapper around a list of *Person*. There is a field *_staff*. When dealing with lenses, it is convention to start field names with underscores.
+
+.. code:: haskell
+
+  newtype Company = Company {_staff :: [Person]} deriving Show
+
+  data Person  = Person
+      { _name    :: String
+      , _address :: Address
+      } deriving Show
+  
+  newtype Address = Address {_city :: String} deriving Show
+
+And we define two *Person*\s and a *Company* with which these *Person*\s are associated.
+
+.. code:: haskell
+
+  alejandro, lars :: Person
+  alejandro = Person
+    {  _name    = "Alejandro"
+    ,  _address = Address {_city = "Zacateca"}
+    }
+  lars = Person
+    {  _name    = "Lars"
+    ,  _address = Address {_city = "Regensburg"}
+    }
+
+  iohk :: Company
+  iohk = Company { _staff = [alejandro, lars] }
+
+The task is to write a simple function, *goTo*, that gets a *String* as argument along with a *Company*. The function should create a new company which it gets by 
+changing all the cities of all the staff of the company with the given string.
+
+If we apply that to *iohk* with a string argument of "Athens*, then we should get a *Company* with the same two *Person*\s, but now both of those *Person*\s have 
+a city of "Athens".
+
+You don't need any advanced Haskell to achieve this, but it's a bit messy, even in this simple example. The function below uses record syntax to modify specific fields
+of records, while leaving the other fields the same. 
+
+The helper function *movePerson* updates the *_address* field of the *Person* *p*, and the *_city* field of that *Address*, and the main part of the function maps the
+*movePerson* function over each member of *_staff*.
+
+.. code:: haskell
+
+  goTo :: String -> Company -> Company
+  goTo there c = c {_staff = map movePerson (_staff c)}
+    where
+      movePerson p = p {_address = (_address p) {_city = there}}
+      
+We can look at the original company in the REPL.
+
+.. code:: haskell
+
+  Prelude Week08.Lens> iohk
+  Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Zacateca"}},Person {_name = "Lars", _address = Address {_city = "Regensburg"}}]}
+
+Now, let's apply the *goTo* function to it, and see the changes.
+
+.. code:: haskell
+
+  Prelude Week08.Lens> goTo "Athens" iohk
+  Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Athens"}},Person {_name = "Lars", _address = Address {_city = "Athens"}}]}
+
+So, dealing with nested record types, even though it is quite simple conceptually, can be quite messy.
+
+
+
+
+
