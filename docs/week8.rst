@@ -1250,3 +1250,29 @@ Now that we have seen what QuickCheck can do, we will turn our attention to usin
 
 Here we hit a problem - how do you use QuickCheck to test side-effected code? This problem does not only arise with blockchain, it arises with all systems 
 that use IO.
+
+John Hughes always uses the example of the file system. How would you test file system operations, i.e. reading, writing, opening and closing files, using QuickCheck.
+
+The approach to use is very similar to the one you can use with Plutus. The idea is that you start with a model.
+
+.. figure:: img/pic__00004.png
+
+The model is basically an idealised model of how the real world system should work. There must be some sort of relation between the model and the real system.
+
+If the real system is a file system, then you could, in the model, have an idealised version of how you think files should work. And then, what QuickCheck does, in its 
+random generation, is to generate a random sequence of actions that you can perform on the system. In the example of a file system, it would randomly generate a 
+sequence of opening files, closing files, writing to files, reading files and so on. Now you can basically step this model and the system in parallel.
+
+You have some sort of action that you perform in the real world, and you apply the same type of action to your model. Then your real system has progressed into a new state,
+and your model has also been updated. After this step, you can compare the two and check that they are still in sync. You can then continue this for several steps.
+
+.. figure:: img/pic__00007.png
+
+While our first QuickCheck example generated a random list of *Int*\s, the idea for testing a real world system is to generate random lists of actions and then to 
+apply those actions both to a model and to the real system and to check that the model and the real system stay in sync.
+
+Shrinking in this example would be that, if you have a list of actions that show that there is a bug, then you can, for example, drop some of the actions and see 
+whether the problem still arises. This can be repeated until you cannot drop any further actions from the list and still reproduce the bug.
+
+This is exactly how the QuickCheck support for Plutus works.
+
