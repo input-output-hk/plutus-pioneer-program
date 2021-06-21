@@ -1627,13 +1627,7 @@ The model state change for *AddTokens* is more complex.
 
   nextState (AddTokens v w n) = do
     started <- hasStarted v                                     -- has the token sale started?
-    when (n > 0 && started) $ do
-        bc <- askModelState $ view $ balanceChange w
-        let token = tokens Map.! v
-        when (tokenAmt + assetClassValueOf bc token >= n) $ do  -- does the wallet have the tokens to give?
-            withdraw w $ assetClassValue token n
-            (tsModel . ix v . tssToken) $~ (+ n)
-    wait 1
+    ...
   
 First we check the the token sale for wallet *v* has actually started, and this is yet another helper function.    
   
@@ -1659,9 +1653,29 @@ we then pass to the primed version of the function along with the *Wallet* argum
       s <- getModelState
       return $ getTSState' s v
   
+And then another variation, this time called *hasStarted*, which will tells us, within the Spec monad, whether the token sale has stared or not.
+
+.. code:: haskell
+
   hasStarted :: Wallet -> Spec TSModel Bool
   hasStarted v = isJust <$> getTSState v
   
+This just checks whether the return value from *getTSState v* is a *Just* or a *Nothing*. The *isJust* function returns True if it is a *Just*, and we need to use *fmap*
+to lift it into the Spec monad.
+
+Continuing the *nextState* function for *AddTokens*
+
+.. code:: haskell
+
+  nextState (AddTokens v w n) = do
+    started <- hasStarted v 
+    when (n > 0 && started) $ do
+      bc <- askModelState $ view $ balanceChange w
+      let token = tokens Map.! v
+      when (tokenAmt + assetClassValueOf bc token >= n) $ do  -- does the wallet have the tokens to give?
+          withdraw w $ assetClassValue token n
+          (tsModel . ix v . tssToken) $~ (+ n)
+    wait 1
   
 
 
