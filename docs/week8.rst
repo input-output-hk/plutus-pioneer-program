@@ -1365,6 +1365,65 @@ fail if the two wallets are not the same.
 
 In *BuyTokens*, the second wallet will try to buy a certain number of tokens from the token sale run by the first wallet.
 
+So, the *Action* type is the first ingredient.
+
+The second ingredient is another associated datatype. For each instance of a contract that we are running, we want a key that identifies the instance.
+
+.. code:: haskell
+
+  data ContractInstanceKey TSModel w s e where
+    StartKey :: Wallet           -> ContractInstanceKey TSModel (Last TokenSale) TSStartSchema' Text
+    UseKey   :: Wallet -> Wallet -> ContractInstanceKey TSModel ()               TSUseSchema    Text
+
+This is a generalised, algebraic datatype (GADT), so it's a little different to usual data declarations in Haskell. Instead of just providing the constructors, you provide the
+constructors with a type signature.
+
+In *ContractInstanceKey*, we have a constructor *StartKey* that takes a *Wallet* as an argument and then produces something of type
+
+.. code:: haskell
+
+  ContractInstanceKey TSModel (Last TokenSale) TSStartSchema' Text
+
+The point of GADTs is that with normal datatypes, the type parameters are the same for all constructors, for example, *Action TSModel* has five constructors, but the type 
+is always *TSModel*. But with GADTs, we are able to provide a more generalised type parameter - in this case *TSModel w s e*.
+
+We need this feature in this case because our contracts can have different type parameters.
+
+There are two types of instances. Recall we have the *start* contract and the *use* contract, which have different type signatures.
+
+*StartKey* returns a type that consists of our model and then the parameters that come from the contract itself - the state type, the schema, and the error type. We used the primed 
+version of *TSStartSchema* - *TSStartSchema'* because we don't want to create the NFT, we want to pass it in ourselves because it makes it easier to write the test if
+we know what NFT we will be using in advance.
+
+We also provide a key for the use contract which takes two *Wallet*\s as parameters. The first is the one that owns the token sale that we are interacting with and the second 
+is the one that actually runs the contract. As for the type parameters, there is no state parameter, and it uses a different schema - *TSUseSchema*, but the error type is
+the same.
+
+Next we need to provide the *instanceTag* function which, given an instance key and a wallet, will provide a so-called contract instance tag. As we already know the 
+wallet that runs the instance, because that was one of the arguments to the instance key constructor we can ignore it as an argument.
+
+.. code:: haskell
+
+  instanceTag key _ = fromString $ "instance tag for: " ++ show key
+
+The *instanceTag* function doesn't have an accessible constructor, but it implements the *IsString* class. We haven't seen the *IsString* class explicitly but we have
+used it when we used the *OverloadedStrings* GHC extension - it allows a type class that implements it to be represented by a string literal. In particular, it has a 
+method *fromString* which, given a string, will create an instance of the type.
+
+The "instance tag for: " literal in the function above isn't necessary - all that is necessary is for the whole string to be unique for each instance that we will ever run.
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
