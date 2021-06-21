@@ -1708,14 +1708,78 @@ instead of using $= to set the value, we use the $~ function which applies a fun
 
 Again, we wait one slot.
 
+Next, we write a *nextState* function for *BuyTokens*. 
 
+.. code:: haskell
 
+  nextState (BuyTokens v w n) = do
+  when (n > 0) $ do
+      m <- getTSState v
+      case m of
+          Just t
+              | t ^. tssToken >= n -> do
+                  let p = t ^. tssPrice
+                      l = p * n
+                  withdraw w $ lovelaceValueOf l
+                  deposit w $ assetClassValue (tokens Map.! v) n
+                  (tsModel . ix v . tssLovelace) $~ (+ l)
+                  (tsModel . ix v . tssToken)    $~ (+ (- n))
+          _ -> return ()
+  wait 1
 
+First we check the the number of tokens we are attempting to buy is positive.  If so, then we get the state of the token sale.
 
+If the state is a *Just* then we know that the token sale has started.
 
+.. code:: haskell
 
+  m <- getTSState v
+  case m of
+      Just t
 
+If so, then we use optics to check that the number of tokens available in the contract is at least enough for us to buy what we are asking for.
 
+.. code:: haskell
 
+  t ^. tssToken >= n -> do
 
+If we are still going, we then lookup the current price and calculate how much the requested number of tokens will cost.
+
+.. code:: haskell
+
+  let p = t ^. tssPrice
+  l = p * n
+  
+The effect should then be that our wallet loses that number of lovelace, and gains the tokens we buy. Here we see the *deposit* function for the first time. It is the opposite
+of the *withdraw* function.
+
+.. code:: haskell
+
+  withdraw w $ lovelaceValueOf l
+  deposit w $ assetClassValue (tokens Map.! v) n
+
+Finally we update the model state by adding the lovelace and removing the bought tokens.
+
+.. code:: haskell
+
+  (tsModel . ix v . tssLovelace) $~ (+ l)
+  (tsModel . ix v . tssToken)    $~ (+ (- n))  
  
+And we wait for one slot.
+
+Finally, the *Withdraw* action.
+
+.. code:: haskell
+
+  nextState (Withdraw v w n l) = do
+  when (v == w) $ do
+      m <- getTSState v
+      case m of
+          Just t
+              | t ^. tssToken >= n && t ^. tssLovelace >= l -> do
+                  deposit w $ lovelaceValueOf l <> assetClassValue (tokens Map.! w) n
+                  (tsModel . ix v . tssLovelace) $~ (+ (- l))
+                  (tsModel . ix v . tssToken) $~ (+ (- n))
+          _ -> return ()
+  wait 1  
+
