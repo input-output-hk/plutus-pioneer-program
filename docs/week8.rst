@@ -1323,3 +1323,19 @@ Then our model *TSModel* is a map from wallets to *TokenSale* states.
   deriving Show
 
 The idea in this test is that we have two wallets and each wallet runs its own *TokenSale* contract, and the two wallets will trade different tokens.
+
+We create lenses for the model. We need optics to interact with the *ContactModel* library.
+
+.. code:: haskell
+
+  makeLenses ''TSModel
+
+All the logic that defines how our model should behave, and how it is linked to the real contract is in
+
+.. code:: haskell
+
+  instance ContractModel TSModel where
+
+First we have an associated datatype. This is quite an advanced Haskell feature. In type classes, as well as methods, you can also have datatypes. We have seen this 
+before in validators where we define a dummy type that provides a link between the datum type and the redeemer type.
+
