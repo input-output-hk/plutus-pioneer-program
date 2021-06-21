@@ -1399,7 +1399,7 @@ We also provide a key for the use contract which takes two *Wallet*\s as paramet
 is the one that actually runs the contract. As for the type parameters, there is no state parameter, and it uses a different schema - *TSUseSchema*, but the error type is
 the same.
 
-Next we need to provide the *instanceTag* function which, given an instance key and a wallet, will provide a so-called contract instance tag. As we already know the 
+Next we need to provide the *instanceTag* method which, given an instance key and a wallet, will provide a so-called contract instance tag. As we already know the 
 wallet that runs the instance, because that was one of the arguments to the instance key constructor we can ignore it as an argument.
 
 .. code:: haskell
@@ -1417,8 +1417,16 @@ There is a default implementation for the *instanceTag* method of the *ContractM
 works if you have at most one contract instance per wallet. This is not the case for us, as we will have three instances per wallet - one *start* instance and two
 *use* instances (one for the own wallet's token sale, and one for the other wallet's token sale).
 
+The next method that we need to implement is *arbitraryAction* which is how we tell the system how to generate a random action.
 
+.. code:: haskell
 
+  arbitraryAction _ = oneof $
+    (Start <$> genWallet) :
+    [ SetPrice  <$> genWallet <*> genWallet <*> genNonNeg ]               ++
+    [ AddTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
+    [ BuyTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
+    [ Withdraw  <$> genWallet <*> genWallet <*> genNonNeg <*> genNonNeg ]  
 
 
 
