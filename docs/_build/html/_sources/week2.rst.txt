@@ -605,9 +605,7 @@ We will leave everything else as it was and check the effect in the
 playground.
 
 .. figure:: img/playground_week2_10.png
-   :alt: alt text
 
-   alt text
 Here, the script address is different. The script is different an so has
 a different hash.
 
@@ -615,9 +613,7 @@ We also notice that the *grab* transaction did not work, and if we
 scroll down to look at the logs, we see that it was not validated.
 
 .. figure:: img/playground_week2_9.png
-   :alt: alt text
 
-   alt text
 So, in our first example we had a validator that would always succeed
 and would allow anyone to grab the UTxOs from it. In the second example,
 we have a validator that always fails and any UTxOs sent to this script
@@ -644,9 +640,7 @@ If we now run the same scenario in the playground with the new code, we
 will see the custom error message that we added.
 
 .. figure:: img/playground_week2_11.png
-   :alt: alt text
 
-   alt text
 Example 3 - Forty Two
 ~~~~~~~~~~~~~~~~~~~~~
 

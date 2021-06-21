@@ -7,7 +7,7 @@ Week 08 - Property Based Testing
 
     In this lecture we cover another state machine example, automatic testing using emulator traces, optics, and property-based testing.
 
-    This week we were using Plutus commit 530cc134364ae186f39fb2b54239fb7c5e2986e9, the same commit as we used in the last lecture.
+    This week we were using Plutus commit ae35c4b8fe66dd626679bd2951bd72190e09a123, the same commit as we used in the last lecture.
 
 Token Sale
 ----------
@@ -363,11 +363,916 @@ Testing
 
 In order to try it out, let's run it in the emulator.
 
+We define a *runMyTrace* function which uses *runEmulatorTraceIO'* with a custom emulator configuration and a *myTrace* function.
 
+.. code:: haskell
+
+  runMyTrace :: IO ()
+  runMyTrace = runEmulatorTraceIO' def emCfg myTrace
+
+Let's first look at the *emCfg* function. Recall that this is where we can give custom initial distributions to wallets. Here we give 1000 Ada and 1000 of a custom 
+token to three wallets.
+
+.. note::
+  
+  The ability to use underscores in large numbers such as 1000_000_000 is provided by a GHC extension *NumericUnderscores*
+
+.. code:: haskell
+
+  emCfg :: EmulatorConfig
+  emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet w, v) | w <- [1 .. 3]]
+    where
+      v :: Value
+      v = Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
       
-
-
-
-
+  currency :: CurrencySymbol
+  currency = "aa"
   
+  name :: TokenName
+  name = "A"
   
+  token :: AssetClass
+  token = AssetClass (currency, name)      
+
+For the trace, first we activate Wallet 1 using the non-primed *startEndpoint* function which mints the NFT is minted automatically. Then, we call the start endpoint, giving it 
+the symbol and name of the token we want to sell, and then wait for five slots, although two would be enough in this case.
+
+.. code:: haskell
+
+  myTrace :: EmulatorTrace ()
+  myTrace = do
+      h <- activateContractWallet (Wallet 1) startEndpoint  
+      callEndpoint @"start" h (currency, name)
+      void $ Emulator.waitNSlots 5
+      Last m <- observableState h
+
+We then read the state, which we wrote using *tell*, and check to see if it is valid. If it is not, we log an error. If it is, we proceed with the test.
+
+.. code:: haskell
+
+  case m of
+    Nothing -> Extras.logError @String "error starting token sale"
+    Just ts -> do  
+        Extras.logInfo $ "started token sale " ++ show ts
+
+We can now activate the endpoints for the three wallets. Recall that the *useEndpoints* function is parameterised by the *TokenSale* data, which is why we needed to 
+get that value.
+
+.. code:: haskell
+
+    h1 <- activateContractWallet (Wallet 1) $ useEndpoints ts
+    h2 <- activateContractWallet (Wallet 2) $ useEndpoints ts
+    h3 <- activateContractWallet (Wallet 3) $ useEndpoints ts  
+
+Wallet 1 sets the price to 1 Ada and we again wait for a generous amount of time.
+
+.. code:: haskell
+
+  callEndpoint @"set price" h1 1_000_000
+  void $ Emulator.waitNSlots 5  
+
+Wallet 1 adds 100 tokens.
+
+.. code:: haskell
+
+  callEndpoint @"add tokens" h1 100
+  void $ Emulator.waitNSlots 5
+  
+Wallet 2 buys 20 tokens. So now the contract should contain 80 tokens and 20 Ada.
+
+.. code:: haskell
+
+  callEndpoint @"buy tokens" h2 20
+  void $ Emulator.waitNSlots 5
+  
+Wallet 3 buys 5 tokens. Now there should be 75 tokens in the contract and 25 Ada.
+
+.. code:: haskell
+
+  callEndpoint @"buy tokens" h3 5
+  void $ Emulator.waitNSlots 5
+
+Finally, Wallet 1 calls the withdraw endpoint, taking out 40 tokens and 10 Ada. At this point, there should be 35 tokens and 10 Ada in the contract.
+
+.. code:: haskell
+
+  callEndpoint @"withdraw" h1 (40, 10_000_000)
+  void $ Emulator.waitNSlots 5
+  
+Let's run this in the REPL.
+
+.. code::
+
+  cabal repl plutus-pioneer-program-week08-tests
+  Ok, five modules loaded.
+  Prelude Main> :l Spec.Trace
+  Ok, one module loaded.
+  Prelude Spec.Trace> runMyTrace
+
+  Slot 00000: TxnValidate 2125c8770581c6140c3c71276889f6353830744191de0184b6aa00b185004500
+  Slot 00000: SlotAdd Slot 1
+  Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Contract instance started
+
+The first endpoint call is to *start*. This creates three transaction. Two of these are from the forge contract to create the NFT, and the third one is to set up our 
+initial UTxO for the token sale.
+
+.. code::
+
+  Slot 00001: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "start"),("value",Object (fromList [("unEndpointValue",Array [Object (fromList [("unCurrencySymbol",String "aa")]),Object (fromList [("unTokenName",String "A")])])]))])
+  Slot 00001: W1: TxSubmit: cccba8b2abc3e82a735735c2346aa3fcac58152f17854b1745306e5b63a0b965
+  Slot 00001: TxnValidate cccba8b2abc3e82a735735c2346aa3fcac58152f17854b1745306e5b63a0b965
+  Slot 00001: SlotAdd Slot 2
+  Slot 00002: W1: TxSubmit: e23e19192aea3304a989ab98f05e70bc01fe43f3ea940da78a92ab7cebec9bbb
+  Slot 00002: TxnValidate e23e19192aea3304a989ab98f05e70bc01fe43f3ea940da78a92ab7cebec9bbb
+  Slot 00002: SlotAdd Slot 3
+  Slot 00003: W1: TxSubmit: 4cae1c5115eb4128243ce029dcd4d6c23d6497d3ab5e71a79f4dc34e9b8cd763
+  Slot 00003: TxnValidate 4cae1c5115eb4128243ce029dcd4d6c23d6497d3ab5e71a79f4dc34e9b8cd763
+  Slot 00003: SlotAdd Slot 4
+  Slot 00004: *** CONTRACT LOG: "started token sale TokenSale {tsSeller = 21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9, tsToken = (aa,\"A\"), tsNFT = (65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55,\"NFT\")}"
+  Slot 00004: SlotAdd Slot 5
+  Slot 00005: SlotAdd Slot 6
+
+We successfully read the *TokenSale* value from the observable state, and start the three contract instances for the use contract.
+
+.. code::
+
+  Slot 00006: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+    Sending contract state to Thread 0
+  Slot 00006: SlotAdd Slot 7
+  Slot 00007: *** USER LOG: started token sale TokenSale {tsSeller = 21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9, tsToken = (aa,"A"), tsNFT = (65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55,"NFT")}
+  Slot 00007: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Contract instance started
+  Slot 00007: 00000000-0000-4000-8000-000000000002 {Contract instance for wallet 2}:
+    Contract instance started
+  Slot 00007: 00000000-0000-4000-8000-000000000003 {Contract instance for wallet 3}:
+    Contract instance started
+
+Then we set the price.
+
+.. code::
+
+  Slot 00007: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "set price"),("value",Object (fromList [("unEndpointValue",Number 1000000.0)]))])
+  Slot 00007: W1: TxSubmit: 2de6dd820e6939b4b1f9e162c0e2cc878cc38ea1231a9be610315da4eda06714
+  Slot 00007: TxnValidate 2de6dd820e6939b4b1f9e162c0e2cc878cc38ea1231a9be610315da4eda06714
+  Slot 00007: SlotAdd Slot 8
+  Slot 00008: SlotAdd Slot 9
+  Slot 00009: SlotAdd Slot 10
+  Slot 00010: SlotAdd Slot 11
+  Slot 00011: SlotAdd Slot 12
+
+Then add some tokens.
+
+.. code::
+
+  Slot 00012: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "add tokens"),("value",Object (fromList [("unEndpointValue",Number 100.0)]))])
+  Slot 00012: W1: TxSubmit: 42f1bebe285d1ea23bd90683d110866bb438eede8ef62eaf5e9e3d65eec18e90
+  Slot 00012: TxnValidate 42f1bebe285d1ea23bd90683d110866bb438eede8ef62eaf5e9e3d65eec18e90
+  Slot 00012: SlotAdd Slot 13
+  Slot 00013: SlotAdd Slot 14
+  Slot 00014: SlotAdd Slot 15
+  Slot 00015: SlotAdd Slot 16
+  Slot 00016: SlotAdd Slot 17
+
+Then the two buys by Wallets 2 and 3.
+
+.. code::
+
+  Slot 00017: 00000000-0000-4000-8000-000000000002 {Contract instance for wallet 2}:
+    Receive endpoint call: Object (fromList [("tag",String "buy tokens"),("value",Object (fromList [("unEndpointValue",Number 20.0)]))])
+  Slot 00017: W2: TxSubmit: 30d28ca855a14accbb11deee682b174adffb548922e1d4257242880f28328f8e
+  Slot 00017: TxnValidate 30d28ca855a14accbb11deee682b174adffb548922e1d4257242880f28328f8e
+  Slot 00017: SlotAdd Slot 18
+  Slot 00018: SlotAdd Slot 19
+  Slot 00019: SlotAdd Slot 20
+  Slot 00020: SlotAdd Slot 21
+  Slot 00021: SlotAdd Slot 22
+  Slot 00022: 00000000-0000-4000-8000-000000000003 {Contract instance for wallet 3}:
+    Receive endpoint call: Object (fromList [("tag",String "buy tokens"),("value",Object (fromList [("unEndpointValue",Number 5.0)]))])
+  Slot 00022: W3: TxSubmit: 708b0c4117ad3b38b69254a714e4695c574af404c3fff0eda859b571218b003c
+  Slot 00022: TxnValidate 708b0c4117ad3b38b69254a714e4695c574af404c3fff0eda859b571218b003c
+  Slot 00022: SlotAdd Slot 23
+  Slot 00023: SlotAdd Slot 24
+  Slot 00024: SlotAdd Slot 25
+  Slot 00025: SlotAdd Slot 26
+  Slot 00026: SlotAdd Slot 27
+
+And finally, the withdraw by Wallet 1.
+
+.. code::
+
+  Slot 00027: 00000000-0000-4000-8000-000000000001 {Contract instance for wallet 1}:
+    Receive endpoint call: Object (fromList [("tag",String "withdraw"),("value",Object (fromList [("unEndpointValue",Array [Number 40.0,Number 1.0e7])]))])
+  Slot 00027: W1: TxSubmit: a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+  Slot 00027: TxnValidate a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+  Slot 00027: SlotAdd Slot 28
+  Slot 00028: SlotAdd Slot 29
+  Slot 00029: SlotAdd Slot 30
+  Slot 00030: SlotAdd Slot 31
+  Slot 00031: SlotAdd Slot 32
+  Slot 00032: SlotAdd Slot 33
+
+All wallets initially owned 1000 tokens and 1000 Ada. Wallet 1 added 100 tokens to the contract, but then in the last step retrieved 40 tokens and 10 Ada,
+and so we see its final balance as 940 tokens and 1010 Ada minus transaction fees.
+
+.. code::
+
+  Final balances
+  Wallet 1: 
+      {aa, "A"}: 940
+      {, ""}: 1009942570
+
+Wallet 2 bought 20 tokens and paid 20 Ada for them, plus some transaction fees.
+
+.. code::
+
+  Wallet 2: 
+      {aa, "A"}: 1020
+      {, ""}: 979985260
+
+Wallet 3 bought 5 tokens for 5 Ada.
+
+.. code::
+
+  Wallet 3: 
+      {aa, "A"}: 1005
+      {, ""}: 994985211
+
+Finally, the script still contains the NFT, which will forever stay there, plus 35 tokens and 15 Ada. There were, at one point, 75 tokens and 25 Ada, before Wallet 1 
+made a withdrawal.
+
+.. code::
+
+  Script fb3eca878d177b6d9264c7c36845fb1e28935553812ed2b56e39c9c4564b85ad: 
+      {65b4199f7d025bfb3b065b0fb88a77d694ffd849ff740b1a4cc453bfaab30f55, "NFT"}: 1
+      {aa, "A"}: 35
+      {, ""}: 15000000
+  
+Unit Testing
+------------
+
+Tasty
+~~~~~
+
+You can find *tasty* on Hackage.
+  
+.. figure:: img/pic__00001.png
+
+There is also some example code on the same page.
+
+Basically you have a main program that references some *tests* of type *TestTree*. As the name suggests, this allows for a tree of tests,
+where you can have sub groups and sub-sub groups and so on.
+
+.. code:: haskell
+
+  main = defaultMain tests
+
+  tests :: TestTree
+  tests = testGroup "Tests" [properties, unitTests]
+
+There is special support for tests in Plutus in the *plutus-contract* package in
+
+.. code:: haskell
+
+  module Plutus.Contract.Test
+
+There are various types of tests that are supported, but here we will only look at two of those. One that works with emulator traces, and one which is much more 
+sophisticated and uses so-called property-based testing.
+
+This module gives us functions for checking predicates, for example
+
+.. code:: haskell
+
+  checkPredicate :: String -> TracePredicate -> EmulatorTrace () -> TestTree 
+
+Here we see the connection with Tasty. It takes, as arguments, the descriptive name of the test, then a *TracePredicate* which we will get to in a moment, and an 
+*EmulatorTrace* like the one we have used to test our contracts previously. And the result is a *TestTree* which, as we have seen, is the type of tests that Tasty
+uses. So, using this *checkPredicate* function we can produce something that the Tasty framework can understand.
+
+There's also a variant with one additional argument of *CheckOptions*
+
+.. code:: haskell
+
+  checkPredicateOptions :: CheckOptions -> String -> TracePredicate -> EmulatorTrace () -> TestTree 
+
+*CheckOptions* has no constructors. This is a bit unfortunate, as we are forced to interact with it via three operations that take a type *Lens'*. *Lens'* is related to something called *optics* in Haskell. Optics is a huge topic 
+in itself, with whole books haven been written about it, so we will just touch on it for now and just learn how to use the emulator trace.
+
+One of its operations is *emulatorConfig* which allows us to specify initial distributions of funds, in a way similar to that which we have done in previous testing examples.
+
+.. code:: haskell
+
+  emulatorConfig :: Lens' CheckOptions EmulatorConfig
+
+Now let's look at *TracePredicate*. This specifies some condition that the emulator trace should satisfy. This is what will be tested when we run the test.
+
+First of all we see some logical combinators - a logical *not* and a logical *and*.
+
+.. code:: haskell
+
+  not :: TracePredicate -> TracePredicate
+
+.. code:: haskell
+
+  (.&&.) :: TracePredicate -> TracePredicate -> TracePredicate
+  
+There are lots of functions for producing *TracePredicate*\s. A few example are
+
+.. code:: haskell
+
+  endpointAvailable :: forall (l :: Symbol) w s e a. ( HasType l Endpoints.ActiveEndpoint (Output s), KnownSymbol l, ContractConstraints s, Monoid w )
+    => Contract w s e a -> ContractInstanceTag -> TracePredicate  
+
+.. code:: haskell
+
+  queryingUtxoAt :: forall w s e a. ( UtxoAt.HasUtxoAt s, ContractConstraints s, Monoid w )
+    => Contract w s e a -> ContractInstanceTag -> Address -> TracePredicate      
+
+.. code:: haskell
+
+  assertDone :: forall w s e a. ( ContractConstraints s, Monoid w )
+    => Contract w s e a -> ContractInstanceTag -> (a -> Bool) -> String -> TracePredicate 
+
+For our example, we will only use one of the available checks, *walletFundsChange*, which checks funds.
+
+.. code:: haskell
+
+  -- | Check that the funds in the wallet have changed by the given amount, exluding fees.
+  walletFundsChange :: Wallet -> Value -> TracePredicate
+
+The *walletFundsChange* creates a *TracePredicate* that checks whether the funds in a *Wallet* have changed by a given *Value*. Interestingly, here, fees are ignored.
+We would have a hard time writing precise tests if this were not the case - we would find ourselves needing to approximate the costs of fees without knowing exactly what 
+they would be.
+
+There is a variation *walletFundsExactChange*, which *does* take fees into account.
+
+If we go back to our test module *Spec.Trace* there is a function that we have not looked at yet, *tests*, and it uses this *checkPredicateOptions*.
+
+.. code:: haskell
+
+  tests :: TestTree
+  tests = checkPredicateOptions
+      (defaultCheckOptions & emulatorConfig .~ emCfg)
+      "token sale trace"
+      (     walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-60))
+      .&&. walletFundsChange (Wallet 2) (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)
+      .&&. walletFundsChange (Wallet 3) (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
+      )
+      myTrace
+
+The first argument, as we have seen is of type *CheckOptions*. This is where we have to use optics, but we won't go into the details of that here. It is sufficient for now
+to note that we use the same *EmulatorConfig* as we used for *runMyTrace*. 
+
+The second argument is the descriptive name of the trace.
+
+For the third argument, we use the (.&&.) combinator to chain together three different trace predicates, each of which uses the *walletFundsChange* function we saw above. Here 
+we specify the changes that we expect to see in each of the wallets at the end of the trace - for example, we expect Wallet 1 to have gained 10 Ada and 
+lost 60 Tokens.
+
+We can now run this in the REPL.
+
+.. code::
+
+  Prelude Spec.Trace> import Test.Tasty
+  Prelude Test.Tasty Spec.Trace> defaultMain tests
+  token sale trace: OK (1.22s)
+  
+  All 1 tests passed (1.22s)
+  *** Exception: ExitSuccess
+  
+This passes. Let's see what happens if it doesn't pass. We can change one of the values.
+
+.. code:: haskell
+
+  ( walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   10_000_000  <> assetClassValue token (-50) )
+
+.. code::
+  
+  Prelude Test.Tasty Spec.Trace> :l Spec.Trace
+  [1 of 1] Compiling Spec.Trace       ( test/Spec/Trace.hs, /home/chris/git/ada/pioneer-fork/code/week08/dist-newstyle/build/x86_64-linux/ghc-8.10.4.20210212/plutus-pioneer-program-week08-0.1.0.0/t/plutus-pioneer-program-week08-tests/build/plutus-pioneer-program-week08-tests/plutus-pioneer-program-week08-tests-tmp/Spec/Trace.o )
+  Ok, one module loaded.
+  Prelude Test.Tasty Spec.Trace> defaultMain tests
+  token sale trace: FAIL (1.32s)
+    Expected funds of W1 to change by
+      Value (Map [(,Map [("",10000000)]),(aa,Map [("A",-50)])])
+      (excluding 57430 lovelace in fees)
+    but they changed by
+      Value (Map [(,Map [("",10000000)]),(aa,Map [("A",-60)])])
+    Test failed.
+    Emulator log:
+    
+    [INFO] Slot 0: TxnValidate 2125c8770581c6140c3c71276889f6353830744191de0184b6aa00b185004500
+    [INFO] Slot 1: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+                     Contract instance started
+    [INFO] Slot 1: 00000000-0000-4000-8000-000000000000 {Contract instance for wallet 1}:
+                     Receive endpoint call: Object (fromList [("tag",String "start"),("value",Object (fromList [("unEndpointValue",Array [Object (fromList [("unCurrencySymbol",String "aa")]),Object (fromList [("unTokenName",String "A")])])]))])
+    [INFO] Slot 1: W1: Balancing an unbalanced transaction:
+    ...
+    ...
+    [INFO] Slot 27: W1: TxSubmit: a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+    [INFO] Slot 27: TxnValidate a42a06cc3e3b1653ec4aba5ab8304484d778adcbddac2ceb9f639f7e4bd1dfd2
+      src/Plutus/Contract/Test.hs:245:
+      token sale trace
+  
+  1 out of 1 tests failed (1.32s)
+  *** Exception: ExitFailure 1
+    
+We see a nice error message, followed by the emulator log, which we didn't get when the tests passed.
+
+This is probably the simplest way to write automated tests for Plutus contracts. You simply write one or more emulator traces, and then use *checkPredicate* in association
+with the appropriate test predicates, to check that the trace leads to the desired result. This lets us write more or less traditional unit tests.
+
+Optics and Lenses 
+-----------------
+
+Before we get to the second way of testing Plutus contracts, we will take a brief look at optics and lenses.
+
+There are various competing optics libraries on Hackage, but the most prominent, and the most infamous one, and the one that the Plutus team decided to use is called *Lens*.
+
+*Lens* is authored by Edward Kmett, who is probably the most prolific contributor to Haskell libraries.
+
+.. figure:: img/pic__00002.png
+
+You can see on the Hackage page there is a scary diagram. There is a whole zoo of optics. There are lenses and prisms and traversals and isos and whatnot. This diagram 
+shows some of the operations that the library provides.
+
+.. figure:: img/pic__00003.png
+
+Optics are all about reaching deeply into hierarchical data types to inspect parts that are hidden deeply in the data type and to manipulate them.
+
+Let's look at a very simple example in
+
+.. code:: haskell
+
+  module Week08.Lens
+
+We have a type *Company* which is a wrapper around a list of *Person*. There is a field *_staff*. When dealing with lenses, it is convention to start field names with underscores.
+
+.. code:: haskell
+
+  newtype Company = Company {_staff :: [Person]} deriving Show
+
+  data Person  = Person
+      { _name    :: String
+      , _address :: Address
+      } deriving Show
+  
+  newtype Address = Address {_city :: String} deriving Show
+
+And we define two *Person*\s and a *Company* with which these *Person*\s are associated.
+
+.. code:: haskell
+
+  alejandro, lars :: Person
+  alejandro = Person
+    {  _name    = "Alejandro"
+    ,  _address = Address {_city = "Zacateca"}
+    }
+  lars = Person
+    {  _name    = "Lars"
+    ,  _address = Address {_city = "Regensburg"}
+    }
+
+  iohk :: Company
+  iohk = Company { _staff = [alejandro, lars] }
+
+The task is to write a simple function, *goTo*, that gets a *String* as argument along with a *Company*. The function should create a new company which it gets by 
+changing all the cities of all the staff of the company with the given string.
+
+If we apply that to *iohk* with a string argument of "Athens*, then we should get a *Company* with the same two *Person*\s, but now both of those *Person*\s have 
+a city of "Athens".
+
+You don't need any advanced Haskell to achieve this, but it's a bit messy, even in this simple example. The function below uses record syntax to modify specific fields
+of records, while leaving the other fields the same. 
+
+The helper function *movePerson* updates the *_address* field of the *Person* *p*, and the *_city* field of that *Address*, and the main part of the function maps the
+*movePerson* function over each member of *_staff*.
+
+.. code:: haskell
+
+  goTo :: String -> Company -> Company
+  goTo there c = c {_staff = map movePerson (_staff c)}
+    where
+      movePerson p = p {_address = (_address p) {_city = there}}
+      
+We can look at the original company in the REPL.
+
+.. code:: haskell
+
+  Prelude Week08.Lens> iohk
+  Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Zacateca"}},Person {_name = "Lars", _address = Address {_city = "Regensburg"}}]}
+
+Now, let's apply the *goTo* function to it, and see the changes.
+
+.. code:: haskell
+
+  Prelude Week08.Lens> goTo "Athens" iohk
+  Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Athens"}},Person {_name = "Lars", _address = Address {_city = "Athens"}}]}
+
+So, dealing with nested record types, even though it is quite simple conceptually, can be quite messy. 
+
+This is what optics try to make easier with the idea of providing first-class field accessors. In the end it's very similar to dealing with such data types in an imperative 
+language such as C# or Java.
+
+We saw in lecture four how monads can be viewed as a programmable semi-colon, where the semi-colon is the statement separator in many imperative languages. In a similar way, optics can be thought of as providing a programmable dot, 
+where a dot is the accessor dot as in Python or Java.
+
+You could implement lenses by hand, but the *lens* library provides some Template Haskell magic to do it automatically, so long as we follow the underscore convention mentioned above.
+
+.. code:: haskell
+
+  makeLenses ''Company
+  makeLenses ''Person
+  makeLenses ''Address
+
+The names of the lenses will be the names of the original fields without the underscore.
+
+There is a way, within the REPL, to inspect what code Template Haskell writes at compile time.
+
+First, enable the following flag
+
+.. code::
+
+  Prelude Week08.Lens> :set -ddump-splices
+
+Then, reload the module. If nothing happens, you'll need to make a minor change to the code, perhaps by adding some whitespace, before reloading.
+
+.. code::
+
+  Prelude Week08.Lens> :r
+  [4 of 4] Compiling Week08.Lens      ( src/Week08/Lens.hs, /home/chris/git/ada/pioneer-fork/code/week08/dist-newstyle/build/x86_64-linux/ghc-8.10.4.20210212/plutus-pioneer-program-week08-0.1.0.0/build/Week08/Lens.o )
+  src/Week08/Lens.hs:35:1-20: Splicing declarations
+      makeLenses ''Company
+    ======>
+      staff :: Iso' Company [Person]
+      staff = (iso (\ (Company x_abBO) -> x_abBO)) Company
+      {-# INLINE staff #-}
+  src/Week08/Lens.hs:36:1-19: Splicing declarations
+      makeLenses ''Person
+    ======>
+      address :: Lens' Person Address
+      address f_abEJ (Person x1_abEK x2_abEL)
+        = (fmap (\ y1_abEM -> (Person x1_abEK) y1_abEM)) (f_abEJ x2_abEL)
+      {-# INLINE address #-}
+      name :: Lens' Person String
+      name f_abEN (Person x1_abEO x2_abEP)
+        = (fmap (\ y1_abEQ -> (Person y1_abEQ) x2_abEP)) (f_abEN x1_abEO)
+      {-# INLINE name #-}
+  src/Week08/Lens.hs:37:1-20: Splicing declarations
+      makeLenses ''Address
+    ======>
+      city :: Iso' Address String
+      city = (iso (\ (Address x_abFw) -> x_abFw)) Address
+      {-# INLINE city #-}
+  
+This now shows us what Template Haskell does.
+
+We see that *makeLenses* for *Company* creates a function *staff*, which returns an *Iso'* - a type of optic - from *Company* to *[Person]*.
+
+For *makeLenses Person* we get an *address* function which returns a *Lens'* from *Person* to *Address*, and we also get a *name* lens from *Person* to *String*.
+
+For *makeLenses Address* we get a *city* function which returns an *Iso'* from *Address* to *String*.
+
+*Iso* and *Lens* are two different types of optics but the order of type arguments is always the same. 
+You always have two type arguments, at least for these primed versions (there are more general optics which take four type parameters). The first argument is always the 
+big data type and the second parameter is the part you are zooming into. The name optics relates to the mental image of zooming into a datatype.
+
+Let's try them out in the REPL.
+
+.. code::
+
+  Prelude Week08.Lens> lars
+  Person {_name = "Lars", _address = Address {_city = "Regensburg"}}
+
+  Prelude Week08.Lens> import Control.Lens
+
+  Prelude Control.Lens Week08.Lens> lars ^. name
+  "Lars"
+  
+  Prelude Control.Lens Week08.Lens> lars ^. address
+  Address {_city = "Regensburg"}
+
+A very powerful feature of lenses is that you can compose them.  
+
+Where we have, above, something going from *Person* to *Address* and we have something else going from *Address* to *String*, then we can combine them using the
+function composition dot. There is some advanced type-level machinery going on behind the scenes to make that work, but it works.
+
+.. code::
+
+  Prelude Control.Lens Week08.Lens> lars ^. address . city
+  "Regensburg"
+
+Not only can you view the contents of record types like this, but you can also manipulate them.
+
+.. code::
+
+  Prelude Control.Lens Week08.Lens> lars & name .~ "LARS"
+  Person {_name = "LARS", _address = Address {_city = "Regensburg"}}
+
+The *&* symbol here is function application, but the other way around - the argument comes first and then the function.
+
+Again, we can compose.
+
+.. code:: haskell
+
+  Prelude Control.Lens Week08.Lens> lars & address . city .~ "Munich"
+  Person {_name = "Lars", _address = Address {_city = "Munich"}}
+  
+There is another type of optics called *Traversables*, that zooms not only into one field, but into many simultaneously. If you had a list it would zoom into each 
+element. So, for example, we could use a list of integers, with the *each* traversable that works with many container types, including lists, and set every element to 42.
+
+.. code:: haskell
+
+  Prelude Control.Lens Week08.Lens> [1 :: Int, 3, 4] & each .~ 42
+  [42,42,42]
+
+You may see a *type-defaults* warning when you run the above, but it is removed here.
+
+A cool thing is that various types of lenses can be combined, again with the dot operator. For example
+
+.. code:: haskell
+
+  Prelude Control.Lens Week08.Lens> iohk & staff . each . address . city .~ "Athens"
+  Company {_staff = [Person {_name = "Alejandro", _address = Address {_city = "Athens"}},Person {_name = "Lars", _address = Address {_city = "Athens"}}]}
+
+And this is exactly what our *goTo* function achieved, so we can write *goTo'* as
+
+.. code:: haskell
+
+  goTo' :: String -> Company -> Company
+  goTo' there c = c & staff . each . address . city .~ there
+  
+And this is actually what we did when we configured our test.
+
+.. code:: haskell
+
+  tests :: TestTree
+  tests = checkPredicateOptions
+      (defaultCheckOptions & emulatorConfig .~ emCfg)
+      
+The function *defaultCheckOptions* is of type *CheckOptions* and there is a lens from *CheckOptions* to *EmulatorConfig*, and this is the part that we wanted to change.
+
+And that concludes our brief excursion into optics and lenses.
+
+Property Based Testing 
+----------------------
+
+Property Based Testing is quite a revolutionary approach to testing that is much more powerful than simple unit testing. It originated from Haskell, which, with its
+pureness and immutable data structures is particularly suited to this approach. It has now been copied by almost all other programming languages.
+
+QuickCheck
+~~~~~~~~~~
+
+One of the inventors of *QuickCheck*, which is the most prominent and was the first library using this approach, is John Hughes, who is also one of the original inventors 
+of Haskell. He and his company work with IOHK to provide special support of this approach to testing Plutus contracts.
+
+Before we look at using QuickCheck for Plutus contracts, let's first look at its use for pur Haskell programs.
+
+Property based testing subsumes unit tests. Let's write a very simple and silly unit test.
+
+.. code:: haskell
+
+  prop_simple :: Bool
+  prop_simple = 2 + 2 == (4 :: Int)
+  
+This function is available in the module.
+
+.. code:: haskell
+
+  module Week08.QuickCheck
+
+After loading this module, and the *Test.QuickCheck* module, we can test our unit test in the REPL.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_simple
+  +++ OK, passed 1 test.
+  
+This is not very exciting. For a more interesting example, the same module contains a buggy implementation of an insertion sort.
+
+.. code:: haskell
+
+  sort :: [Int] -> [Int] -- not correct
+  sort []     =  []
+  sort (x:xs) =  insert x xs
+  
+  insert :: Int -> [Int] -> [Int] -- not correct
+  insert x []                     =  [x]
+  insert x (y:ys)  | x <= y       =  x : ys
+                   | otherwise    =  y : insert x ys
+
+To test it, a property that would could test would be that after applying sort to a list of integers, the resulting list is sorted.
+
+.. code:: haskell
+
+  isSorted :: [Int] -> Bool
+  isSorted []           = True
+  isSorted [_]          = True
+  isSorted (x : y : ys) = x <= y && isSorted (y : ys)  
+
+Using this, we can now provide a QuickCheck property that is not just simply of type *Bool*, but instead is a function from a list of *Int*\s to *Bool*.
+
+.. code:: haskell
+
+  prop_sort_sorts :: [Int] -> Bool
+  prop_sort_sorts xs = isSorted $ sort xs  
+
+You can read that like a specification, which says "for all the lists of integers *xs*, if you apply *sort* to it, then the result should be sorted."
+
+QuickCheck can deal with such properties.
+
+In the REPL
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_sorts 
+  *** Failed! Falsified (after 8 tests and 4 shrinks):    
+  [0,0,-1]
+ 
+It fails, and gives us an example where the property does not hold. We can test that example.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> sort [0, 0, -1]
+  [0,-1]
+
+And can see that, indeed, it is not correct.  
+
+How does QuickCheck do this? If you provide a function with one or more arguments, it will generate random arguments for the function. In our example, QuickCheck 
+has generated 100 random lists of integers and, for each of those lists, has checked whether the property holds, until it hit a failure.
+
+Note that the failure was reported as 
+
+.. code::
+
+  *** Failed! Falsified (after 8 tests and 4 shrinks):    
+
+This means that after 8 tests the property was falsified, but at this point, rather than just report the failure, it has tried to shrink it - to simplify it. 
+
+This is a powerful feature of QuickCheck, because the random counter examples that QuickCheck finds are very complicated - long lists with long numbers. But once a counter
+example has been found, QuickCheck tries to simplify it, perhaps by dropping some elements from the list, or by making some of the numbers smaller, until it doesn't
+find a way to get an even simpler example.
+
+It is this combination of random test generation and shrinking that makes QuickCheck so tremendously useful.
+
+We can see what type of random lists QuickCheck generates.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> sample (arbitrary :: Gen [Int])
+  []
+  [0]
+  [2,4,-1,3]
+  [3,-1,4,3,-5]
+  [3,-1,-8,-4,-6]
+  [4,5,-1,4,-7,2,8,4,-5]
+  [-8,-8,-11,-12,2,-4,-12,2,4]
+  [7,9,3,-5,5,-9,3,1,11]
+  [12,-7,-9,9,-11,-15,5,-10,-7,4,8,8,-12,-6,16]
+  [-11,11,-1,-6]
+  [14,2,-5,9,13,-8,-8,-17,-1,-11,-19,15,9,8,-19,-4,16,4,4,19]
+
+The way QuickCheck does this random generation is by using a type class called *Arbitrary*
+
+.. code::
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> :i Arbitrary
+  type Arbitrary :: * -> Constraint
+  class Arbitrary a where
+    arbitrary :: Gen a
+    shrink :: a -> [a]
+
+There are many more lines to the above output, but the important ones are shown. We can see that it has two methods. One is called *arbitrary* and one is called *shrink*.
+
+*Gen* is yet another monad. The monad provides various methods that allow for random number generation for values of type *a*.
+  
+The second method is *shrink*, which, when given an *a* will provide a list of simpler versions of *a*. This, of course, depends on the type of *a*.
+
+If we look at the output above that provides some random integer lists, we see something interesting. The further we go down the list, the more complicated the list becomes. The 
+first is just the empty list, then we get single-element lists, then some longer lists, and it tends towards greater complexity over time.
+
+In addition to just providing random generation in the *Gen* monad, there is also a concept of complexity. If you implement an instance of *Gen* you are expected not only 
+to generate a random *a* but also a random *a* of some given complexity.
+
+When *QuickCheck* checks a property, it starts with simple, random arguments, then makes them more complex over time. By default it tests 100 random arguments, but this
+can be configured.
+
+Now that we know that our code fails, let's try to fix it.
+
+.. code:: haskell
+
+  sort :: [Int] -> [Int] -- not correct
+  sort []     =  []
+  sort (x:xs) =  insert x xs
+
+The problem is that all we do for a non-empty list is to insert the first element into the tail, but we don't recursively sort the tail.
+
+Our first attempt to fix...
+
+.. code:: haskell
+
+  sort :: [Int] -> [Int]
+  sort []     =  []
+  sort (x:xs) =  insert x $ sort xs
+
+Now, when we test this...
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck> :r
+  [1 of 1] Compiling Week08.QuickCheck ( src/Week08/QuickCheck.hs, /home/chris/git/ada/pioneer-fork/code/week08/dist-newstyle/build/x86_64-linux/ghc-8.10.4.20210212/plutus-pioneer-program-week08-0.1.0.0/build/Week08/QuickCheck.o )
+  Ok, one module loaded.
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_sorts 
+  +++ OK, passed 100 tests.
+  
+It passes. However, if we test specifically for the case that failed previously...
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> sort [0, 0, -1]
+  [-1,0]
+
+It is clearly not correct. Even though the list has been sorted, the length of the list has changed. This leads to an important point. QuickCheck can't do magic - its results are only 
+as good as the properties we provide. What we see here is that our property *prop_sort_sorts* is not strong enough to test if the function is correct.
+
+We can add a second property that checks the length.
+
+.. code:: haskell
+
+  prop_sort_preserves_length :: [Int] -> Bool
+  prop_sort_preserves_length xs = length (sort xs) == length xs
+  
+And we find that this property is not satisfied by our code.  
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_preserves_length
+  *** Failed! Falsified (after 4 tests and 3 shrinks):    
+  [0,0]
+
+The bug in our code is in the *insert* function.
+
+.. code:: haskell
+
+  insert :: Int -> [Int] -> [Int] -- not correct
+  insert x []                     =  [x]
+  insert x (y:ys)  | x <= y       =  x : ys
+                   | otherwise    =  y : insert x ys
+                   
+We say here that, if *x* is less or equal to *y*, then we append *x* to *ys*, but we have forgotten about the *y*. It should read:
+
+.. code:: haskell
+
+  insert x (y:ys)  | x <= y       =  x : y : ys
+
+This should fix it.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> :r
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_preserves_length
+  +++ OK, passed 100 tests.
+
+Of course, this is still not proof that our function is correct, because these two properties are still not enough to specify a sorting function fully. For example,
+the sorting function could return a list of the same length containing only zeroes. This would pass all tests. It is quite an art to find properties to guarantee that,
+if they are all satisfied, there is no bug.
+
+Even so, this approach to testing is often more effective than unit testing as it can test a huge number of random cases and can find examples of 
+failure which a programmer writing a unit test may not have thought of.
+
+Using QuickCheck with Plutus 
+++++++++++++++++++++++++++++
+
+Now that we have seen what QuickCheck can do, we will turn our attention to using it to test Plutus contracts.
+
+Here we hit a problem - how do you use QuickCheck to test side-effected code? This problem does not only arise with blockchain, it arises with all systems 
+that use IO.
+
+John Hughes always uses the example of the file system. How would you test file system operations, i.e. reading, writing, opening and closing files, using QuickCheck.
+
+The approach to use is very similar to the one you can use with Plutus. The idea is that you start with a model.
+
+.. figure:: img/pic__00004.png
+
+The model is basically an idealised model of how the real world system should work. There must be some sort of relation between the model and the real system.
+
+If the real system is a file system, then you could, in the model, have an idealised version of how you think files should work. And then, what QuickCheck does, in its 
+random generation, is to generate a random sequence of actions that you can perform on the system. In the example of a file system, it would randomly generate a 
+sequence of opening files, closing files, writing to files, reading files and so on. Now you can basically step this model and the system in parallel.
+
+You have some sort of action that you perform in the real world, and you apply the same type of action to your model. Then your real system has progressed into a new state,
+and your model has also been updated. After this step, you can compare the two and check that they are still in sync. You can then continue this for several steps.
+
+.. figure:: img/pic__00009.png
+
+While our first QuickCheck example generated a random list of *Int*\s, the idea for testing a real world system is to generate random lists of actions and then to 
+apply those actions both to a model and to the real system and to check that the model and the real system stay in sync.
+
+Shrinking in this example would be that, if you have a list of actions that show that there is a bug, then you can, for example, drop some of the actions and see 
+whether the problem still arises. This can be repeated until you cannot drop any further actions from the list and still reproduce the bug.
+
+This is exactly how the QuickCheck support for Plutus works.
+

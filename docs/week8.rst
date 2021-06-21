@@ -1266,7 +1266,7 @@ sequence of opening files, closing files, writing to files, reading files and so
 You have some sort of action that you perform in the real world, and you apply the same type of action to your model. Then your real system has progressed into a new state,
 and your model has also been updated. After this step, you can compare the two and check that they are still in sync. You can then continue this for several steps.
 
-.. figure:: img/pic__00007.png
+.. figure:: img/pic__00009.png
 
 While our first QuickCheck example generated a random list of *Int*\s, the idea for testing a real world system is to generate random lists of actions and then to 
 apply those actions both to a model and to the real system and to check that the model and the real system stay in sync.
