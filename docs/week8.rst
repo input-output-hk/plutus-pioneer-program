@@ -1527,14 +1527,76 @@ The next method to implement is *initialState* which, as the name suggests, is t
 Now comes the most complex function that we must implement to set this up. You will recall from when we looked at the diagram that we
 must know what effect performing and action will have on the model. This is exactly what the *nextState* function does.
 
+If we look at the type of *nextState*, we see that it takes an action and returns something in yet another monad, this time the *Spec* monad. The *Spec* monad
+allows us to inspect the current state of our model, and also to transfer funds within our model.
 
+.. code:: haskell
 
+  nextState :: ContractModel state => Action state -> Spec state ()
 
+Let's look an example for *Start*. This should tell us the effect on our model if wallet *w* starts a token sale.
 
+.. code:: haskell
 
+  nextState (Start w) = do
+    withdraw w $ nfts Map.! w
+      (tsModel . at w) $= Just (TSState 0 0 0)
+    wait 1
 
+Here we see a function from the Spec monad called *withdraw*. Using *withdraw* means that some funds go from a wallet to a contract - it doesn't matter which contract. So,
+this says that the effect of *Start* will be that Wallet *w* loses the NFT.
 
+The NFT is again something that is defined in a helper function. Let's quickly look at the helper functions that define the NFTs and tradable tokens.
 
+Each wallet will trade its own token and each wallet will have its own NFT.
+
+.. code:: haskell
+
+  tokenCurrencies, nftCurrencies :: Map Wallet CurrencySymbol
+  tokenCurrencies = Map.fromList $ zip wallets ["aa", "bb"]
+  nftCurrencies   = Map.fromList $ zip wallets ["01", "02"]
+  
+  tokenNames :: Map Wallet TokenName
+  tokenNames = Map.fromList $ zip wallets ["A", "B"]
+  
+  tokens :: Map Wallet AssetClass
+  tokens = Map.fromList [(w, AssetClass (tokenCurrencies Map.! w, tokenNames Map.! w)) | w <- wallets]
+  
+  nftAssets :: Map Wallet AssetClass
+  nftAssets = Map.fromList [(w, AssetClass (nftCurrencies Map.! w, nftName)) | w <- wallets]
+  
+  nfts :: Map Wallet Value
+  nfts = Map.fromList [(w, assetClassValue (nftAssets Map.! w) 1) | w <- wallets]  
+
+Wallet 1 will trade the A token and Wallet 2 will trade the B token. Wallet one will have the 01 NFT and Wallet two will have the 02 NFT.
+
+While we are here, we can look at the *tss* helper which exists alongside the above helper functions and maps the wallets to their *TokenSale* parameters.
+
+.. code:: haskell
+
+  tss :: Map Wallet TokenSale
+  tss = Map.fromList
+      [ (w, TokenSale { tsSeller =  pubKeyHash $ walletPubKey w
+                      , tsToken  =  tokens Map.! w
+                      , tsNFT    =  nftAssets Map.! w
+                      })
+      | w <- wallets
+      ]
+
+Now, back to the *nextState* function. The first line of the *do* block says that the effect of calling Start will be that the wallet will loses the NFT to the contract. Remember that the NFT is locked in the 
+contract when we start the token sale.
+
+.. code:: haskell
+
+  nextState (Start w) = do
+    withdraw w $ nfts Map.! w
+      (tsModel . at w) $= Just (TSState 0 0 0)
+    wait 1
+
+Secondly, there will be an effect on the model state. Remember that the model state is a map from *Wallet* to *TSState*, where *TSState* is a triple of price, tokens and Ada.
+
+So, the second line of the *do* block says that after the contract has started, there will be an entry in the map with 0 price, 0 tokens and 0 Ada. The left hand side
+of the expression is another example of an optic, this time allowing us to access the map element of *_tsModel* from *TSModel* that relates to the wallet instance *w*.
 
 
 
