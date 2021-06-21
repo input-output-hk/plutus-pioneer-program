@@ -1700,7 +1700,15 @@ Then we check whether the wallet has enough of them.
     (tsModel . ix v . tssToken) $~ (+ n)
   wait 1
 
-  
+The number in *tokenAmt* is the number of tokens the wallet had at the start, so by adding this to the balance change for the token, we get the number of tokens 
+currently in the wallet.
+
+If we have enough tokens, then we withdraw the correct number of tokens from the wallet, and we update the model to show that the tokens should now be in the contract. Note that 
+instead of using $= to set the value, we use the $~ function which applies a function to a value.
+
+Again, we wait one slot.
+
+
 
 
 
