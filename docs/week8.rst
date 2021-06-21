@@ -1604,6 +1604,66 @@ The $= comes from the Spec monad and it takes a lens on the left-hand side and t
 
 The *wait* function comes from the Spec monad and says here that the *Start* will take one slot.
 
+Now we do something similar for all the other operations. Firstly, *SetPrice*.
+
+.. code:: haskell
+
+  nextState (SetPrice v w p) = do
+    when (v == w) $
+        (tsModel . ix v . tssPrice) $= p
+    wait 1
+
+In this function, we only do something if the wallet that invokes *SetPrice* is the same as the wallet that is running the token sale. If it is then the funds 
+don't move, but we must update the model.
+
+We use a different optic - instead of *at* we use *ix* which is a *Traversal*. It is similar to *at*, but whereas *at* returned a *Maybe*, *ix* does not. It also uses the *tssPrice* lens to access the first element of the *TSState* triple, which it sets to the price.
+In the event that *ix* does not find an entry, the line will have no effect. 
+
+Whether or not the wallets match, and whether or not the price update succeeds, we wait one slot.
+
+The model state change for *AddTokens* is more complex.
+
+.. code:: haskell
+
+  nextState (AddTokens v w n) = do
+    started <- hasStarted v                                     -- has the token sale started?
+    when (n > 0 && started) $ do
+        bc <- askModelState $ view $ balanceChange w
+        let token = tokens Map.! v
+        when (tokenAmt + assetClassValueOf bc token >= n) $ do  -- does the wallet have the tokens to give?
+            withdraw w $ assetClassValue token n
+            (tsModel . ix v . tssToken) $~ (+ n)
+    wait 1
+  
+First we check the the token sale for wallet *v* has actually started, and this is yet another helper function.    
+  
+.. code:: haskell
+
+  getTSState' :: ModelState TSModel -> Wallet -> Maybe TSState
+  getTSState' s v = s ^. contractState . tsModel . at v
+  
+Given a *ModelState* (which is of type *TSModel* but with additional information such as current funds and current time) and given a *Wallet*, we want to extract the
+*TSState* which is the state of the token sale contract for that wallet, which may or may not have started yet.
+
+This is again performed using optics. There is a lens called *contractState* which, here is the *TSModel* type. We then zoom into the map and use the *at* lens, which
+will return *Nothing* if the wallet key *v* does not exist, or a *Just TSState* if it is there.
+
+Using this, we can write a slight variety of this function which doesn't have the first argument. Instead it takes just the *Wallet* argument, but then returns the
+*Maybe TSState* in the Spec monad. In order to do that, we use a feature of the Spec monad, a function called *getModelState*, which will return the model state, which
+we then pass to the primed version of the function along with the *Wallet* argument.
+
+.. code:: haskell
+
+  getTSState :: Wallet -> Spec TSModel (Maybe TSState)
+  getTSState v = do
+      s <- getModelState
+      return $ getTSState' s v
+  
+  hasStarted :: Wallet -> Spec TSModel Bool
+  hasStarted v = isJust <$> getTSState v
+  
+  
+
 
 
 
