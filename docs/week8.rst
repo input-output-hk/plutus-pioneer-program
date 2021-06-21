@@ -1336,6 +1336,27 @@ All the logic that defines how our model should behave, and how it is linked to 
 
   instance ContractModel TSModel where
 
-First we have an associated datatype. This is quite an advanced Haskell feature. In type classes, as well as methods, you can also have datatypes. We have seen this 
+First we have an associated datatype. This is quite an advanced Haskell feature. In type classes, as well as methods, you can have data types. We have seen this 
 before in validators where we define a dummy type that provides a link between the datum type and the redeemer type.
 
+Here, we associate an *Action* type, which represents the actions that QuickCheck will generate. In principal, we just have one constructor in the *Action* type for
+each of the endpoints we saw earlier. We have additional arguments because now there are additional wallets at play and we must keep track of which wallet performs an 
+action.
+
+.. code:: haskell
+
+  data Action TSModel =
+      Start Wallet
+    | SetPrice Wallet Wallet Integer
+    | AddTokens Wallet Wallet Integer
+    | Withdraw Wallet Wallet Integer Integer
+    | BuyTokens Wallet Wallet Integer
+  deriving (Show, Eq)
+
+*Start Wallet* means that this wallet starts the token sale contract.
+
+*SetPrice Wallet Wallet Integer* means that the second wallet sets the price for the token sale contract operated by the first wallet. We know from the contract logic that 
+this should only work if both the wallets are the same, because only the owner of the contract can set the price.
+
+
+ 
