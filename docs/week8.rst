@@ -1499,7 +1499,23 @@ You can use the applicative style if the actions in the monad you are invoking d
 the result in *w1* and make some choice based upon it. This is not possible in *Applicative*, but often monadic code doesn't make use of this power, and in these 
 situations, we have this more compact way of writing it.
 
+We can try out the *arbitraryAction* function in the REPL.
 
+.. code:: haskell
+
+  Prelude Test.QuickCheck Plutus.Contract.Test.ContractModel Spec.Model> sample (arbitraryAction undefined :: Gen (Action TSModel))
+  Start (Wallet 1)
+  AddTokens (Wallet 1) (Wallet 1) 1
+  AddTokens (Wallet 1) (Wallet 1) 3
+  SetPrice (Wallet 1) (Wallet 2) 3
+  SetPrice (Wallet 1) (Wallet 1) 2
+  AddTokens (Wallet 1) (Wallet 1) 1
+  SetPrice (Wallet 2) (Wallet 1) 12
+  Withdraw (Wallet 2) (Wallet 1) 14 3
+  AddTokens (Wallet 2) (Wallet 1) 9
+  AddTokens (Wallet 2) (Wallet 1) 18
+  SetPrice (Wallet 2) (Wallet 1) 17
+  
 
 
 
