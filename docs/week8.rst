@@ -1671,17 +1671,36 @@ Continuing the *nextState* function for *AddTokens*
     started <- hasStarted v 
     when (n > 0 && started) $ do
       bc <- askModelState $ view $ balanceChange w
-      let token = tokens Map.! v
-      when (tokenAmt + assetClassValueOf bc token >= n) $ do  -- does the wallet have the tokens to give?
-          withdraw w $ assetClassValue token n
-          (tsModel . ix v . tssToken) $~ (+ n)
-    wait 1
+
   
+If the token sale has not started, we don't do anything because *AddTokens* shouldn't have any effect in that case.
 
+We also check that the number of tokens to be added is greater than zero. If not, again we do nothing. Otherwise, we continue.
 
+We now see another function from the Spec monad called *askModelState*, which is similar to *getModelState* but it doesn't return the complete model state but instead
+takes a function and applies it to the the model state. The function *view* comes from the *lens* library and is just another name for the *^.* operator for viewing the
+result of zooming into a lens.
 
+And there is a *balanceChange w* lens which is a lens to the balance change of wallet *w*. The balance change refers to how much the funds of the wallet have changed 
+since the start of the simulation.
 
+At this point we have the balance change bound to *bc*. The reason we are doing this is because we want to make sure that the wallet has enough funds to add the requested
+number of tokens, which we now do. First we look up the token.
 
+.. code:: haskell
+
+  let token = tokens Map.! v
+
+Then we check whether the wallet has enough of them.
+
+.. code:: haskell
+
+  when (tokenAmt + assetClassValueOf bc token >= n) $ do  -- does the wallet have the tokens to give?
+    withdraw w $ assetClassValue token n
+    (tsModel . ix v . tssToken) $~ (+ n)
+  wait 1
+
+  
 
 
 
