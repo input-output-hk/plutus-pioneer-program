@@ -1516,6 +1516,16 @@ We can try out the *arbitraryAction* function in the REPL.
   AddTokens (Wallet 2) (Wallet 1) 18
   SetPrice (Wallet 2) (Wallet 1) 17
   
+We see that is generates a sample of random actions with random arguments.
+
+The next method to implement is *initialState* which, as the name suggests, is the initial state of our model.
+
+.. code:: haskell
+
+  initialState = TSModel Map.empty
+
+Now comes the most complex function that we must implement to set this up. You will recall from when we looked at the diagram that we
+must know what effect performing and action will have on the model. This is exactly what the *nextState* function does.
 
 
 
