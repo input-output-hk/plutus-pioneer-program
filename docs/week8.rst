@@ -1157,11 +1157,89 @@ first is just the empty list, then we get single-element lists, then some longer
 In addition to just providing random generation in the *Gen* monad, there is also a concept of complexity. If you implement an instance of *Gen* you are expected not only 
 to generate a random *a* but also a random *a* of some given complexity.
 
+When *QuickCheck* checks a property, it starts with simple, random arguments, then makes them more complex over time. By default it tests 100 random arguments, but this
+can be configured.
+
+Now that we know that our code fails, let's try to fix it.
+
+.. code:: haskell
+
+  sort :: [Int] -> [Int] -- not correct
+  sort []     =  []
+  sort (x:xs) =  insert x xs
+
+The problem is that all we do for a non-empty list is to insert the first element into the tail, but we don't recursively sort the tail.
+
+Our first attempt to fix...
+
+.. code:: haskell
+
+  sort :: [Int] -> [Int]
+  sort []     =  []
+  sort (x:xs) =  insert x $ sort xs
+
+Now, when we test this...
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck> :r
+  [1 of 1] Compiling Week08.QuickCheck ( src/Week08/QuickCheck.hs, /home/chris/git/ada/pioneer-fork/code/week08/dist-newstyle/build/x86_64-linux/ghc-8.10.4.20210212/plutus-pioneer-program-week08-0.1.0.0/build/Week08/QuickCheck.o )
+  Ok, one module loaded.
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_sorts 
+  +++ OK, passed 100 tests.
+  
+It passes. However, if we test specifically for the case that failed previously...
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> sort [0, 0, -1]
+  [-1,0]
+
+It is clearly not correct. Even though the list has been sorted, the length of the list has changed. This leads to an important point. QuickCheck can't do magic - its results are only 
+as good as the properties we provide. What we see here is that our property *prop_sort_sorts* is not strong enough to test if the function is correct.
+
+We can add a second property that checks the length.
+
+.. code:: haskell
+
+  prop_sort_preserves_length :: [Int] -> Bool
+  prop_sort_preserves_length xs = length (sort xs) == length xs
+  
+And we find that this property is not satisfied by our code.  
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_preserves_length
+  *** Failed! Falsified (after 4 tests and 3 shrinks):    
+  [0,0]
+
+The bug in our code is in the *insert* function.
+
+.. code:: haskell
+
+  insert :: Int -> [Int] -> [Int] -- not correct
+  insert x []                     =  [x]
+  insert x (y:ys)  | x <= y       =  x : ys
+                   | otherwise    =  y : insert x ys
+                   
+We say here that, if *x* is less or equal to *y*, then we append *x* to *ys*, but we have forgotten about the *y*. It should read:
+
+.. code:: haskell
+
+  insert x (y:ys)  | x <= y       =  x : y : ys
+
+This should fix it.
+
+.. code:: haskell
+
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> :r
+  Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_preserves_length
+  +++ OK, passed 100 tests.
+
+Of course, this is still not proof that our function is correct, because these two properties are still not enough to specify a sorting function fully.
 
 
-
-
-
+  
 
 
 
