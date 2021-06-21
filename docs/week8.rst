@@ -1422,7 +1422,7 @@ The next method that we need to implement is *arbitraryAction* which is how we t
 .. code:: haskell
 
   arbitraryAction _ = oneof $
-    (Start <$> genWallet) :
+     (Start <$> genWallet) :
     [ SetPrice  <$> genWallet <*> genWallet <*> genNonNeg ]               ++
     [ AddTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
     [ BuyTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
@@ -1472,6 +1472,33 @@ What this means is that we first use *genWallet* to generate a random wallet and
 
 The right-hand side is of type *Gen Wallet* and *Start* takes a *Wallet* and returns an action. If we *fmap* (<$>) this, we get a type of *Gen Wallet -> Gen Action*, which
 is what we want.
+
+For the other four actions, we use an additional helper function *genNonNeg* which generates a nonnegative number.
+
+.. code:: haskell
+  
+  genNonNeg :: Gen Integer
+  genNonNeg = getNonNegative <$> arbitrary
+  
+Now, when we want to generate a random action for *SetPrice*, this is where the applicative style really shines.
+
+.. code:: haskell
+
+  SetPrice <$> genWallet <*> genWallet <*> genNonNeg
+
+If we wanted to write this in a *do* block, we would do something like
+
+.. code:: haskell
+
+  w1 <- genWallet
+  w2 <- genWallet
+  p  <- genNonNeg
+  return (SetPrice w1 w2 p)
+
+You can use the applicative style if the actions in the monad you are invoking don't depend on the result of previous actions. In a *do* block, you could do inspect the
+the result in *w1* and make some choice based upon it. This is not possible in *Applicative*, but often monadic code doesn't make use of this power, and in these 
+situations, we have this more compact way of writing it.
+
 
 
 
