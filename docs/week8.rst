@@ -1428,6 +1428,56 @@ The next method that we need to implement is *arbitraryAction* which is how we t
     [ BuyTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
     [ Withdraw  <$> genWallet <*> genWallet <*> genNonNeg <*> genNonNeg ]  
 
+As an argument it gets the model state. We will come to this later, but we don't need it here and so ignore it in the method declaration.
+
+The function *oneof* is one of the combinators provided by QuickCheck. Given a list of arbitrary actions, it randomly picks one of those.
+
+Here we are using something else that we have not seen before - the applicative style. Recall that when we looked at monads, we saw that *Monad* has *Applicative* as 
+a superclass. *Applicative* is often useful to write more compact monadic code.
+
+First let's look at the *genWallet* function.
+
+.. code:: haskell
+
+  genWallet :: Gen Wallet
+  genWallet = elements wallets
+  
+In the random generation monad *Gen*, it generates a random wallet. It uses another combinator provided by QuickCheck, *elements*, which simply takes a list of the type
+that we wish to generate, and randomly picks one of those elements.
+
+This is using another helper function *wallets*.
+
+.. code:: haskell
+
+  wallets :: [Wallet]
+  wallets = [w1, w2]
+
+Which, in turn, uses
+
+.. code:: haskell
+
+  w1, w2 :: Wallet
+  w1 = Wallet 1
+  w2 = Wallet 2
+  
+So *genWallet* will randomly pick either Wallet 1 or Wallet 2.
+
+Getting back to the *arbitraryAction* code. 
+
+.. code:: haskell
+
+  Start <$> genWallet
+
+What this means is that we first use *genWallet* to generate a random wallet and then return *Action Start w*, where *w* is the wallet we have just picked. 
+
+The right-hand side is of type *Gen Wallet* and *Start* takes a *Wallet* and returns an action. If we *fmap* (<$>) this, we get a type of *Gen Wallet -> Gen Action*, which
+is what we want.
+
+
+
+
+
+
 
 
 
