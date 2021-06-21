@@ -1274,5 +1274,15 @@ apply those actions both to a model and to the real system and to check that the
 Shrinking in this example would be that, if you have a list of actions that show that there is a bug, then you can, for example, drop some of the actions and see 
 whether the problem still arises. This can be repeated until you cannot drop any further actions from the list and still reproduce the bug.
 
-This is exactly how the QuickCheck support for Plutus works.
+This is exactly how the QuickCheck support for Plutus works. In order to test a Plutus contract, we have to come up with a model and define our expectations of how 
+the various endpoints, for example, would change the model. We would then need to provide a link between the model and the real system (the emulator), and then apply the
+QuickCheck machinery.
+
+The code to do this is in
+
+.. code:: haskell
+
+  module Spec.Model 
+
+  
 
