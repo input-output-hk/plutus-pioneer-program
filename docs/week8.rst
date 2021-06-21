@@ -1300,9 +1300,6 @@ And we import three more test modules. One for Tasty, one for QuickCheck, and on
   import           Test.Tasty
   import           Test.Tasty.QuickCheck  
 
-The Model
-_________
-
 To define a model, we first define a datatype that represents the state of one *TokenSale* instance.
 
 .. code:: haskell
@@ -1783,3 +1780,60 @@ Finally, the *Withdraw* action.
           _ -> return ()
   wait 1  
 
+This is only possible if the wallet wanting to withdraw is the same as the wallet running the sale. We check this first, then get the contract state.
+
+We check both that there are enough tokens for us to withdraw the tokens that we are requesting, and also that there are enough lovelace for us to withdraw the lovelace that
+we are requesting. If this is satisfied, the effect is that we add the lovelace and the tokens to the wallet, and the model is updated to reflect the fact that the
+tokens and the lovelace have been removed.
+
+That completes the *nextState* function declarations.
+
+Right now, the model is just a conceptual model that has nothing to do with the contracts we wrote earlier. The names are suggestive because they have same names as
+we used in the redeemer, but there is no link yet between the model and the actual contracts.
+
+The link is provided by yet another method in the *ContractModel* class that we have to implement, and that's the *perform* function.
+
+.. code:: haskell
+
+  perform
+    :: ContractModel state =>
+      HandleFun state
+      -> ModelState state
+      -> Action state
+      -> Plutus.Trace.Emulator.EmulatorTrace ()
+
+It takes something called *HandleFun* and then it takes the *ModelState* and the *Action*. 
+
+The *HandleFun* parameter gives us access to the contract handles.
+
+Let's look at our implementation of this method. We don't need access to the *ModelState* for this example.
+
+.. code:: haskell
+
+  perform h _ cmd = case cmd of
+    (Start w)          -> callEndpoint @"start"      (h $ StartKey w) (nftCurrencies Map.! w, tokenCurrencies Map.! w, tokenNames Map.! w) >> delay 1
+    (SetPrice v w p)   -> callEndpoint @"set price"  (h $ UseKey v w) p                                                                    >> delay 1
+    (AddTokens v w n)  -> callEndpoint @"add tokens" (h $ UseKey v w) n                                                                    >> delay 1
+    (BuyTokens v w n)  -> callEndpoint @"buy tokens" (h $ UseKey v w) n                                                                    >> delay 1
+    (Withdraw v w n l) -> callEndpoint @"withdraw"   (h $ UseKey v w) (n, l)   
+  
+Here we are linking actions to contract endpoints. Recall that we wrote functions that create keys that uniquely identify contracts. The functions were called *StartKey* 
+and *UseKey*. 
+
+The *StartKey* function takes one *Wallet* as an argument, and you can see that we give that argument here in the first line of the body of the function. 
+Then we apply the function *h* to it. The function *h* is the *HandleFun* parameter and it is the job of this function to get a handle to the contract instance associated with a given key.
+
+We also pass in the parameters. So in the example of the start action, we pass in a pre-computed values for the NFT, the token currencies and the token names. Recall that, 
+in *instanceSpec*, we specified *startEndpoint'* - the primed version - which takes those three parameters.
+
+The *delay* function used in *perform* is another simple helper function to wait for a number of slots.
+
+.. code:: haskell
+
+  delay :: Int -> EmulatorTrace ()
+  delay = void . waitNSlots . fromIntegral
+
+All the other actions are very similar, but note that they all use *UseKey* instead of *StartKey*.
+
+
+  
