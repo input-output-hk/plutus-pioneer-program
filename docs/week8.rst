@@ -1595,8 +1595,16 @@ contract when we start the token sale.
 
 Secondly, there will be an effect on the model state. Remember that the model state is a map from *Wallet* to *TSState*, where *TSState* is a triple of price, tokens and Ada.
 
-So, the second line of the *do* block says that after the contract has started, there will be an entry in the map with 0 price, 0 tokens and 0 Ada. The left hand side
-of the expression is another example of an optic, this time allowing us to access the map element of *_tsModel* from *TSModel* that relates to the wallet instance *w*.
+The second line of the *do* block says that after the contract has started, there will be an entry in the map at key *w* with 0 price, 0 tokens and 0 Ada. 
+
+The left hand side of the expression is another example of an optic, this time allowing us to access the map *_tsModel* from *TSModel*. The *at* lens allows us to 
+reference a map entry at a given key. The type returned by this optic is a *Maybe* as the key may or may not be there.
+
+The $= comes from the Spec monad and it takes a lens on the left-hand side and then a new value on the right-hand side.
+
+The *wait* function comes from the Spec monad and says here that the *Start* will take one slot.
+
+
 
 
 
