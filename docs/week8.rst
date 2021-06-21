@@ -1410,7 +1410,15 @@ The *instanceTag* function doesn't have an accessible constructor, but it implem
 used it when we used the *OverloadedStrings* GHC extension - it allows a type class that implements it to be represented by a string literal. In particular, it has a 
 method *fromString* which, given a string, will create an instance of the type.
 
-The "instance tag for: " literal in the function above isn't necessary - all that is necessary is for the whole string to be unique for each instance that we will ever run.
+The "instance tag for: " literal in the function above isn't necessary - all that is necessary is for the whole string to be unique for each instance that we will 
+ever run in our tests.
+
+There is a default implementation for the *instanceTag* method of the *ContractModel* class, so you normally don't have to implement it yourself. However, it only 
+works if you have at most one contract instance per wallet. This is not the case for us, as we will have three instances per wallet - one *start* instance and two
+*use* instances (one for the own wallet's token sale, and one for the other wallet's token sale).
+
+
+
 
 
 
