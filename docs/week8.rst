@@ -1284,5 +1284,42 @@ The code to do this is in
 
   module Spec.Model 
 
-  
+We notice that we import two Plutus test modules, with the QuickCheck support being provided by the *ContractModel*, which has all the machinery to define a model and to link 
+it to a real contract.
 
+.. code:: haskell
+
+  import           Plutus.Contract.Test
+  import           Plutus.Contract.Test.ContractModel
+  
+And we import three more test modules. One for Tasty, one for QuickCheck, and one that allows for using QuickCheck properties in Tasty test suites.
+
+.. code:: haskell
+
+  import           Test.QuickCheck
+  import           Test.Tasty
+  import           Test.Tasty.QuickCheck  
+
+The Model
+_________
+
+To define a model, we first define a datatype that represents the state of one *TokenSale* instance.
+
+.. code:: haskell
+
+  data TSState = TSState
+    { _tssPrice    :: !Integer
+    , _tssLovelace :: !Integer
+    , _tssToken    :: !Integer
+    } deriving Show
+
+It has three fields - the current price, the current supply of lovelace in the contract, and the current supply of tokens in the contract.
+
+Then our model *TSModel* is a map from wallets to *TokenSale* states.
+
+.. code:: haskell
+
+  newtype TSModel = TSModel {_tsModel :: Map Wallet TSState}
+  deriving Show
+
+The idea in this test is that we have two wallets and each wallet runs its own *TokenSale* contract, and the two wallets will trade different tokens.
