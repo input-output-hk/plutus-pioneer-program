@@ -1236,11 +1236,17 @@ This should fix it.
   Prelude Control.Lens Test.QuickCheck Week08.QuickCheck> quickCheck prop_sort_preserves_length
   +++ OK, passed 100 tests.
 
-Of course, this is still not proof that our function is correct, because these two properties are still not enough to specify a sorting function fully.
+Of course, this is still not proof that our function is correct, because these two properties are still not enough to specify a sorting function fully. For example,
+the sorting function could return a list of the same length containing only zeroes. This would pass all tests. It is quite an art to find properties to guarantee that,
+if they are all satisfied, there is no bug.
 
+Even so, this approach to testing is often more effective than unit testing as it can test a huge number of random cases and can find examples of 
+failure which a programmer writing a unit test may not have thought of.
 
-  
+Using QuickCheck with Plutus 
+++++++++++++++++++++++++++++
 
+Now that we have seen what QuickCheck can do, we will turn our attention to using it to test Plutus contracts.
 
-
-
+Here we hit a problem - how do you use QuickCheck to test side-effected code? This problem does not only arise with blockchain, it arises with all systems 
+that use IO.
