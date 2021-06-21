@@ -1358,5 +1358,15 @@ action.
 *SetPrice Wallet Wallet Integer* means that the second wallet sets the price for the token sale contract operated by the first wallet. We know from the contract logic that 
 this should only work if both the wallets are the same, because only the owner of the contract can set the price.
 
+*AddTokens* is very similar to *SetPrice*.
+
+For *Withdraw*, the second wallet attempts to withdraw a certain number of lovelace and a certain number tokens (respectively) from the token sale run by the first wallet. Again, this should 
+fail if the two wallets are not the same.
+
+In *BuyTokens*, the second wallet will try to buy a certain number of tokens from the token sale run by the first wallet.
+
+
+
+
 
  
