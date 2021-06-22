@@ -24,8 +24,8 @@ For this lecture, Professor Simon Thomson, a very prominent figure in the Haskel
 
 Afterwards we will look at the Marlowe playground and play with a simple smart contract.
 
-Prof. Simon Thomson
--------------------
+Lecture by Prof. Simon Thomson
+------------------------------
 
 Marlowe is a special-purpose language for writing financial contracts on Cardano.
 
