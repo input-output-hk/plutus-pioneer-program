@@ -7,8 +7,6 @@ Week 09 - Marlowe
 
     In this lecture we cover Marlowe - a special-purpose language for financial contracts on Cardano.
 
-    This week we were using Plutus commit ae35c4b8fe66dd626679bd2951bd72190e09a123, the same commit as we used in the last lecture.
-
 Overview
 --------
 
