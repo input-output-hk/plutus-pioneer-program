@@ -2098,13 +2098,13 @@ And, if we look at the referenced Spec.hs
       , Spec.Model.tests
       ]  
 
-We can see that it specifies a list of test modules. And these can be run from the command line with 
+We can see that it specifies a list of test modules. And these can be run from the command line with the following command.
 
 .. code::
 
   cabal test
 
-  
+
 
   
   
