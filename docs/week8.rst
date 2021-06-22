@@ -1823,8 +1823,8 @@ and *UseKey*.
 The *StartKey* function takes one *Wallet* as an argument, and you can see that we give that argument here in the first line of the body of the function. 
 Then we apply the function *h* to it. The function *h* is the *HandleFun* parameter and it is the job of this function to get a handle to the contract instance associated with a given key.
 
-We also pass in the parameters. So in the example of the start action, we pass in a pre-computed values for the NFT, the token currencies and the token names. Recall that, 
-in *instanceSpec*, we specified *startEndpoint'* - the primed version - which takes those three parameters.
+We also pass in the parameters. So in the example of the start action, we pass in a pre-computed values for the NFT, the token currencies and the token names. 
+We will say later how the *instanceSpec* function links the *StartKey* to *startEndpoint'*, the primed version of the function, which takes those three parameters.
 
 The *delay* function used in *perform* is another simple helper function to wait for a number of slots.
 
@@ -1835,5 +1835,276 @@ The *delay* function used in *perform* is another simple helper function to wait
 
 All the other actions are very similar, but note that they all use *UseKey* instead of *StartKey*.
 
+Finally, the last method we must provide for the *ContractModel* instance is *precondition*. This allows us to define the conditions under which it is acceptable
+to provide each action.
 
+.. code:: haskell
+
+  precondition :: ContractModel state => ModelState state -> Action state -> Bool
+
+The precondition for *Start* is that the token sale has not yet started. It says that, given a certain state *s* and the *Start w* action, check that the return value 
+of *getTSState' s w* is *Nothing*.
+
+.. code:: haskell
+
+  precondition s (Start w)          = isNothing $ getTSState' s w
+
+And for the others, we do the opposite. They are only possible if the token sale has started.
+
+.. code:: haskell
+
+  precondition s (SetPrice v _ _)   = isJust    $ getTSState' s v
+  precondition s (AddTokens v _ _)  = isJust    $ getTSState' s v
+  precondition s (BuyTokens v _ _)  = isJust    $ getTSState' s v
+  precondition s (Withdraw v _ _ _) = isJust    $ getTSState' s v  
+  
+One last thing, we must link the keys to actual contracts. We do this with the *instanceSpec* function.
+
+.. code:: haskell
+
+  instanceSpec :: [ContractInstanceSpec TSModel]
+  instanceSpec =
+      [ContractInstanceSpec (StartKey w) w startEndpoint' | w <- wallets] ++
+      [ContractInstanceSpec (UseKey v w) w $ useEndpoints $ tss Map.! v | v <- wallets, w <- wallets]  
+
+The *instanceSpec* function returns a list of *ContractInstanceSpec* types.
+
+A *ContractInstanceSpec* takes three arguments - the first is the key, the second is the wallet, and the third is the contract that is supposed to be invoked.
+
+For the start endpoint, we generate a *ContractInstanceSpec* for each wallet. 
+
+For the use endpoint, we generate a *ContractInstanceSpec* for all combinations of two wallets. Note also that the *useEndpoints* function takes an argument of type
+*TokenSale*, so we need to get this from Wallet *v* and pass it in.
+
+And finally (honestly), we can define a QuickCheck property.
+
+There's a function in Plutus.Contract.Test called *propRunActionsWithOptions*.
+
+.. code:: haskell
+
+  propRunActionsWithOptions
+  :: ContractModel state =>
+     Plutus.Contract.Test.CheckOptions
+     -> [ContractInstanceSpec state]
+     -> (ModelState state -> Plutus.Contract.Test.TracePredicate)
+     -> Actions state
+     -> Property
+     
+First it takes the *CheckOptions* type that we have seen before when we did emulator trace testing. Next it takes the list of *ContractInstanceSpec*\s that we defined above.
+Then it takes a function from *ModelState* to *TracePredicate*, which allows us to insert additional tests. And finally, it produces a function from a list of *Action*\s to
+*Property*. *Property* is like a beefed-up *Bool*, which has additional capabilities, mostly for logging and debugging.
+
+We use this in the *prop_TS* function. For options we use the same as before which allows us to specify the initial coin distributions. We give each wallet 1,000 Ada, the
+wallet's NFT and 1,000 of both tokens, *A* and *B*.
+
+For the second argument we provide the *instanceSpec* function. For the third argument, we don't add any additional checks.
+
+.. code:: haskell
+
+  prop_TS :: Actions TSModel -> Property
+  prop_TS = withMaxSuccess 100 . propRunActionsWithOptions
+      (defaultCheckOptions & emulatorConfig .~ EmulatorConfig (Left d))
+      instanceSpec
+      (const $ pure True)
+    where
+      d :: InitialDistribution
+      d = Map.fromList $ [ ( w
+                           , lovelaceValueOf 1000_000_000 <>
+                             (nfts Map.! w)               <>
+                             mconcat [assetClassValue t tokenAmt | t <- Map.elems tokens])
+                         | w <- wallets
+                         ]
+                         
+This results in a type
+
+.. code:: haskell
+
+  Actions TSModel -> Property
+
+And this is something that QuickCheck can handle.
+
+Let's look at a sample of *Actions TSModel*
+
+.. code:: haskell
+
+  Prelude Test.QuickCheck Plutus.Contract.Test.ContractModel Spec.Model> sample (arbitrary :: Gen (Actions TSModel))
+  Actions []
+  Actions []
+  Actions []
+  Actions []
+  Actions []
+  Actions 
+   [Start (Wallet 1),
+    AddTokens (Wallet 1) (Wallet 2) 8,
+    Withdraw (Wallet 1) (Wallet 2) 5 1,
+    Withdraw (Wallet 1) (Wallet 1) 7 2,
+    SetPrice (Wallet 1) (Wallet 1) 0,
+    Start (Wallet 2),
+    BuyTokens (Wallet 2) (Wallet 1) 2]
+  Actions 
+   [Start (Wallet 1)]
+  Actions 
+   [Start (Wallet 2),
+    Withdraw (Wallet 2) (Wallet 1) 4 5,
+    SetPrice (Wallet 2) (Wallet 2) 5,
+    BuyTokens (Wallet 2) (Wallet 2) 3,
+    Start (Wallet 1),
+    BuyTokens (Wallet 1) (Wallet 1) 14,
+    Withdraw (Wallet 1) (Wallet 1) 11 7,
+    AddTokens (Wallet 2) (Wallet 1) 12]
+  Actions 
+   [Start (Wallet 1),
+    AddTokens (Wallet 1) (Wallet 2) 1,
+    BuyTokens (Wallet 1) (Wallet 1) 11,
+    SetPrice (Wallet 1) (Wallet 2) 5,
+    Withdraw (Wallet 1) (Wallet 1) 10 6,
+    Withdraw (Wallet 1) (Wallet 2) 13 0,
+    BuyTokens (Wallet 1) (Wallet 1) 8,
+    Withdraw (Wallet 1) (Wallet 2) 6 14,
+    SetPrice (Wallet 1) (Wallet 2) 7,
+    BuyTokens (Wallet 1) (Wallet 2) 4,
+    AddTokens (Wallet 1) (Wallet 2) 3]
+  Actions 
+   [Start (Wallet 1),
+    BuyTokens (Wallet 1) (Wallet 2) 10]
+  Actions 
+   [Start (Wallet 1),
+    SetPrice (Wallet 1) (Wallet 2) 14,
+    BuyTokens (Wallet 1) (Wallet 1) 20,
+    BuyTokens (Wallet 1) (Wallet 2) 15,
+    Start (Wallet 2),
+    Withdraw (Wallet 2) (Wallet 2) 14 1,
+    AddTokens (Wallet 2) (Wallet 2) 4,
+    Withdraw (Wallet 2) (Wallet 1) 21 2,
+    SetPrice (Wallet 2) (Wallet 1) 8,
+    Withdraw (Wallet 1) (Wallet 2) 15 17,
+    SetPrice (Wallet 1) (Wallet 1) 2,
+    BuyTokens (Wallet 2) (Wallet 1) 4]
+  
+We notice here a similar pattern to before, where things start quite simply and get more complex as the list goes on.    
+
+So what will be tested? As we saw in the diagram back at the beginning, for all these randomly-generated action sequences, it will test that the properties we specified in the model - 
+how the funds flow - corresponds to what actually happens in the emulator. If there is a discrepancy, the test will fail.
+
+Let's use it!
+
+.. code:: haskell
+
+  Prelude Test.QuickCheck Plutus.Contract.Test.ContractModel Spec.Model> test
+  (21 tests)
+
+It takes quite a while.
+
+.. code:: haskell
+
+  Prelude Test.QuickCheck Plutus.Contract.Test.ContractModel Spec.Model> test
+  (27 tests)
+
+But it will run 100 if you let it complete.
+
+What might be more interesting would be to implement a bug in the code and see if these tests will find it.
+
+In the *transition* function of our *TokenSale* code, let's forget to check that only the seller can change the price.
+
+.. code:: haskell
+
+  transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
+  transition ts s r = case (stateValue s, stateData s, r) of
+      (v, _, SetPrice p)   | p >= 0 -> Just ( mempty -- Just ( Constraints.mustBeSignedBy (tsSeller ts)
+      , State p $
+        v <>
+        nft (negate 1)
+      )
+  ...
+  
+We need to reload the code.
+
+.. code:: haskell
+
+  Prelude Test.QuickCheck Plutus.Contract.Test.ContractModel Spec.Model> :l test/Spec/Model.hs
+  Ok, one module loaded.
+  Prelude Test.QuickCheck Plutus.Contract.Test.ContractModel Spec.Model> test
+  *** Failed! Assertion failed (after 13 tests and 2 shrinks)...
+
+You will see a whole bunch of output, but at the top, you will see clearly the action sequence that led to the bug.
+
+.. code:: haskell
+
+  Actions
+    [Start (Wallet 2),
+     SetPrice (Wallet 2) (Wallet 1) 12,
+     AddTokens (Wallet 2) (Wallet 2) 11,
+     BuyTokens (Wallet 2) (Wallet 2) 1]
+  Expected funds of W2 to change by
+     Value (Map [(02,Map [("NFT",-1)]),(bb,Map [("B",-10)])])
+     (excluding 29466 lovelace in fees)
+  but they changed to
+     Value (Map [(,Map [("",-12)]),(02,Map [("NFT",-1)]),(bb,Map [("B",-10)])])
+  Test failed.
+
+And we see that Wallet 1 has tried to set the price of the token sale that was started by Wallet 2. This should result in no change, because Wallet 1 is not allowed to 
+do this.
+
+The model believes that the price should still be zero, but in the emulator the price has been set to 12.
+
+Then Wallet 2 adds 11 tokens, and then buys 1 token from itself.
+
+According to the model, the tokens should be free. The model expects that the wallet loses the NFT, that the wallet also loses 10 "B" because it gave 11 and then bought 1 back,
+and that there is no change in Ada in the wallet, because the token price is zero.
+
+But in the emulator, setting the price did have an effect, and so it reports that the wallet lost 12 lovelace.
+
+So the discrepancy in the flow of funds has been found, and QuickCheck reports the error.
+
+By default this is all the QuickCheck test do. It only checks the flow of funds, whether the emulator and the model agree at each point. It is, however, possible to 
+add additional checks. And it is also possible to influence the action sequences so that we can specify certain flows of actions to steer the tests in certain 
+directions. That is called Dynamic Logic, and that is yet another monad.
+
+Even though this is very powerful, it also has its limitations. For one, it only tests the contracts that we provide. It doesn't test all possible off-chain code. It is 
+possible that some party could write their own off-chain code that would allow them to steal funds from our contract, and this QuickCheck model can't test for that.
+
+The second problem is concurrency. We added this delay of one slot to each action to make sure that everything is nicely sequenced. Of course, in a real blockchain or
+in an emulator, wallets can have concurrent submissions of transactions. In principle we could try to do that with this model as well, but then we would need to 
+somehow specify in the model what should happen in each case and that could get very complicated.
+
+We should quickly look at how this integrates with Tasty.
+
+There is a function in the Tasty library called *testProperty* that takes, as one its arguments, a QuickCheck property.
+
+.. code:: haskell
+
+  tests :: TestTree
+  tests = testProperty "token sale model" prop_TS
+
+You will see an additional stanza in this week's cabal file
+
+.. code::
+
+  test-suite plutus-pioneer-program-week08-tests
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  ...
+
+And, if we look at the referenced Spec.hs
+
+.. code:: haskell
+
+  main :: IO ()
+  main = defaultMain tests
+  
+  tests :: TestTree
+  tests = testGroup "token sale"
+      [ Spec.Trace.tests
+      , Spec.Model.tests
+      ]  
+
+We can see that it specifies a list of test modules. And these can be run from the command line with 
+
+.. code::
+
+  cabal test
+
+  
+
+  
   
