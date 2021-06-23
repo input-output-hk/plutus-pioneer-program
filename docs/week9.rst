@@ -334,4 +334,17 @@ for spending crypto assets.
 Using Marlowe run and an associated wallet, we construct the transactions.
 
 We get a flow of information in both directions. Marlowe run will submit transactions to the blockchain that then can be validated by the Marlowe interpreter, which
-is itself a Plutus contract.
+is itself a Plutus contract. It's one of the largest Plutus contracts that exists.
+
+But there's also information flow another way because suppose that the transaction I've submitted is a deposit of money into a running contract, and suppose the 
+contract also involves Charles Hoskinson, so my instance of Marlowe Run has submitted that transaction, but Charles also has to be notified about that.
+
+The information flows in the other direction using the companion contract to ensure that every instance of Marlowe Run gets informed about activity in that contract.
+
+Alex will talk some more about the details of the implementation but here you're seeing an outline of how it all how it all works.
+
+Transactions are validated on chain through the interpreter, but they have to be built off chain and in some cases have to be authorized. Essentially the blockchain is
+the central synchronization point for the distributed system that is the collection of instances of Marlowe Run that are interacting to execute the contract/
+
+You saw in the demo that, in two separate windows, we were sharing information. That was simulating it locally but in production this will be information that's stored
+on the blockchain.
