@@ -49,4 +49,13 @@ What kind of assurance can we give?
 We can give two kinds of assurance. We can make sure that contracts do what they are supposed to do, but we can also make sure that they don't do what they shouldn't. We 
 will see both aspects of that as we go along.
 
+We've designed the language to be a simple as possible and the implementation reflects that, and we'll talk a bit about that later on. Contracts are nice and readable, and also
+we can easily simulate them, so we can present to users a very clear picture of how their contract in Marlowe will behave.
+
+In fact, we can do more than that. Because they are particularly restricted, we can explore every possible behavior path that a contract can take, before it is executed. So, we 
+can give complete guarantees about how a contract will behave, not just on one or two tests, but on every possibly execution sequence.
+
+It's also more straightforward to write mathematical proofs of various kinds of safety, so that is the strongest criteria that we can hit in this kind of world; a mathematical 
+proof that the system will do certain things and won't do others.
+
 
