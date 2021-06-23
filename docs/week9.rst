@@ -100,8 +100,32 @@ Designed for safety
 
 What we chose to do was to design for safety.
 
+Contracts are finite
+____________________
+
 Firstly, contracts are designed to be finite. Their life will be finite, there is no recursion or looping in Marlowe. We will come back to that a bit later on when 
 we talk about Marlowe being embedded in other languages.
+
+Contracts will terminate
+________________________
+
+We can be sure that contracts will terminate. We do that by putting timeouts on every external action. Every choice, every deposit of money into the contract comes with
+a deadline. Marlowe contracts cannot wait forever for somebody to make a choice or for an action to happen. If you hit the timeout then an alternative course is taken.
+
+No assets retained no close
+___________________________
+
+We've designed the semantics of the language so that when a contract reaches its close, at the end of its lifetime, any money left in the contract will be 
+refunded to participants.
+
+Conservation of value
+_____________________
+
+Conservation of value is something that we get for free from the underlying blockchain. The blockchain guarantees that we can't double spend and because we are using 
+the transaction mechanisms of the underlying blockchain, we can be sure that we are getting conservation of value.
+
+
+
 
 
 
