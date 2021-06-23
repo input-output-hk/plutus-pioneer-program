@@ -214,6 +214,12 @@ experience that they will have when Marlowe is running on blockchain. This will 
 At the moment it's running locally but in a few weeks' time we will be releasing a version that runs in a distributed fashion on the simulated blockchain.
 Then, as we go into the end of the year we expect to have it running for real on the Cardano blockchain itself.
 
+You can find the Marlowe Playground at
+
+.. code::
+
+    https://staging.marlowe-dash.iohkdev.io/
+
 .. figure:: img/pic__00023.png
 
 Marlowe run runs in the browser and what it does is provide the end user interaction with contracts running on the blockchain.
@@ -221,7 +227,18 @@ Marlowe run runs in the browser and what it does is provide the end user interac
 For the moment we're simulating that blockchain inside the browser but eventually this will be the tool you'll use to run contracts for real on Cardano.
 
 To interact with the contract your wallet needs to be involved to control your your signature and to control your assets, so we link up Marlowe to run with
-a wallet. Let's link it up with Shruti's wallet.
+a wallet. Let's link it up with Shruti's wallet. You can do this by creating a demo wallet, or by selecting an existing wallet.
 
 .. figure:: img/pic__00024.png
+
+In this window we see the world from Shruti's perspective. Let's open up another window and link that window to the world from Charles's perspective.
+
+.. figure:: img/pic__00028.png
+
+At the moment neither of them has any contracts running. They have a blank space, but let's start a contract up. Let's set up a zero coupon bond which is a fancy name
+for a loan. You can do this by clicking *Create* and selecting the *Zero Coupon Bond* option.
+
+Let's suppose that Shruti is making a loan to Charles. She's the investor he's the issuer of the bond.
+
+.. figure:: img/pic__00031.png
 
