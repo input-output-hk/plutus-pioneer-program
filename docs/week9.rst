@@ -188,7 +188,7 @@ So that is the language. What is the Marlowe product itself?
 
 We have a suite of things. First we'll look at the overall vision for Marlowe and then look at where we are in terms of fulfilling that vision.
 
-.. figure:: img/pic__00015.png
+.. figure:: img/pic__00020.png
 
 We have a prototype for Marlowe Run. That is the system through which an end user will interact with contracts running on the Cardano blockchain. You can think of Marlowe 
 Run as the Marlowe dApp. It's the things that allows Marlowe contracts to be executed.
@@ -197,4 +197,22 @@ We're also building a market where contracts can be uploaded, downloaded, and wh
 
 We allow contracts to be simulated interactively and we call that Marlowe Play. We allow contracts to be built in various different ways and we call that Marlowe Build. In 
 fact fact what we've done at the moment is bundle those two - Marlowe Play and Build - into what we call the Marlowe Playground.
+
+So as things stand at the moment you can use the Marlowe Playground to simulate and construct Marlowe contracts we're in the process of redesigning the user experience
+based on what we've done with Marlowe Run.
+
+What we're releasing very shortly is the prototype of Marlowe Run and this is the prototype of how end users will interact with Marlowe on the blockchain. Our 
+intention is that we'll have all these products available running on the Cardano blockchain when we have the full support for this which will involve having the
+Plutus Application Backend and the wallet back end and so on working as they should.
+
+Demonstration
+~~~~~~~~~~~~~
+
+We'll now look at a demo of what we have in Marlowe Run to give you a sense of what we can do at the moment in terms of giving users the 
+experience that they will have when Marlowe is running on blockchain. This will be the app that is going to provide that experience.
+
+At the moment it's running locally but in a few weeks' time we will be releasing a version that runs in a distributed fashion on the simulated blockchain.
+Then, as we go into the end of the year we expect to have it running for real on the Cardano blockchain itself.
+
+.. figure:: img/pic__00021.png
 
