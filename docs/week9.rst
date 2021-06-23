@@ -20,12 +20,12 @@ Plutus is a very powerful language. So powerful, in fact, that you can implement
 
 One such language is Marlowe. Marlowe is a Domain Specific Language (DSL) for smart contracts.
 
-For this lecture, Professor Simon Thomson, a very prominent figure in the Haskell community who leads the Marlowe team, and his colleague Alex Nemish will give guest lectures to tell us a bit about Marlowe.
+For this lecture, Professor Simon Thompson, a very prominent figure in the Haskell community who leads the Marlowe team, and his colleague Alex Nemish will give guest lectures to tell us a bit about Marlowe.
 
 Afterwards we will look at the Marlowe playground and play with a simple smart contract.
 
-Lecture by Prof. Simon Thomson
-------------------------------
+Lecture by Prof. Simon Thompson
+-------------------------------
 
 Marlowe is a special-purpose language for writing financial contracts on Cardano.
 
