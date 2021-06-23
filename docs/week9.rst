@@ -130,7 +130,25 @@ it need not terminate and it could terminate while holding a whole collection of
 The Marlowe Language
 ~~~~~~~~~~~~~~~~~~~~
 
-So what does the language look like?
+So what does the language look like? Let's cut to the chase.
+
+.. figure:: img/pic__00013.png
+
+Marlowe, at heart, is represented as a Haskell datatype.
+
+.. code:: haskell
+
+    data Contract = Close
+    | Pay Party Payee Value Contract
+    | If Observation Contract Contract
+    | When [Case] Timeout Contract
+    | Let ValueId Value Contract
+    | Assert Observation Contract
+    deriving (Eq,Ord,Show,Read,Generic,Pretty)
+
+We have a *Pay* construct. In that a *Party* in the contract makes a payment to a *Payee* of a particular *Value*, and then the contract continues with what we call the 
+continuation contract.
+
 
 
 
