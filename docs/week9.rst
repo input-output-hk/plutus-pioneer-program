@@ -252,3 +252,43 @@ if you look at Charles's view of the world, it's running there too for him.
 
 .. figure:: img/pic__00037.png
 
+We're at the first step. If we click through on Charles's contract, it's saying that it's waiting for something from the investor, who is Shruti. 
+
+.. figure:: img/pic__00038.png
+
+So let's see what's happening in her view.
+
+.. figure:: img/pic__00039.png
+
+She's being asked to make a deposit so let's click on that to make the deposit.
+
+.. figure:: img/pic__00040.png
+
+And click to confirm with a fee of 10 lovelace.
+
+Then you can see her view has changed now she's waiting for the issuer to pay her back.
+
+We look in Charles's view, which is incidentally the mobile view, of Marlowe Run, and he's asked to pay his 1 Ada.
+
+.. figure:: img/pic__00041.png
+
+Let's make him do that now. He'll also have to pay a 10 lovelace transaction fee. 
+
+.. figure:: img/pic__00043.png
+
+Let's make that deposit.
+
+.. figure:: img/pic__00045.png
+
+And you see now from both their perspectives that loan is completed you can see the history of what's gone on. You can see, at particular points, the
+balances that the contract holds.
+
+If we close that and select *History*, we can see the history of all the contracts that Shruti has taken part in.
+
+.. figure:: img/pic__00046.png
+
+That pretty much covers the basics of what you get from Marlowe Run. It's an intuitive interface to a contract running on the blockchain.
+You see that each participant in the contract gets their view of the contract in real time, updated from what is, in this case in the browser, but
+eventually what's on the blockchain.
+
+
