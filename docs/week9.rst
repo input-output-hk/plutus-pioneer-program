@@ -240,5 +240,15 @@ for a loan. You can do this by clicking *Create* and selecting the *Zero Coupon 
 
 Let's suppose that Shruti is making a loan to Charles. She's the investor he's the issuer of the bond.
 
-.. figure:: img/pic__00031.png
+.. figure:: img/pic__00034.png
+
+Charles wants to borrow one Ada from Shruti and he's promised to pay back 1.1 Ada. So we've said who the issuer and investor are we said what the price and
+the eventual value will be and we're now going to create the contract. In order to do that we have to make a payment of 30 lovelace to get the contract started.
+
+.. figure:: img/pic__00035.png
+
+So let's pay. We are asked to approve and the payment goes through. You can see now in Shruti's Marlowe Run we've got the Zero Coupon Bond running, but also,
+if you look at Charles's view of the world, it's running there too for him.
+
+.. figure:: img/pic__00037.png
 
