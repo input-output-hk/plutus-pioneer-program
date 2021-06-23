@@ -124,7 +124,13 @@ _____________________
 Conservation of value is something that we get for free from the underlying blockchain. The blockchain guarantees that we can't double spend and because we are using 
 the transaction mechanisms of the underlying blockchain, we can be sure that we are getting conservation of value.
 
+So this is giving us a lot of guarantees out of the box. These are not guarantees that you get from Plutus contracts in general. A Plutus contract could go on forever, 
+it need not terminate and it could terminate while holding a whole collection of assets which then become unreachable.
 
+The Marlowe Language
+~~~~~~~~~~~~~~~~~~~~
+
+So what does the language look like?
 
 
 
