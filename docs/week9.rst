@@ -58,4 +58,14 @@ can give complete guarantees about how a contract will behave, not just on one o
 It's also more straightforward to write mathematical proofs of various kinds of safety, so that is the strongest criteria that we can hit in this kind of world; a mathematical 
 proof that the system will do certain things and won't do others.
 
+What does a financial contract do?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Let's start by looking at what a financial contract can do. 
+
+It can accept payments from participants in the contract and depending on choices made by one the participants, it can evolve in different directions. Or, it can make 
+decisions based on external information such as the information coming from a stock exchange.
+ 
+.. figure:: img/pic__00010.png
+
 
