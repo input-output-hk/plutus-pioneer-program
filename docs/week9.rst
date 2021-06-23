@@ -141,7 +141,7 @@ Marlowe, at heart, is represented as a Haskell datatype.
     data Contract = Close
     | Pay Party Payee Value Contract
     | If Observation Contract Contract
-    | When [Case] Timeout Contract
+    | When [Case Action Contract] Timeout Contract
     | Let ValueId Value Contract
     | Assert Observation Contract
     deriving (Eq,Ord,Show,Read,Generic,Pretty)
@@ -160,12 +160,18 @@ false we follow the second *Contract*.
 
     If Observation Contract Contract
 
-    
+The most complex construct in Marlowe is the *When* construct. It takes three arguments. The first of those is a list of *Contract*/*Action* pairs - a list of *Case*\s.
 
+.. code:: haskell
 
+    When [Case Action Contract] Timeout Contract
 
+What the *When* construct does is wait for one of a number of *Action*\s. When one of those *Action*\s happens, it performs the corresponding *Contract*. For example, it
+could be waiting for a deposit. If we have a case where the first part of the pair is a deposit, then we execute the corresponding second part of the pair. Similarly with 
+making a choice or with getting a value from an oracle.
 
+Here we are waiting for external actions and, of course, the contract can't make those actions happen. A contract can't force somebody to make a choice. It can't force
+somebody to make a deposit. But what we can do is say that if none of these actions takes place then we will hit the *Timeout*, and when we hit the *Timeout*, we will perform 
+the *Contract* represented by the final argument to the *When* construct.
 
-
-
-
+... work in progress
