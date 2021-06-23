@@ -63,9 +63,24 @@ What does a financial contract do?
 
 Let's start by looking at what a financial contract can do. 
 
-It can accept payments from participants in the contract and depending on choices made by one the participants, it can evolve in different directions. Or, it can make 
-decisions based on external information such as the information coming from a stock exchange.
+A contract can accept payments from participants in the contract.
+
+Depending on choices made by one the participants, it can evolve in different directions. 
+
+.. figure:: img/pic__00011.png
+
+It can make decisions based on external information such as the information coming from a stock exchange. So, information coming from an oracle can determine the future behaviour
+of a contract.
  
-.. figure:: img/pic__00010.png
+A contract can also make payments out. If money has been deposited in the contract, that money can be deposited out to participants.
+
+So we have flows of money and choices according to external factors.
+
+One final thing that we have is that the roles in a contract are things that themselves can be owned. We represent that in Marlowe by minting tokens that 
+represent those roles. That means that we can use those tokens as evidence that somebody is meant to be playing a role. They are a form of security that a person 
+submitting a transaction is allowed to submit that transaction, but also it means that these roles are tradable. A role could be traded by another person or another contract.
+
+
+
 
 
