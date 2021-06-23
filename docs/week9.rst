@@ -80,6 +80,29 @@ One final thing that we have is that the roles in a contract are things that the
 represent those roles. That means that we can use those tokens as evidence that somebody is meant to be playing a role. They are a form of security that a person 
 submitting a transaction is allowed to submit that transaction, but also it means that these roles are tradable. A role could be traded by another person or another contract.
 
+Language design
+~~~~~~~~~~~~~~~
+
+Now let's think about how to design a language based on these ingredients.
+
+.. figure:: img/pic__00012.png
+
+When we design a language of contracts, what we are really doing is designing a programming language. A smart contract is just a program running on a blockchain.
+
+A contract could, in principle, run forever. And also, more subtly, it could get stuck waiting for an input forever.
+
+It could terminate while holding assets, locking them up forever.
+
+So there's a whole lot of security issues that a program might have.
+
+Designed for safety
++++++++++++++++++++
+
+What we chose to do was to design for safety.
+
+Firstly, contracts are designed to be finite. Their life will be finite, there is no recursion or looping in Marlowe. We will come back to that a bit later on when 
+we talk about Marlowe being embedded in other languages.
+
 
 
 
