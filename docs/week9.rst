@@ -112,7 +112,7 @@ ________________________
 We can be sure that contracts will terminate. We do that by putting timeouts on every external action. Every choice, every deposit of money into the contract comes with
 a deadline. Marlowe contracts cannot wait forever for somebody to make a choice or for an action to happen. If you hit the timeout then an alternative course is taken.
 
-No assets retained no close
+No assets retained on close
 ___________________________
 
 We've designed the semantics of the language so that when a contract reaches its close, at the end of its lifetime, any money left in the contract will be 
@@ -148,6 +148,20 @@ Marlowe, at heart, is represented as a Haskell datatype.
 
 We have a *Pay* construct. In that a *Party* in the contract makes a payment to a *Payee* of a particular *Value*, and then the contract continues with what we call the 
 continuation contract.
+
+.. code:: haskell
+
+    Pay Party Payee Value Contract
+    
+We can go in two separate directions. We can observe *If* a particular *Observation* is true or not. If the observation is true we follow the first *Contract*, if it is 
+false we follow the second *Contract*.
+
+.. code:: haskell
+
+    If Observation Contract Contract
+
+    
+
 
 
 
