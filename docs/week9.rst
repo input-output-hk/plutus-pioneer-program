@@ -181,4 +181,20 @@ Finally we have the *Close* construct which has the semantics defined so that no
 
 That is the Marlowe language, and we will see that we can use these to construct Marlowe contracts in a variety of ways.
 
-... work in progress
+The Marlowe Product
+~~~~~~~~~~~~~~~~~~~
+
+So that is the language. What is the Marlowe product itself?
+
+We have a suite of things. First we'll look at the overall vision for Marlowe and then look at where we are in terms of fulfilling that vision.
+
+.. figure:: img/pic__00015.png
+
+We have a prototype for Marlowe Run. That is the system through which an end user will interact with contracts running on the Cardano blockchain. You can think of Marlowe 
+Run as the Marlowe dApp. It's the things that allows Marlowe contracts to be executed.
+
+We're also building a market where contracts can be uploaded, downloaded, and where we can provide various kinds of assurance about those contracts.
+
+We allow contracts to be simulated interactively and we call that Marlowe Play. We allow contracts to be built in various different ways and we call that Marlowe Build. In 
+fact fact what we've done at the moment is bundle those two - Marlowe Play and Build - into what we call the Marlowe Playground.
+
