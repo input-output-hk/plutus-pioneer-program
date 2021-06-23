@@ -174,4 +174,11 @@ Here we are waiting for external actions and, of course, the contract can't make
 somebody to make a deposit. But what we can do is say that if none of these actions takes place then we will hit the *Timeout*, and when we hit the *Timeout*, we will perform 
 the *Contract* represented by the final argument to the *When* construct.
 
+So, we can guarantee that something will happen in the *When* construct, either by one of the actions triggering a successive contract, or we hit the timeout and go to that 
+continuation.
+
+Finally we have the *Close* construct which has the semantics defined so that nothing is retained when we close.
+
+That is the Marlowe language, and we will see that we can use these to construct Marlowe contracts in a variety of ways.
+
 ... work in progress
