@@ -489,7 +489,7 @@ and to debug how that eventuality can happen, and so gives you a chance to think
 
 So, very powerful and entirely push button. You push a button and you get the results.
 
-.. figure:: img/pic__00058.png
+.. figure:: img/pic__00059.png
 
 Here you see a fragment of a Marlowe contract. It's an escrow contract where the contract starts with a deposit of 450 lovelace.
 
@@ -498,7 +498,7 @@ that you're okay - it's not going to give you a warning whatever you do.
 
 But if we change that deposit of 450 lovelace to a deposit of 40 and analyze we then get this warning.
 
-.. figure:: img/pic__00059.png
+.. figure:: img/pic__00060.png
 
 We get a transaction partial payment. We're told that we get to a payment where we're meant to pay 450 units of lovelace but there are only 40 available, and we
 get given a list of transactions that take us there.
@@ -508,7 +508,7 @@ payment of 450 lovelace.
 
 So it's easy for us to see that we need to either make the payment smaller or make the initial deposit bigger. As it's entirely push button, we get that sort of assurance for free, as it were.
 
-.. figure:: img/pic__00059.png
+.. figure:: img/pic__00061.png
 
 But thinking about verification, we can do rather more than that. We can prove properties of the system once and for all.
 
