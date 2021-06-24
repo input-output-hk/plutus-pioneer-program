@@ -512,5 +512,31 @@ So it's easy for us to see that we need to either make the payment smaller or ma
 
 But thinking about verification, we can do rather more than that. We can prove properties of the system once and for all.
 
-So, for example, just looking on the left-hand side here, we can prove from the semantics, that accounts inside a Marlowe contract as it executes never go negative.
+So, for example, we can prove from the semantics that accounts inside a Marlowe contract never go negative. You can't ever overdraw an account in a Marlowe contract.
 
+We can also prove this theorem of money preservation. We can prove that if we look at all the money that's gone into the contract so far, that's equal to the sum of 
+two things - the amount of money that's held inside the contract plus the amount of money that has been paid out. That gives a clear picture of money preservation.
+
+We're also able to to prove other more technical things about the system. For example, that a *Close* construct will never produce any warnings. So, if we're 
+analyzing for warnings, we don't need to worry about *Close* constructs. That allows us to optimize the static analysis.
+
+We're also able to prove that the static analysis, which makes a number of simplifications to speed
+things up, is sound and complete. That means the static analysis will give us an error warning when the real contract can generate an error warning and 
+it won't give us an error warning if the real contract can't do that.
+
+One thing that we haven't done but is on our road map is to do these sorts of proofs for individual contracts or individual contract templates. Things that we 
+can't necessarily prove with static analysis, we can prove by proving them by hand.
+
+The system is amenable to having these proofs written about it, and they give us the highest level of assurance about how it works.
+
+We've said enough for the moment about Marlowe. Where can you go to find out more?
+
+.. figure:: img/pic__00062.png
+
+There's a Marlowe GitHub repository that has the semantics and the basics about Marlowe. 
+
+.. code::
+
+    https://github.com/input-output-hk/marlowe
+
+Quite a lot of the implementation of the tools from Marlowe is in the Plutus repository because it has that repository as a dependency.
