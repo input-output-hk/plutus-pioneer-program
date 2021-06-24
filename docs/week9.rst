@@ -382,3 +382,24 @@ might mean.
 
 .. figure:: img/pic__00048.png
 
+What's even nicer is that we can reuse the semantics in a number of different ways.
+
+In the theorem prover Isabelle, we can use the semantics for reasoning and proof and we use pretty much the same semantics because Isabelle uses a functional
+language as is as its subject.
+
+We can run the semantics in Plutus. Plutus is more or less Haskell, perhaps not with all the libraries, but we can, in principle at least, build our 
+implementation on blockchain from our semantics, and also we can translate the semantics into PureScript for simulation in the browser.
+
+Now pure script is not the same exactly the same as Haskell. Isabelle's language is not exactly the same as Haskell. How can we be sure that all these
+versions are the same?
+
+One way of doing it is to extract Haskell code from Isabelle and test the original against um this extracted code. We do that on random contracts and that gives 
+us a pretty high level of assurance that the two are the same.
+
+Down down the line in our road map we certainly expect to be using a Haskell and Javascript implementation at some point to replace PureScript in the front end 
+so we don't have to write a PureScript version of the semantics when we're doing the off chain interpretation building the transactions to be submitted. We can 
+use the real haskell implementation by compiling it into Javascript and running that in Marlowe Run in the client code.
+
+So, building the language in Haskell means that though we use various different versions of the semantics, we can get a high level of
+assurance that these are the same and indeed we can in some situations replace things like the PureScript by Javascript.
+
