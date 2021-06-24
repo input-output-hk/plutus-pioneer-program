@@ -380,15 +380,19 @@ What would it mean if we were to add this construct? What would it mean if we we
 If we'd written it in a purely purely logical format, it's difficult to unscramble just from the rules as they're laid out what, precisely, a change in rule
 might mean.
 
-.. figure:: img/pic__00048.png
+.. figure:: img/pic__00049.png
 
 What's even nicer is that we can reuse the semantics in a number of different ways.
 
 In the theorem prover Isabelle, we can use the semantics for reasoning and proof and we use pretty much the same semantics because Isabelle uses a functional
 language as is as its subject.
 
+.. figure:: img/pic__00050.png
+
 We can run the semantics in Plutus. Plutus is more or less Haskell, perhaps not with all the libraries, but we can, in principle at least, build our 
 implementation on blockchain from our semantics, and also we can translate the semantics into PureScript for simulation in the browser.
+
+.. figure:: img/pic__00051.png
 
 Now pure script is not the same exactly the same as Haskell. Isabelle's language is not exactly the same as Haskell. How can we be sure that all these
 versions are the same?
@@ -402,4 +406,19 @@ use the real haskell implementation by compiling it into Javascript and running 
 
 So, building the language in Haskell means that though we use various different versions of the semantics, we can get a high level of
 assurance that these are the same and indeed we can in some situations replace things like the PureScript by Javascript.
+
+Usability
+~~~~~~~~~
+
+That gives us a picture about how how the system is put together. Let's go to another aspect of Marlowe. We we talked about it being a special purpose
+language, and that being a DSL promoted usability.
+
+Let's say a bit more about that.
+
+.. figure:: img/pic__00053.png
+
+One way we we promote usability is that we provide different ways of writing contracts. Another way we promote usability is to allow people to explore interactively
+how contracts behave before they're actually run in the simulation.
+
+So let's talk about those now.
 
