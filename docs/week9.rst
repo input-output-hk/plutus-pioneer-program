@@ -348,3 +348,37 @@ the central synchronization point for the distributed system that is the collect
 
 You saw in the demo that, in two separate windows, we were sharing information. That was simulating it locally but in production this will be information that's stored
 on the blockchain.
+
+System Design 
+~~~~~~~~~~~~~
+
+Let's talk a little bit about how the system is designed in in a high-level way.
+
+Here's a piece of the semantics of Marlowe, and as you can see it's a Haskell function.
+
+.. figure:: img/pic__00047.png
+
+We take an environment, the current state and a contract we executed, and based on what contract that is - a *close* perhaps, or a *pay*, we can reduce we can take 
+some steps of computing the results of that contract.
+
+We do that in a way that uses uses Haskell in a quite straightforward way to advance the contract. This specification in Haskell is
+an executable specification of the semantics and this gives us some very nice consequences.
+
+.. figure:: img/pic__00048.png
+
+We've got al we've got a high level description of what the semantics are, and we're doing that through something that is effectively an interpreter. So
+we're defining at a high level this interpreter in Haskell for Marlowe contracts.
+
+One really nice thing about writing it in this sort of way is that we can be sure we cover all cases because it's a it will be obvious if we're missing some
+cases. Writing it as an interpreter ensures that we will hit cases we need to in describing the semantics.
+
+Also it really helps us to understand the semantics. When you're designing a language you have an abstract idea about what it's going to mean, but there's
+nothing like having a an implementation of it so you can actually run the semantics.
+
+What would it mean if we were to add this construct? What would it mean if we were to modify the semantics in this way?
+
+If we'd written it in a purely purely logical format, it's difficult to unscramble just from the rules as they're laid out what, precisely, a change in rule
+might mean.
+
+.. figure:: img/pic__00048.png
+
