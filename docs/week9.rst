@@ -422,3 +422,95 @@ how contracts behave before they're actually run in the simulation.
 
 So let's talk about those now.
 
+.. figure:: img/pic__00054.png
+
+We want to write a Marlowe contract, how can we do it? Well, we can write Haskell using the Marlowe data type as text. That's one way we can do it and
+that's fine. We have an editor for that inside the playground that supports code completion and will make suggestions and and so on.
+
+So we can build the contracts as pure Marlowe, but there are other routes as well.
+
+We have a visual editor for Marlowe so that you can produce Marlowe contracts visually, putting together blocks in a way that doesn't require you
+to be a confident programmer. You can start off by using the visual version as a way of learning to engage with Marlowe if you are a coder. 
+
+Marlowe is embedded in Haskell and in Javascript so we can use facilities like recursion to describe Marlowe contracts. We can say, in Haskell, let's do this particular pattern of
+behavior a certain number of times. We can write that in Haskell and then for a particular contract we convert the Haskell into Marlowe, and we can also do that for
+Javascript.
+
+Finally, something we're not going to talk about anymore in this talk is that we can generate contracts from initial conditions. We've been
+looking at that for the actor standard of financial contracts. On the basis of the contract terms we generate code in Marlowe. We write functions 
+whose output is Marlowe code. 
+
+We provide users with a variety of different approaches, leveraging knowledge of Javascript, for example, or leveraging a non-code-based approach for 
+describing the contracts
+
+We also allow people to simulate the behavior of contracts. This is something that you can see in the current version of the Marlowe Playground.
+
+.. figure:: img/pic__00055.png
+
+That's something you can play with yourselves. We are looking at different ways of describing the results of a simulation. So at the moment we have a transaction
+log. We are allowed to choose an next action to perform, you can undo the last step to take you back and then try another path so you can step interactively 
+backwards and forwards through the source code through the application of the contract.
+
+What we're looking at is changing the user interface Marlowe Playground so that we'll use something rather more like the Marlowe Run run description of a running contract.
+
+.. figure:: img/pic__00056.png
+
+Assurance 
+~~~~~~~~~
+
+We've talked about usability. What about the sort of assurance that Marlowe can give users?
+
+.. figure:: img/pic__00057.png
+
+We've seen we've seen that making the system transparent, that making code readable is itself an advantage. We've seen that there's simulation to
+give people to validate their intuition about a contract.
+
+But rather more formally we can use the power of logic to do two things for us. We can do what's called *static analysis* so we can automatically verify
+properties of individual contracts. That means we can guarantee this contract will behave as it should, checking every route through the contract.
+
+Also we can do machine-supported proof so, not automatic any longer, written by a user, but we can prove properties of the overall system.
+
+Static Analysis 
++++++++++++++++
+
+.. figure:: img/pic__00058.png
+
+What static analysis allows us to do is check all execution paths through a Marlowe contract. All choices, all choices of slots for a submission of a transaction so
+we examine every possible way in which the contract might be executed.
+
+The canonical example here is the example of whether a pay construct might fail. Is it possible a pay construct could fail? The answer is that we
+will use what's called an SMT solver An SMT is an automatic logic tool - the one we use is called Z3, although others are available. The SMT solver effectively 
+checks all execution parts.
+
+If a property is is satisfied that's fine, we get get the result. If it's not satisfied, we get a counter example. We get told that there's a way 
+through this contract that leads to a failed payment - a payment that can't be fulfilled. So it gives an example of how it can go wrong, and that's really 
+helpful. It means that if you really want to make sure that a failed payment can't happen, then this gives you a mechanism to understand
+and to debug how that eventuality can happen, and so gives you a chance to think about how to avoid it.
+
+So, very powerful and entirely push button. You push a button and you get the results.
+
+.. figure:: img/pic__00058.png
+
+Here you see a fragment of a Marlowe contract. It's an escrow contract where the contract starts with a deposit of 450 lovelace.
+
+Checking the analysis in the playground, we've got the results. Static analysis could not find any any execution that results in any warning, so that's saying
+that you're okay - it's not going to give you a warning whatever you do.
+
+But if we change that deposit of 450 lovelace to a deposit of 40 and analyze we then get this warning.
+
+.. figure:: img/pic__00059.png
+
+We get a transaction partial payment. We're told that we get to a payment where we're meant to pay 450 units of lovelace but there are only 40 available, and we
+get given a list of transactions that take us there.
+
+So we're able to see from that how we got to that point, and the problem is that we didn't put enough money in and then we reached a place where we needed to make a
+payment of 450 lovelace.
+
+So it's easy for us to see that we need to either make the payment smaller or make the initial deposit bigger. As it's entirely push button, we get that sort of assurance for free, as it were.
+
+.. figure:: img/pic__00059.png
+
+But thinking about verification, we can do rather more than that. We can prove properties of the system once and for all.
+
+So, for example, just looking on the left-hand side here, we can prove from the semantics, that accounts inside a Marlowe contract as it executes never go negative.
+
