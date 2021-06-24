@@ -22,7 +22,7 @@ One such language is Marlowe. Marlowe is a Domain Specific Language (DSL) for sm
 
 For this lecture, Professor Simon Thompson, a very prominent figure in the Haskell community who leads the Marlowe team, and his colleague Alex Nemish will give guest lectures to tell us a bit about Marlowe.
 
-Afterwards we will look at the Marlowe playground and play with a simple smart contract.
+Afterwards we will look at the `Marlowe playground <https://play.marlowe-finance.io/>`_ and play with a simple smart contract.
 
 Lecture by Prof. Simon Thompson
 -------------------------------
@@ -540,3 +540,40 @@ There's a Marlowe GitHub repository that has the semantics and the basics about 
     https://github.com/input-output-hk/marlowe
 
 Quite a lot of the implementation of the tools from Marlowe is in the Plutus repository because it has that repository as a dependency.
+
+If you look in the `IOHK online research library <https://iohk.io/en/research/library/>`_ and search for Marlowe you'll find a number of research papers we've written about how the system works.
+
+You'll also find an online tutorial in the Marlowe Playground.
+
+Finally, Alex is going to give some more information in his presentation coming up next.
+
+Summary
+~~~~~~~
+
+.. figure:: img/pic__00063.png
+
+Just to summarize, what we have in Marlowe is a DSL, a special-purpose language for financial contracts, running on top of Plutus. Because it's a
+DSL it allows us to give assurance that is harder to give for a general purpose language. And we get assurance of they way contracts should and shouldn't behave.
+
+It also allows us to to orient its design around users as well as developers. The language is simple and therefore we get readability. 
+
+We also get simulatability and we get these stronger assurances of static analysis and verification.
+
+Lecture by Alex Nemish
+----------------------
+
+Alex Nemish is one of the Marlowe developers and in this presentation, he shows us a bit of Marlowe semantics and Marlowe PAB (Plutus Application Backend) contracts.
+
+We'll start with a brief description of Marlowe Semantics that's implemented in the `Semantics.hs <https://github.com/input-output-hk/marlowe/blob/master/semantics-2.0/Semantics.hs>`_ file.
+Then we'll look at the PAB contracts.
+
+Here are the main data types for Marlowe.
+
+.. figure:: img/pic__00065.png
+
+It's a contract. Essentially those are six constructors that you can start to model a contract with and here's the state that is going to be stored on a blockchain.
+
+.. figure:: img/pic__00066.png
+
+So we have a state of balances of accounts by party.
+
