@@ -612,9 +612,24 @@ continue with the loop, until we get an empty input list. Then we return the cur
 
 .. figure:: img/pic__00074.png
 
-The *reduceContractUntilQuiescent* function goes through a loop and tries to apply *reduceContractStep* which essentially evaluates a contract. If we get a *Close* then we are in a quiescent state.
+The *reduceContractUntilQuiescent* function goes through a loop and tries to apply *reduceContractStep* which essentially evaluates a contract.
 
 .. figure:: img/pic__00075.png
+
+If we get a *Close* then we are in a quiescent state. If we get a payment, then we evaluate it, update the balances and then return the reduced contract.
+
+.. figure:: img/pic__00076.png
+
+We do the same for *If*, *Let* and *Assert*. But for *When*, we only evaluate it if it's timed out, otherwise we say that it's not reduced, and that the contract is
+quiescent.
+
+In a nutshell, Marlowe contract evaluation consists of two steps.
+
+* We reduce the contract until it is quiescent - it's either closed or we get to a *When* that's not timed out yet.
+* We try to apply inputs and evaluate the contract further.
+
+
+
 
 
 
