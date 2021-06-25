@@ -603,4 +603,16 @@ of 10, you cannot produce a contract with a slot interval of 5..15 because it wi
 Then we apply all inputs and if this is successful we return the transaction output with any warnings we have found, the payments we expect, the new state and the continuation 
 contract.
 
+.. figure:: img/pic__00073.png
+
+So what happens in *applyAllInputs*?
+
+First of all, it's a loop. It reduces the contract until it reaches a quiescent state. Once we reach a quiescent state, we take the first input and try to apply it, and then 
+continue with the loop, until we get an empty input list. Then we return the current state and the continuation contract.
+
+
+
+
+
+
 
