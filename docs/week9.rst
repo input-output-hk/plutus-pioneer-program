@@ -638,12 +638,26 @@ validator that's being executed on-chain.
 Here's the *scriptInstance* which calls the *mkMarloweValidator* code, which in turn calls *mkValidator*, which uses a state machine library function *mkStateMachine* to
 which is provides two functions - a transition function and a finality check.
 
+The finality check is very simple - we just check the the contract contract is constructed with *Close*.
 
+.. figure:: img/pic__00079.png
 
+The transition function is the meat of the validator.
 
+It takes *MarloweParams* - which we'll talk about later, it takes the state of the state machine *MarloweData*, it takes *MarloweInput* which is essentially transaction 
+input expressed in Cardano types. It will then return either *Nothing* in the case of error, or a new state along with zero or more constraints.
 
+We check that the balances are valid - we require balances to be positive.
 
+Then we create input constraints based on the inputs. So, in the case of deposits we expect that money will go into a contract. In the case of choices, we expect witnesses
+of the respective parties. We calculate that the contract contains the correct balance.
 
+.. figure:: img/pic__00081.png
 
+We construct a *TransactionInput* given the slot interval and list of inputs, and we call the *computeTransaction* function that we saw in *semantics.hs*.
+
+.. figure:: img/pic__00082.png
+
+With the computed result we construct a *MarloweData* with a new contract continuation and updated state.
 
 
