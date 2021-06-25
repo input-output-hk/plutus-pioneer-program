@@ -658,6 +658,28 @@ We construct a *TransactionInput* given the slot interval and list of inputs, an
 
 .. figure:: img/pic__00082.png
 
-With the computed result we construct a *MarloweData* with a new contract continuation and updated state.
+With the computed result we construct a *MarloweData* with a new contract continuation and updated state. We produce output constraints that produce payouts to the 
+respective parties, and we calculate the new balance. Then we combine all the constraints with range validation.
 
+.. figure:: img/pic__00083.png
 
+To validate inputs, we check that the required signatures and role tokens are present.
+
+.. figure:: img/pic__00084.png
+
+Payments to parties go either to a public key, or go to the validator *rolePayoutValidatorHash*, which simply checks, given a currency, that a transaction spends a role token.
+
+For off-chain execution, we provide three Marlowe PAB contracts.
+
+* Marlowe Follower Contract
+* Marlowe Control Contract
+* Marlowe Companion Contract
+
+Follower Contract
+~~~~~~~~~~~~~~~~~
+
+Control Contract
+~~~~~~~~~~~~~~~~~
+
+Companion Contract
+~~~~~~~~~~~~~~~~~
