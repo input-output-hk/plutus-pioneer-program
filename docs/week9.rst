@@ -575,5 +575,11 @@ It's a contract. Essentially those are six constructors that you can start to mo
 
 .. figure:: img/pic__00066.png
 
-So we have a state of balances of accounts by party.
+So we have a state of balances of accounts by party, we have a map of choices, we have bound values which come from the *Let* constructor, and a *minSlot* which is
+the first slot that the contract sees.
+
+.. figure:: img/pic__00067.png
+
+The *Input* data type essentially contains actions for a Marlowe contract. It is either a deposit, a choice, or a notification.
+
 
