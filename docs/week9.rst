@@ -582,4 +582,12 @@ the first slot that the contract sees.
 
 The *Input* data type essentially contains actions for a Marlowe contract. It is either a deposit, a choice, or a notification.
 
+.. figure:: img/pic__00068.png
 
+Here is the *TransactionInput* datatype. This is what we give as an input. Every transaction has a defined slot interval and a list of inputs.
+
+.. figure:: img/pic__00070.png
+
+And we have *TransactionOutput* which contains the payments that we expect to happen, the output state and the output contract.
+
+We also see *MarloweData* which is essentially what is going to be stored on the blockchain. It's the current state of a contract as well as the actual contract.
