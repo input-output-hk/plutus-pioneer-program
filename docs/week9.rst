@@ -712,7 +712,12 @@ When you call the *create* endpoint, you provide a contract and a map of roles t
 *MarloweParams* is a way to parameterise a Marlowe contract. You can specify your own role payout validator by providing its hash. There is a default one that checks that 
 the role token is spent within the transaction but you can do whatever you like.
 
-When your contract uses roles, we need to know the currency symbol for the role.
+When your contract uses roles, we need to know the currency symbol for the role. When the contract uses roles, we need to create role tokens and distribute them to their
+owners.
+
+In the *setupMarloweParams* function we get the roles that are used within the contract. If we have owners for these roles, we create tokens with role names. By default we
+create one token per role. We use the *Contract.forgeContract* function to create the tokens and then assign them to the creator. Then, in the same transaction, we
+distribute the role tokens to their owners.
 
 Companion Contract
 ~~~~~~~~~~~~~~~~~~
