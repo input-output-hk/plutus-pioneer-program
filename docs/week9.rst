@@ -628,6 +628,15 @@ In a nutshell, Marlowe contract evaluation consists of two steps.
 * We reduce the contract until it is quiescent - it's either closed or we get to a *When* that's not timed out yet.
 * We try to apply inputs and evaluate the contract further.
 
+Let's see how it works from the client side.
+
+As you may have noticed, the Marlowe semantics code is quite abstract and it doesn't depend on the Cardano system's actions. So let's take a look at the actual Marlowe
+validator that's being executed on-chain.
+
+.. figure:: img/pic__00078.png
+
+Here's the *scriptInstance* which calls the *mkMarloweValidator* code, which in turn calls *mkValidator*, which uses a state machine library function *mkStateMachine* to
+which is provides two functions - a transition function and a finality check.
 
 
 
