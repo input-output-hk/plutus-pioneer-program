@@ -591,3 +591,16 @@ Here is the *TransactionInput* datatype. This is what we give as an input. Every
 And we have *TransactionOutput* which contains the payments that we expect to happen, the output state and the output contract.
 
 We also see *MarloweData* which is essentially what is going to be stored on the blockchain. It's the current state of a contract as well as the actual contract.
+
+.. figure:: img/pic__00073.png
+
+The entrance to the semantics is the *computeTransaction* function. It gets the transaction input, the current state and the current contract and returns the 
+transaction output.
+
+First of all we check the slot interval for errors. For example, we do not allow the slot interval to contain any timeouts. If you have a contract with a *When* construct
+of 10, you cannot produce a contract with a slot interval of 5..15 because it will contain a timeout.
+
+Then we apply all inputs and if this is successful we return the transaction output with any warnings we have found, the payments we expect, the new state and the continuation 
+contract.
+
+
