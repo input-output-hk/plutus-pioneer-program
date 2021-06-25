@@ -805,4 +805,63 @@ gets the total amount. Depending on Charlie's decision either Alice gets 20 or B
 There's always the possibility that one of the three doesn't play along; Alice doesn't make her deposit, Bob doesn't make his deposit, or Charlie doesn't make his
 choice. In this case everybody should just get reimbursed.
 
+When we start with Blockly, there is a contract and it's just a *Close* contract, which in this case doesn't do anything. If there was money in internal accounts 
+it would pay back the money to the owners of the accounts.
+
+We want to do something else, so let's first wait for a deposit by Alice.
+
+Because that's an external action that's triggered by one of the parties, in this case Alice, we need the *When* construct that Simon mentioned.
+
+.. figure:: img/pic__000103.png
+
+We can remove the *Close* contract, slide the *When* one into its place.
+
+.. figure:: img/pic__000104.png
+
+Here we see all the slots where other things need to go. We see some fields that we have to set.
+
+We can set a timeout so let's say this deposit by Alice has to happen by slot 10.
+
+.. figure:: img/pic__000105.png
+
+If it doesn't happen, we can say what should happen afterwards, and there is not really a good choice to do anything except close in that case, so in that case
+nothing will happen.
+
+.. figure:: img/pic__000106.png
+
+Here we say what external actions we wait for. Let's say we only wait for one action, namely that Alice makes a deposit.
+
+So we can check for actions and pick the deposit one and slide it in.
+
+.. figure:: img/pic__000107.png
+
+We see some slots that we have to fill. First of all, a party who has to make the deposit, and there are two choices - a public key or role.
+
+.. figure:: img/pic__000108.png
+
+Let's take role because then we can just say Alice. Normally this would be the name of the role token, so whoever owns that token can incorporate that role.
+
+.. figure:: img/pic__000109.png
+
+So Alice makes a deposit. Now the amount. That's a *Value* and let's say we just pick a constant amount of 10 Ada.
+
+.. figure:: img/pic__000110.png
+
+The amount is 10, and the fact that it is Ada must be specified in the currency slot.
+
+.. figure:: img/pic__000111.png
+
+There's also the option to use tokens than Ada, but let's stick with Ada.
+
+Now there are these internal accounts that also belong to one of the parties, so let's say Alice pays it into her own internal account.
+
+.. figure:: img/pic__000112.png
+
+That can be copy/pasted rather than getting it from the *Party* menu again.
+
+Now we must say what happens next, if Alice makes this deposit. Afterwards we want Bob to make a deposit, so we can start by just copying the whole *When* block.
+
+.. figure:: img/pic__000113.png
+
+
 
