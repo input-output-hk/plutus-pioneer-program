@@ -678,6 +678,24 @@ For off-chain execution, we provide three Marlowe PAB contracts.
 Follower Contract
 ~~~~~~~~~~~~~~~~~
 
+.. figure:: img/pic__00086.png
+
+This is a very simple one - it contains only one endpoint called *follow*. It subscribes to all changes to a Marlowe contract validator address, so that we can store 
+all the inputs that are applied to a Marlowe contract.
+
+It uses the *updateHistoryFromTx* function which, in a nutshell, finds a Marlowe input and constructs a *TransactionInput* data type, and uses *tell* to update the PAB
+contract state.
+
+If you were connected to a web socket for this contract, you would be notified about transition changes.
+
+.. figure:: img/pic__00086.png
+
+The state of the contract is stored in *ContractHistory*, which stores an initial *MarloweParams*, an initial *MarloweData* and a list of all *TransactionInput*\s that 
+were applied to this contract. You can always restore the current state by applying a list of inputs to an initial state.
+
+.. figure:: img/pic__00086.png
+
+
 Control Contract
 ~~~~~~~~~~~~~~~~~
 
