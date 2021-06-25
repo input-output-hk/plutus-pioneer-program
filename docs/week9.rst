@@ -782,7 +782,7 @@ Let's play around a little with Marlowe in the playground.
 
 When you go to the playground, you first get presented with three options for you to choose in which language you want to write your Marlowe contracts.
 
-.. figure:: img/pic__000101.png
+.. figure:: img/pic__00101.png
 
 You can do it in Haskell, you can do it in Javascript, or you can do it in Blockly or directly in Marlowe.
 
@@ -793,7 +793,7 @@ Blockly
 
 Let's start a new project and select *Blockly*.
 
-.. figure:: img/pic__000102.png
+.. figure:: img/pic__00102.png
 
 This is a graphical editor. We can just click and drop a Marlowe contract together.
 
