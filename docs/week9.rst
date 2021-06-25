@@ -705,6 +705,9 @@ if possible, to redeem tokens from payments to roles, and to close the contract.
 
 Let's go through Marlowe contract creation.
 
+Create Endpoint
++++++++++++++++
+
 When you call the *create* endpoint, you provide a contract and a map of roles to public keys. We then setup a *MarloweParams*.
 
 .. figure:: img/pic__00090.png
@@ -718,6 +721,29 @@ owners.
 In the *setupMarloweParams* function we get the roles that are used within the contract. If we have owners for these roles, we create tokens with role names. By default we
 create one token per role. We use the *Contract.forgeContract* function to create the tokens and then assign them to the creator. Then, in the same transaction, we
 distribute the role tokens to their owners.
+
+Next in the control contract, we use the state machine library to create a state machine client and submit the transaction.
+
+Apply Endpoint
+++++++++++++++
+
+The *apply* endpoint is very simple. We call the *applyInputs* function.
+
+.. figure:: img/pic__00091.png
+
+We construct a slot range and we use the *runStep* function which takes a slot range and a list of inputs.
+
+Redeem Endpoint
++++++++++++++++
+
+The *redeem* endpoint allows you to get money that has been paid to a role payout script. 
+
+.. figure:: img/pic__00092.png
+
+We get the address of the script and then send all the outputs to the token owner.
+
+Auto Endpoint
++++++++++++++
 
 Companion Contract
 ~~~~~~~~~~~~~~~~~~
