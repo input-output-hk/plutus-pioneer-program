@@ -607,8 +607,15 @@ contract.
 
 So what happens in *applyAllInputs*?
 
-First of all, it's a loop. It reduces the contract until it reaches a quiescent state. Once we reach a quiescent state, we take the first input and try to apply it, and then 
+First of all, it's a loop. It uses the *reduceContractUntilQuiescent* function which reduces the contract until it reaches a quiescent state. Once we reach a quiescent state, we take the first input and try to apply it, and then 
 continue with the loop, until we get an empty input list. Then we return the current state and the continuation contract.
+
+.. figure:: img/pic__00074.png
+
+The *reduceContractUntilQuiescent* function goes through a loop and tries to apply *reduceContractStep* which essentially evaluates a contract. If we get a *Close* then we are in a quiescent state.
+
+.. figure:: img/pic__00075.png
+
 
 
 
