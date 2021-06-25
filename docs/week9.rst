@@ -863,5 +863,27 @@ Now we must say what happens next, if Alice makes this deposit. Afterwards we wa
 
 .. figure:: img/pic__00113.png
 
+First of all we change the timeout to 20 so as to give Bob also 10 slots to do something, and then wherever we have Alice, we now put Bob.
+
+.. figure:: img/pic__00114.png
+
+So at this point, if both these actions happen, Alice has deposited 10 into her internal account and Bob has deposited 10 into his external account.
+
+Now we want Charlie to make a choice, and this is again an external action, so again we need a *When*, but this time it's not a deposit so let's delete 
+the deposit. Then let's change the timeout to 30 to give Charlie 10 slots to make his choice.
+
+.. figure:: img/pic__00115.png
+
+Now we need a different action. Where earlier we had *Deposit*, now we pick the *Choice* action. We can give it a name, let's say *Winner*. We must say who 
+makes the choice, so that's will be Charlie, and now we must specify what values this choice can have.
+
+.. figure:: img/pic__00116.png
+
+That's numeric so because Charlie is supposed to choose between Alice and Bobs, which is two choices, I can pick arbitrary values like one and two. One for Alice,
+two for Bob. That's already the default so that's fine. 
+
+This allows Charlie to choose one or two.
+
+.. figure:: img/pic__00117.png
 
 
