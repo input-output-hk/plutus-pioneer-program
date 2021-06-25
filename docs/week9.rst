@@ -688,16 +688,31 @@ contract state.
 
 If you were connected to a web socket for this contract, you would be notified about transition changes.
 
-.. figure:: img/pic__00086.png
+.. figure:: img/pic__00087.png
 
 The state of the contract is stored in *ContractHistory*, which stores an initial *MarloweParams*, an initial *MarloweData* and a list of all *TransactionInput*\s that 
 were applied to this contract. You can always restore the current state by applying a list of inputs to an initial state.
 
-.. figure:: img/pic__00086.png
-
+.. figure:: img/pic__00088.png
 
 Control Contract
 ~~~~~~~~~~~~~~~~~
 
+.. figure:: img/pic__00089.png
+
+The *marlowePlutusContract* is a control contract. It allows you to create an instance of a Marlowe contract, apply inputs to the instance, to auto-execute the contract, 
+if possible, to redeem tokens from payments to roles, and to close the contract.
+
+Let's go through Marlowe contract creation.
+
+When you call the *create* endpoint, you provide a contract and a map of roles to public keys. We then setup a *MarloweParams*.
+
+.. figure:: img/pic__00090.png
+
+*MarloweParams* is a way to parameterise a Marlowe contract. You can specify your own role payout validator by providing its hash. There is a default one that checks that 
+the role token is spent within the transaction but you can do whatever you like.
+
+When your contract uses roles, we need to know the currency symbol for the role.
+
 Companion Contract
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
