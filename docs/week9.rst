@@ -1060,6 +1060,16 @@ construct.
 
 Of course, there are other options when using Haskell. We could also paramterise the contract, for example, we could pass in the deposit value as an argument.
 
+We could also parameterise the parties and even generalise it so that the number of parties could be variable. This would be very inconvenient if we were to have to 
+do this by hand using Blockly, but in Haskell it is quite straightforward.
+
+What is noteworthy here is that Marlowe, in contrast to Plutus, is very simply Haskell. The Marlowe team made a point of using only basic Haskell features. You
+don't need lenses, you don't need Template Haskell, you don't even need monads or type-level programming.
+
+Marlowe is not always appropriate because it is specifically for financial contracts, but if it is appropriate then it is a very nice option due to all the safety
+assurances that Simon mentioned and because it is much simpler and easy to get right than Plutus.
+
+
 
 
 
