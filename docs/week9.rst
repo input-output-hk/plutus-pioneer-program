@@ -1055,6 +1055,11 @@ Then now it is Alice's turn.
 So, basically, to use the Haskell editor, we write a program that produces something of type *Contract* and you can use all the features of Haskell like local
 functions or whatever to make your life easier.
 
+When using Blockly, if we had wanted to give Bob the option of being the first to deposit, we would have had no choice but to have copy and pasted the whole *When*
+construct.
+
+Of course, there are other options when using Haskell. We could also paramterise the contract, for example, we could pass in the deposit value as an argument.
+
 
 
 
