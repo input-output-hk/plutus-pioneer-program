@@ -910,6 +910,59 @@ So, we'll just pick Alice's internal account.
 
 .. figure:: img/pic__00122.png
 
+We will pay 10 Ada.
+
+.. figure:: img/pic__00123.png
+
+So who pays? It must be an internal account because this pay contract is something that the contract has control over, so it is not an external action. So, payments are
+triggered from internal accounts and in this case, it is Bob's account.
+
+.. figure:: img/pic__00124.png
+
+So this now says: If Charlie picked 1, then pay from Bob's internal account 10 Ada to Alice's internal account.
+
+After this we can just close. And when we close, all the internal accounts will be paid to the external owners. At this point, Alices internal account will have 20 Ada, 
+and when we close, she will get the 20 Ada paid to her.
+
+.. figure:: img/pic__00125.png
+
+And, if Charlie did not choose Alice, then we must pay to Bob. We can copy paste the previous Pay contract for this and make the necessary modifications.
+
+.. figure:: img/pic__00126.png
+
+And this should be enough for our contract.
+
+Now we can, for example, look at the pure Marlowe. This is the value of the Marlowe data type called *Contract*.
+
+.. figure:: img/pic__00127.png
+
+And we can send it to the simulator.
+
+.. figure:: img/pic__00128.png
+
+We can start the simulation.
+
+.. figure:: img/pic__00129.png
+
+Now, whenever there is a *When*, we get prompted for which of the available actions to take. In our case we only ever have one available action at each point.
+
+So in the first *When*, either Alice makes her deposit, or the timeout is reached.
+
+If we wait for the timeout it is very boring. The contract is reduced to *Close*, and nothing happened.
+
+.. figure:: img/pic__00129.png
+
+If, however, she makes the deposit, then this contract simplifies - it reduces to what happens after she makes the deposit.
+
+.. figure:: img/pic__00130.png
+
+
+
+
+
+
+
+
 
 
 
