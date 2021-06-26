@@ -901,5 +901,18 @@ To see if it is Alice, we will use the *Choice by* option to ask if Charlie's *W
 
 .. figure:: img/pic__00120.png
 
+In the *then* branch we now take a pay contract. The payee is who gets the money - it can be an internal account or it can be an external party. In this case it doesn't
+matter, because when we close, all the parties get the money from the internal accounts as well.
+
+.. figure:: img/pic__00121.png
+
+So, we'll just pick Alice's internal account.
+
+.. figure:: img/pic__00122.png
+
+
+
+
+
 
 
