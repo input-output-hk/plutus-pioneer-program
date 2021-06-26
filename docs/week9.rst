@@ -950,11 +950,137 @@ So in the first *When*, either Alice makes her deposit, or the timeout is reache
 
 If we wait for the timeout it is very boring. The contract is reduced to *Close*, and nothing happened.
 
-.. figure:: img/pic__00129.png
+.. figure:: img/pic__00130.png
 
 If, however, she makes the deposit, then this contract simplifies - it reduces to what happens after she makes the deposit.
 
-.. figure:: img/pic__00130.png
+.. figure:: img/pic__00131.png
+
+And now we can see we are in the second *When*, where we are waiting for Bob's deposit. Again, he can choose not to deposit. If he does that, then we can see the
+actions in the transaction log that Alice deposited 10 Ada and the contract pays this back to Alice upon close.
+
+.. figure:: img/pic__00132.png
+
+It is more interesting though if Bob also makes his deposit.
+
+.. figure:: img/pic__00133.png
+
+Now the contract has simplified again. Now we are in the *When* where the only available action is that Charlie chooses a winner.
+
+If Charlie doesn't do anything and the contract times out, Bob and Alice both get their money back.
+
+.. figure:: img/pic__00134.png
+
+If Charlie picks Alice (choice 1), then we see that the contract pays 20 Ada to Alice.
+
+.. figure:: img/pic__00135.png
+
+If instead he picks choice 2, then the contract pays 20 Ada to Bob.
+
+.. figure:: img/pic__00136.png
+
+Let's now reset the contract.
+
+We will copy the Marlowe code to the clipboard, then create a new Haskell project.
+
+.. figure:: img/pic__00137.png
+
+In the Haskell editor there is a template.
+
+.. figure:: img/pic__00138.png
+
+All this program does is to take a Marlowe contract, and then pretty prints it. This is then used to, for example, run in the simulator.
+
+Instead of Close, we can paste what we just copied to the clipboard.
+
+.. figure:: img/pic__00139.png
+
+We can then compile this, and send it to the simulator and it should behave exactly as before.
+
+There we don't really see the benefit of doing it in Haskell, we could just as well do it in Blockly, although you may find that Blockly is really only useful for
+learning and writing extremely simple contracts. We have just written a simple contract and already it was starting to get quite unwieldy in the Blockly editor. If you 
+do something more complicated it can start to get very confusing in the editor.
+
+But, we can do other things in this Haskell program. We don't have to literally define a contract. We can use the whole power of Haskell to help us to write the contract.
+
+For example, we can see a lot of repetition because we always have the Alice, Bob and Charlie roles. We could define these separately.
+
+Note that we can use overloaded string literals here because the *fromString* function uses the *Role* constructor for *Party*.
+
+.. figure:: img/pic__00140.png
+
+We can also define a constant for the deposit of 10 Ada.
+
+.. figure:: img/pic__00141.png
+
+For (Token "" ""), we can replace this with the *ada* abbreviation.
+
+.. figure:: img/pic__00142.png
+
+We can also simplify Charlie's *ChoiceId*.
+
+.. figure:: img/pic__00143.png
+
+Now it is already cleaned up quite a bit.
+
+It's possible to do more sophisticated things. Our contract is slightly asymmetric even though it sounds like a symmetric situation. Alice and Bob are completely
+symmetric, but in our contract, Alice has to deposit first.
+
+What we could do is to allow Bob to deposit first as well. In the outermost *When* we would have two deposits - one where Alice deposits, and one where Bob 
+deposits.
+
+Let's make a little helper function. It takes two *Party*\s - the party that deposits first and the party that deposits second and then it returns a *Case*. We can
+use this to parameterise Alice and Bob as *x* and *y* in the *Case*. Note that we only need to do this for the deposits, the part where Charlie makes his choice can
+remain the same, with Alice and Bob continuing to be represented by 1 and 2 respectively.
+
+.. figure:: img/pic__00144.png
+
+Now we can replace the originally-pasted code with our helper function, and we can create the symmetric case where Bob deposits first as an option to the outermost
+*When*.
+
+.. figure:: img/pic__00146.png
+
+This should compile and we can now send to the simulator.
+
+.. figure:: img/pic__00147.png
+
+Now we have two possible actions that can happen in the first step. Alice can deposit 10, or Bob can deposit 10.
+
+If Bob starts...
+
+.. figure:: img/pic__00147.png
+
+Then now it is Alice's turn.
+
+So, basically, to use the Haskell editor, we write a program that produces something of type *Contract* and you can use all the features of Haskell like local
+functions or whatever to make your life easier.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
