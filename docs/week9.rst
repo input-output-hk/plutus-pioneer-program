@@ -886,4 +886,20 @@ This allows Charlie to choose one or two.
 
 .. figure:: img/pic__00117.png
 
+Then if and when Charlie makes a choice, we continue, and it now depends on the choice that he has made. If he chose Alice then Alice must get all the money, if he 
+chose Bob then Bob must get all the money.
+
+So we will add an *If* conditional.
+
+.. figure:: img/pic__00118.png
+
+Then we will add an observation to check if Alice is the winner. The observation we add is the *value is equal to* observation.
+
+.. figure:: img/pic__00119.png
+
+To see if it is Alice, we will use the *Choice by* option to ask if Charlie's *Winner* name is equal to Alice.
+
+.. figure:: img/pic__00120.png
+
+
 
