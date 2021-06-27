@@ -48,6 +48,17 @@ the same trick that we have used a couple of times before, and as datum, it will
 
 So in the beginning, when the factory is just being created, that list will be empty.
 
-Now let's assume that one user, Alice wants to create a liquidity pool for tokens A and B.
+Now let's assume that one user, Alice wants to create a liquidity pool for tokens A and B. A pool that allows others to swap A against B or B against A.
 
 .. figure:: img/pic__00150.png
+
+She has to provide some initial liquidity for the pool. So she needs some amount of token A and some amount of token B, let's say she has 1,000A and 2000B.
+
+It's important to note here that the ratio between A and B reflects Alice's belief in the relative value of the tokens. So if she wants to set up a pool with 
+1000A and 2000B, then she believes that one A has the same value as two Bs.
+
+In order to create the liquidity pool, she will create a transaction with two inputs and three outputs.
+
+.. figure:: img/pic__00150.png
+
+
