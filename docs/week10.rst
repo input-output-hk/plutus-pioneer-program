@@ -61,4 +61,22 @@ In order to create the liquidity pool, she will create a transaction with two in
 
 .. figure:: img/pic__00150.png
 
+The two inputs will be the liquidity she wants to provide; the 1000A and 2000B and the Uniswap factory invoked with the create redeemer. The three outputs 
+will be the newly-created pool.
 
+We call it *Pool AB* here to indicate that it contains tokens AB, which will contain the liquidity that Alice provided; the 1000A and the 2000B and a freshly-minted 
+token that identifies this pool, an NFT, called *AB NFT* here.
+
+The datum of the pool, the 1415, will be the amount of liquidity tokens that Alice receives in return for setting up this pool and providing the liquidity. #
+
+If you wonder about the number, that is the square root of the product of 1000 and 2000, so that's how the initial amount of liquidity tokens is calculated. It 
+doesn't really matter, you could scale it arbitrarily, but that's the way Uniswap does it.
+
+The second output is the Uniswap factory again, with the same NFT as before that identifies it. And now the datum has been updated. So in this list that was 
+empty before, the list of all liquidity pools, there is now an entry for the newly-created AB pool.
+
+Finally, there's a third output for Alice, where she receives the freshly-minted liquidity tokens, called *AB* here to indicate that they belong to the pool AB.
+
+Now that the liquidity pool has been set up, other users can use it to swap.
+
+.. figure:: img/pic__00151.png
