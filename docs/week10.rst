@@ -80,3 +80,54 @@ Finally, there's a third output for Alice, where she receives the freshly-minted
 Now that the liquidity pool has been set up, other users can use it to swap.
 
 .. figure:: img/pic__00151.png
+
+So let's assume that Bob wants to swap 100A against B. What will Bob do?
+
+He will create a transaction that has two inputs and two outputs. The two inputs are the 100A he wants to swap, and the pool with the swap redeemer. The outputs 
+are the Bs he gets in return.
+
+In this example, that would be 181B and the updated pool. So the pool now has the additional 100A that Bob provided. So now it's 1,100A, and it has 181B fewer than before.
+
+It still, of course, has the NFT that identifies the pool and the datum hasn't changed because the amount of liquidity tokens that have been minted hasn't changed.
+
+Now, of course, the question is, where does this 181 come from? This is this ingenious idea, how price discovery works in Uniswap.
+
+So the rule is roughly that the product of the amounts of the two tokens must never decrease. Initially we have 1000 As and 2000 Bs and the product is 2 million.
+
+If you do the calculation, then you will see that after the swap 1100*1819 will be slightly larger than 2 million.
+
+If you think about it or try a couple of examples by yourself, then you will see that in principle, you will always pay this ratio of the As and Bs in the pool, at least if you swap small amounts.
+
+So originally the ratio from A to B was 1:2, 1000:2000. 100 is relatively small in comparison to the 1000 liquidity, so Bob should roughly get 200B, but he does get less
+and there are two reasons for that.
+
+One is that the amount of tokens in the liquidity pool is never allowed to go to zero. And the more of one sort you take out, the more expensive it gets - 
+the less you get in return. So 100 depletes the pool a bit of As, so Bob doesn't get the full factor 2 out, he gets a little bit less out. That's exactly how this product formula works.
+
+This also makes it ingenious, because it automatically accounts for supply and demand. If the next person also wants to swap 100A, they would get even less out.
+
+The idea is if a lot of people want to put A in and want to get B in return, that means the demand for B is high. And that means the price of B in relation to A 
+should rise. And that is exactly what's happening.
+
+So the more people do a swap in this direction, put A in and get B out, the less of the gap because the price of B rises. If there were swaps in the other direction, 
+you would have the opposite effect.
+
+If there's an equal amount of swaps from A to B and B to A, then this ratio between the two amounts would stay roughly the same.
+
+There's an additional reason why Bob doesn't get the full 200 that he might expect, and that is fees.
+
+We want to incentivize Alice to set up the pool in the first place. She won't just do that for fun, she wants to profit from it, so she wants to earn on swaps that people make.
+
+The original product formula is modified a bit to insist that the product doesn't only not decrease, but that it increases by a certain amount, a certain percentage, 
+depending on how much people swap. That's 3% in this example of the 100A that Bob swaps, and it would be the same if you swap B instead.
+
+This is basically added on top of this product, so anytime somebody swaps, not only does the product not decrease, it actually increases. And the more people swap, the more it increases.
+
+The idea is that if Alice now would close the pool by burning her liquidity tokens, she gets all the remaining tokens in the pool and the product 
+would be higher than what she originally put in.
+
+So that's her incentive to set up the pool in the first place. 
+
+The next operation we look at is the add operation where somebody supplies the pool with additional liquidity.
+
+.. figure:: img/pic__00152.png
