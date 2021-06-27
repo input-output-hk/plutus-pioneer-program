@@ -18,6 +18,7 @@
    week7.rst
    week8.rst
    week9.rst
+   week10.rst
    
 
    

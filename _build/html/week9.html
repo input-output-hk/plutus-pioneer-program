@@ -120,8 +120,18 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#lecture-by-alex-nemish">10.3. Lecture by Alex Nemish</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#follower-contract">10.3.1. Follower Contract</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#control-contract">10.3.2. Control Contract</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#control-contract">10.3.2. Control Contract</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#create-endpoint">10.3.2.1. Create Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#apply-endpoint">10.3.2.2. Apply Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#redeem-endpoint">10.3.2.3. Redeem Endpoint</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#auto-endpoint">10.3.2.4. Auto Endpoint</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="#companion-contract">10.3.3. Companion Contract</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#playing-in-the-playground">10.4. Playing in the Playground</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#blockly">10.4.1. Blockly</a></li>
 </ul>
 </li>
 </ul>
@@ -743,13 +753,346 @@ respective parties, and we calculate the new balance. Then we combine all the co
 <div class="figure align-default">
 <img alt="_images/pic__00086.png" src="_images/pic__00086.png" />
 </div>
-<p>This is a very simple one - it contains only one endpoint called <em>follow</em>.</p>
+<p>This is a very simple one - it contains only one endpoint called <em>follow</em>. It subscribes to all changes to a Marlowe contract validator address, so that we can store
+all the inputs that are applied to a Marlowe contract.</p>
+<p>It uses the <em>updateHistoryFromTx</em> function which, in a nutshell, finds a Marlowe input and constructs a <em>TransactionInput</em> data type, and uses <em>tell</em> to update the PAB
+contract state.</p>
+<p>If you were connected to a web socket for this contract, you would be notified about transition changes.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00087.png" src="_images/pic__00087.png" />
+</div>
+<p>The state of the contract is stored in <em>ContractHistory</em>, which stores an initial <em>MarloweParams</em>, an initial <em>MarloweData</em> and a list of all <em>TransactionInput</em>s that
+were applied to this contract. You can always restore the current state by applying a list of inputs to an initial state.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00088.png" src="_images/pic__00088.png" />
+</div>
 </div>
 <div class="section" id="control-contract">
 <h3><span class="section-number">10.3.2. </span>Control Contract<a class="headerlink" href="#control-contract" title="Permalink to this headline">¶</a></h3>
+<div class="figure align-default">
+<img alt="_images/pic__00089.png" src="_images/pic__00089.png" />
+</div>
+<p>The <em>marlowePlutusContract</em> is a control contract. It allows you to create an instance of a Marlowe contract, apply inputs to the instance, to auto-execute the contract,
+if possible, to redeem tokens from payments to roles, and to close the contract.</p>
+<p>Let’s go through Marlowe contract creation.</p>
+<div class="section" id="create-endpoint">
+<h4><span class="section-number">10.3.2.1. </span>Create Endpoint<a class="headerlink" href="#create-endpoint" title="Permalink to this headline">¶</a></h4>
+<p>When you call the <em>create</em> endpoint, you provide a contract and a map of roles to public keys. We then setup a <em>MarloweParams</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00090.png" src="_images/pic__00090.png" />
+</div>
+<p><em>MarloweParams</em> is a way to parameterise a Marlowe contract. You can specify your own role payout validator by providing its hash. There is a default one that checks that
+the role token is spent within the transaction but you can do whatever you like.</p>
+<p>When your contract uses roles, we need to know the currency symbol for the role. When the contract uses roles, we need to create role tokens and distribute them to their
+owners.</p>
+<p>In the <em>setupMarloweParams</em> function we get the roles that are used within the contract. If we have owners for these roles, we create tokens with role names. By default we
+create one token per role. We use the <em>Contract.forgeContract</em> function to create the tokens and then assign them to the creator. Then, in the same transaction, we
+distribute the role tokens to their owners.</p>
+<p>Next in the control contract, we use the state machine library to create a state machine client and submit the transaction.</p>
+</div>
+<div class="section" id="apply-endpoint">
+<h4><span class="section-number">10.3.2.2. </span>Apply Endpoint<a class="headerlink" href="#apply-endpoint" title="Permalink to this headline">¶</a></h4>
+<p>The <em>apply</em> endpoint is very simple. We call the <em>applyInputs</em> function.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00092.png" src="_images/pic__00092.png" />
+</div>
+<p>We construct a slot range and we use the <em>runStep</em> function which takes a slot range and a list of inputs.</p>
+</div>
+<div class="section" id="redeem-endpoint">
+<h4><span class="section-number">10.3.2.3. </span>Redeem Endpoint<a class="headerlink" href="#redeem-endpoint" title="Permalink to this headline">¶</a></h4>
+<p>The <em>redeem</em> endpoint allows you to get money that has been paid to a role payout script.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00093.png" src="_images/pic__00093.png" />
+</div>
+<p>We get the address of the script and then send all the outputs to the token owner.</p>
+</div>
+<div class="section" id="auto-endpoint">
+<h4><span class="section-number">10.3.2.4. </span>Auto Endpoint<a class="headerlink" href="#auto-endpoint" title="Permalink to this headline">¶</a></h4>
+<div class="figure align-default">
+<img alt="_images/pic__00095.png" src="_images/pic__00095.png" />
+</div>
+<p>The <em>auto</em> endpoint is quite interesting and quite complicated. There is a set of contracts that can be executed automatically.</p>
+<p>Imagine a contract that contains only deposits and payouts. No participant needs to provide choices or any interactive stuff. There are only scheduled payments. Such a
+contract can be executed automatically, and the <em>auto</em> endpoint allows exactly that.</p>
+<p>So, if a contract can be executed automatically, it calls <em>autoExecuteContract</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00096.png" src="_images/pic__00096.png" />
+</div>
+<p>This is a state machine that pays a deposit or waits for other parties to do their part.</p>
+</div>
 </div>
 <div class="section" id="companion-contract">
 <h3><span class="section-number">10.3.3. </span>Companion Contract<a class="headerlink" href="#companion-contract" title="Permalink to this headline">¶</a></h3>
+<p>The last interesting contract is the Marlowe Companion Contract.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00097.png" src="_images/pic__00097.png" />
+</div>
+<p>This is a contract that monitors a participant wallet and notifies when a role token arrives.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00098.png" src="_images/pic__00098.png" />
+</div>
+<p>It listens to transactions that go to your own address and if there is a token and this token is generated by Marlowe contract creation, it tries to find the Marlowe
+contract and, if it succeeds, it updates the state of the contract. If you are subscribed to the contract’s web socket, you will get a notification about a role
+token, and you’ll get a map of <em>MarloweParams</em> to <em>MarloweData</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00099.png" src="_images/pic__00099.png" />
+</div>
+</div>
+</div>
+<div class="section" id="playing-in-the-playground">
+<h2><span class="section-number">10.4. </span>Playing in the Playground<a class="headerlink" href="#playing-in-the-playground" title="Permalink to this headline">¶</a></h2>
+<p>Let’s play around a little with Marlowe in the playground.</p>
+<p>When you go to the playground, you first get presented with three options for you to choose in which language you want to write your Marlowe contracts.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00101.png" src="_images/pic__00101.png" />
+</div>
+<p>You can do it in Haskell, you can do it in Javascript, or you can do it in Blockly or directly in Marlowe.</p>
+<p>Blockly is very nice and you don’t need any programming experience to do this.</p>
+<div class="section" id="blockly">
+<h3><span class="section-number">10.4.1. </span>Blockly<a class="headerlink" href="#blockly" title="Permalink to this headline">¶</a></h3>
+<p>Let’s start a new project and select <em>Blockly</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00102.png" src="_images/pic__00102.png" />
+</div>
+<p>This is a graphical editor. We can just click and drop a Marlowe contract together.</p>
+<p>As an example let’s write a contract where there are three parties - Alice, Bob and Charlie.</p>
+<p>The idea is that Alice and Bob deposit an amount of Ada into the contract, let’s say 10 Ada, and then Charlie decides whether Alice or Bob
+gets the total amount. Depending on Charlie’s decision either Alice gets 20 or Bob gets 20.</p>
+<p>There’s always the possibility that one of the three doesn’t play along; Alice doesn’t make her deposit, Bob doesn’t make his deposit, or Charlie doesn’t make his
+choice. In this case everybody should just get reimbursed.</p>
+<p>When we start with Blockly, there is a contract and it’s just a <em>Close</em> contract, which in this case doesn’t do anything. If there was money in internal accounts
+it would pay back the money to the owners of the accounts.</p>
+<p>We want to do something else, so let’s first wait for a deposit by Alice.</p>
+<p>Because that’s an external action that’s triggered by one of the parties, in this case Alice, we need the <em>When</em> construct that Simon mentioned.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00103.png" src="_images/pic__00103.png" />
+</div>
+<p>We can remove the <em>Close</em> contract, slide the <em>When</em> one into its place.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00104.png" src="_images/pic__00104.png" />
+</div>
+<p>Here we see all the slots where other things need to go. We see some fields that we have to set.</p>
+<p>We can set a timeout so let’s say this deposit by Alice has to happen by slot 10.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00105.png" src="_images/pic__00105.png" />
+</div>
+<p>If it doesn’t happen, we can say what should happen afterwards, and there is not really a good choice to do anything except close in that case, so in that case
+nothing will happen.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00106.png" src="_images/pic__00106.png" />
+</div>
+<p>Here we say what external actions we wait for. Let’s say we only wait for one action, namely that Alice makes a deposit.</p>
+<p>So we can check for actions and pick the deposit one and slide it in.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00107.png" src="_images/pic__00107.png" />
+</div>
+<p>We see some slots that we have to fill. First of all, a party who has to make the deposit, and there are two choices - a public key or role.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00108.png" src="_images/pic__00108.png" />
+</div>
+<p>Let’s take role because then we can just say Alice. Normally this would be the name of the role token, so whoever owns that token can incorporate that role.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00109.png" src="_images/pic__00109.png" />
+</div>
+<p>So Alice makes a deposit. Now the amount. That’s a <em>Value</em> and let’s say we just pick a constant amount of 10 Ada.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00110.png" src="_images/pic__00110.png" />
+</div>
+<p>The amount is 10, and the fact that it is Ada must be specified in the currency slot.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00111.png" src="_images/pic__00111.png" />
+</div>
+<p>There’s also the option to use tokens than Ada, but let’s stick with Ada.</p>
+<p>Now there are these internal accounts that also belong to one of the parties, so let’s say Alice pays it into her own internal account.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00112.png" src="_images/pic__00112.png" />
+</div>
+<p>That can be copy/pasted rather than getting it from the <em>Party</em> menu again.</p>
+<p>Now we must say what happens next, if Alice makes this deposit. Afterwards we want Bob to make a deposit, so we can start by just copying the whole <em>When</em> block.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00113.png" src="_images/pic__00113.png" />
+</div>
+<p>First of all we change the timeout to 20 so as to give Bob also 10 slots to do something, and then wherever we have Alice, we now put Bob.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00114.png" src="_images/pic__00114.png" />
+</div>
+<p>So at this point, if both these actions happen, Alice has deposited 10 into her internal account and Bob has deposited 10 into his external account.</p>
+<p>Now we want Charlie to make a choice, and this is again an external action, so again we need a <em>When</em>, but this time it’s not a deposit so let’s delete
+the deposit. Then let’s change the timeout to 30 to give Charlie 10 slots to make his choice.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00115.png" src="_images/pic__00115.png" />
+</div>
+<p>Now we need a different action. Where earlier we had <em>Deposit</em>, now we pick the <em>Choice</em> action. We can give it a name, let’s say <em>Winner</em>. We must say who
+makes the choice, so that’s will be Charlie, and now we must specify what values this choice can have.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00116.png" src="_images/pic__00116.png" />
+</div>
+<p>That’s numeric so because Charlie is supposed to choose between Alice and Bobs, which is two choices, I can pick arbitrary values like one and two. One for Alice,
+two for Bob. That’s already the default so that’s fine.</p>
+<p>This allows Charlie to choose one or two.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00117.png" src="_images/pic__00117.png" />
+</div>
+<p>Then if and when Charlie makes a choice, we continue, and it now depends on the choice that he has made. If he chose Alice then Alice must get all the money, if he
+chose Bob then Bob must get all the money.</p>
+<p>So we will add an <em>If</em> conditional.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00118.png" src="_images/pic__00118.png" />
+</div>
+<p>Then we will add an observation to check if Alice is the winner. The observation we add is the <em>value is equal to</em> observation.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00119.png" src="_images/pic__00119.png" />
+</div>
+<p>To see if it is Alice, we will use the <em>Choice by</em> option to ask if Charlie’s <em>Winner</em> name is equal to Alice.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00120.png" src="_images/pic__00120.png" />
+</div>
+<p>In the <em>then</em> branch we now take a pay contract. The payee is who gets the money - it can be an internal account or it can be an external party. In this case it doesn’t
+matter, because when we close, all the parties get the money from the internal accounts as well.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00121.png" src="_images/pic__00121.png" />
+</div>
+<p>So, we’ll just pick Alice’s internal account.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00122.png" src="_images/pic__00122.png" />
+</div>
+<p>We will pay 10 Ada.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00123.png" src="_images/pic__00123.png" />
+</div>
+<p>So who pays? It must be an internal account because this pay contract is something that the contract has control over, so it is not an external action. So, payments are
+triggered from internal accounts and in this case, it is Bob’s account.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00124.png" src="_images/pic__00124.png" />
+</div>
+<p>So this now says: If Charlie picked 1, then pay from Bob’s internal account 10 Ada to Alice’s internal account.</p>
+<p>After this we can just close. And when we close, all the internal accounts will be paid to the external owners. At this point, Alices internal account will have 20 Ada,
+and when we close, she will get the 20 Ada paid to her.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00125.png" src="_images/pic__00125.png" />
+</div>
+<p>And, if Charlie did not choose Alice, then we must pay to Bob. We can copy paste the previous Pay contract for this and make the necessary modifications.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00126.png" src="_images/pic__00126.png" />
+</div>
+<p>And this should be enough for our contract.</p>
+<p>Now we can, for example, look at the pure Marlowe. This is the value of the Marlowe data type called <em>Contract</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00127.png" src="_images/pic__00127.png" />
+</div>
+<p>And we can send it to the simulator.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00128.png" src="_images/pic__00128.png" />
+</div>
+<p>We can start the simulation.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00129.png" src="_images/pic__00129.png" />
+</div>
+<p>Now, whenever there is a <em>When</em>, we get prompted for which of the available actions to take. In our case we only ever have one available action at each point.</p>
+<p>So in the first <em>When</em>, either Alice makes her deposit, or the timeout is reached.</p>
+<p>If we wait for the timeout it is very boring. The contract is reduced to <em>Close</em>, and nothing happened.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00130.png" src="_images/pic__00130.png" />
+</div>
+<p>If, however, she makes the deposit, then this contract simplifies - it reduces to what happens after she makes the deposit.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00131.png" src="_images/pic__00131.png" />
+</div>
+<p>And now we can see we are in the second <em>When</em>, where we are waiting for Bob’s deposit. Again, he can choose not to deposit. If he does that, then we can see the
+actions in the transaction log that Alice deposited 10 Ada and the contract pays this back to Alice upon close.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00132.png" src="_images/pic__00132.png" />
+</div>
+<p>It is more interesting though if Bob also makes his deposit.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00133.png" src="_images/pic__00133.png" />
+</div>
+<p>Now the contract has simplified again. Now we are in the <em>When</em> where the only available action is that Charlie chooses a winner.</p>
+<p>If Charlie doesn’t do anything and the contract times out, Bob and Alice both get their money back.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00134.png" src="_images/pic__00134.png" />
+</div>
+<p>If Charlie picks Alice (choice 1), then we see that the contract pays 20 Ada to Alice.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00135.png" src="_images/pic__00135.png" />
+</div>
+<p>If instead he picks choice 2, then the contract pays 20 Ada to Bob.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00136.png" src="_images/pic__00136.png" />
+</div>
+<p>Let’s now reset the contract.</p>
+<p>We will copy the Marlowe code to the clipboard, then create a new Haskell project.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00137.png" src="_images/pic__00137.png" />
+</div>
+<p>In the Haskell editor there is a template.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00138.png" src="_images/pic__00138.png" />
+</div>
+<p>All this program does is to take a Marlowe contract, and then pretty prints it. This is then used to, for example, run in the simulator.</p>
+<p>Instead of Close, we can paste what we just copied to the clipboard.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00139.png" src="_images/pic__00139.png" />
+</div>
+<p>We can then compile this, and send it to the simulator and it should behave exactly as before.</p>
+<p>There we don’t really see the benefit of doing it in Haskell, we could just as well do it in Blockly, although you may find that Blockly is really only useful for
+learning and writing extremely simple contracts. We have just written a simple contract and already it was starting to get quite unwieldy in the Blockly editor. If you
+do something more complicated it can start to get very confusing in the editor.</p>
+<p>But, we can do other things in this Haskell program. We don’t have to literally define a contract. We can use the whole power of Haskell to help us to write the contract.</p>
+<p>For example, we can see a lot of repetition because we always have the Alice, Bob and Charlie roles. We could define these separately.</p>
+<p>Note that we can use overloaded string literals here because the <em>fromString</em> function uses the <em>Role</em> constructor for <em>Party</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00140.png" src="_images/pic__00140.png" />
+</div>
+<p>We can also define a constant for the deposit of 10 Ada.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00141.png" src="_images/pic__00141.png" />
+</div>
+<p>For (Token “” “”), we can replace this with the <em>ada</em> abbreviation.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00142.png" src="_images/pic__00142.png" />
+</div>
+<p>We can also simplify Charlie’s <em>ChoiceId</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00143.png" src="_images/pic__00143.png" />
+</div>
+<p>Now it is already cleaned up quite a bit.</p>
+<p>It’s possible to do more sophisticated things. Our contract is slightly asymmetric even though it sounds like a symmetric situation. Alice and Bob are completely
+symmetric, but in our contract, Alice has to deposit first.</p>
+<p>What we could do is to allow Bob to deposit first as well. In the outermost <em>When</em> we would have two deposits - one where Alice deposits, and one where Bob
+deposits.</p>
+<p>Let’s make a little helper function. It takes two <em>Party</em>s - the party that deposits first and the party that deposits second and then it returns a <em>Case</em>. We can
+use this to parameterise Alice and Bob as <em>x</em> and <em>y</em> in the <em>Case</em>. Note that we only need to do this for the deposits, the part where Charlie makes his choice can
+remain the same, with Alice and Bob continuing to be represented by 1 and 2 respectively.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00144.png" src="_images/pic__00144.png" />
+</div>
+<p>Now we can replace the originally-pasted code with our helper function, and we can create the symmetric case where Bob deposits first as an option to the outermost
+<em>When</em>.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00146.png" src="_images/pic__00146.png" />
+</div>
+<p>This should compile and we can now send to the simulator.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00147.png" src="_images/pic__00147.png" />
+</div>
+<p>Now we have two possible actions that can happen in the first step. Alice can deposit 10, or Bob can deposit 10.</p>
+<p>If Bob starts…</p>
+<div class="figure align-default">
+<img alt="_images/pic__00147.png" src="_images/pic__00147.png" />
+</div>
+<p>Then now it is Alice’s turn.</p>
+<p>So, basically, to use the Haskell editor, we write a program that produces something of type <em>Contract</em> and you can use all the features of Haskell like local
+functions or whatever to make your life easier.</p>
+<p>When using Blockly, if we had wanted to give Bob the option of being the first to deposit, we would have had no choice but to have copy and pasted the whole <em>When</em>
+construct.</p>
+<p>Of course, there are other options when using Haskell. We could also paramterise the contract, for example, we could pass in the deposit value as an argument.</p>
+<p>We could also parameterise the parties and even generalise it so that the number of parties could be variable. This would be very inconvenient if we were to have to
+do this by hand using Blockly, but in Haskell it is quite straightforward.</p>
+<p>What is noteworthy here is that Marlowe, in contrast to Plutus, is very simply Haskell. The Marlowe team made a point of using only basic Haskell features. You
+don’t need lenses, you don’t need Template Haskell, you don’t even need monads or type-level programming.</p>
+<p>Marlowe is not always appropriate because it is specifically for financial contracts, but if it is appropriate then it is a very nice option due to all the safety
+assurances that Simon mentioned and because it is much simpler and easy to get right than Plutus.</p>
 </div>
 </div>
 </div>
