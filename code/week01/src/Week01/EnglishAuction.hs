@@ -15,6 +15,8 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
 module Week01.EnglishAuction where
 
 import           Control.Monad        hiding (fmap)
