@@ -213,7 +213,87 @@ So let's look at the Types module first.
 
 .. figure:: img/pic__00157.png
 
-U represents the Uniswap coin, the one that identifies the factory
+*U* represents the Uniswap coin, the one that identifies the factory.
 
 .. figure:: img/pic__00158.png
+
+*A* and *B* are used for pool operations where we have these two sorts of tokens inside the pool.
+
+.. figure:: img/pic__00160.png
+
+*PoolState* is the token that identifies a pool, actually in the diagram earlier I said it's an NFT. By definition, an NFT is something that only 
+exists once. Actually here in the implementation for each pool, an identical coin is created that identifies that pool. So it's not strictly speaking an NFT.
+
+All the liquidity pools have one coin of that sort.
+
+.. figure:: img/pic__00161.png
+
+*Liquidity* is used for the liquidity tokens that the liquidity providers get.
+
+.. figure:: img/pic__00162.png
+
+And all these types are then used in the coin A type. So A is a type parameter, that's a so-called *phantom* type. So that means it has no 
+representation at run time. It's just used to not mix up the various coins to make it easier to see what goes where, so in the datum, a coin 
+is simply an asset class that we have seen before. Recall that *AssetClass* is a combination of currency symbol and token name.
+
+.. figure:: img/pic__00163.png
+
+Then amount is just a wrapper around integer that also contains such a phantom type parameter, so that we don't confuse amounts for token A and token B, for example.
+
+.. figure:: img/pic__00164.png
+
+Then we have some helper functions, for example *valueOf* for constructing a *Value* from *Coin* and *Amount*. Here, for example, we see the use of this phantom type.
+
+That's actually a common trick in Haskell because now if you have, for example, pool operations that have two different coins and two different amounts for the different coins.
+And if the one is tagged with this type capital A and the other with capital B, then normally one could easily confuse them and somehow do operations with the one 
+coin, with the amount for the other, and then make a mistake.
+
+And here the type system enforces that we don't do that. So we can only use this value of function, for example, if we a coin and an amount with the same tag type tag.
+
+So as I said, that's a common trick in Haskell, some lightweight type level programming that doesn't need any fancy GHC extensions.
+
+The *unitValue* function creates one amount of the given coin and *isUnity* checks whether this coin is contained in the value exactly once,
+
+Then *amountOf* checks how often the coin is contained in the value, and finally *mkCoin* turns a currency symbol into a token name, into a coin.
+
+.. figure:: img/pic__00165.png
+
+Then we have the Uniswap type which identifies the instance of the Uniswap system we are running. So of course, nobody can stop anybody 
+from setting up a competing Uniswap system with the competing factory, but the value of this type identifies a specific system.
+
+And all the operations that are specific to pool will be parameterized by a value of this type, but it's just a wrapper around the coin U. And that is just the NFT that identifies the factory.
+
+.. figure:: img/pic__00166.png
+
+Then we have a type for liquidity pools, and that is basically just two coins, the two coins in there.
+
+However, there is one slight complication, only the two types of tokens inside the pool matter, not the order, there is no first or second token.
+
+.. figure:: img/pic__00167.png
+
+And in order to achieve that, the *Eq* instance has a special implementation. If we want to compare two liquidity pools, we don't just 
+compare the first field with the first field of the other, and the second with the second, but we also try the other way round.
+
+So liquidity pool tokens AB would be the same as liquidity pool with tokens BA. So that's the only slight complication here.
+
+.. figure:: img/pic__00168.png
+
+Then we define the actions, that's basically the redeemers. So *Create* with argument *LiquidityPool* is for creating a new liquidity
+pool, *Close* is  for closing one, *Swap* is for swapping, *Remove* is for removing liquidity and *Add* is for adding liquidity.
+
+Note that in the diagrams we saw earlier for simplicity, the redeemer was called simply *Create*.
+So I didn't mention this argument of type liquidity pool.
+
+.. figure:: img/pic__00170.png
+
+The datum is a bit more complex than we have seen before. It's not just a simple integer or similarly simple type, it's the type *UniswapDatum*.
+
+There are two constructors, one for the factory and one for each pool. The factory will use the *Factory* constructor and the pool will use the *Pool* constructor.
+
+And we saw before, the datum contains a list of all liquidity pools that currently exist. And the datum for *Pool* contains the *LiquidityPool* that we didn't
+see in the diagram. It also contains something we did see in the diagram, the amount of liquidity that has been minted for this pool. Remember that gets updated when somebody adds liquidity or removes liquidity.
+
+.. figure:: img/pic__00172.png
+
+Next let's look at the pool module, which as I explained before, contains the business logic, the calculations.
 
