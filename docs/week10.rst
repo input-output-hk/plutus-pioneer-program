@@ -198,6 +198,9 @@ list. The second output contains of all the remaining tokens, all the tokens tha
 
 So the remaining liquidity tokens are burnt and Charlie gets all the remaining tokens from the pool.
 
+Uniswap in Plutus
+-----------------
+
 .. figure:: img/pic__00156.png
 
 Code for Uniswap is actually part of the Plutus repository and it is in the plutus-usecases library, split into four modules that are imported by the
@@ -671,6 +674,9 @@ coins are the same, or if we specify a larger liquidity than exists in the walle
 So in this case, if we get an error, we just log it to the console.
 
 The cases for all the other endpoints are very similar.
+
+Trying it Out
+-------------
 
 Now let's try it out.
 
