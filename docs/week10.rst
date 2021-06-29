@@ -295,5 +295,560 @@ see in the diagram. It also contains something we did see in the diagram, the am
 
 .. figure:: img/pic__00172.png
 
-Next let's look at the pool module, which as I explained before, contains the business logic, the calculations.
+Next let's look at the *Pool* module, which as I explained before, contains the business logic, the calculations.
 
+So we have *calculateInitialLiquidity*. It gets the initial amount of token A and B that are put into the pool and returns the liquidity tokens that are 
+returned in exchange for those.
+
+Then *calculateAdditionalLiquidity* for the case that the pool already exists and somebody provides additional liquidity. So the first two 
+arguments are the amount of token already in there. Then the third one is the liquidity tokens that have already been minted for the pool. And 
+the next two arguments are how many As and Bs are added to the pool. The result is how many liquidity tokens will be minted in exchange
+for this additional amount.
+
+.. figure:: img/pic__00173.png
+
+The *calculateRemoval* function is for the opposite case. So given how many tokens are in the pool, how many liquidity tokens have been minted, how many 
+liquidity tokens should be removed? It gives how many of tokens A and B remain in the pool.
+
+Now *checkSwap* is arguably the central function of the whole Uniswap system. It calculates a swap.
+
+This is how many As and Bs are originally in the pool and this says how many As and Bs there are after the swap in the pool. And it just returns whether that's okay or not.
+
+So in principle, it just checks that the product of the last two arguments is larger than the product of the first two.
+
+And we noted before, it's a bit more complicated because the fee is taken into account. So in this case, it's 0.3% and you can see this is taking into account here.
+
+.. figure:: img/pic__00175.png
+
+It also makes sure that none of the amounts ever drops to zero. So it's not allowed to remove all coins of one sort or of both from a pool.
+That also makes sense because of this product, if one of the factors was zero, then of course it couldn't be larger than it was before.
+
+Finally, there's this *lpTicker* function. It's just a helper function that given a liquidity pool, computes a token name for the liquidity token. The idea 
+here is that this token name should only depend on the liquidity pool and should be unique. So each pair of tokens should result in a unique token name. In 
+principle it just takes the currency symbols and the token names of the two tokens or coins, concatenates all of them and hashes that, and then uses
+the hash of the concatenation to get something unique.
+
+A slight complication here is that again we must make sure that the order of coins in the pool doesn't matter.
+
+.. figure:: img/pic__00176.png
+
+Now let's look at the on-chain part. Only two functions are exported.
+
+First *mkUniswapValidator*, to make the validator for the Uniswap, both factory and pools, because they share the same script address. They are just distinguished by the datum and by the coins that identify them.
+
+Then *validateLiquidityForging* which is the monetary policy script for the liquidity tokens, but there is a lot of code in this module and we 
+don't want to go through it in detail, let's rather look at the structure.
+
+.. figure:: img/pic__00178.png
+
+So this is the *mkUniswapValidator* function. This function contains all the cases for factories and pools and the various redeemers.
+
+And we have the function *validateLiquidityForging*, which is the monetary policy for liquidity tokens. The idea here is that it doesn't contain 
+any logic and simply delegates the logic to the Uniswap validator. The way it does that is it checks the inputs of the forging transaction
+and checks that it either contains a factory or contains a pool, because if it does, then we know that this validator will 
+run and then the validator can check that the forging is okay.
+
+The way it checks whether either the factory or pool is an input is via the coins that identify a factory or pool. So it checks whether this 
+Uniswap factory coin is in the input or whether one of the pool coins is in the input.
+
+And then we just have helper functions for all the various cases and they look quite long but it's all straightforward. It's basically what we saw 
+in the diagram, just spelled out in detail so that all these conditions are satisfied for all the different cases.
+
+.. figure:: img/pic__00179.png
+
+Finally, let's look at the off-chain code. 
+
+.. figure:: img/pic__00181.png
+
+No surprises here, it's the usual boiler plate.
+
+.. figure:: img/pic__00182.png
+
+We define two different schemas. The idea is that one is for the entity that creates the Uniswap factory, and that only has one endpoint *start* and no parameters.
+
+Then once that is created a second schema for people that make use of this Uniswap system, and all the contracts in here will be parameterized by the uniswap
+instance that the first action creates.
+
+.. figure:: img/pic__00183.png
+
+We make use of the state mechanism this monad writer mechanism that is accessible via *tell*, and basically for all the user operations, 
+we have our own state, we call it *UserContractState*.
+
+So there will be a helper contract that queries for all existing pools. So then the state would be using the *Pools* constructor and will return a
+list of pools in a simplified form - it's just a nested pair of pairs of coin and amount in each pool.
+
+Now the helper function to query the existing funds of a wallet that will just return a value. 
+
+Then constructors for all the other operations. So  if they have happened, then one of those will be the state. For example, if we did a swap, then afterwards the status will be updated to swapped. If we removed liquidity, it will be updated to removed and so on.
+
+.. figure:: img/pic__00184.png
+
+Then some names for the various tokens, so "Uniswap" will be the token name of the NFT in the Uniswap factory, "Pool State" will be the token name for the
+coins that identify the liquidity pools.
+
+Then our usual boiler plate to actually get a script instance.
+
+.. figure:: img/pic__00185.png
+
+And the policy for the liquidity tokens.
+
+Some various helper functions,
+
+.. figure:: img/pic__00186.png
+
+Then all the parameters for the endpoints. So, for example, if we want to create a pool we need to know the tokens and the amounts.
+
+If you want to swap, it must know the tokens and how much to swap and the idea in the *SwapParams* datatype that one of the two last fields should be zero. So 
+if you want to put in A and get out B, we've would specify the *spAmountA* for how many As we want to put in, but we would leave the *spAmountB* at zero, 
+and the other way round if we want to swap Bs against As.
+
+*CloseParams* for if you want to close a pool - we just have to specify which pool. So we give the two tokens that are in there.
+
+*RemoveParams* - you have to specify the pool and how much liquidity we want to burn.
+
+*AddParams* - again, identify the pool and how many As and how many Bs we want to add.
+
+.. figure:: img/pic__00188.png
+
+Now here we have the implementation.
+
+So *start*, as we saw, sets up the whole system and it again makes use of this other use case we have used before, the *Currency.forgeContract* to mint
+the factory NFT that's then used to identify the Uniswap factory.
+
+.. figure:: img/pic__00189.png
+
+The *create* contract is the contract that creates a liquidity pool. We see all of these will be, as we mentioned before, identified by the Uniswap value, 
+which is the result of this *start* contract here. 
+
+So we have *create*,
+
+.. figure:: img/pic__00190.png
+
+We have *close*, again parameterized by Uniswap,
+
+.. figure:: img/pic__00191.png
+
+*remove* ,
+
+.. figure:: img/pic__00192.png
+
+*add*,
+
+.. figure:: img/pic__00193.png
+
+and *swap*.
+
+All these functions also make use of the functions from the *Pools* module, that contain the business logic. So that will be used both in the validator, 
+on the on-chain side, as well as on the off chain side in these contracts here.
+
+.. figure:: img/pic__00194.png
+
+The *pools* contract just queries the existing pools. So it looks for the factory UTxO and checks the datum, and, as we know, 
+the datum of the factory contains the list of all pools.
+
+.. figure:: img/pic__00195.png
+
+And finally *funds* just checks our own funds, the funds in the wallet, and returns them.
+
+So these all return values but we want to write that in the state, and this is now done these endpoint definitions.
+
+.. figure:: img/pic__00197.png
+
+So first we have *ownerEndpoint* for setting up the whole system, which just uses the stop contract.
+
+And then we have *userEndpoints*, which combine all these operations that a user can do.
+
+Now there is no return value anymore, and instead we make use of the state. So we use the *Last* monoid again, so only the last *told* state will be kept.
+
+And we also allow for error, so if there's an error in one of these contracts, then we will catch that error, but use a *Left* to write it in the state. If there was no error we write the appropriate user contract state value in the state with the *Right* constructor of *Either*.
+
+.. figure:: img/pic__00198.png
+
+Finally, we also have a *stop* endpoint that simply stops, it doesn't do anything. At any time you can invoke *stop* or one of the others, 
+and if it was one of the others then recursively *userEndpoints* is called again, but in the case of *stop* not, so if the *stop* endpoint
+is ever called then the contract stops.
+
+There are also tests for Uniswap contained in this Plutus use-cases library, but we won't look at them now.
+
+Let's rather look at the Plutus PAB part and how you can write a front-end for Uniswap.
+
+There is actually one also contained in the Plutus repo. It's in the plutus-pab library and in the examples folder there's a Uniswap folder that 
+contains an example on how to do that.
+
+.. figure:: img/pic__00200.png
+
+This has been copied it into our Plutus Pioneer Program repo and slightly modified it to make it more suitable for our purposes.
+
+When we look at the Cabal file for this week's code, there are two executables.
+
+One uniswap-pab, which will run the PAB server, and then uniswap-client, which is a simple console based front-end for the Uniswap application.
+
+.. figure:: img/pic__00201.png
+
+You see, in the *other-modules* field there is a module Uniswap and that's listed in both. That contains some common definitions that are used by both parts.
+
+So let's first look at that.
+
+.. figure:: img/pic__00202.png
+
+First of all, as we saw with oracle demo, we need some data type that captures the various instances we can run for the wallets. In this case, we have three.
+
+*Init* hasn't been mentioned before, that has nothing specifically to do with Uniswap, this is just used to create some example tokens and distribute them in the beginning.
+
+*UniswapStart* corresponds to the Uniswap start or Uniswap owner schema that we saw just now for setting up the whole system.
+
+*UniswapUser* corresponds to the other part, to the various endpoints to interact with the system. And this class constructor is parameterized by a value of type Uniswap,
+which is the result of starting. So after having started the system, the result would be of type Uniswap and this is then needed to parameterize the client.
+
+.. figure:: img/pic__00203.png
+
+Then there is some boiler plate, then this *initContract* function that distributes the initial funds. So it again makes use of *forgeContract* that we have seen before.
+
+And it now produces tokens with token names A, B, C, D with 1 million of each. Actually it also multiplies that by the number of wallets. So in this case, 
+I want to use four wallets, wallets one to four, so it's actually 4 million of each of the tokens that will be forged.
+
+And once they have been forged, they are sent from the forging wallet to all the other wallets. So one wallet forges four million of each, and then loops over the other
+wallets and sends them 1 million each.
+
+So this is just needed to set up example tokens and distribute them amongst the wallets.
+
+The *cidFile* function is just a helper function because in order to communicate the various contract instance IDs and other things we need, we 
+use helper files and this is function gives the file name for a given wallet.
+
+.. figure:: img/pic__00205.png
+
+So now let's look at the PAB part. 
+
+First there is the boiler plate that we saw earlier to actually hook up the PAB mechanism with actual contracts. It uses the Uniswap contracts that we just 
+defined with the three constructors *Init*, *UniswapStart* and *UniswapUser*.
+
+So, *UniswapUser* user will use the *UniswapUser* schema that we defined before, *UniswapStart* will use the *UniswapOwner* schema that we defined before and 
+*Init* will use a schema without endpoints.
+
+And we connect these constructors with actual contracts. So *UniswapUser* with argument *us* will use the *userEndpoints* that we looked at earlier,
+*UniswapStart* will use the *ownerEndpoint*, and *Init* will use the *initContract* that we just defined, and that's just for demonstration to create these initial coins.
+
+.. figure:: img/pic__00206.png
+
+Now we can look at the main program.
+
+So in the *Simulator* monad, we execute certain things. First we set up the whole system, we start the server and get the handle to shut it down again.
+
+The first thing is that Wallet 1 activates the *Init* contract. We know from looking at the code what that will do, it will mint all these example tokens, ABCD, 
+4 million of each, and then distribute them so that wallets one to four end up with 1 million of each of the four different tokens.
+
+This will concurrently start this contract, but then immediately continue - it won't block - so we use the *waitForState* that we saw when
+we talked about oracles, to wait until *Init* returns.
+
+What *Init* will do is that it will write the currency symbol of the forged example tokens into the state. So we wait until we see that and then we 
+remember it and we wait until the *Init* contract has finished.
+
+And then we write the currency symbol into the file *symbol.json*. We use the *encode* function from Data.Aeson, the json standard json library for Haskell.
+
+Then again for Wallet 1, we start the Uniswap system. So we use the *UniswapStart* constructor and we again use *waitForState* to wait until we 
+get the result. The result of the *UniswapStart* as we saw earlier will be a value of type Uniswap, and we need that value in order to parameterize the user contracts.
+
+So we wait until we get this, and call it *us*, and now Uniswap, the system is running and now we can start the user instances for all the wallets.
+
+So we loop over all wallets and activate the *UniswapUser* contract which is now parameterized by the *us* value we got in the previous step here.
+
+Now we have these handles and in order to interact, to communicate, from the front-end with the server, we need these handles. So we write them 
+into a file and this is where we use the helper function *cidFile* that we saw earlier.
+
+So we will end up with four files *w1.cid* through to *w4.cid*, which contain these contract instance IDs for the four contracts. 
+
+Then we just wait until the user types a key and then we can shut down the server.
+
+.. figure:: img/pic__00208.png
+
+Let's try this out with *cabal run uniswap-pab*.
+
+A lot of stuff is happening. Remember, first we forge these example tokens ABCD, and then we need to distribute them to the other wallets. 
+
+Then we have to start the Uniswap system. And for that, we again have to first forge the Uniswap NFT that identifies the factory and then create the initial 
+UTxO for the factory that contains an empty list of pools.
+
+.. figure:: img/pic__00209.png
+
+Now we see that all the *UniswapUser* contracts have started for each of the the four wallets.
+
+If we look, we see the various files, so we can look at those. 
+
+So *symbol.json* is the currency symbol of the example tokens and we need that to refer to them.
+
+.. figure:: img/pic__00211.png
+
+And then we have these *w1.cid* - *w4.cid* files. If you look at one of those, they hold the contract instance IDs for the contract instances for the four wallets.
+
+We need these in order to find the correct HTTP endpoints to communicate with them.
+
+.. figure:: img/pic__00212.png
+
+Let's look at the client next.
+
+As for the oracle, this is also written that in Haskell using the same library for doing HTTP requests.
+
+In the main program we expect one command line parameter, just a number from one to four, so that the main program knows for which wallet it's running.
+
+Then we read the corresponding CID file to get the contract instance ID for that wallet. We read this *symbol.json* file to get the currency symbol of 
+the example tokens. We use the *readFile* function the ByteString library, and *decode* comes from the Data.Aeson library to 
+decode the json back to Haskell data type.
+
+We check whether there was an error, and if not, we invoke the *go* function where we pass the contract instance ID and the currency symbol.
+
+.. figure:: img/pic__00213.png
+
+And then it's just a loop. We read a command from the console, and then depending on the command, we involve various helper functions. The 
+commands exactly correspond to the endpoints we have, except for stop, which is not implemented.
+
+So we can query our funds, we can look for existing pools, we can create a pool, we can add liquidity to a pool, we can remove liquidity from
+a pool, we can close a pool, and we can swap, which is the whole point.
+
+So for each of those, we have a constructor in the *Command* data type.
+
+Because the currency symbol will always be *cs* - our example tokens, we don't need to parameterise the currency symbol. And because the
+token names are just A, B, C and D we can just use a character for that.
+
+So for example, *Create Integer Character Integer Character* means create a liquidity pool with a certain amount of a given token and 
+a certain amount of a second token.
+
+.. figure:: img/pic__00214.png
+
+The *readCommandIO* function reads from the keyboard and then tries to pass that as a command. If it fails it will just recursively call the read command again. If it 
+succeeds, it returns the command.
+
+Then there are just various helper functions to convert something of type *Command* into the corresponding parameter types, like *CreateParams* 
+or *AddParams* from the Uniswap module that we saw earlier.
+
+.. figure:: img/pic__00215.png
+
+The functions *showCoinHeader* and *showCoin* are just to make it look a bit prettier when we query the funds or the pools, and then we have the various endpoints
+and that all makes use of some helper functions.
+
+.. figure:: img/pic__00216.png
+
+There is *getStatus*, which we need in order to get something back from the contracts, and *callEndpoint* which uses the *Req* library, just as last time.
+
+The interesting part is the request. It will be the post request, and we must give the instance ID. This is of type UUID, so we just convert 
+it into a string and then pack it to a text because this HTTP library expects *Text*.
+
+The request body depends on the third argument in the function.
+
+The response will always be *Unit* and we just check whether we get a 200 status code or not.
+
+The *getStatus* is a get request that invokes the *status* HTTP endpoint, again with the CID.
+
+We have to tell it what we're dealing with so that's why we need the *UniswapContracts* type, and that's also why this Uniswap client executable also needs
+access to this Uniswap module.
+
+And then we just check if the state is empty, which happens right in the beginning because that is before anything has told anything to the state. Then we wait a
+second and recurse and if there's a state (if it's *Just e*), then we know that this is of type *Either Text UserContractState*.
+
+Recall this UserContractState had one constructor for each of the endpoints, but if there's an error during contract execution, we get the error message as a *Text*.
+
+And if something went wrong, then we end in the third case. With these two functions - *getStatus* and *getEndpoint* - it's easy to write all the cases for the endpoints.
+
+.. figure:: img/pic__00217.png
+
+So let's maybe look at one, *getFunds*. We use the *callEndpoint* helper function that we just saw. For the endpoint named "funds", and in this case, the argument, 
+the request body, is just *Unit*.
+
+We wait for two seconds and then use the *getStatus* helper function. If we get a *Right*, then we show the funds, otherwise we recurse.
+
+So we wait until we get the *Right*, because in this case "funds" should never fail. There's no way that can fail, therefore we can safely wait forever.
+
+.. figure:: img/pic__00218.png
+
+The *getPools* function is similar. It's more or less the same, except that instead of "funds", we have "pools".
+
+Let's look at one more example, for creating a pool.
+
+.. figure:: img/pic__00219.png
+
+Again we call the endpoint and we wait for two seconds. Here something could actually go wrong. For example, if we try to create a pool where both 
+coins are the same, or if we specify a larger liquidity than exists in the wallet, then we would get an error.
+
+So in this case, if we get an error, we just log it to the console.
+
+The cases for all the other endpoints are very similar.
+
+Now let's try it out.
+
+Let's start three instances for wallets one, two and three, and try to recreate the scenario from the diagrams at the beginning.
+
+We start it simply by using *cabal run* with a command line parameter for the number of the wallet.
+
+.. code:: haskell
+      
+      cabal run uniswap-client -- 1
+
+And we do the same for wallets 2 and 3.
+
+.. figure:: img/pic__00220.png
+
+Here we see the log messages for the contract instance ID and the symbol for token that we can use.
+
+So what can we do?
+
+We can, for example, query our funds.
+
+.. figure:: img/pic__00221.png
+
+And we see that we have A, B, C, D with 1 million each and 100,000 Ada.
+
+We can also look for pools, but right now, there shouldn't be any, and indeed none are listed.
+
+.. figure:: img/pic__00222.png
+
+So let's switch to Wallet 1, let's say this is Alice, Bob is 2 and Charlie is 3.
+
+In the diagrams, we started with Alice setting up a liquidity pool for 1000 tokens A and 2000 B tokens.
+
+So to do this here, we can type
+
+.. code:: haskell
+
+      Create 1000 'A' 2000 'B'
+
+Remember that was of type *Char*, so we use single quotes.
+
+We get the created status spec.
+
+.. figure:: img/pic__00223.png
+
+So it seems to have worked. We can query for pools again, and indeed there is one now.
+
+.. figure:: img/pic__00224.png
+
+We see that it has A and B and with the correct amounts, 1000 and 2000 respectively.
+
+The next step was that Bob swaps 100A for Bs. So, in the console that is running Bob's wallet, we can write
+
+.. code:: haskell
+
+     Swap 100 'A' 'B'
+
+Let's check how many funds Bob now has. As expected, he has 100 fewer As and 181 as many Bs.
+
+.. figure:: img/pic__00225.png
+
+Next Charlie added liquidity. 
+
+.. code:: haskell
+
+      Add 400 'A' 800 'B'
+      
+Now we check the pools again.
+
+It's 1500 and 2619. We had 1000 at the beginning, then 100 where added by Bob and now 400 by Charlie.
+
+.. figure:: img/pic__00226.png
+
+Now, if we go back to Alice, she wants to remove her liquidity. So let's first query her funds.
+
+.. figure:: img/pic__00227.png
+
+So she has less A and Bs now because she provided them as liquidity for the pool, but she has 1415 of the liquidity token.
+
+So for example, she can burn the liquidity tokens and get tokens in exchange. She doesn't have to burn all, but in the diagram she did.
+So let's do this, so 
+
+.. code:: haskell
+      
+      Remove 1415 'A' 'B'
+
+And let's query her funds again.      
+
+.. figure:: img/pic__00228.png
+
+So now she doesn't have liquidity token anymore, but she got As and Bs back.
+
+So she received 1869Bs and 1070 As.
+
+The last step was that Charlie closes the pool. So let's switch to Charlie
+
+.. code:: haskell
+
+      Close 'A' 'B'
+
+.. figure:: img/pic__00229.png
+
+And if now we look for pools, then again, we don't get any. So it all seems to work.
+
+Finally, we will look at how to use the front-end without Haskell and just use something like curl.
+
+Let's look at the file *status.sh* which you will find in the code folder.
+
+.. figure:: img/pic__00230.png
+
+This script expects one argument, that's the wallet.
+
+Then we just *curl* to this URL and interpolate the content of the correct wallet file given by the first parameter.
+
+And because the output is very unwieldy, we pipe it through *jq* and get the current state and observable state of the resulting json.
+
+So if I try this right now for Wallet 1, for example, we see that wallet one at the moment has these amounts of the tokens ABCD.
+
+.. figure:: img/pic__00230.png
+
+At least that was the last status. Maybe it's not up to date.
+
+Let's also look at the *funds.sh* script.
+
+.. figure:: img/pic__00231.png
+
+So that again, only takes one parameter, one argument, the wallet, in order to put the correct instance ID in the URL, and then uses the *funds* endpoint.
+
+And this is a POST request, so we need a request body. This is *Unit* because the funds endpoint doesn't require any arguments except the *Unit* argument.
+
+A bit more interesting is what to do with the post request that do have interesting arguments. For example, if now, Wallet 1 wants to create a pool 
+again with 1000A and 2000 B. In that case we need a request body for the correct parameters for the *CreateParams*.
+
+So let's look at this in *create.sh*
+
+.. figure:: img/pic__00232.png
+
+In principle, the curl is simple, so now again, contract instance ID but now with endpoint *create*. But the question is what to write in this body.
+
+We use similar arguments to in the Haskell implementation. So first the wallet and then the A amount, A token, B amount, and B token.
+
+So maybe we should first check whether it works.
+
+.. code:: haskell
+
+      ./create.sh 1 1000 A 2000 B
+
+.. figure:: img/pic__00233.png
+
+And now if we wait a few seconds and then query the status, it should have updated.
+
+.. figure:: img/pic__00234.png
+
+We can now run
+
+.. code:: haskell
+
+      ./status.sh 1
+
+.. figure:: img/pic__00235.png
+
+Now we have this new liquidity pool with A and B. 
+
+So the remaining question is, how did we get the JSON body for the curl call? It's hard to do this by hand, but if we look back at the Haskell output, what we
+did was here, for example, for create, to always write the URL we are calling and also the request body.
+
+And we can check the code for this. If we look at uniswap-client. It is in the helper function *callEndpoint* on lines 216 and 217.
+
+.. figure:: img/pic__00237.png
+
+So we get the *a*, that's just a Haskell value with an instance of *ToJSON* so that can be encoded to JSON, and we just use encode from the Aeson library.
+This is now a byte string, but in order to write that to the console, we need two strings, so we use something from the ByteString library 
+
+.. code:: haskell
+      
+      Data.ByteString.Lazy.Char8
+      
+And we unpack this ByteString to a string and then log it. So this is a good way to figure out what requests bodies to use.
+
+You don't, of course, have to write a whole program, you can also do that in the REPL. You just need a value of the correct type and then use Aeson to 
+encode it and look at the result and then you see the shape of the json that is expected.
