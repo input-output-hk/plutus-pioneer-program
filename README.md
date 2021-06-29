@@ -4,11 +4,13 @@
 
 - [Lecture #1](https://youtu.be/_zr3W8cgzIQ)
 
-  - Welcome
-  - The (E)UTxO-model
-  - An auction contract in the EUTxO-model
-  - Running an example auction contract on a local Playground
-  - Homework
+  - Welcome.
+  - The (E)UTxO-model.
+  - Building the example code.
+  - An auction contract in the EUTxO-model.
+  - A brief look at the auction code.
+  - Running an example auction contract on a local Playground.
+  - Homework.
 
 ## Code Examples
 
