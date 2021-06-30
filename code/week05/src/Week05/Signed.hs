@@ -56,7 +56,11 @@ type SignedSchema =
 
 mint :: MintParams -> Contract w SignedSchema Text ()
 mint mp = do
+<<<<<<< HEAD
     pkh <- pubKeyHash <$> Contract.ownPubKey 
+=======
+    pkh <- pubKeyHash <$> Contract.ownPubKey
+>>>>>>> b50b196d57dc35559b7526fe17b49dd2ba4790bc
     let val     = Value.singleton (curSymbol pkh) (mpTokenName mp) (mpAmount mp)
         lookups = Constraints.monetaryPolicy $ policy pkh
         tx      = Constraints.mustForgeValue val

@@ -25,8 +25,12 @@ import           Ledger                 hiding (singleton)
 import           Ledger.Constraints     as Constraints
 import qualified Ledger.Typed.Scripts   as Scripts
 import           Ledger.Value           as Value
+<<<<<<< HEAD
 --import           Playground.Contract    (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
 import           Playground.Contract    (ToSchema)
+=======
+import           Playground.Contract    (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
+>>>>>>> b50b196d57dc35559b7526fe17b49dd2ba4790bc
 import           Playground.TH          (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types       (KnownCurrency (..))
 import           Text.Printf            (printf)
