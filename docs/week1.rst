@@ -51,10 +51,12 @@ That is not how the UTxO model works.
 
 Unspent transaction outputs are exactly what the name says. They are
 transaction outputs from previous transactions that have happened on the
-blockchain and have not yet been spent. Let's look at an example where
-we have two such UTxOs.
+blockchain that have not yet been spent. 
+
+Let's look at an example where we have two such UTxOs. One belonging to Alice of 100 Ada, and another belonging to Bob of 50 Ada.
 
 .. figure:: img/pic__00000.png
+   :alt: Alice and Bob's UTxOs
 
 Alice wants to send 10 ADA to Bob, so she needs to create a transaction. 
 
@@ -68,7 +70,7 @@ input. Alice cannot simply split her existing 100 ADA into a 90 and a
 10, she has to use the full 100 ADA as the input to a transaction.
 
 .. figure:: img/2.png
-   :alt: Image 2
+   :alt: Alice Creates a Transaction
 
 Once consumed by the transaction, Alice's input is no longer a UTxO (an unspent transaction). It will
 have been spent as an input to Tx 1. So, she needs to create outputs for her transaction.
@@ -80,7 +82,7 @@ receiving a new transaction of 10 ADA, and Alice receiving the change
 of 90 ADA.
 
 .. figure:: img/3.png
-   :alt: Image 3
+   :alt: Alice's Transaction Generates Two New UTxOs
 
 In any transaction, the sum of the output values must match the sum of
 the input values. Although, strictly speaking, this is not true. There
@@ -92,7 +94,6 @@ are two exceptions.
    or to burn tokens, in which case the inputs will be lower or higher
    than the outputs, depending on the scenario.
 
-
 Let's take a look at a slightly more complicated example.
 
 Alice and Bob want to transfer 55 ADA each to Charlie. Alice has no
@@ -101,7 +102,7 @@ his two UTxOs is large enough to cover the 55 ADA he wishes to send to
 Charlie. Bob will have to use both his UTxOs as input.
 
 .. figure:: img/4.png
-   :alt: Image 4
+   :alt: Alice and Bob Create a Transaction With Three Outputs
 
 When Is Spending Allowed?
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -113,17 +114,18 @@ without her consent.
 The way it works is by adding signatures to transactions.
 
 In transaction 1, Alice's signature has to be added to the transaction.
-In transaction 2, both Alice and Bob need to sign the transaction.
+In transaction 2, both Alice and Bob need to sign the transaction. Incidentally, this second, more complex, transaction cannot be done in Daedalus, so you would need
+to use the CLI for this.
 
 Everything explained so far is just about the UTxO model, not the
 (E)UTxO model.
 
 The extended part comes in when we talk about smart contracts, so in
 order to understand that, let's concentrate on the consumption of
-Alice's UTxO of 100 ADA by Tx 1.
+Alice's UTxO of 100 ADA.
 
 .. figure:: img/5.png
-   :alt: Image 5
+   :alt: Alice's UTxO as an Input (Blue Line)
 
 In the UTxO model, the validation that decides whether the transaction
 that this input belongs to is allowed to consume the UTxO, relies on
@@ -134,24 +136,28 @@ The idea of the (E)UTxO model is to make this more general.
 
 Instead of having just one condition, namely that the appropriate
 signature is present in the transaction, we replace this with arbitrary
-logic. This is where Plutus comes in.
+logic. 
+
+This is where Plutus comes in.
 
 Instead of just having an address that corresponds to a public key that
 can be verified by a signature that is added to the transaction, we have
-more general logic, not based on public keys or the hashes of public
-keys, but instead arbitrary logic which decides under which conditions a
-particular UTxO can be spent by particular transaction.
+more general addresses, not based on public keys or the hashes of public
+keys, but instead contain arbitrary logic which decides under which conditions a
+particular UTxO can be spent by a particular transaction.
 
-The input will justify that it is allowed to consume this output with
-some arbitrary piece of logic that is called the Redeemer.
+So, instead of an input being validated simply by its public key, the input will 
+justify that it is allowed to consume this output with some arbitrary piece of data 
+that we call the *Redeemer*.
 
 .. figure:: img/6.png
-   :alt: Image 6
+   :alt: The Redeemer Is Used To Validate Spending of the UTxO
 
-What exactly does that mean?
+We replace the public key address (Alice's in our example), with a script, and we replace the digital signature with a *Redeemer*.
 
-It is important to consider the context that the script has. There are
-several options.
+What exactly does that mean? What do we mean by *arbitrary logic*?
+
+It is important to consider the context that the script has. There are several options.
 
 Script Context
 ~~~~~~~~~~~~~~
