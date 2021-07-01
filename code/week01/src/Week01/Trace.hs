@@ -11,6 +11,7 @@ import Ledger
 import Plutus.Trace.Emulator      as Emulator
 import Wallet.Emulator.Wallet
 import Ledger.Value         as Value
+import Ledger.TimeSlot
 import Ledger.Ada                 as Ada
 import qualified Data.Map                   as Map
 import           Data.Default               (Default (..))
@@ -44,7 +45,7 @@ myTrace = do
     h2 <- activateContractWallet (Wallet 2) endpoints
     h3 <- activateContractWallet (Wallet 3) endpoints
     callEndpoint @"start" h1 $ StartParams
-        { spDeadline  = 20
+        { spDeadline  = slotToPOSIXTime 10
         , spMinBid    = 3
         , spCurrency  = assetSymbol
         , spToken     = assetToken
