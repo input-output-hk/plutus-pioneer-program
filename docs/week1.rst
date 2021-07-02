@@ -3,7 +3,7 @@ Week 01 - English Auction
 
 .. note::
    This is a written version of `Lecture
-   #1 <https://www.youtube.com/watch?v=_zr3W8cgzIQ&t=2394s>`__.
+   #1 - Iteration #2 <https://www.youtube.com/watch?v=_zr3W8cgzIQ&t=2394s>`__.
 
    It covers an introduction to Plutus, the (E)UTxO model (and how it
    compares to other models), and concludes with an example English Auction
