@@ -1,5 +1,5 @@
-Week 01 - Introduction
-======================
+Week 01 - English Auction
+=========================
 
 .. note::
    This is a written version of `Lecture
