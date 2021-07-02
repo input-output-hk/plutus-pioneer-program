@@ -3,11 +3,16 @@ Week 01 - Introduction
 
 .. note::
    This is a written version of `Lecture
-   #1 <https://youtu.be/IEn6jUo-0vU>`__.
+   #1 <https://www.youtube.com/watch?v=_zr3W8cgzIQ&t=2394s>`__.
 
    It covers an introduction to Plutus, the (E)UTxO model (and how it
    compares to other models), and concludes with an example English Auction
    managed with a Plutus smart contract running on the Plutus Playground.
+
+   These notes have been updated to reflect the changes in iteration two of the
+   program.
+
+   The Plutus commit used in these notes is ea0ca4e9f9821a9dbfc5255fa0f42b6f2b3887c4.
 
 Welcome
 -------
@@ -209,7 +214,7 @@ Datum. That is a piece of data that can be associated with a UTxO along
 with the UTxO value.
 
 .. figure:: img/7.png
-   :alt: Image 7
+   :alt: Datum
 
 With this it is possible to prove mathematically that Plutus is at least
 as powerful as the Ethereum model - any logic you can express in
@@ -248,6 +253,17 @@ concentrate on this context that just consists of the spending
 transaction. So you have a much more limited scope and that makes it
 much easier to understand what a script is actually doing and what can
 possibly go wrong.
+
+Who is responsible for providing the datum, redeemer and the validator? The rule in Plutus is that the spending transaction has to do that whereas the producing transaction only has to provide hashes. 
+
+That means that if I produce an output that sits at a script address then this producing transaction only has to include the hash of the script
+and the hash of the datum that belongs to the output. Optionally it can include the datum and the script as well.
+
+If a transaction wants to consume such an output then *that* transaction has to provide the datum, the redeemer and the script. Which means that in order to spend a 
+given input, you need to know the datum, because only the hash is publicly visible on the blockchain.
+
+This is sometimes a problem and not what you want and that's why you have the option to include the datum in the producing transaction. If this were not possible, only
+people that knew the datum by some means other than looking at the blockchain would ever be able to spend such an output.
 
 The (E)UTxO model is not tied to a particular programming language. What
 we have is Plutus, which is Haskell, but in principal you could use the
@@ -314,15 +330,322 @@ playground can compile the code itself.
 The English Auction contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+As our introductory example we are going to look at an English Auction. Somebody wants to auction an NFT (Non-fungible token) - a native token on Cardano that
+exists only once. An NFT can represent some digital art or maybe some real-world asset.
+
+The auction is parameterised by the owner of the token, the token itself, a minimal bid and a deadline.
+
+So let's say that Alice has an NFT and wants to auction it.
+
+.. figure:: img/iteration2/pic__00000.png
+   :alt: Alice Creates an English Auction
+
+She creates a UTxO at the script output. We will look at the code later, but first we will just examine the ideas of the UTxO model.
+
+The value of the UTxO is the NFT, and the datum is *Nothing*. Later on it will be the highest bidder and the highest bid. But right now, there hasn't yet been a bid.
+
+In the real blockchain you can't have a UTxO that just contains native tokens, they always have to be accompanied by some Ada, but for simplicity we will ignore that here.
+
+Not let's say that Bob wants to bid 100 Ada.
+
+.. figure:: img/iteration2/pic__00001.png
+   :alt: Bob Makes a Bid
+
+In order to do this, Bob creates a transaction with two inputs and one output. The first input is the auction UTxO and the second input is Bob's bid of 100 Ada. The output
+is, again, at the output script, but now the value and the datum has changed. Previously the datum was *Nothing* but now it is (Bob, 100).
+
+The value has changed because now there is not only the NFT in the UTxO, but also the 100 Ada bid.
+
+As a redeemer, in order to unlock the original auction UTxO, we use something called *Bid*. This is just an algebraic data type. There will be other values as well but one
+of those is *Bid*. And the auction script will check that all the conditions are satisfied. So, in this case the script has to check that the bid happens before the deadline,
+that the bid is high enough.
+
+It also has to check that the correct inputs and outputs are present. In this case that means checking that the auction is an output containing the NFT and has the correct datum.
+
+Next, let's assume that Charlie wants to outbid Bob and bid 200 Ada.
+
+.. figure:: img/iteration2/pic__00002.png
+   :alt: Charlie Makes a Bid
+
+Charlie will create another transaction, this time one with two inputs and two outputs. As in the first case, the two inputs are the bid (this time Charlie's bid of 200 Ada),
+and the auction UTxO. One of the outputs is the updated auction UTxO. There will also be a second output, which will be a UTxO which returns Bob's bid of 100 Ada.
+
+.. note::
+
+   In reality the auction UTxO is not updated because nothing ever changes. 
+   
+   What really happens is that the old auction UTxO is spent and a new one is created, but it has the feel of updating the state of the auction UTxO
+
+This time we again use the *Bid* redeemer. This time the script has to check that the deadline has been reached, that the bid is higher than the previous bid, it has to 
+check that the auction UTxO is correctly created and it has to check that the previous highest bidder gets their bid back.
+
+Finally, let's assume that there won't be another bid, so once the deadline has been reached, the auction can be closed.
+
+In order to do that, somebody has to create yet another transaction. That could be Alice who wants to collect the bid or it could be Charlie who wants to collect the NFT. It
+can be anybody, but Alice and Charlie have an incentive to do so.
+
+This transaction will have one input - the auction UTxO, this time with the *Close* redeemer - and it will have two outputs. One of the outputs is for highest bidder,
+Charlie, and he gets the NFT and the second output goes to Alice who gets the highest bid.
+
+In the *Close* case, the script has to check that the deadline has been reached and that the winner gets the NFT and the auction owner gets the highest bid.
+
+There is one more scenario for us to consider, namely that nobody makes any bid.
+
+.. figure:: img/iteration2/pic__00002.png
+   :alt: Nobody Makes a Bid
+
+Alice creates the auction, but receives no bids. In this case, there must be a mechanism for Alice to retrieve her NFT.
+
+For that she creates a transaction with the *Close* redeemer, but now because there is no bidder, the NFT doesn't go to the highest bidder but simply goes back to Alice.
+
+The logic in this case is slightly different. It will check that the NFT goes back to Alice, however, it doesn't really need to check the recipient because the transaction
+will be triggered by Alice and she can send the NFT wherever she wants.
+
+On-chain and Off-chain code
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The important thing to realise about Plutus is that there is on-chain and off-chain code.
+
+On-chain
+++++++++
+
+On-chain code is the scripts we were discussing - the scripts from the UTxO model. In addition to public key addresses we have script address and outputs can sit at
+such an address, and if a transaction tries to consume such an output, the script is executed, and the transaction is only valid if the script succeeds.
+
+If a node receives a new transaction, it validates it before accepting it into its mempool and eventually into a block. For each input of the transaction, if that input
+happens to be a script address, the corresponding script is executed. If the script does not succeed, the transaction is invalid.
+
+The programming language this script is expressed in is called Plutus Core, but you never write Plutus Core by hand. Instead, you write Haskell and that gets compiled
+down to Plutus Core. EVentually there may be other high-level languages such as Solidity, C or Python that can compile down to Plutus Core.
+
+The task of a script is to say yes or no to whether a transaction can consume an output. 
+
+Off-chain
++++++++++
+
+In order to unlock a UTxO, you must be able to construct a transaction that will pass validation and that is the responsibility of the off-chain part of Plutus. This 
+is the part that runs on the wallet and not on the blockchain and will construct suitable transactions.
+
+One of the nice things about Plutus is that both the on-chain parts and the off-chain parts are written in Haskell. One obvious advantage of that is that you don't
+have to learn two programming languages. The other advantage is that you can share code between the on-chain and off-chain parts.
+
+Later in this course we talk about state machines and then this sharing between on-chain and off-chain code becomes even more direct, but even without state machines
+there is still a lot of opportunities to share code.
+
+We will have a brief look at the code but don't worry, you are not expected to understand it at this point.
+
 The code for the English Auction contract is at
 
 ::
 
       /path/to/plutus-pioneer-program/repo/code/week01/src/Week01/EnglishAuction.hs
 
+We see a data type *Auction* which represents the parameters for the contract that, in our example, Alice starts. The *aCurrency* and *aToken* parameters represent the
+NFT.
+
+.. code:: haskell
+
+   data Auction = Auction
+      { aSeller   :: !PubKeyHash
+      , aDeadline :: !POSIXTime
+      , aMinBid   :: !Integer
+      , aCurrency :: !CurrencySymbol
+      , aToken    :: !TokenName
+      } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+    
+You also see other data types, but the heart of the code is the *mkAuctionValidator* function. This is the function that determines whether a given transaction is allowed
+to spend a UTxO sitting at this script address.
+
+.. code:: haskell
+
+   {-# INLINABLE mkAuctionValidator #-}
+   mkAuctionValidator :: AuctionDatum -> AuctionAction -> ScriptContext -> Bool
+   mkAuctionValidator ad redeemer ctx =
+       traceIfFalse "wrong input value" correctInputValue &&
+       case redeemer of
+           MkBid b@Bid{..} ->
+               traceIfFalse "bid too low" (sufficientBid bBid)                &&
+               traceIfFalse "wrong output datum" (correctBidOutputDatum b)    &&
+               traceIfFalse "wrong output value" (correctBidOutputValue bBid) &&
+               traceIfFalse "wrong refund"       correctBidRefund             &&
+               traceIfFalse "too late"           correctBidSlotRange
+           Close           ->
+               traceIfFalse "too early" correctCloseSlotRange &&
+               case adHighestBid ad of
+                   Nothing      ->
+                       traceIfFalse "expected seller to get token" (getsValue (aSeller auction) tokenValue)
+                   Just Bid{..} ->
+                       traceIfFalse "expected highest bidder to get token" (getsValue bBidder tokenValue) &&
+                       traceIfFalse "expected seller to get highest bid" (getsValue (aSeller auction) $ Ada.lovelaceValueOf bBid)
+   
+     where
+         ...
+   
+And then here is where the compilation to Plutus Core happens. It uses something called Template Haskell to take the Haskell function above and compile it to Plutus Core.
+
+.. code:: haskell
+
+   auctionTypedValidator :: Scripts.TypedValidator Auctioning
+   auctionTypedValidator = Scripts.mkTypedValidator @Auctioning
+       $$(PlutusTx.compile [|| mkAuctionValidator ||])
+       $$(PlutusTx.compile [|| wrap ||])
+     where
+       wrap = Scripts.wrapValidator
+
+The off-chain part of the code defines the endpoints that can be invoked.
+
+We have three endpoints for this example, and each has a datatype defined to represent their parameters.
+
+.. code:: haskell
+
+   data StartParams = StartParams
+      { spDeadline :: !POSIXTime
+      , spMinBid   :: !Integer
+      , spCurrency :: !CurrencySymbol
+      , spToken    :: !TokenName
+      } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+   data BidParams = BidParams
+      { bpCurrency :: !CurrencySymbol
+      , bpToken    :: !TokenName
+      , bpBid      :: !Integer
+      } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+   data CloseParams = CloseParams
+      { cpCurrency :: !CurrencySymbol
+      , cpToken    :: !TokenName
+      } deriving (Generic, ToJSON, FromJSON, ToSchema)
+   
+Then the off-chain operations are defined.
+
+First the *start* logic.
+
+.. code:: haskell
+
+   start :: AsContractError e => StartParams -> Contract w s e ()
+   start StartParams{..} = do
+       pkh <- pubKeyHash <$> ownPubKey
+       let a = Auction
+                   { aSeller   = pkh
+                   , aDeadline = spDeadline
+                   , aMinBid   = spMinBid
+                   , aCurrency = spCurrency
+                   , aToken    = spToken
+                   }
+           d = AuctionDatum
+                   { adAuction    = a
+                   , adHighestBid = Nothing
+                   }
+           v = Value.singleton spCurrency spToken 1
+           tx = mustPayToTheScript d v
+       ledgerTx <- submitTxConstraints auctionTypedValidator tx
+       void $ awaitTxConfirmed $ txId ledgerTx
+       logInfo @String $ printf "started auction %s for token %s" (show a) (show v)
+
+Then the *bid* logic.
+
+.. code:: haskell
+
+   bid :: forall w s. BidParams -> Contract w s Text ()
+   bid BidParams{..} = do
+       (oref, o, d@AuctionDatum{..}) <- findAuction bpCurrency bpToken
+       logInfo @String $ printf "found auction utxo with datum %s" (show d)
+   
+       when (bpBid < minBid d) $
+           throwError $ pack $ printf "bid lower than minimal bid %d" (minBid d)
+       pkh <- pubKeyHash <$> ownPubKey
+       let b  = Bid {bBidder = pkh, bBid = bpBid}
+           d' = d {adHighestBid = Just b}
+           v  = Value.singleton bpCurrency bpToken 1 <> Ada.lovelaceValueOf bpBid
+           r  = Redeemer $ PlutusTx.toData $ MkBid b
+   
+           lookups = Constraints.typedValidatorLookups auctionTypedValidator <>
+                     Constraints.otherScript auctionValidator                <>
+                     Constraints.unspentOutputs (Map.singleton oref o)
+           tx      = case adHighestBid of
+                       Nothing      -> mustPayToTheScript d' v                            <>
+                                       mustValidateIn (to $ aDeadline adAuction)          <>
+                                       mustSpendScriptOutput oref r
+                       Just Bid{..} -> mustPayToTheScript d' v                            <>
+                                       mustPayToPubKey bBidder (Ada.lovelaceValueOf bBid) <>
+                                       mustValidateIn (to $ aDeadline adAuction)          <>
+                                       mustSpendScriptOutput oref r
+       ledgerTx <- submitTxConstraintsWith lookups tx
+       void $ awaitTxConfirmed $ txId ledgerTx
+       logInfo @String $ printf "made bid of %d lovelace in auction %s for token (%s, %s)"
+           bpBid
+           (show adAuction)
+           (show bpCurrency)
+           (show bpToken)
+           
+And finally the *close* logic.
+
+.. code:: haskell
+
+   close :: forall w s. CloseParams -> Contract w s Text ()
+   close CloseParams{..} = do
+       (oref, o, d@AuctionDatum{..}) <- findAuction cpCurrency cpToken
+       logInfo @String $ printf "found auction utxo with datum %s" (show d)
+   
+       let t      = Value.singleton cpCurrency cpToken 1
+           r      = Redeemer $ PlutusTx.toData Close
+           seller = aSeller adAuction
+   
+           lookups = Constraints.typedValidatorLookups auctionTypedValidator <>
+                     Constraints.otherScript auctionValidator                <>
+                     Constraints.unspentOutputs (Map.singleton oref o)
+           tx      = case adHighestBid of
+                       Nothing      -> mustPayToPubKey seller t                          <>
+                                       mustValidateIn (from $ aDeadline adAuction)       <>
+                                       mustSpendScriptOutput oref r
+                       Just Bid{..} -> mustPayToPubKey bBidder t                         <>
+                                       mustPayToPubKey seller (Ada.lovelaceValueOf bBid) <>
+                                       mustValidateIn (from $ aDeadline adAuction)       <>
+                                       mustSpendScriptOutput oref r
+       ledgerTx <- submitTxConstraintsWith lookups tx
+       void $ awaitTxConfirmed $ txId ledgerTx
+       logInfo @String $ printf "closed auction %s for token (%s, %s)"
+           (show adAuction)
+           (show cpCurrency)
+           (show cpToken)
+
+There is some code to tie everything up.
+
+.. code:: haskell
+
+   endpoints :: Contract () AuctionSchema Text ()
+   endpoints = (start' `select` bid' `select` close') >> endpoints
+     where
+       start' = endpoint @"start" >>= start
+       bid'   = endpoint @"bid"   >>= bid
+       close' = endpoint @"close" >>= close
+       
+And the last lines are just helpers to create a sample NFT to allow us to try the auctioning of this NFT in the playground.
+
+.. code:: haskell
+
+   mkSchemaDefinitions ''AuctionSchema
+
+   myToken :: KnownCurrency
+   myToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "T" :| [])
+   
+   mkKnownCurrencies ['myToken]
+   
+An example of code reuse is the *minBid* function.
+
+.. code:: haskell
+
+   minBid :: AuctionDatum -> Integer
+   minBid AuctionDatum{..} = case adHighestBid of
+       Nothing      -> aMinBid adAuction
+       Just Bid{..} -> bBid + 1
+       
+This function gets used in the on-chain part for validation, but also in the off-chain code, in the wallet, before it even bothers to create the transaction, to check
+whether it is worth doing so.
+      
 We will run this contract in our local Plutus Playground.
 
-If all went well above, you should be able to open the playground at
+If all went well in the setup above, you should be able to open the playground at
 https://localhost:8009. You will likely receive a certificate error,
 which can be bypassed.
 
@@ -331,15 +654,6 @@ which can be bypassed.
 
 Copy and paste the EnglishAuction.sh file contents into the playground,
 replacing the existing demo contract.
-
-When using the original tag for Week 01
-(3746610e53654a1167aeb4c6294c6096d16b0502), you will need to remove the
-"module" header from the script in order to compile it in the
-playground. This is not required in future iterations of Plutus.
-
-Another thing to note in this version of the playground is that fees are
-not considered - this also changes in upcoming lectures working with
-later Plutus commits.
 
 .. figure:: img/playground_2.png
    :alt: Plutus Playground

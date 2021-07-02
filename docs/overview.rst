@@ -16,4 +16,7 @@ not yet spent any time making adjustments to work on any issues with their prese
 If you find this helpful, and you fancy helping out a small Cardano Stake Pool, please consider staking a little of your ADA with CHESS https://chess.ihpapp.com, 
 or any of the many other small pools run by single stake pool operators. 
 
+To stay up-to-date with changes to these notes, you can follow me on Twitter @PoolChess.
+
+
 

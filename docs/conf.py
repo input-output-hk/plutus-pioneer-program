@@ -20,7 +20,7 @@ import sphinx_rtd_theme
 # -- Project information -----------------------------------------------------
 
 project = 'Plutus Pioneer Program Lecture Notes'
-author = 'Transcribed by Chris Moreton'
+author = 'Transcribed by @PoolChess (Twitter)'
 
 
 # -- General configuration ---------------------------------------------------
