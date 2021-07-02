@@ -281,52 +281,6 @@ interesting, especially for the first lecture, to showcase a more
 interesting contract and demonstrate what Plutus can do. We can then use
 that to look at certain concepts in more detail.
 
-Plutus Setup
-~~~~~~~~~~~~
-
-Before compiling the sample contract code, we need to setup Plutus. It
-is advisable to set up a Nix shell from the main Plutus repository at
-which can also be used to compile the example contracts.
-
-`There are detailed notes on how to do this
-here <https://www.evernote.com/shard/s426/client/snv?noteGuid=b34acc67-c94b-fc64-9350-398a8f6fc6ec&noteKey=7e6b84c9501e9949eef2cadf6e35eaff&sn=https%3A%2F%2Fwww.evernote.com%2Fshard%2Fs426%2Fsh%2Fb34acc67-c94b-fc64-9350-398a8f6fc6ec%2F7e6b84c9501e9949eef2cadf6e35eaff&title=Installation>`__.
-
-This will setup your environment with the dependencies necessary to
-compile the sample contracts.
-
-Once you are inside the Nix shell, you can start the Plutus client and
-server from the cloned Plutus repository.
-
-The lecture videos were recorded at various times and the Plutus code
-that goes along with them was compiled against specific commits of the
-Plutus main branch. You can find the commit tag in the cabal.project
-file.
-
-Server
-^^^^^^
-
-.. code:: bash
-
-      cd /path/to/plutus/repo/plutus-playground-client
-      plutus-playground-server
-
-Client
-^^^^^^
-
-.. code:: bash
-
-      cd /path/to/plutus/repo/plutus-playground-client
-      npm run start
-
-To check that everything is in order, you can then compile the code for
-Week 01. This is not necessary to run the code in the playground, as the
-playground can compile the code itself.
-
-.. code:: bash
-
-      cd /path/to/plutus-pioneer-program/repo/code/week01
-      cabal build all
-
 The English Auction contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -642,8 +596,57 @@ An example of code reuse is the *minBid* function.
        
 This function gets used in the on-chain part for validation, but also in the off-chain code, in the wallet, before it even bothers to create the transaction, to check
 whether it is worth doing so.
-      
+
+To the Playground
+-----------------
+
 We will run this contract in our local Plutus Playground.
+
+Plutus Setup
+~~~~~~~~~~~~
+
+Before compiling the sample contract code, we need to setup Plutus. It
+is advisable to set up a Nix shell from the main Plutus repository at
+which can also be used to compile the example contracts.
+
+`There are detailed notes on how to do this
+here <https://www.evernote.com/shard/s426/client/snv?noteGuid=b34acc67-c94b-fc64-9350-398a8f6fc6ec&noteKey=7e6b84c9501e9949eef2cadf6e35eaff&sn=https%3A%2F%2Fwww.evernote.com%2Fshard%2Fs426%2Fsh%2Fb34acc67-c94b-fc64-9350-398a8f6fc6ec%2F7e6b84c9501e9949eef2cadf6e35eaff&title=Installation>`__.
+
+This will setup your environment with the dependencies necessary to
+compile the sample contracts.
+
+Once you are inside the Nix shell, you can start the Plutus client and
+server from the cloned Plutus repository.
+
+The lecture videos were recorded at various times and the Plutus code
+that goes along with them was compiled against specific commits of the
+Plutus main branch. You can find the commit tag in the cabal.project
+file.
+
+Server
+^^^^^^
+
+.. code:: bash
+
+      cd /path/to/plutus/repo/plutus-playground-client
+      plutus-playground-server
+
+Client
+^^^^^^
+
+.. code:: bash
+
+      cd /path/to/plutus/repo/plutus-playground-client
+      npm run start
+
+To check that everything is in order, you can then compile the code for
+Week 01. This is not necessary to run the code in the playground, as the
+playground can compile the code itself.
+
+.. code:: bash
+
+      cd /path/to/plutus-pioneer-program/repo/code/week01
+      cabal build all
 
 If all went well in the setup above, you should be able to open the playground at
 https://localhost:8009. You will likely receive a certificate error,
@@ -678,9 +681,11 @@ We are going to treat the token T as a non-fungible token (NFT), and
 simulate this by changing the wallets such that Wallet 1 has 1 T and the
 other wallets have 0 T.
 
-Click the "Add Wallet" option, the adjust the balances accordingly:
+Also, 10 lovelace is ridiculously low, so let's give each wallet 1000 Ada, which is 1,000,000,000 lovelace.
 
-.. figure:: img/playground_4.png
+Click the "Add Wallet" option, then adjust the balances accordingly:
+
+.. figure:: img/iteration2/pic__00005.png
    :alt: Plutus Playground
 
 You can see in the playground that the contract has three endpoints:
@@ -690,22 +695,31 @@ The "Pay to Wallet" endpoint is always there by default in the
 playground. It allows a simple transfer of Lovelace from one wallet to
 another.
 
-Click "start" on wallet 1, to create an action:
-
-.. figure:: img/actions.png
-   :alt: Plutus Playground
+Click "start" on wallet 1, to create an auction:
 
 This is where the seller is going to set the rules for the auction.
 
 The getSlot field specifies the deadline for the auction. Bidding after
 this deadline will not be allowed by the contract.
 
-Enter 20 into the getSlot field.
+Let's say that the deadline is Slot 10. 
+
+Time is measured in POSIX time (seconds since 1st January 1970), so we need to calculate this value. Luckily in the *plutus-ledger* package in module *Ledger.Timeslot*,
+there is a function *slotToPOSIXTime*. If we import this into the REPL, we can get the value we need. The simulation starts at the beginning of the Shelley era, so this
+value - 1596059101 - reflects that and this will be on July 29th 2020 - the 10th slot of the Shelley era.
+
+.. code:: haskell
+
+   Prelude Week01.EnglishAuction> import Ledger.TimeSlot
+   Prelude Ledger.TimeSlot Week01.EnglishAuction> slotToPOSIXTime 10
+   POSIXTime {getPOSIXTime = 1596059101}
+
+Add this value to the deadline field.
 
 The spMinField specifies the minimum amount of ADA that must be bid. If
-this minimum is not met by the deadline, no bid will succeed.
+this minimum is not met by the deadline, no bid will succeed. Let's make this 100 Ada.
 
-Enter 3 into the spMinBid field.
+Enter 100000000 into the spMinBid field.
 
 The last two fields - spCurrencySymbol and unTokenName specify the
 currency of the NFT that is the subject of the auction. In Plutus a
@@ -715,48 +729,43 @@ In this case, the symbol is 66 and the token name, as we have seen is T.
 
 Enter these values into their respective fields.
 
-.. figure:: img/actions2.png
+.. figure:: img/iteration2/pic__00006.png
    :alt: Plutus Playground
 
-   alt text
 We can also insert "wait" actions, to wait for a certain number of
 slots. We will need to wait for at least one slot in order for the
 transaction to start the auction to complete.
 
-.. figure:: img/actions3.png
+.. figure:: img/iteration2/pic__00007.png
    :alt: Plutus Playground
 
-   alt text
 Now bidding can start.
 
 Let's say that Wallets 2 and 3 want to bid for this token.
 
-Wallet 2 is faster, and bids 3 Lovelace by invoking the bid endpoint
-with the parameters as shown below.
+Wallet 2 is faster, and bids 100 Ada by invoking the bid endpoint
+with the parameters as shown below. 
 
-.. figure:: img/actions4.png
+.. figure:: img/iteration2/pic__00008.png
    :alt: Plutus Playground
 
-   alt text
-We now insert another wait action, and a bid by Wallet 3.
+We now insert another wait action, and now we add a bid by Charlie (Wallet 3) for 200 Ada.
 
-.. figure:: img/actions5.png
+.. figure:: img/iteration2/pic__00009.png
    :alt: Plutus Playground
 
-   alt text
 Let's say that these two bids are the only bids.
 
-We now add a wait action that will wait until slot 20, the deadline of
+We now add a wait action that will wait until slot 11, which is the slot after the deadline of
 the auction.
 
-.. figure:: img/actions6.png
+.. figure:: img/iteration2/pic__00010.png
    :alt: Plutus Playground
 
-   alt text
-At this point, anybody can invoke the "close" endpoint. The auction will
+At this point, anybody can invoke the *close* endpoint. The auction will
 not settle on its own, it needs to be triggered by an endpoint.
 
-When the "close" endpoint is triggered, the auction will be settled
+When the *close* endpoint is triggered, the auction will be settled
 according to the rules.
 
 -  If there was at least one bid, the highest bidder will receive the
@@ -765,14 +774,13 @@ according to the rules.
    that are lower than the minimum bid level.
 -  If there were no bidders, Wallet 1 will get the token back.
 
-Let's say that Wallet 1 invokes the "close" endpoint. We will add this
+Let's say that Alice (Wallet 1) invokes the *close* endpoint. We will add this
 and also add another wait action, which we need at the end in order to
 see the final transaction when we run the simulation.
 
-.. figure:: img/actions7.png
+.. figure:: img/iteration2/pic__00011.png
    :alt: Plutus Playground
 
-   alt text
 Now, click the "Evaluate" button - either the one at the bottom or the
 one at the top of the page.
 
@@ -786,44 +794,42 @@ Slot zero is not caused by our contract, it is the Genesis transaction
 that sets up the initial balances of the wallets. There are three
 outputs for this transaction.
 
-.. figure:: img/evaluate1.png
+.. figure:: img/iteration2/pic__00012.png
    :alt: Plutus Playground
 
-   alt text
-The first transaction has one input and two outputs. The input is the
-only UTxO that Wallet 1 has. Even though it is two tokens, 10 Lovelace
-and 1 T, they sit in one UTxO. As mentioned earlier, UTxOs always need
+Now click on the Slot 1 transaction.
+
+The transaction has one input and three outputs. The input is the
+only UTxO that Wallet 1 has. Even though it is two tokens, 1000 Ada
+and 1T, they sit in one UTxO. As mentioned earlier, UTxOs always need
 to be consumed in their entirety, so the entire UTxO is sent as input.
 
-The output is 10 ADA back to Wallet 1, and 1 T to the contract to hold
-onto while the bidding takes place. Here you also see the script
-address.
+The outputs are a 10 lovelace fee (this is a demo fee and does not reflect what a real fee would be), 999,999,990 lovelace back Wallet 1, and 1 T to the contract to hold
+onto while the bidding takes place. Here you also see the script address.
 
 As we know from the introduction to the UTxO model, there can also be a
-Datum, and there is a Datum, but this is not visible in this display.
+datum, and there is a datum, but this is not visible in this display.
 
-.. figure:: img/evaluate2.png
+.. figure:: img/iteration2/pic__00013.png
    :alt: Plutus Playground
 
-   alt text
 So now the auction is set up, let's look at the next transaction, where
-Wallet 2 makes a bid of 3 Lovelace.
+Bob (Wallet 2) makes a bid of 100 Ada.
 
-There are two inputs - the script UTxO and the UTxO that Wallet 2 owns.
+There are two inputs - the script UTxO and the UTxO that Bob owns.
 
-There are also two outputs - one giving change to Wallet 2, and the
-other locking the bid into the contract.
+There are also three outputs. The first is a fee of 14,129 lovelace. The second gives Bob his change - his original sum minus the fees and bid. The third
+output locks the bid into the contract.
 
 The script validator here must make sure that Wallet 2 can't just take
 the token, so it will only validate in a scenario where there is an
 output where the token ends up in the contract again. Remember that in
 the (E)UTxO model, all inputs and outputs are visible to the script.
 
-.. figure:: img/evaluate3.png
+.. figure:: img/iteration2/pic__00014.png
    :alt: Plutus Playground
 
-   alt text
-Now let's look at the next transaction. This is where Wallet 3 bids 4
+Now let's look at the next transaction. This is where Charlie bids 200 Ada
 Lovelace (it is 5 Lovelace in Lars' videos, but I entered it as 4 and
 I'd rather not take all those screenshots again).
 
@@ -838,153 +844,37 @@ handled correctly, i.e. that the new bid is higher than the previous bid
 and that the token T continues to be locked in the contract along with
 the new bid.
 
-.. figure:: img/evaluate4.png
+.. figure:: img/iteration2/pic__00015.png
    :alt: Plutus Playground
 
-   alt text
-The last transaction is the "close" action. This one only has the script
-UTxO as input. Its outputs are the successful bid of 4 Lovelace to the
-seller (Wallet 1) and the transfer of the NFT to the successful bidder,
-Wallet 3.
+The last transaction is the *close* action. This two inputs - one from Alice
+in order to pay for the fees, and the second is the script UTxO as input. There are four outputs - the fees from Alice and the change back to Alice, 
+and then the successful bid of 200 Ada to Alice and the transfer of the NFT to Charlie.
 
-.. figure:: img/evaluate5.png
+.. figure:: img/iteration2/pic__00016.png
    :alt: Plutus Playground
 
-   alt text
 If we scroll down, we can now see the final balances.
 
-.. figure:: img/evaluate6.png
+.. figure:: img/iteration2/pic__00017.png
    :alt: Plutus Playground
 
-   alt text
-Let's check what happens when something goes wrong.
+Let's check what happens when something goes wrong, for example, if Charlie makes a bid that is lower than Bob's bid. Let's say Charlie makes a mistake and bids
+only 20 Ada.
 
-So, if Wallet 2 makes a bid that is below the minimum bid, and Wallet 3
-makes the same error.
+Now we see that we have only four transactions, and Bob wins the auction.
 
-In this scenario, both bids should fail and the seller (Wallet 1) should
-get the token back.
-
-Now we see that we have only three transactions. The Genesis transaction
-is the same.
-
-.. figure:: img/evaluate7.png
+.. figure:: img/iteration2/pic__00018.png
    :alt: Plutus Playground
 
-   alt text
-But now the biddings don't happen, because there is logic in the Plutus
-code that determines that the bid is two low.
+Let's see what happens if there are no valid bids.
 
-.. figure:: img/evaluate8.png
+.. figure:: img/iteration2/pic__00019.png
    :alt: Plutus Playground
 
-   alt text
-The last transaction is the close transaction. As this is a failed
-auction, where there was no successful bid, this transaction returns the
+Now there are only three transactions, the last of which is the close transaction. As this is a failed auction, where there was no successful bid, this transaction returns the
 NFT to Wallet 1.
 
-.. figure:: img/evaluate9.png
+.. figure:: img/iteration2/pic__00020.png
    :alt: Plutus Playground
-
-   alt text
-And the balances reflect this.
-
-.. figure:: img/evaluate10.png
-   :alt: Plutus Playground
-
-   alt text
-If you scroll down further, you will find error messages, such as this
-one showing that the bid from Wallet 2 was too low.
-
-.. figure:: img/errorlog.png
-   :alt: Plutus Playground
-
-   alt text
-So there you have it. A relatively realistic and complete auction
-written as a Plutus smart contract.
-
-When writing a Plutus contract it is important to realise that there are
-two parts to a contract.
-
-The first is the script that lives on the blockchain, that governs which
-inputs can be consumed by a transaction and under what conditions.
-
-The other part is the part that allows wallets to create valid
-transactions that then will be validated by the on-chain script.
-
-The nice thing about Plutus is that everything is written in Haskell and
-the data types can be shared between the on-chain and the off-chain
-parts.
-
-For example, in this contract there is a datatype Auction:
-
-.. code:: haskell
-
-      data Auction = Auction
-         { aSeller   :: !PubKeyHash
-         , aDeadline :: !Slot
-         , aMinBid   :: !Integer
-         , aCurrency :: !CurrencySymbol
-         , aToken    :: !TokenName
-         } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
-Then later there is the logic that defines the script that lives on the
-chain - the validation logic of the script.
-
-::
-
-      mkAuctionValidator :: AuctionDatum -> AuctionAction -> ValidatorCtx -> Bool
-
-Then, from line 231, is the off-chain (wallet) part.
-
-These three data types define the parameters of the three endpoints:
-
-.. code:: haskell
-
-      data StartParams = StartParams
-         { spDeadline :: !Slot
-         , spMinBid   :: !Integer
-         , spCurrency :: !CurrencySymbol
-         , spToken    :: !TokenName
-         } deriving (Generic, ToJSON, FromJSON, ToSchema)
-
-      data BidParams = BidParams
-         { bpCurrency :: !CurrencySymbol
-         , bpToken    :: !TokenName
-         , bpBid      :: !Integer
-         } deriving (Generic, ToJSON, FromJSON, ToSchema)
-
-      data CloseParams = CloseParams
-         { cpCurrency :: !CurrencySymbol
-         , cpToken    :: !TokenName
-         } deriving (Generic, ToJSON, FromJSON, ToSchema)
-
-Then there is the logic of the three endpoints, defined by the
-functions:
-
-.. code:: haskell
-
-      start :: (HasBlockchainActions s, AsContractError e) => StartParams -> Contract w s e ()
-
-      bid :: forall w s. HasBlockchainActions s => BidParams -> Contract w s Text ()
-
-      close :: forall w s. HasBlockchainActions s => CloseParams -> Contract w s Text ()
-
-An example of sharing code between the on-chain part and the off-chain
-part is the minBid function:
-
-.. code:: haskell
-
-      {-# INLINABLE minBid #-}
-      minBid :: AuctionDatum -> Integer
-      minBid AuctionDatum{..} = case adHighestBid of
-         Nothing      -> aMinBid adAuction
-         Just Bid{..} -> bBid + 1
-
-This is used during the validation both on the wallet side and on the
-blockchain side. The wallet doesn't have to do this, it could just
-submit the transaction, which would then fail, but it's neater that it
-does.
-
-Most of the rest of the script is boilerplate.
 
