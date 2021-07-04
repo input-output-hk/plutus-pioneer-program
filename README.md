@@ -26,8 +26,8 @@
   - Enter a `nix-shell` in the Plutus repository directory with the correct commit checked out.
   - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
   - Go to the `plutus-playground-client` folder.
-  - Start the Playground server with `plutus-playground-server`.
-  - Start the Playground client (in another `nix-shell`) with `npm run start`.
+  - Start the Playground server with `plutus-playground-server`. When you will run this for the first time, a `nix` will build some things in the background, this will take time, be patient.
+  - Start the Playground client (in another `nix-shell`) with `npm run start`. When you will run this for the first time, a `nix` will build some things in the background, this will take time, be patient.
   - Copy-paste the auction contract into the Playground editor.
   - Compile.
   - Simulate various auction scenarios.
