@@ -54,3 +54,4 @@
 - [The Plutus repository](https://github.com/input-output-hk/plutus)
 - [Learn You a Haskell for Great Good!](http://learnyouahaskell.com/)
 - [Haskell & Cryptocurrencies course Mongolia](https://www.youtube.com/playlist?list=PLJ3w5xyG4JWmBVIigNBytJhvSSfZZzfTm)
+- [Community Playground] (https://playground.plutus-community.com)
