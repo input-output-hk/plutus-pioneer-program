@@ -22,6 +22,10 @@
 
   - Clone the [The Plutus repository](https://github.com/input-output-hk/plutus), check out the correct commit
     as specified in [cabal.project](code/week01/cabal.project).
+    
+    If running under Windows Subsystem for Linux (WSL) make sure to use WSL version 2 and clone the Plutus repository
+    in the WSL drive (that is your Linux `$HOME` directory, not somewhere inside Windows NTFS drive). Otherwise `npm run start` will
+    fail in the later step with an error ([more info](https://cardano.stackexchange.com/a/2134)).
   - Set-up IOHK binary caches [How to set up the IOHK binary caches](https://github.com/input-output-hk/plutus#iohk-binary-cache). "If you do not do this, you will end up building GHC, which takes several hours. If you find yourself building GHC, STOP and fix the cache."
   - Enter a `nix-shell` in the Plutus repository directory with the correct commit checked out.
   - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
