@@ -12,7 +12,7 @@
   - Running an example auction contract on a local Playground.
   - Homework.
 
-- [Lecture #2]()
+- [Lecture #2](https://youtu.be/sN3BIa3GAOc)
 
   - Triggering change.
   - Low-level, untyped on-chain validation scripts.
