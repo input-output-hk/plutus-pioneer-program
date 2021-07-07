@@ -24,8 +24,6 @@ import           Ledger.Ada          as Ada
 import           Playground.Contract (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH       (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types    (KnownCurrency (..))
-import           Prelude             (Semigroup (..), String)
-import           Text.Printf         (printf)
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
@@ -41,6 +39,46 @@ valHash = Scripts.validatorHash validator
 
 scrAddress :: Ledger.Address
 scrAddress = scriptAddress validator
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{-
+{-# INLINABLE mkValidator #-}
+mkValidator :: Data -> Data -> Data -> ()
+mkValidator _ _ _ = ()
+
+validator :: Validator
+validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
 
 type GiftSchema =
             Endpoint "give" Integer
@@ -74,3 +112,4 @@ endpoints = (give' `select` grab') >> endpoints
 mkSchemaDefinitions ''GiftSchema
 
 mkKnownCurrencies []
+-}
