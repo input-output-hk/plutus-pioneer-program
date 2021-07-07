@@ -12,9 +12,16 @@
   - Running an example auction contract on a local Playground.
   - Homework.
 
+- [Lecture #2]()
+
+  - Triggering change.
+  - Low-level, untyped on-chain validation scripts.
+  - High-level, typed on-chain validation scripts.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
+- Lecture #2:  [Simple validation](code/week02)
 
 ## Exercises
 
@@ -31,6 +38,11 @@
   - Copy-paste the auction contract into the Playground editor.
   - Compile.
   - Simulate various auction scenarios.
+
+- Week #2
+
+  - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
 
 ## Some Plutus Modules
 

@@ -28,7 +28,7 @@ import           Ledger.Ada           as Ada
 import           Playground.Contract  (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
-import           Prelude              (Semigroup (..), String)
+import           Prelude              (IO, Semigroup (..), String)
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}

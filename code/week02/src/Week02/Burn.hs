@@ -8,8 +8,6 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
-
 module Week02.Burn where
 
 import           Control.Monad       hiding (fmap)
@@ -27,12 +25,14 @@ import           Ledger.Ada          as Ada
 import           Playground.Contract (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH       (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types    (KnownCurrency (..))
-import           Prelude             (Semigroup (..), String)
+import           Prelude             (IO, Semigroup (..), String)
 import           Text.Printf         (printf)
+
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: Data -> Data -> Data -> ()
-mkValidator _ _ _ = traceError "NO WAY!"
+mkValidator _ _ _ = traceError "BURNT!"
 
 validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])

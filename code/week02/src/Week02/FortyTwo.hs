@@ -25,7 +25,7 @@ import           Ledger.Ada          as Ada
 import           Playground.Contract (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH       (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types    (KnownCurrency (..))
-import           Prelude             (Semigroup (..), String)
+import           Prelude             (IO, Semigroup (..), String)
 import           Text.Printf         (printf)
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
@@ -57,13 +57,13 @@ give amount = do
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
 grab :: forall w s e. AsContractError e => Integer -> Contract w s e ()
-grab r = do
+grab n = do
     utxos <- utxoAt scrAddress
     let orefs   = fst <$> Map.toList utxos
         lookups = Constraints.unspentOutputs utxos      <>
                   Constraints.otherScript validator
         tx :: TxConstraints Void Void
-        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I r | oref <- orefs]
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ I n | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "collected gifts"

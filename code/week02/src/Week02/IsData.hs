@@ -17,6 +17,7 @@ import           Data.Map             as Map
 import           Data.Text            (Text)
 import           Data.Void            (Void)
 import           Plutus.Contract
+import           PlutusTx             (Data (..))
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import           Ledger               hiding (singleton)
@@ -26,17 +27,16 @@ import           Ledger.Ada           as Ada
 import           Playground.Contract  (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
-import           Prelude              (Semigroup (..), Show, String)
+import           Prelude              (IO, Semigroup (..), String)
 import           Text.Printf          (printf)
 
 newtype MySillyRedeemer = MySillyRedeemer Integer
-    deriving Show
 
 PlutusTx.unstableMakeIsData ''MySillyRedeemer
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: () -> MySillyRedeemer -> ScriptContext -> Bool
-mkValidator () (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
+mkValidator _ (MySillyRedeemer r) _ = traceIfFalse "wrong redeemer" $ r == 42
 
 data Typed
 instance Scripts.ValidatorTypes Typed where
@@ -77,7 +77,7 @@ grab r = do
         lookups = Constraints.unspentOutputs utxos      <>
                   Constraints.otherScript validator
         tx :: TxConstraints Void Void
-        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData $ MySillyRedeemer r | oref <- orefs]
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData (MySillyRedeemer r) | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "collected gifts"
