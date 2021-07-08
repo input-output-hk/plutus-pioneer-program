@@ -13,7 +13,7 @@ Before We Start
 
 Let's talk about an important point that was brought up by one of the pioneers following lecture #1.
 
-You will recall in the auction example, we created three endpoints - start, bid and close. For close there were two scenarios. If there was a high-enough bid, the token goes to the highest bidder.
+You will recall in the auction example, we created three endpoints - start, bid and close. For *close* there were two scenarios. If there was a high-enough bid, the token goes to the highest bidder.
 If there was not a high-enough bid, the token goes back to the seller.
 
 What would happen if the *close* endpoint wasn't there? Could the money be locked forever in the contract?
