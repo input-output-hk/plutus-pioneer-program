@@ -3,7 +3,7 @@ Week 02 - Validation
 
 .. note::
       This is a written version of `Lecture
-      #2, Iteration #2 <https://www.youtube.com/watch?v=sN3BIa3GAOc>`__.
+      #2 <https://youtu.be/E5KRk5y9KjQ>`__.
 
       It covers low-level, untyped on-chain validation scripts and high-level,
       typed on-chain validation scripts.
