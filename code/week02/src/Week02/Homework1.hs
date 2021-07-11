@@ -8,38 +8,38 @@
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
 module Week02.Homework1 where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Map             as Map
 import           Data.Text            (Text)
 import           Data.Void            (Void)
-import           Plutus.Contract      hiding (when)
-import           PlutusTx             (Data (..))
+import           Plutus.Contract
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
-import qualified Ledger.Scripts       as Scripts
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Ada           as Ada
 import           Playground.Contract  (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
-import           Prelude              (Semigroup (..))
+import           Prelude              (IO, Semigroup (..), String, undefined)
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
 -- This should validate if and only if the two Booleans in the redeemer are equal!
-mkValidator :: () -> (Bool, Bool) -> ValidatorCtx -> Bool
+mkValidator :: () -> (Bool, Bool) -> ScriptContext -> Bool
 mkValidator _ _ _ = True -- FIX ME!
 
 data Typed
-instance Scripts.ScriptType Typed where
+instance Scripts.ValidatorTypes Typed where
 -- Implement the instance!
 
-inst :: Scripts.ScriptInstance Typed
-inst = undefined -- FIX ME!
+typedValidator :: Scripts.TypedValidator Typed
+typedValidator = undefined -- FIX ME!
 
 validator :: Validator
 validator = undefined -- FIX ME!
@@ -51,18 +51,17 @@ scrAddress :: Ledger.Address
 scrAddress = undefined -- FIX ME!
 
 type GiftSchema =
-    BlockchainActions
-        .\/ Endpoint "give" Integer
+            Endpoint "give" Integer
         .\/ Endpoint "grab" (Bool, Bool)
 
-give :: (HasBlockchainActions s, AsContractError e) => Integer -> Contract w s e ()
+give :: AsContractError e => Integer -> Contract w s e ()
 give amount = do
     let tx = mustPayToTheScript () $ Ada.lovelaceValueOf amount
-    ledgerTx <- submitTxConstraints inst tx
+    ledgerTx <- submitTxConstraints typedValidator tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount
 
-grab :: forall w s e. (HasBlockchainActions s, AsContractError e) => (Bool, Bool) -> Contract w s e ()
+grab :: forall w s e. AsContractError e => (Bool, Bool) -> Contract w s e ()
 grab bs = do
     utxos <- utxoAt scrAddress
     let orefs   = fst <$> Map.toList utxos

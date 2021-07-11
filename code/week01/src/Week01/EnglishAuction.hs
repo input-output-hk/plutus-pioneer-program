@@ -345,7 +345,13 @@ endpoints = (start' `select` bid' `select` close') >> endpoints
 
 mkSchemaDefinitions ''AuctionSchema
 
-myToken :: KnownCurrency
-myToken = KnownCurrency (ValidatorHash "f") "Token" (TokenName "T" :| [])
+myToken1 :: KnownCurrency
+myToken1 = KnownCurrency (ValidatorHash "f1") "Token" (TokenName "T1" :| [])
 
-mkKnownCurrencies ['myToken]
+myToken2 :: KnownCurrency
+myToken2 = KnownCurrency (ValidatorHash "f2") "Token" (TokenName "T2" :| [])
+
+myToken3 :: KnownCurrency
+myToken3 = KnownCurrency (ValidatorHash "f3") "Token" (TokenName "T3" :| [])
+
+mkKnownCurrencies ['myToken1,'myToken2,'myToken3]
