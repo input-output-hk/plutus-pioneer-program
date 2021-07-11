@@ -1091,9 +1091,14 @@ If you try this code, which is in ``IsData.hs``, in the playground, you should s
 Summary
 -------
 
-We have seen a couple of examples of simple validators and we have seen both the low-level approach and the higher-level typed approach where we
-can use a custom type.
+We have seen a couple of examples of simple validators.
 
-We completely ignore the third argument, the script context, which allows us to inspect the spending transaction which we haven't done so far.
+We started with a validator that will always succeed, completely ignoring its arguments. Then we looked at a validator that always fails, again completely ignoring
+its arguments. Then we looked at one that examines its redeemer to check for a certain predefined value. 
+
+We then turned this validator into a typed version which is the one which would be used in practice. First we used built-in data types and then we saw how we can use
+custom data types.
+
+We have not yet looked at examples where the datum or the context are inspected, which would be required for more realistic examples.
 
 We will look at that in the next lecture.
