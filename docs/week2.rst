@@ -15,10 +15,10 @@ Before We Start
 
 Let's talk about an important point that was brought up by one of the pioneers following lecture #1.
 
-You will recall in the auction example, we created three endpoints - start, bid and close. For *close* there were two scenarios. If there was a high-enough bid, the token goes to the highest bidder.
-If there was not a high-enough bid, the token goes back to the seller.
+You will recall in the auction example, we created three endpoints - ``start``, ``bid`` and ``close``. For ``close`` there were two scenarios. If there was a 
+high-enough bid, the token goes to the highest bidder. If there was not a high-enough bid, the token goes back to the seller.
 
-What would happen if the *close* endpoint wasn't there? Could the money be locked forever in the contract?
+What would happen if the ``close`` endpoint wasn't there? Could the money be locked forever in the contract?
 
 This is a really important point, because what you have to realise is that that UTxOs on the blockchain are just data, they are absolutely passive. In order 
 for anything to happen there must be a transaction. In order to make progress and to change the state of the blockchain, there must be a new transaction submitted
@@ -27,12 +27,12 @@ that consumes various UTxOs and produces new UTxOs.
 Only new transactions change the state. A UTxO will never spring into action by itself and do something. You can't have a smart contract that sits on the blockchain and
 the, at some point, suddenly performs an action.
 
-So, we really need the *close* endpoint if we want the auction to be settled. In our case, the endpoint was manually triggered. You could write a contract that
-runs in the wallet that would automatically generate the *close* transaction - it is possible to write quite sophisticated off-chain code.
+So, we really need the ``close`` endpoint if we want the auction to be settled. In our case, the endpoint was manually triggered. You could write a contract that
+runs in the wallet that would automatically generate the ``close`` transaction - it is possible to write quite sophisticated off-chain code.
 
 However, from the point-of-view of the blockchain, it is always an external trigger that does something. Nothing happens if it is not externally triggered.
 
-So, if there were no *close* endpoint, or the *close* endpoint never got triggered, the funds would remain sitting at the script address forever.
+So, if there were no ``close`` endpoint, or the ``close`` endpoint never got triggered, the funds would remain sitting at the script address forever.
 
 Introduction
 ------------
