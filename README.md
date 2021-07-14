@@ -18,10 +18,17 @@
   - Low-level, untyped on-chain validation scripts.
   - High-level, typed on-chain validation scripts.
 
+- [Lecture #3](https://youtu.be/6_rfCCY9_gY)
+
+  - Script contexts.
+  - Time handling.
+  - Parameterized contracts.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
 - Lecture #2:  [Simple validation](code/week02)
+- Lecture #2:  [Script Context & Parameterized Contracts](code/week03)
 
 ## Exercises
 
@@ -44,6 +51,11 @@
   - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
 
+- Week #3
+
+  - Fix and complete the code in the [Homework1](code/week03/src/Week03/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week03/src/Week03/Homework2.hs) module.
+
 ## Some Plutus Modules
 
 - [`Language.Marlowe.Semantics`](https://github.com/input-output-hk/plutus/blob/master/marlowe/src/Language/Marlowe/Semantics.hs), contains Marlowe types and semantics.
@@ -51,6 +63,7 @@
 - [`Plutus.Contract.Test`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test.hs), provides various ways to write tests for Plutus contracts.
 - [`Plutus.Contract.Test.ContractModel`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Contract/Test/ContractModel.hs), support for property based testing of Plutus contracts.
 - [`Plutus.Contracts.Uniswap`](https://github.com/input-output-hk/plutus/blob/master/plutus-use-cases/src/Plutus/Contracts/Uniswap.hs), an implementation of Uniswap in Plutus.
+- [`Plutus.Ledger.TimeSlot`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger/src/Ledger/TimeSlot.hs), conversions between `Slot` and `POSIXTime`.
 - [`Plutus.PAB.Webserver.API`](https://github.com/input-output-hk/plutus/blob/master/plutus-pab/src/Plutus/PAB/Webserver/API.hs), contains the HTTP-interface provided by the PAB.
 - [`Plutus.Trace.Emulator`](https://github.com/input-output-hk/plutus/blob/master/plutus-contract/src/Plutus/Trace/Emulator.hs), contains types and functions related to traces.
 - [`Plutus.V1.Ledger.Ada`](https://github.com/input-output-hk/plutus/blob/master/plutus-ledger-api/src/Plutus/V1/Ledger/Ada.hs), contains support for the Ada currency.
