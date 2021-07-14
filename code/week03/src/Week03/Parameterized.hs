@@ -11,6 +11,8 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
 module Week03.Parameterized where
 
 import           Control.Monad        hiding (fmap)
@@ -20,6 +22,7 @@ import           Data.Text            (Text)
 import           Data.Void            (Void)
 import           GHC.Generics         (Generic)
 import           Plutus.Contract
+import           PlutusTx             (Data (..))
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import           Ledger               hiding (singleton)
@@ -32,45 +35,44 @@ import           Playground.Types     (KnownCurrency (..))
 import           Prelude              (IO, Semigroup (..), Show (..), String)
 import           Text.Printf          (printf)
 
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
-
 data VestingParam = VestingParam
     { beneficiary :: PubKeyHash
     , deadline    :: POSIXTime
     } deriving Show
 
-PlutusTx.unstableMakeIsData ''VestingParam
 PlutusTx.makeLift ''VestingParam
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: VestingParam -> () -> () -> ScriptContext -> Bool
-mkValidator p () () ctx =
-    traceIfFalse "beneficiary's signature missing" checkSig      &&
-    traceIfFalse "deadline not reached"            checkDeadline
+mkValidator p () () ctx = traceIfFalse "beneficiary's signature missing" signedByBeneficiary &&
+                          traceIfFalse "deadline not reached" deadlineReached
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
-    checkSig :: Bool
-    checkSig = beneficiary p `elem` txInfoSignatories info
+    signedByBeneficiary :: Bool
+    signedByBeneficiary = txSignedBy info $ beneficiary p
 
-    checkDeadline :: Bool
-    checkDeadline = from (deadline p) `contains` txInfoValidRange info
+    deadlineReached :: Bool
+    deadlineReached = contains (from $ deadline p) $ txInfoValidRange info
 
 data Vesting
 instance Scripts.ValidatorTypes Vesting where
     type instance DatumType Vesting = ()
     type instance RedeemerType Vesting = ()
 
-inst :: VestingParam -> Scripts.TypedValidator Vesting
-inst p = Scripts.mkTypedValidator @Vesting
+typedValidator :: VestingParam -> Scripts.TypedValidator Vesting
+typedValidator p = Scripts.mkTypedValidator @Vesting
     ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode p)
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @() @()
 
 validator :: VestingParam -> Validator
-validator = Scripts.validatorScript . inst
+validator = Scripts.validatorScript . typedValidator
+
+valHash :: VestingParam -> Ledger.ValidatorHash
+valHash = Scripts.validatorHash . typedValidator
 
 scrAddress :: VestingParam -> Ledger.Address
 scrAddress = scriptAddress . validator
@@ -92,7 +94,7 @@ give gp = do
                 , deadline    = gpDeadline gp
                 }
         tx = mustPayToTheScript () $ Ada.lovelaceValueOf $ gpAmount gp
-    ledgerTx <- submitTxConstraints (inst p) tx
+    ledgerTx <- submitTxConstraints (typedValidator p) tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace to %s with deadline %s"
         (gpAmount gp)

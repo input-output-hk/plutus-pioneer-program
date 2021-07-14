@@ -21,6 +21,7 @@ import           Data.Text            (Text)
 import           Data.Void            (Void)
 import           GHC.Generics         (Generic)
 import           Plutus.Contract
+import           PlutusTx             (Data (..))
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import           Ledger               hiding (singleton)
@@ -42,18 +43,17 @@ PlutusTx.unstableMakeIsData ''VestingDatum
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
-mkValidator dat () ctx =
-    traceIfFalse "beneficiary's signature missing" checkSig      &&
-    traceIfFalse "deadline not reached"            checkDeadline
+mkValidator dat () ctx = traceIfFalse "beneficiary's signature missing" signedByBeneficiary &&
+                         traceIfFalse "deadline not reached" deadlineReached
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
-    checkSig :: Bool
-    checkSig = beneficiary dat `elem` txInfoSignatories info
+    signedByBeneficiary :: Bool
+    signedByBeneficiary = txSignedBy info $ beneficiary dat
 
-    checkDeadline :: Bool
-    checkDeadline = from (deadline dat) `contains` txInfoValidRange info
+    deadlineReached :: Bool
+    deadlineReached = contains (from $ deadline dat) $ txInfoValidRange info
 
 data Vesting
 instance Scripts.ValidatorTypes Vesting where
@@ -69,6 +69,9 @@ typedValidator = Scripts.mkTypedValidator @Vesting
 
 validator :: Validator
 validator = Scripts.validatorScript typedValidator
+
+valHash :: Ledger.ValidatorHash
+valHash = Scripts.validatorHash typedValidator
 
 scrAddress :: Ledger.Address
 scrAddress = scriptAddress validator
