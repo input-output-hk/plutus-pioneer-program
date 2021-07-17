@@ -26,7 +26,7 @@ myTrace = do
     callEndpoint @"give" h1 $ GiveParams
         { gpBeneficiary = pubKeyHash $ walletPubKey $ Wallet 2
         , gpDeadline    = slotToBeginPOSIXTime def 20
-        , gpAmount      = 1000
+        , gpAmount      = 10000000
         }
     void $ waitUntilSlot 20
     callEndpoint @"grab" h2 ()
