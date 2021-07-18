@@ -36,6 +36,12 @@
 
   - Clone the [The Plutus repository](https://github.com/input-output-hk/plutus), check out the correct commit
     as specified in [cabal.project](code/week01/cabal.project).
+  - Install NixOS cross-referencing the following resources.
+     - https://nixos.org/download.html
+     - https://docs.plutus-community.com
+     - A few resources to understand the what and why regarding NixOS
+       - https://nixos.org/manual/nix/stable
+       - https://serokell.io/blog/what-is-nix
   - Set-up IOHK binary caches [How to set up the IOHK binary caches](https://github.com/input-output-hk/plutus#iohk-binary-cache). "If you do not do this, you will end up building GHC, which takes several hours. If you find yourself building GHC, STOP and fix the cache."
   - Enter a `nix-shell`.
   - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
