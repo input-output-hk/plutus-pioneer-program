@@ -28,7 +28,7 @@
 
 - Lecture #1:  [English Auction](code/week01)
 - Lecture #2:  [Simple validation](code/week02)
-- Lecture #2:  [Script Context & Parameterized Contracts](code/week03)
+- Lecture #3:  [Script Context & Parameterized Contracts](code/week03)
 
 ## Exercises
 
