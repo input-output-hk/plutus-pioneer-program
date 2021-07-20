@@ -35,13 +35,14 @@ payContract = do
 payTrace :: Integer -> Integer -> EmulatorTrace ()
 payTrace x y = do
     h <- activateContractWallet (Wallet 1) payContract
+    let pkh = pubKeyHash $ walletPubKey $ Wallet 2
     callEndpoint @"pay" h $ PayParams
-        { ppRecipient = pubKeyHash $ walletPubKey $ Wallet 2
+        { ppRecipient = pkh
         , ppLovelace  = x
         }
     void $ Emulator.waitNSlots 1
     callEndpoint @"pay" h $ PayParams
-        { ppRecipient = pubKeyHash $ walletPubKey $ Wallet 2
+        { ppRecipient = pkh
         , ppLovelace  = y
         }
     void $ Emulator.waitNSlots 1
