@@ -46,23 +46,19 @@ PlutusTx.unstableMakeIsData ''VestingDatum
 -- This should validate if either beneficiary1 has signed the transaction and the current slot is before or at the deadline
 -- or if beneficiary2 has signed the transaction and the deadline has passed.
 mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
-mkValidator dat () ctx = traceIfFalse "too early to grab spendings for beneficiary2" signedByBeneficiaryWithinDeadline ||
-                         traceIfFalse "too late to grab the gift for beneficiary1" signedBySelfOutsideDeadline 
+mkValidator dat () ctx 
+                         | signedByBeneficiary1WithinDeadline = True 
+                         | signedByBeneficiary2OutsideDeadline = True 
+                         | otherwise = traceError "Beneficiary1 can only reclaim before deadline or Beneficiary2 can only claim once deadline has passed"
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
-    signedByBeneficiaryWithinDeadline :: Bool
-    signedByBeneficiaryWithinDeadline = signedByBeneficiary1 && beforeDeadline
+    signedByBeneficiary1WithinDeadline :: Bool
+    signedByBeneficiary1WithinDeadline = (txSignedBy info $ beneficiary1 dat) && beforeDeadline
 
-    signedBySelfOutsideDeadline :: Bool
-    signedBySelfOutsideDeadline = signedByBeneficiary2 && not beforeDeadline
-
-    signedByBeneficiary1 :: Bool
-    signedByBeneficiary1 = txSignedBy info $ beneficiary1 dat
-
-    signedByBeneficiary2 :: Bool
-    signedByBeneficiary2 = txSignedBy info $ beneficiary2 dat
+    signedByBeneficiary2OutsideDeadline :: Bool
+    signedByBeneficiary2OutsideDeadline = (txSignedBy info $ beneficiary2 dat) && not beforeDeadline
 
     beforeDeadline :: Bool
     beforeDeadline = contains (to $ deadline dat) $ txInfoValidRange info
