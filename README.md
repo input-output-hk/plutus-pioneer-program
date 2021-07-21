@@ -24,11 +24,18 @@
   - Time handling.
   - Parameterized contracts.
 
+- [Lecture #4](https://youtu.be/g4lvA14I-Jg)
+
+  - Monads.
+  - The `EmulatorTrace`-monad.
+  - The `Contract`-monad.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
 - Lecture #2:  [Simple validation](code/week02)
 - Lecture #3:  [Script Context & Parameterized Contracts](code/week03)
+- Lecture #4:  [Monad, Traces & Contracts](code/week04)
 
 ## Exercises
 
@@ -61,6 +68,11 @@
 
   - Fix and complete the code in the [Homework1](code/week03/src/Week03/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week03/src/Week03/Homework2.hs) module.
+
+- Week #4
+
+  - Implement function `payTrace` in the [Homework](code/week04/src/Week04/Homework.hs) module.
+  - Handle exceptions thrown by `submitTx` in function `payContract` in the same module.
 
 ## Some Plutus Modules
 
