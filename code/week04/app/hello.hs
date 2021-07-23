@@ -16,7 +16,7 @@
 -- foo = ...
 
 main :: IO ()
-main = bar -- putStrLn "Hello, world!"
+main =  bar -- putStrLn "Hello, world!"
 
 bar :: IO ()
 bar = getLine >>= \s ->
