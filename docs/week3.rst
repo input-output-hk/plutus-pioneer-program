@@ -15,7 +15,7 @@ Before We Start
 
 Since the last lecture there has been an update to the playground, which is present in the Plutus commit we are using for this lecture (see note above).
 
-There was an issue whereby the timeout, which has hardcoded into the playground was too short. This would cause simulations to fail if they took longer than the
+There was an issue whereby the timeout, which was hardcoded into the playground was too short. This would cause simulations to fail if they took longer than the
 hardcoded timeout.
 
 There is now an option when you start the Plutus Playground Server which allows you to specify the timeout. The following example sets the timeout to 120 seconds.

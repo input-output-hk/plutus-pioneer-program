@@ -103,11 +103,11 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#example-2-parameterized-contract">4.5. Example 2 - Parameterized Contract</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#an-observation">4.5.1. An Observation</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#another-way-of-doing-it">4.5.2. Another Way of Doing It</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#the-lift-class">4.5.2.1. The Lift Class</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#on-chain">4.5.1. On-Chain</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#the-lift-class">4.5.1.1. The Lift Class</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="#off-chain">4.5.2. Off-Chain</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#back-to-the-playground">4.5.3. Back to the playground</a></li>
 </ul>
 </li>
@@ -563,371 +563,353 @@ whether the validity interval is fully contained within the interval that starts
 <span class="nf">deadlineReached</span> <span class="ow">=</span> <span class="n">contains</span> <span class="p">(</span><span class="n">from</span> <span class="o">$</span> <span class="n">deadline</span> <span class="n">dat</span><span class="p">)</span> <span class="o">$</span> <span class="n">txInfoValidRange</span> <span class="n">info</span>
 </pre></div>
 </div>
-<p>Let’s look back at the <code class="docutils literal notranslate"><span class="pre">ScriptContext</span></code> type.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">ScriptContext</span> <span class="ow">=</span> <span class="kt">ScriptContext</span><span class="p">{</span><span class="n">scriptContextTxInfo</span> <span class="ow">::</span> <span class="kt">TxInfo</span><span class="p">,</span> <span class="n">scriptContextPurpose</span> <span class="ow">::</span> <span class="kt">ScriptPurpose</span> <span class="p">}</span>
-</pre></div>
-</div>
-<p>We are not interest in the script purpose, as we know that it is a
-spending script. The interesting one for us here is <em>TxInfo</em>, as this
-provides both the signatures and the timing information.</p>
-<p>So let’s add a helper function that gets this for us from our third
-argument - <em>ctx</em>.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="n">dat</span> <span class="nb">()</span> <span class="n">ctx</span> <span class="ow">=</span>
-   <span class="n">traceIfFalse</span> <span class="s">&quot;beneficiary&#39;s signature missing&quot;</span> <span class="n">checkSig</span>      <span class="o">&amp;&amp;</span>
-   <span class="n">traceIfFalse</span> <span class="s">&quot;deadline not reached&quot;</span>            <span class="n">checkDeadline</span>
-<span class="kr">where</span>
-   <span class="n">info</span> <span class="ow">::</span> <span class="kt">TxInfo</span>
-   <span class="n">info</span> <span class="ow">=</span> <span class="n">scriptContextTxInfo</span> <span class="n">ctx</span>
-   <span class="o">...</span>
-   <span class="n">checkSig</span> <span class="ow">::</span> <span class="kt">Bool</span>
-   <span class="o">...</span>
-   <span class="n">checkDeadline</span> <span class="ow">::</span> <span class="kt">Bool</span>
-   <span class="o">...</span>
-</pre></div>
-</div>
-<p>For the first helper function, <em>checkSig</em>, we must check that the
-beneficiary has signed the transaction.</p>
-<p>Here we use the <code class="docutils literal notranslate"><span class="pre">elem</span></code> function here from the Plutus Prelude, which is
-a copy of the same function from the standard Prelude. You will recall
-that this is because it is not possible to make functions in standard
-Prelude INLINABLE, which is required for our validation scripts to
-compile.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">checkSig</span> <span class="ow">=</span> <span class="n">beneficiary</span> <span class="n">dat</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="n">txInfoSignatories</span> <span class="n">info</span>
-</pre></div>
-</div>
-<p>To check the deadline we need the <em>txInfoValidRange</em> field of <em>TxInfo</em>,
-which gives us a value of type <em>SlotRange</em>.</p>
-<p>We must check that this transaction is only submitted once the deadline
-has been reached.</p>
-<p>As we saw before, the way time is handled is that, during validation,
-before any script is run, it is checked that this range that the
-transaction gives actually includes the current slot.</p>
-<p>We don’t know exactly what the current slot is because the interval may
-be large, but what we do know is that one of those slots is the current
-time.</p>
-<p>So, in order to make sure that the deadline has been reached, we must
-check that all the slots in the slot range are after the deadline. And
-one way to do this, is to ask if the valid slot range is included in the
-interval that starts at the deadline and extends to the end of time.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">checkDeadline</span> <span class="ow">=</span> <span class="n">from</span> <span class="p">(</span><span class="n">deadline</span> <span class="n">dat</span><span class="p">)</span> <span class="p">`</span><span class="n">contains</span><span class="p">`</span> <span class="n">txInfoValidRange</span> <span class="n">info</span>
-</pre></div>
-</div>
-<p>Remember that if the current slot was not in the <em>txInfoValidRange</em>,
-then the validation script would not even be running.</p>
-<p>That completes the validation logic. Let’s take care of some
-boilerplate.</p>
+<p>That completes the validation logic. Let’s take care of some boilerplate.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Vesting</span>
-<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptType</span> <span class="kt">Vesting</span> <span class="kr">where</span>
-   <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="kt">VestingDatum</span>
-   <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="nb">()</span>
+<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ValidatorTypes</span> <span class="kt">Vesting</span> <span class="kr">where</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="kt">VestingDatum</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="nb">()</span>
 
-<span class="nf">inst</span> <span class="ow">::</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptInstance</span> <span class="kt">Vesting</span>
-<span class="nf">inst</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validator</span> <span class="o">@</span><span class="kt">Vesting</span>
-   <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
-   <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
-<span class="kr">where</span>
-   <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="kt">VestingDatum</span> <span class="o">@</span><span class="nb">()</span>
+<span class="nf">typedValidator</span> <span class="ow">::</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">TypedValidator</span> <span class="kt">Vesting</span>
+<span class="nf">typedValidator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">mkTypedValidator</span> <span class="o">@</span><span class="kt">Vesting</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
+  <span class="kr">where</span>
+    <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="kt">VestingDatum</span> <span class="o">@</span><span class="nb">()</span>
 </pre></div>
 </div>
-<p>We will focus more on the wallet part of the script later, but here are
-the changes.</p>
-<p>We have created a <em>GiveParams</em> type, and modified the <em>grab</em> endpoint to
+<p>We will focus more on the wallet part of the script later, but here are the changes.</p>
+<p>In addition to some new <code class="docutils literal notranslate"><span class="pre">LANGUAGE</span></code> pragmas and some extra imports, we have created a <code class="docutils literal notranslate"><span class="pre">GiveParams</span></code> type, and modified the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint to
 require no parameters.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">VestingSchema</span></code> type defines the endpoints that we want to expose to the user. As in our last example, <code class="docutils literal notranslate"><span class="pre">give</span></code> will be used by the user who puts funds into the
+contract, then <code class="docutils literal notranslate"><span class="pre">grab</span></code> will be used by the user wanting to claim the funds.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">type</span> <span class="kt">VestingSchema</span> <span class="ow">=</span>
+   <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;give&quot;</span> <span class="kt">GiveParams</span>
+   <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;grab&quot;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>So what parameters do we need for <code class="docutils literal notranslate"><span class="pre">give</span></code>? The endpoint will create a UTxO at the vesting script address with an amount and a datum. If you recall, our datum
+contains the beneficiary and the deadline. So, there are three pieces of information that we must pass to the <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">GiveParams</span> <span class="ow">=</span> <span class="kt">GiveParams</span>
    <span class="p">{</span> <span class="n">gpBeneficiary</span> <span class="ow">::</span> <span class="o">!</span><span class="kt">PubKeyHash</span>
-   <span class="p">,</span> <span class="n">gpDeadline</span>    <span class="ow">::</span> <span class="o">!</span><span class="kt">Slot</span>
+   <span class="p">,</span> <span class="n">gpDeadline</span>    <span class="ow">::</span> <span class="o">!</span><span class="kt">POSIXTime</span>
    <span class="p">,</span> <span class="n">gpAmount</span>      <span class="ow">::</span> <span class="o">!</span><span class="kt">Integer</span>
    <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Generic</span><span class="p">,</span> <span class="kt">ToJSON</span><span class="p">,</span> <span class="kt">FromJSON</span><span class="p">,</span> <span class="kt">ToSchema</span><span class="p">)</span>
-
-<span class="kr">type</span> <span class="kt">VestingSchema</span> <span class="ow">=</span>
-   <span class="kt">BlockchainActions</span>
-      <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;give&quot;</span> <span class="kt">GiveParams</span>
-      <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;grab&quot;</span> <span class="nb">()</span>
 </pre></div>
 </div>
-<p>For the <em>give</em> endpoint, the <em>Datum</em> is constructed from the
-<em>GiveParams</em>.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">give</span> <span class="ow">::</span> <span class="p">(</span><span class="kt">HasBlockchainActions</span> <span class="n">s</span><span class="p">,</span> <span class="kt">AsContractError</span> <span class="n">e</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">GiveParams</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<p>The <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint doesn’t require any parameters because the beneficiary will just look for UTxOs sitting at the script address and can then check whether they
+are the beneficiary and whether the deadline has passed. If so, they can consume them.</p>
+<p>Let’s quickly look at the <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">give</span> <span class="ow">::</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">GiveParams</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
 <span class="nf">give</span> <span class="n">gp</span> <span class="ow">=</span> <span class="kr">do</span>
-   <span class="kr">let</span> <span class="n">dat</span> <span class="ow">=</span> <span class="kt">VestingDatum</span>
-               <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">=</span> <span class="n">gpBeneficiary</span> <span class="n">gp</span>
-               <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">=</span> <span class="n">gpDeadline</span> <span class="n">gp</span>
-               <span class="p">}</span>
-      <span class="n">tx</span>  <span class="ow">=</span> <span class="n">mustPayToTheScript</span> <span class="n">dat</span> <span class="o">$</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="o">$</span> <span class="n">gpAmount</span> <span class="n">gp</span>
-   <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraints</span> <span class="n">inst</span> <span class="n">tx</span>
-   <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
-   <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="n">printf</span> <span class="s">&quot;made a gift of %d lovelace to %s with deadline %s&quot;</span>
-      <span class="p">(</span><span class="n">gpAmount</span> <span class="n">gp</span><span class="p">)</span>
-      <span class="p">(</span><span class="n">show</span> <span class="o">$</span> <span class="n">gpBeneficiary</span> <span class="n">gp</span><span class="p">)</span>
-      <span class="p">(</span><span class="n">show</span> <span class="o">$</span> <span class="n">gpDeadline</span> <span class="n">gp</span><span class="p">)</span>
+    <span class="kr">let</span> <span class="n">dat</span> <span class="ow">=</span> <span class="kt">VestingDatum</span>
+                <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">=</span> <span class="n">gpBeneficiary</span> <span class="n">gp</span>
+                <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">=</span> <span class="n">gpDeadline</span> <span class="n">gp</span>
+                <span class="p">}</span>
+        <span class="n">tx</span>  <span class="ow">=</span> <span class="n">mustPayToTheScript</span> <span class="n">dat</span> <span class="o">$</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="o">$</span> <span class="n">gpAmount</span> <span class="n">gp</span>
+    <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraints</span> <span class="n">typedValidator</span> <span class="n">tx</span>
+    <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
+    <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="n">printf</span> <span class="s">&quot;made a gift of %d lovelace to %s with deadline %s&quot;</span>
+        <span class="p">(</span><span class="n">gpAmount</span> <span class="n">gp</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">show</span> <span class="o">$</span> <span class="n">gpBeneficiary</span> <span class="n">gp</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">show</span> <span class="o">$</span> <span class="n">gpDeadline</span> <span class="n">gp</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The <em>grab</em> endpoint is a bit more involved. Here, the grabber needs to
-find the UTxOs that they can actually consume, which is performed by the
-<em>isSuitable</em> helper function.</p>
-<p>This looks at the all UTxOs and only keeps those that are suitable. It
-first checks that the <em>Datum</em> hash exists, nad, if so, it deserialises
-it, and, if that succeeds it checks that the beneficiary of the UTxO is
-the public key hash of the grabber. It then checks that the deadline is
-not in the future.</p>
-<p>We see here that, from the wallet, we have access to the current slot
-and to our own public key hash.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab</span> <span class="ow">::</span> <span class="n">forall</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span><span class="o">.</span> <span class="p">(</span><span class="kt">HasBlockchainActions</span> <span class="n">s</span><span class="p">,</span> <span class="kt">AsContractError</span> <span class="n">e</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<p>First we compute the datum we want to use, and we can get both pieces of information from the <code class="docutils literal notranslate"><span class="pre">GiveParams</span></code> which is passed into the function.</p>
+<p>Then, for the transaction, we add a constraint that there must be an output at this script address with the datum that we just defined and a certain number of
+lovelace, which we also get from the <code class="docutils literal notranslate"><span class="pre">GiveParams</span></code>.</p>
+<p>The rest of the function is as before, just with a different log message.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint is a bit more involved.</p>
+<p>There can be many UTxOs at this script address and some of them might not be suitable for us, either because we are not the beneficiary, or because the deadline has
+not yet passed. If we try to submit a transaction when there are no suitable UTxOs, we will pay fees, but get nothing in return.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab</span> <span class="ow">::</span> <span class="n">forall</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span><span class="o">.</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
 <span class="nf">grab</span> <span class="ow">=</span> <span class="kr">do</span>
-   <span class="n">now</span>   <span class="ow">&lt;-</span> <span class="n">currentSlot</span>
-   <span class="n">pkh</span>   <span class="ow">&lt;-</span> <span class="n">pubKeyHash</span> <span class="o">&lt;$&gt;</span> <span class="n">ownPubKey</span>
-   <span class="n">utxos</span> <span class="ow">&lt;-</span> <span class="kt">Map</span><span class="o">.</span><span class="n">filter</span> <span class="p">(</span><span class="n">isSuitable</span> <span class="n">pkh</span> <span class="n">now</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">utxoAt</span> <span class="n">scrAddress</span>
-   <span class="kr">if</span> <span class="kt">Map</span><span class="o">.</span><span class="n">null</span> <span class="n">utxos</span>
-      <span class="kr">then</span> <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;no gifts available&quot;</span>
-      <span class="kr">else</span> <span class="kr">do</span>
+    <span class="n">now</span>   <span class="ow">&lt;-</span> <span class="n">currentTime</span>
+    <span class="n">pkh</span>   <span class="ow">&lt;-</span> <span class="n">pubKeyHash</span> <span class="o">&lt;$&gt;</span> <span class="n">ownPubKey</span>
+    <span class="n">utxos</span> <span class="ow">&lt;-</span> <span class="kt">Map</span><span class="o">.</span><span class="n">filter</span> <span class="p">(</span><span class="n">isSuitable</span> <span class="n">pkh</span> <span class="n">now</span><span class="p">)</span> <span class="o">&lt;$&gt;</span> <span class="n">utxoAt</span> <span class="n">scrAddress</span>
+    <span class="kr">if</span> <span class="kt">Map</span><span class="o">.</span><span class="n">null</span> <span class="n">utxos</span>
+        <span class="kr">then</span> <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;no gifts available&quot;</span>
+        <span class="kr">else</span> <span class="kr">do</span>
             <span class="kr">let</span> <span class="n">orefs</span>   <span class="ow">=</span> <span class="n">fst</span> <span class="o">&lt;$&gt;</span> <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="n">utxos</span>
-               <span class="n">lookups</span> <span class="ow">=</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">unspentOutputs</span> <span class="n">utxos</span>  <span class="o">&lt;&gt;</span>
-                        <span class="kt">Constraints</span><span class="o">.</span><span class="n">otherScript</span> <span class="n">validator</span>
-               <span class="n">tx</span> <span class="ow">::</span> <span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span>
-               <span class="n">tx</span>      <span class="ow">=</span> <span class="n">mconcat</span> <span class="p">[</span><span class="n">mustSpendScriptOutput</span> <span class="n">oref</span> <span class="o">$</span> <span class="kt">Redeemer</span> <span class="o">$</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">toData</span> <span class="nb">()</span> <span class="o">|</span> <span class="n">oref</span> <span class="ow">&lt;-</span> <span class="n">orefs</span><span class="p">]</span> <span class="o">&lt;&gt;</span>
-                        <span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="n">now</span><span class="p">)</span>
+                <span class="n">lookups</span> <span class="ow">=</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">unspentOutputs</span> <span class="n">utxos</span>  <span class="o">&lt;&gt;</span>
+                          <span class="kt">Constraints</span><span class="o">.</span><span class="n">otherScript</span> <span class="n">validator</span>
+                <span class="n">tx</span> <span class="ow">::</span> <span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span>
+                <span class="n">tx</span>      <span class="ow">=</span> <span class="n">mconcat</span> <span class="p">[</span><span class="n">mustSpendScriptOutput</span> <span class="n">oref</span> <span class="o">$</span> <span class="kt">Redeemer</span> <span class="o">$</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">toData</span> <span class="nb">()</span> <span class="o">|</span> <span class="n">oref</span> <span class="ow">&lt;-</span> <span class="n">orefs</span><span class="p">]</span> <span class="o">&lt;&gt;</span>
+                          <span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="n">now</span><span class="p">)</span>
             <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraintsWith</span> <span class="o">@</span><span class="kt">Void</span> <span class="n">lookups</span> <span class="n">tx</span>
             <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
             <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;collected gifts&quot;</span>
-<span class="kr">where</span>
-   <span class="n">isSuitable</span> <span class="ow">::</span> <span class="kt">PubKeyHash</span> <span class="ow">-&gt;</span> <span class="kt">Slot</span> <span class="ow">-&gt;</span> <span class="kt">TxOutTx</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
-   <span class="n">isSuitable</span> <span class="n">pkh</span> <span class="n">now</span> <span class="n">o</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">txOutDatumHash</span> <span class="o">$</span> <span class="n">txOutTxOut</span> <span class="n">o</span> <span class="kr">of</span>
-      <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
-      <span class="kt">Just</span> <span class="n">h</span>  <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="kt">Map</span><span class="o">.</span><span class="n">lookup</span> <span class="n">h</span> <span class="o">$</span> <span class="n">txData</span> <span class="o">$</span> <span class="n">txOutTxTx</span> <span class="n">o</span> <span class="kr">of</span>
+  <span class="kr">where</span>
+    <span class="n">isSuitable</span> <span class="ow">::</span> <span class="kt">PubKeyHash</span> <span class="ow">-&gt;</span> <span class="kt">POSIXTime</span> <span class="ow">-&gt;</span> <span class="kt">TxOutTx</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+    <span class="n">isSuitable</span> <span class="n">pkh</span> <span class="n">now</span> <span class="n">o</span> <span class="ow">=</span> <span class="kr">case</span> <span class="n">txOutDatumHash</span> <span class="o">$</span> <span class="n">txOutTxOut</span> <span class="n">o</span> <span class="kr">of</span>
+        <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
+        <span class="kt">Just</span> <span class="n">h</span>  <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="kt">Map</span><span class="o">.</span><span class="n">lookup</span> <span class="n">h</span> <span class="o">$</span> <span class="n">txData</span> <span class="o">$</span> <span class="n">txOutTxTx</span> <span class="n">o</span> <span class="kr">of</span>
             <span class="kt">Nothing</span>        <span class="ow">-&gt;</span> <span class="kt">False</span>
             <span class="kt">Just</span> <span class="p">(</span><span class="kt">Datum</span> <span class="n">e</span><span class="p">)</span> <span class="ow">-&gt;</span> <span class="kr">case</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">fromData</span> <span class="n">e</span> <span class="kr">of</span>
-               <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
-               <span class="kt">Just</span> <span class="n">d</span>  <span class="ow">-&gt;</span> <span class="n">beneficiary</span> <span class="n">d</span> <span class="o">==</span> <span class="n">pkh</span> <span class="o">&amp;&amp;</span> <span class="n">deadline</span> <span class="n">d</span> <span class="o">&lt;=</span> <span class="n">now</span>
+                <span class="kt">Nothing</span> <span class="ow">-&gt;</span> <span class="kt">False</span>
+                <span class="kt">Just</span> <span class="n">d</span>  <span class="ow">-&gt;</span> <span class="n">beneficiary</span> <span class="n">d</span> <span class="o">==</span> <span class="n">pkh</span> <span class="o">&amp;&amp;</span> <span class="n">deadline</span> <span class="n">d</span> <span class="o">&lt;=</span> <span class="n">now</span>
 </pre></div>
 </div>
-<p>Note the call:</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="n">now</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>If we do not do this, the default would be the infinite slot range, and
-this would cause validation to fail in our case.</p>
-<p>We could use a singleton slot here, but, if there were any issues, for
-example network delays, and the transaction arrived at a node a slot or
+<p>First, we get the current time and calculate our public key hash. We then look up all the UTxOs at this address and filter them using the <code class="docutils literal notranslate"><span class="pre">isSuitable</span></code> helper function,
+which is defined in the <code class="docutils literal notranslate"><span class="pre">where</span></code> clause.</p>
+<p>It first checks the datum hash, and, if it finds it, it attempts to look up the corresponding datum. Recall that the producing transaction, in this case <code class="docutils literal notranslate"><span class="pre">give</span></code> doesn’t
+have to supply the datum, it need only supply the datum hash. However, in our case we need to have the datum available to the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint, so the <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint
+does provide the datum.</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint finds the datum, it must deserialise it to the <code class="docutils literal notranslate"><span class="pre">Vesting</span></code> type.</p>
+<p>If all of this succeeds we can check whether we are the beneficiary and whether the deadline has passed.</p>
+<p>At this point, <code class="docutils literal notranslate"><span class="pre">utxos</span></code> contains all the UTxOs that we can consume. If we find none, then we just log a message to that effect. If there is at least one, then we
+construct one transaction that consumes all of them as inputs and pays the funds to our wallet.</p>
+<p>As <code class="docutils literal notranslate"><span class="pre">lookups</span></code>, we provide the list of UTxOs as well as the validator script. Recall that, in order to consume UTxOs at this address, the spending transaction must
+provide the validation script.</p>
+<p>We then create a transaction that spends all the suitable UTxOs along with a constraint that it must validate in the <code class="docutils literal notranslate"><span class="pre">Interval</span></code> which stretches from now until the end of time.
+If we don’t provide the interval here, then validation will fail, because the default interval is from genesis until the end of time. The on-chain validation
+would reject this as it needs an interval that is fully contained in the interval stretching from the deadline until the end of time.</p>
+<p>We could use the singleton <code class="docutils literal notranslate"><span class="pre">Interval</span></code> <code class="docutils literal notranslate"><span class="pre">now</span></code>, but, if there were any issues, for example network delays, and the transaction arrived at a node a slot or
 two later, then validation would no longer work.</p>
-<p>Another thing to note is that, if there is no suitable UTxO available,
-we don’t even try to submit the transaction. We want to make sure that
-when the grabber submits, they get something in return. Otherwise they
-would have to pay fees for a transaction that doesn’t have any outputs.</p>
+<p>The, we just bundle up the endpoints.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">endpoints</span> <span class="ow">::</span> <span class="kt">Contract</span> <span class="nb">()</span> <span class="kt">VestingSchema</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">endpoints</span> <span class="ow">=</span> <span class="p">(</span><span class="n">give&#39;</span> <span class="p">`</span><span class="n">select</span><span class="p">`</span> <span class="n">grab&#39;</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">endpoints</span>
+  <span class="kr">where</span>
+    <span class="n">give&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;give&quot;</span> <span class="o">&gt;&gt;=</span> <span class="n">give</span>
+    <span class="n">grab&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;grab&quot;</span> <span class="o">&gt;&gt;</span>  <span class="n">grab</span>
+</pre></div>
+</div>
+<p>Then there is some boilerplate which is just used in the playground.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkSchemaDefinitions</span> <span class="kt">&#39;&#39;VestingSchema</span>
+
+<span class="nf">mkKnownCurrencies</span> <span class="kt">[]</span>
+</pre></div>
+</div>
 <div class="section" id="in-the-playground">
 <h3><span class="section-number">4.4.1. </span>In the playground<a class="headerlink" href="#in-the-playground" title="Permalink to this headline">¶</a></h3>
-<p>First, let’s get Wallet 1 to send some lovelace.</p>
+<p>First, let’s add a third wallet. We are going to create a scenario where Wallet 1 makes two gifts to Wallet 2 with different deadlines and also makes one gift to Wallet 3.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00004.png" />
+<img alt="_images/pic__000431.png" src="_images/pic__000431.png" />
 </div>
-<p>Here we run into a technical problem. We need to supply the beneficiary
-address, but there is no way in the playground to get the public key
+<p>Normally it would be possible to submit both <code class="docutils literal notranslate"><span class="pre">give</span></code> transactions in the same slot, but the way our code is implemented, we wait for confirmation, which means
+we need to add a wait action. This is maybe not the best way to do it, but that’s how it is for the time being.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000441.png" src="_images/pic__000441.png" />
+</div>
+<p>Here we run into our first problem. We need to supply the beneficiary address, but there is no way in the playground to get the public key
 hash of a wallet.</p>
 <p>But we can get it from the REPL.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">IsData</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Wallet.Emulator</span>
-<span class="kt">Prelude</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">IsData</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Ledger</span>
-<span class="kt">Prelude</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">IsData</span><span class="o">&gt;</span> <span class="n">pubKeyHash</span> <span class="o">$</span> <span class="n">walletPubKey</span> <span class="o">$</span> <span class="kt">Wallet</span> <span class="mi">2</span>
-<span class="mi">39</span><span class="n">f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f</span>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span>Prelude Week03.Homework1&gt; :l src/Week03/Vesting.hs
+Ok, one module loaded.
+Prelude Week03.Vesting&gt; import Ledger
+Prelude Ledger Week03.Vesting&gt; import Wallet.Emulator
+Prelude Ledger Wallet.Emulator Week03.Vesting&gt; pubKeyHash $ walletPubKey $ Wallet 2
+39f713d0a644253f04529421b9f51b9b08979d08295959c4f3990ee617f5139f
+Prelude Ledger Wallet.Emulator Week03.Vesting&gt; pubKeyHash $ walletPubKey $ Wallet 3
+dac073e0123bdea59dd9b3bda9cf6037f63aca82627d7abcd5c4ac29dd74003e
 </pre></div>
 </div>
-<p>Let’s create a scenario where validation passes. Wallet 1 gives 500
-lovelace with a deadline of slot 15. We wait for 15 slots, and then
-Wallet 2 grabs.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00005.png" />
+<img alt="_images/pic__000471.png" src="_images/pic__000471.png" />
 </div>
-<p>After evaluation, we see the Genesis transaction, plus the give and the
-grab transactions.</p>
+<p>The next problem is the deadline. In the last lecture we saw how to convert between slots and POSIX times. This has changed. Previously you just needed a slot and out came
+a POSIX time. Now there is a second argument.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Ledger.TimeSlot</span>
+<span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">TimeSlot</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="n">slotToBeginPOSIXTime</span>
+<span class="nf">slotToBeginPOSIXTime</span> <span class="ow">::</span> <span class="kt">SlotConfig</span> <span class="ow">-&gt;</span> <span class="kt">Slot</span> <span class="ow">-&gt;</span> <span class="kt">POSIXTime</span>
+</pre></div>
+</div>
+<p>There are also versions of <code class="docutils literal notranslate"><span class="pre">slotToBeginPOSIXTime</span></code> that have a begin and an end time. This is because a slot is not just a point in time, it’s a duration in time.</p>
+<p>So what is this <code class="docutils literal notranslate"><span class="pre">SlotConfig</span></code>?</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">TimeSlot</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">SlotConfig</span>
+<span class="kr">type</span> <span class="kt">SlotConfig</span> <span class="ow">::</span> <span class="o">*</span>
+<span class="kr">data</span> <span class="kt">SlotConfig</span>
+  <span class="ow">=</span> <span class="kt">SlotConfig</span> <span class="p">{</span><span class="n">scSlotLength</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">,</span> <span class="n">scZeroSlotTime</span> <span class="ow">::</span> <span class="kt">POSIXTime</span><span class="p">}</span>
+        <span class="c1">-- Defined in ‘Ledger.TimeSlot’</span>
+<span class="kr">instance</span> <span class="kt">Eq</span> <span class="kt">SlotConfig</span> <span class="c1">-- Defined in ‘Ledger.TimeSlot’</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">SlotConfig</span> <span class="c1">-- Defined in ‘Ledger.TimeSlot’</span>
+</pre></div>
+</div>
+<p>It takes the slot length and the time at which slot zero starts.</p>
+<p>So now we have to find out what <code class="docutils literal notranslate"><span class="pre">SlotConfig</span></code> to use for the playground. Luckily, it’s the default. For that we need to use the <code class="docutils literal notranslate"><span class="pre">Data.Default</span></code> module.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">TimeSlot</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">Data.Default</span>
+<span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">TimeSlot</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Default</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="n">def</span> <span class="ow">::</span> <span class="kt">SlotConfig</span>
+<span class="kt">SlotConfig</span> <span class="p">{</span><span class="n">scSlotLength</span> <span class="ow">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="n">scZeroSlotTime</span> <span class="ow">=</span> <span class="kt">POSIXTime</span> <span class="p">{</span><span class="n">getPOSIXTime</span> <span class="ow">=</span> <span class="mi">1596059091000</span><span class="p">}}</span>
+</pre></div>
+</div>
+<p>Now we can use <code class="docutils literal notranslate"><span class="pre">slotToBeginPOSIXTime</span></code> with the default config to get the POSIX time for slot 10 and slot 20.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">TimeSlot</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Default</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="n">slotToBeginPOSIXTime</span> <span class="n">def</span> <span class="mi">10</span>
+<span class="kt">POSIXTime</span> <span class="p">{</span><span class="n">getPOSIXTime</span> <span class="ow">=</span> <span class="mi">1596059101000</span><span class="p">}</span>
+
+<span class="kt">Prelude</span> <span class="kt">Ledger</span> <span class="kt">Wallet</span><span class="o">.</span><span class="kt">Emulator</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">TimeSlot</span> <span class="kt">Data</span><span class="o">.</span><span class="kt">Default</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Vesting</span><span class="o">&gt;</span> <span class="n">slotToBeginPOSIXTime</span> <span class="n">def</span> <span class="mi">20</span>
+<span class="kt">POSIXTime</span> <span class="p">{</span><span class="n">getPOSIXTime</span> <span class="ow">=</span> <span class="mi">1596059111000</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>And we can use these in the playground. We’ll use slot 10 as the deadline for the first and third <code class="docutils literal notranslate"><span class="pre">give``s</span> <span class="pre">and</span> <span class="pre">slot</span> <span class="pre">20</span> <span class="pre">for</span> <span class="pre">the</span> <span class="pre">second</span> <span class="pre">``give</span></code>. We’ll also give 10 Ada
+in each case.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00006.png" />
+<img alt="_images/pic__000481.png" src="_images/pic__000481.png" />
 </div>
+<p>Let’s create a scenario where everything works. Wallet 3 grabs at slot 10 when the deadline for Wallet 3 has passed, and Wallet 2 grabs at slot 20, when both
+the Wallet 2 deadlines have passed. We will use the <code class="docutils literal notranslate"><span class="pre">Wait</span> <span class="pre">Until..</span></code> option for this.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00007.png" />
+<img alt="_images/pic__000491.png" src="_images/pic__000491.png" />
 </div>
+<p>After evaluation, we first see the Genesis transaction.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00008.png" />
+<img alt="_images/pic__000501.png" src="_images/pic__000501.png" />
 </div>
-<p>And the final balances.</p>
+<p>If we look at the next transaction, we see the gift from Wallet 1 to Wallet 2 with the deadline of 10. Here, ten Ada get locked in the script address.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00009.png" />
+<img alt="_images/pic__000511.png" src="_images/pic__000511.png" />
 </div>
-<p>Now let’s look at the case where the grab happens too early. We’ll
-change the wait time to 14 slots.</p>
+<p>The next transaction is the gift from Wallet 1 to Wallet 2 with the deadline of 20. A new UTxO is now created at the script address with ten Ada.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00010.png" />
+<img alt="_images/pic__00052.png" src="_images/pic__00052.png" />
 </div>
-<p>Now we see just two transactions - the Genesis transaction, and the
-give.</p>
+<p>And the third gift, this time to Wallet 3, with a deadline of 10. Wallet 1 now has about 70 Ada, and another UTxO is created with 10 Ada locked at the script address.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00012.png" />
+<img alt="_images/pic__000531.png" src="_images/pic__000531.png" />
 </div>
-<p>The grab transaction has failed validation.</p>
+<p>At slot 10, Wallet 3 grabs successfully. The third UTxO is the input, some fees are paid, and then the remainder of the lovelace is sent to Wallet 3.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00013.png" />
+<img alt="_images/pic__000541.png" src="_images/pic__000541.png" />
 </div>
+<p>Then at slot 20, Wallet 2 successfully grabs both the UTxOs for which they are the beneficiary. This time the fee is higher because two validators have to run.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000551.png" src="_images/pic__000551.png" />
+</div>
+<p>The final balances reflect the changes.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000561.png" src="_images/pic__000561.png" />
+</div>
+<p>Now let’s look at the case where the grab happens too early. We’ll make Wallet 2 grab at slot 15 instead of slot 20.</p>
+<div class="figure align-default">
+<img alt="" src="_images/pic__00010.png" />
+</div>
+<p>Now we see that the first transactions are the same, but that the final transaction at slot 15 has only one input, because the second UTxO is not yet available.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000571.png" src="_images/pic__000571.png" />
+</div>
+<p>And we can see that there are 10 Ada still locked at the script address.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000571.png" src="_images/pic__000571.png" />
+</div>
+<p>Our off-chain code was written in such a way that it will only submit a transaction if there is a suitable UTxO that can be grabbed. This means that we don’t really
+exercise the validator because we are only sending transactions to the blockchain that will pass validation.</p>
+<p>If you want to test the validator, you could modify the wallet code so that the grab endpoint attempts to grab everything and then validation will fail if you are not
+the beneficiary or the deadline has not been reached.</p>
+<p>You need to keep in mind that anybody can write off-chain code. So, even though it works now as long as you use the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint that we wrote ourselves, somebody
+could write a different piece of off-chain code that doesn’t filter the UTxOs as we did. In this case, if the validator is not correct something could be horribly wrong.</p>
 </div>
 </div>
 <div class="section" id="example-2-parameterized-contract">
 <h2><span class="section-number">4.5. </span>Example 2 - Parameterized Contract<a class="headerlink" href="#example-2-parameterized-contract" title="Permalink to this headline">¶</a></h2>
-<p>Our next example will be parameterized contracts, but let’s start with
-an observation about our existing contract.</p>
-<div class="section" id="an-observation">
-<h3><span class="section-number">4.5.1. </span>An Observation<a class="headerlink" href="#an-observation" title="Permalink to this headline">¶</a></h3>
-<p>We will set up a scenario where both wallets give and both wallets grab.</p>
-<p>Again, in this example, the public key hash of Wallet 1’s address was
-obtained from the REPL in the same way as with the Wallet 2 example
-above.</p>
-<div class="figure align-default">
-<img alt="" src="_images/week03__00014.png" />
-</div>
-<p>After evaluation…</p>
-<p>The Genesis transaction, as always.</p>
-<div class="figure align-default">
-<img alt="" src="_images/week03__00015.png" />
-</div>
-<p>The give of Wallet 2…</p>
-<div class="figure align-default">
-<img alt="" src="_images/week03__00016.png" />
-</div>
-<p>The give of Wallet 1…</p>
-<div class="figure align-default">
-<img alt="" src="_images/week03__00017.png" />
-</div>
-<p>The grab of Wallet 2…</p>
-<div class="figure align-default">
-<img alt="" src="_images/week03__00018.png" />
-</div>
-<p>And, the grab of Wallet 1…</p>
-<div class="figure align-default">
-<img alt="" src="_images/week03__00019.png" />
-</div>
-<p>Now, what we want to focus on here is the script addresses for the give
-of Wallet 1 and the give of Wallet 2. If you look back at those
-screenshots, you will notice that the script address in both cases is
-the same.</p>
-<p>And this is not surprising. Recall that the address of the script is
-calculated by taken the hash of the compiled Plutus code of the
-validator. Since the same validator is being used in both those
-transactions, the script address is the same.</p>
-<p>Keep this in mind for what we are about to cover in the following
-section.</p>
-</div>
-<div class="section" id="another-way-of-doing-it">
-<h3><span class="section-number">4.5.2. </span>Another Way of Doing It<a class="headerlink" href="#another-way-of-doing-it" title="Permalink to this headline">¶</a></h3>
-<p>In our example, we have put the beneficiary and the deadline into the
-datum. But there are other choices.</p>
-<p>You could also parameterize the whole script on those two pieces of data
-- the beneficiary and the deadline.</p>
-<p>A parameterized script is like a family of scripts. You can instantiate
-it with different parameters, and you get different scripts. They all
-behave the same, but they have these different parameters.</p>
-<p>We start by making a copy of Vesting.hs and creating a new module -
-Week03.Parameterized.</p>
-<p>Now, instead of using the <em>VestedDatum</em>, we are going to parameterize
-the script with it. It makes sense to first change its name.</p>
+<p>We’ll start the next example by copying the code from the vesting example into a new module called <code class="docutils literal notranslate"><span class="pre">Week03.Parameterized</span></code>.</p>
+<div class="section" id="on-chain">
+<h3><span class="section-number">4.5.1. </span>On-Chain<a class="headerlink" href="#on-chain" title="Permalink to this headline">¶</a></h3>
+<p>Note that in the vesting example we used the <code class="docutils literal notranslate"><span class="pre">Vesting</span></code> type as the datum, but it was just fixed, it didn’t change. Alternatively, we could have baked it into the contract, so to speak,
+so that we have a contract where the script itself already contains the beneficiary and deadline information.</p>
+<p>All the examples of contracts we have seen so far were fixed. We used a <code class="docutils literal notranslate"><span class="pre">TypedValidator</span></code> as a compile-time constant. The idea of parameterized scripts is that you can
+have a parameter and, depending on the value of the parameter, you get different values of <code class="docutils literal notranslate"><span class="pre">TypedValidator</span></code>.</p>
+<p>So, instead of defining one script, with a single script address, with all UTxOs sitting at the same address, you can define a family of
+scripts that are parameterized by a given parameter. In our case, this will mean that UTxOs for different beneficiaries and/or deadlines will be a different script addresses, as
+they will have parameterized validators specific to their parameters rather than specific to the datum of the UTxO.</p>
+<p>We are going to demonstrate how to do this by, instead of using datum for the beneficiary and deadline values, using a parameter.</p>
+<p>Let’s start by renaming <code class="docutils literal notranslate"><span class="pre">VestingDatum</span></code> to something more suitable.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">VestingParam</span> <span class="ow">=</span> <span class="kt">VestingParam</span>
-   <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">::</span> <span class="kt">PubKeyHash</span>
-   <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">::</span> <span class="kt">Slot</span>
-   <span class="p">}</span> <span class="kr">deriving</span> <span class="kt">Show</span>
+      <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">::</span> <span class="kt">PubKeyHash</span>
+      <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">::</span> <span class="kt">POSIXTime</span>
+      <span class="p">}</span> <span class="kr">deriving</span> <span class="kt">Show</span>
 </pre></div>
 </div>
-<p>Next, we will return to using Unit as our datum type, but we will add a
-new validation argument, before the other arguments, of our new type
-<em>VestingParam</em>.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
-</pre></div>
-</div>
-<p>The idea is that mkValidator is now a function that takes a VestingParam
-and returns a custom validator based on those params.</p>
-<p>We don’t need to change much, just the function header and the parts
-that previously accessed the datum.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
-<span class="nf">mkValidator</span> <span class="n">p</span> <span class="nb">()</span> <span class="nb">()</span> <span class="n">ctx</span> <span class="ow">=</span>
-   <span class="n">traceIfFalse</span> <span class="s">&quot;beneficiary&#39;s signature missing&quot;</span> <span class="n">checkSig</span>      <span class="o">&amp;&amp;</span>
-   <span class="n">traceIfFalse</span> <span class="s">&quot;deadline not reached&quot;</span>            <span class="n">checkDeadline</span>
-<span class="kr">where</span>
-   <span class="n">info</span> <span class="ow">::</span> <span class="kt">TxInfo</span>
-   <span class="n">info</span> <span class="ow">=</span> <span class="n">scriptContextTxInfo</span> <span class="n">ctx</span>
+<p>We will also remove the <code class="docutils literal notranslate"><span class="pre">unstableMakeIsData</span></code> call as we don’t need this anymore.</p>
+<p>The reason we don’t need it, is because we are just going to use <code class="docutils literal notranslate"><span class="pre">()</span></code> for the datum in the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function. All the information we require will be in a new argument
+to <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code>, of type <code class="docutils literal notranslate"><span class="pre">VestingParam</span></code>, which we add at the beginning of the list of arguments.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">mkValidator</span> <span class="n">p</span> <span class="nb">()</span> <span class="nb">()</span> <span class="n">ctx</span> <span class="ow">=</span> <span class="n">traceIfFalse</span> <span class="s">&quot;beneficiary&#39;s signature missing&quot;</span> <span class="n">signedByBeneficiary</span> <span class="o">&amp;&amp;</span>
+                          <span class="n">traceIfFalse</span> <span class="s">&quot;deadline not reached&quot;</span> <span class="n">deadlineReached</span>
+  <span class="kr">where</span>
+    <span class="n">info</span> <span class="ow">::</span> <span class="kt">TxInfo</span>
+    <span class="n">info</span> <span class="ow">=</span> <span class="n">scriptContextTxInfo</span> <span class="n">ctx</span>
 
-   <span class="n">checkSig</span> <span class="ow">::</span> <span class="kt">Bool</span>
-   <span class="n">checkSig</span> <span class="ow">=</span> <span class="n">beneficiary</span> <span class="n">p</span> <span class="p">`</span><span class="n">elem</span><span class="p">`</span> <span class="n">txInfoSignatories</span> <span class="n">info</span>
+    <span class="n">signedByBeneficiary</span> <span class="ow">::</span> <span class="kt">Bool</span>
+    <span class="n">signedByBeneficiary</span> <span class="ow">=</span> <span class="n">txSignedBy</span> <span class="n">info</span> <span class="o">$</span> <span class="n">beneficiary</span> <span class="n">p</span>
 
-   <span class="n">checkDeadline</span> <span class="ow">::</span> <span class="kt">Bool</span>
-   <span class="n">checkDeadline</span> <span class="ow">=</span> <span class="n">from</span> <span class="p">(</span><span class="n">deadline</span> <span class="n">p</span><span class="p">)</span> <span class="p">`</span><span class="n">contains</span><span class="p">`</span> <span class="n">txInfoValidRange</span> <span class="n">info</span>
+    <span class="n">deadlineReached</span> <span class="ow">::</span> <span class="kt">Bool</span>
+    <span class="n">deadlineReached</span> <span class="ow">=</span> <span class="n">contains</span> <span class="p">(</span><span class="n">from</span> <span class="o">$</span> <span class="n">deadline</span> <span class="n">p</span><span class="p">)</span> <span class="o">$</span> <span class="n">txInfoValidRange</span> <span class="n">info</span>
 </pre></div>
 </div>
-<p>And, we need to change another piece of code that previously referenced
-the datum.</p>
+<p>We also change the <code class="docutils literal notranslate"><span class="pre">Vesting</span></code> type to reflect the change to the datum.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Vesting</span>
-<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptType</span> <span class="kt">Vesting</span> <span class="kr">where</span>
-   <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="nb">()</span>
-   <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="nb">()</span>
+<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ValidatorTypes</span> <span class="kt">Vesting</span> <span class="kr">where</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="nb">()</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Vesting</span> <span class="ow">=</span> <span class="nb">()</span>
 </pre></div>
 </div>
-<p>And now we come to an interesting question. What do we do here?</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">inst</span> <span class="ow">::</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptInstance</span> <span class="kt">Vesting</span>
-<span class="nf">inst</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validator</span> <span class="o">@</span><span class="kt">Vesting</span>
-   <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
-   <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
+<p>Now, the <code class="docutils literal notranslate"><span class="pre">TypedValidator</span></code> will no longer be a constant value. Instead it will take a parameter.</p>
+<p>Recall that the function <code class="docutils literal notranslate"><span class="pre">mkTypedValidator</span></code> requires as its first argument the compiled code of a function that takes three arguments and returns a <code class="docutils literal notranslate"><span class="pre">Bool</span></code>. But now, it has four arguments,
+so we need to account for that.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">typedValidator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">TypedValidator</span> <span class="kt">Vesting</span>
+<span class="nf">typedValidator</span> <span class="n">p</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">mkTypedValidator</span> <span class="o">@</span><span class="kt">Vesting</span>
+</pre></div>
+</div>
+<p>Now, what we would like to do is something like this, passing in the new parameter <code class="docutils literal notranslate"><span class="pre">p</span></code> to <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> so that the compiled code within the Oxford brackets would have the correct type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span>  <span class="c1">-- this won&#39;t work</span>
+  <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="n">p</span> <span class="o">||</span><span class="p">])</span>
+  <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
 <span class="kr">where</span>
-   <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="kt">VestingDatum</span> <span class="o">@</span><span class="nb">()</span>
+  <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="nb">()</span> <span class="o">@</span><span class="nb">()</span>
 </pre></div>
 </div>
-<p>As is, this won’t work because now <em>mkValidator</em> has the wrong type.
-Remember that it must be a function that takes three arguments and
-returns a boolean. But now, it has four arguments.</p>
-<p>Also, we won’t always get the same instance, so this must now become a
-function that takes <em>VestingParam</em> as an argument.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">inst</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ScriptInstance</span> <span class="kt">Vesting</span>
-<span class="nf">inst</span> <span class="n">p</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validator</span> <span class="o">@</span><span class="kt">Vesting</span>
+<p>This code will not work, but before we investigate, let’s leave the code as it is for now and make some more changes to the rest of the code.</p>
+<p><code class="docutils literal notranslate"><span class="pre">validator</span></code> now will take a <code class="docutils literal notranslate"><span class="pre">VestingParam</span></code> and will return a composed function. The returned function has the effect that any paramater passed to <code class="docutils literal notranslate"><span class="pre">validator</span></code> would now effectively
+get passed to the <code class="docutils literal notranslate"><span class="pre">typedValidator</span></code> function, whose return value would in turned get passed to the <code class="docutils literal notranslate"><span class="pre">validatorScript</span></code> function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">validator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Validator</span>
+<span class="nf">validator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorScript</span> <span class="o">.</span> <span class="n">typedValidator</span>
 </pre></div>
 </div>
-<p>The first idea would be to simply do something like this - adding the
-<em>p</em> as a parameter, which would make the type correct again.</p>
+<p>And the same for <code class="docutils literal notranslate"><span class="pre">valHash</span></code> and <code class="docutils literal notranslate"><span class="pre">scrAddress</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">valHash</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">ValidatorHash</span>
+<span class="nf">valHash</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorHash</span> <span class="o">.</span> <span class="n">typedValidator</span>
+
+<span class="nf">scrAddress</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Address</span>
+<span class="nf">scrAddress</span> <span class="ow">=</span> <span class="n">scriptAddress</span> <span class="o">.</span> <span class="n">validator</span>
+</pre></div>
+</div>
+<p>Now, let’s find out what’s wrong with out <code class="docutils literal notranslate"><span class="pre">typedValidator</span></code> function.</p>
+<p>If we try to launch the REPL, we get a compile error.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">GHC</span> <span class="kt">Core</span> <span class="n">to</span> <span class="kt">PLC</span> <span class="n">plugin</span><span class="kt">:</span> <span class="kt">E043:Error:</span> <span class="kt">Reference</span> <span class="n">to</span> <span class="n">a</span> <span class="n">name</span> <span class="n">which</span> <span class="n">is</span> <span class="n">not</span> <span class="n">a</span> <span class="n">local</span><span class="p">,</span> <span class="n">a</span> <span class="n">builtin</span><span class="p">,</span> <span class="n">or</span> <span class="n">an</span> <span class="n">external</span> <span class="kt">INLINABLE</span> <span class="n">function</span><span class="kt">:</span> <span class="kt">Variable</span> <span class="n">p</span>
+<span class="kt">No</span> <span class="n">unfolding</span>
+<span class="kt">Context:</span> <span class="kt">Compiling</span> <span class="n">expr</span><span class="kt">:</span> <span class="n">p</span>
+<span class="kt">Context:</span> <span class="kt">Compiling</span> <span class="n">expr</span><span class="kt">:</span> <span class="kt">Week03</span><span class="o">.</span><span class="kt">Parameterized</span><span class="o">.</span><span class="n">mkValidator</span> <span class="n">p</span>
+<span class="kt">Context:</span> <span class="kt">Compiling</span> <span class="n">expr</span> <span class="n">at</span> <span class="s">&quot;plutus-pioneer-program-week03-0.1.0.0-inplace:Week03.Parameterized:(67,10)-(67,48)&quot;</span>
+</pre></div>
+</div>
+<p>The problem is this line.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- this won&#39;t work</span>
 <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="n">p</span> <span class="o">||</span><span class="p">])</span>
 </pre></div>
 </div>
-<p>But the problem is that, as we have seen before, in Template Haskell,
-the things inside the Oxford Brackets must be known at compile time, but
-the value of <em>p</em> here will not be known until runtime.</p>
-<p>Luckily, there is a way around this.</p>
-<p>We have something called applyCode, which takes two Plutus scripts, and,
-assuming that the first one is a function, it applies this function to
-the second argument.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- partial code</span>
-<span class="p">(</span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span> <span class="p">`</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">applyCode</span><span class="p">`</span> <span class="c1">-- ...</span>
-</pre></div>
-</div>
-<p>So, now, this…</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
-</pre></div>
-</div>
-<p>…is now a Plutus script for a function that takes such a parameter.
-So, now, we must write a Plutus script for that parameter. Then
-<em>applyCode</em> will apply the function to the script for the parameter, and
-we will get a script of the right type out of that.</p>
-<p>But this looks like it still doesn’t solve the problem because what do
-we write after <em>applyCode</em>? How do we get the parameter there. We can’t
-use PlutusTx.compile, as we have already seen.</p>
-<p>This is where another important class comes in - the so-called <em>Lift</em>
-class.</p>
+<p>Recall that everything inside the Oxford brackets must be explicitly known at compile time. Normally it would even need all the code to be written explicitly, but
+by using the <code class="docutils literal notranslate"><span class="pre">INLINABLE</span></code> pragma on the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function we can reference the function instead. However, it must still be known at compile time, because that’s
+how Template Haskell works - it is executed before the main compiler.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">p</span></code> is not known at compile time, because we intend to supply it at runtime. Luckily there is a way around this.</p>
+<p>On the Haskell side, we have our <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function and we have <code class="docutils literal notranslate"><span class="pre">p</span></code> of type <code class="docutils literal notranslate"><span class="pre">VestingParam</span></code>. We can compile <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> to Plutus, but we can’t compile <code class="docutils literal notranslate"><span class="pre">p</span></code> to Plutus
+because we don’t know what it is. But, if we could get our hands on the compiled version of <code class="docutils literal notranslate"><span class="pre">p</span></code>, we could apply this compiled version to the compiled <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code>, and this
+would give us what we want.</p>
+<p>This seems to solve nothing, because we still need a compiled version of <code class="docutils literal notranslate"><span class="pre">p</span></code> and we have the same problem that <code class="docutils literal notranslate"><span class="pre">p</span></code> is not known at compile time.</p>
+<p>However, <code class="docutils literal notranslate"><span class="pre">p</span></code> is not some arbitrary Haskell code, it’s data, so it doesn’t contain any function types. If we make the type of <code class="docutils literal notranslate"><span class="pre">p</span></code> an instance of a type class called <code class="docutils literal notranslate"><span class="pre">Lift</span></code>.
+We can use <code class="docutils literal notranslate"><span class="pre">liftCode</span></code> to compile <code class="docutils literal notranslate"><span class="pre">p</span></code> at runtime to Plutus Core and then, using <code class="docutils literal notranslate"><span class="pre">applyCode</span></code> we can apply the Plutus Core <code class="docutils literal notranslate"><span class="pre">p</span></code> to the Plutus Core <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code>.</p>
 <div class="section" id="the-lift-class">
-<h4><span class="section-number">4.5.2.1. </span>The Lift Class<a class="headerlink" href="#the-lift-class" title="Permalink to this headline">¶</a></h4>
-<p>The <em>Lift</em> class is defined in package <em>plutus-tx</em>.</p>
+<h4><span class="section-number">4.5.1.1. </span>The Lift Class<a class="headerlink" href="#the-lift-class" title="Permalink to this headline">¶</a></h4>
+<p>Let’s briefly look at the <code class="docutils literal notranslate"><span class="pre">Lift</span></code> class. It is defined in package <code class="docutils literal notranslate"><span class="pre">plutus-tx</span></code>.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">module</span> <span class="nn">PlutusTx.Lift.Class</span>
 </pre></div>
 </div>
-<p>It only has one function, <em>Lift</em>. However, we won’t use this function
-directly.</p>
-<p>The importance of the class is that it allows us to, at runtime, lift
-Haskell values into corresponding Plutus script values. And this is
-exactly what we need to convert our parameter <em>p</em> into code.</p>
-<p>We will use a different function, defined in the same package but in a
-different module.</p>
+<p>It only has one function, <code class="docutils literal notranslate"><span class="pre">Lift</span></code>. However, we won’t use this function directly.</p>
+<p>The importance of the class is that it allows us to, at runtime, lift Haskell values into corresponding Plutus script values. And this is
+exactly what we need to convert our parameter <code class="docutils literal notranslate"><span class="pre">p</span></code> into code.</p>
+<p>We will use a different function, defined in the same package but in a different module.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">module</span> <span class="nn">PlutusTx.Lift</span>
 </pre></div>
 </div>
-<p>The function we will use is called <em>liftCode</em></p>
+<p>The function we will use is called <code class="docutils literal notranslate"><span class="pre">liftCode</span></code>.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="c1">-- | Get a Plutus Core program corresponding to the given value as a &#39;CompiledCodeIn&#39;, throwing any errors that occur as exceptions and ignoring fresh names.</span>
 <span class="nf">liftCode</span>
    <span class="ow">::</span> <span class="p">(</span><span class="kt">Lift</span><span class="o">.</span><span class="kt">Lift</span> <span class="n">uni</span> <span class="n">a</span><span class="p">,</span> <span class="kt">Throwable</span> <span class="n">uni</span> <span class="n">fun</span><span class="p">,</span> <span class="kt">PLC</span><span class="o">.</span><span class="kt">ToBuiltinMeaning</span> <span class="n">uni</span> <span class="n">fun</span><span class="p">)</span>
@@ -935,100 +917,148 @@ different module.</p>
 <span class="nf">liftCode</span> <span class="n">x</span> <span class="ow">=</span> <span class="n">unsafely</span> <span class="o">$</span> <span class="n">safeLiftCode</span> <span class="n">x</span>
 </pre></div>
 </div>
-<p>It takes a Haskell value of type <em>a</em>, provided <em>a</em> is an instance of the
-<em>Lift</em> class, and turns it into a piece of Plutus script code
-corresponding to the same type.</p>
-<p>So, let’s use that.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="p">(</span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span> <span class="p">`</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">applyCode</span><span class="p">`</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">liftCode</span> <span class="n">p</span><span class="p">)</span>
+<p>It takes a Haskell value of type <code class="docutils literal notranslate"><span class="pre">a</span></code>, provided <code class="docutils literal notranslate"><span class="pre">a</span></code> is an instance of the <code class="docutils literal notranslate"><span class="pre">Lift</span></code> class, and turns it into a piece of Plutus script code corresponding to the same type.</p>
+<p>Now we can fix our validator.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">typedValidator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">TypedValidator</span> <span class="kt">Vesting</span>
+<span class="nf">typedValidator</span> <span class="n">p</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">mkTypedValidator</span> <span class="o">@</span><span class="kt">Vesting</span>
+    <span class="p">(</span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span> <span class="p">`</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">applyCode</span><span class="p">`</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">liftCode</span> <span class="n">p</span><span class="p">)</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
+  <span class="kr">where</span>
+    <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="nb">()</span> <span class="o">@</span><span class="nb">()</span>
 </pre></div>
 </div>
-<p>There is still a problem, however. We need a <em>Lift</em> instance for <em>p</em>.</p>
-<p>Luckily, similar to how we got an instance for <em>IsData</em> there is also a
-Template Haskell function for <em>Lift</em>.</p>
+<p>This code is fine, but it won’t yet compile, because <code class="docutils literal notranslate"><span class="pre">VestingParam</span></code> is not an instance of <code class="docutils literal notranslate"><span class="pre">Lift</span></code>. To fix this, we can use <code class="docutils literal notranslate"><span class="pre">makeLift</span></code>.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">makeLift</span> <span class="kt">&#39;&#39;VestingParam</span>
 </pre></div>
 </div>
-<p>But, it still won’t compile. We need another GHC extension.</p>
+<p>And, we need to enable a GHC extension.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# LANGUAGE MultiParamTypeClasses #-}</span>
 </pre></div>
 </div>
-<p>Now we have to some more little modifications.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">validator</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Validator</span>
-<span class="nf">validator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorScript</span> <span class="o">.</span> <span class="n">inst</span>
-
-<span class="nf">scrAddress</span> <span class="ow">::</span> <span class="kt">VestingParam</span> <span class="ow">-&gt;</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Address</span>
-<span class="nf">scrAddress</span> <span class="ow">=</span> <span class="n">scriptAddress</span> <span class="o">.</span> <span class="n">validator</span>
+<p>Now it will compile.</p>
+</div>
+</div>
+<div class="section" id="off-chain">
+<h3><span class="section-number">4.5.2. </span>Off-Chain<a class="headerlink" href="#off-chain" title="Permalink to this headline">¶</a></h3>
+<p>The off-chain code hasn’t changed much.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">GiveParams</span></code> are still the same.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">GiveParams</span> <span class="ow">=</span> <span class="kt">GiveParams</span>
+      <span class="p">{</span> <span class="n">gpBeneficiary</span> <span class="ow">::</span> <span class="o">!</span><span class="kt">PubKeyHash</span>
+      <span class="p">,</span> <span class="n">gpDeadline</span>    <span class="ow">::</span> <span class="o">!</span><span class="kt">POSIXTime</span>
+      <span class="p">,</span> <span class="n">gpAmount</span>      <span class="ow">::</span> <span class="o">!</span><span class="kt">Integer</span>
+      <span class="p">}</span> <span class="kr">deriving</span> <span class="p">(</span><span class="kt">Generic</span><span class="p">,</span> <span class="kt">ToJSON</span><span class="p">,</span> <span class="kt">FromJSON</span><span class="p">,</span> <span class="kt">ToSchema</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Changes are also necessary in the wallet part.</p>
-<p>The <em>GiveParams</em> stay the same, but the endpoints are slightly
-different, because in the <em>grab</em> endpoint earlier we only had the Unit
-argument, but now we need the slot.</p>
-<p>This is because, in order to construct the address that we grab from, we
-need the params - the beneficiary and the deadline. We already now the
-beneficiary, as it will be the address of the wallet that is doing the
-grabbing, but we need to pass in the slot value for the deadline.</p>
-<p>In the <em>give</em> endpoint, there are also some differences.</p>
-<p>Whenever we need an <em>inst</em> we must pass in the params.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraints</span> <span class="p">(</span><span class="n">inst</span> <span class="n">p</span><span class="p">)</span> <span class="n">tx</span>
+<p><code class="docutils literal notranslate"><span class="pre">VestingSchema</span></code> has slightly changed because the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint now relies on knowing the beneficiary and deadline in order to know
+determine the script address. We know the beneficiary because it will be the public key hash of the wallet that calls <code class="docutils literal notranslate"><span class="pre">grab</span></code>, but we don’t know the deadline, so we must
+pass it to <code class="docutils literal notranslate"><span class="pre">grab</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">type</span> <span class="kt">VestingSchema</span> <span class="ow">=</span>
+          <span class="kt">Endpoint</span> <span class="s">&quot;give&quot;</span> <span class="kt">GiveParams</span>
+      <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;grab&quot;</span> <span class="kt">POSIXTime</span>
 </pre></div>
 </div>
-<p>And in the <em>grab</em> endpoint, we have the additional parameter.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint is similar to the vesting example, but there are some differences.</p>
+<p>Instead of computing the datum, we will construct something of type <code class="docutils literal notranslate"><span class="pre">VestingParam</span></code>. We also change the reference to the datum in <code class="docutils literal notranslate"><span class="pre">mustPayToTheScript</span></code> to become <code class="docutils literal notranslate"><span class="pre">()</span></code>, and
+we provide the type <code class="docutils literal notranslate"><span class="pre">p</span></code> to <code class="docutils literal notranslate"><span class="pre">typedValidator</span></code> as it is no longer a constant.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">give</span> <span class="ow">::</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">GiveParams</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<span class="nf">give</span> <span class="n">gp</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="kr">let</span> <span class="n">p</span>  <span class="ow">=</span> <span class="kt">VestingParam</span>
+                <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">=</span> <span class="n">gpBeneficiary</span> <span class="n">gp</span>
+                <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">=</span> <span class="n">gpDeadline</span> <span class="n">gp</span>
+                <span class="p">}</span>
+        <span class="n">tx</span> <span class="ow">=</span> <span class="n">mustPayToTheScript</span> <span class="nb">()</span> <span class="o">$</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="o">$</span> <span class="n">gpAmount</span> <span class="n">gp</span>
+    <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraints</span> <span class="p">(</span><span class="n">typedValidator</span> <span class="n">p</span><span class="p">)</span> <span class="n">tx</span>
+    <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
+    <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="n">printf</span> <span class="s">&quot;made a gift of %d lovelace to %s with deadline %s&quot;</span>
+        <span class="p">(</span><span class="n">gpAmount</span> <span class="n">gp</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">show</span> <span class="o">$</span> <span class="n">gpBeneficiary</span> <span class="n">gp</span><span class="p">)</span>
+        <span class="p">(</span><span class="n">show</span> <span class="o">$</span> <span class="n">gpDeadline</span> <span class="n">gp</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint, there are also some changes.</p>
+<p>Recall that earlier we got all the UTxOs sitting at this one script address and that they could be for arbitrary beneficiaries and for arbitrary deadlines. For this reason, we
+had to filter those UTxOs which were for us and where the deadline had been reached.</p>
+<p>We now have the additional parameter, which we’ll call <code class="docutils literal notranslate"><span class="pre">d</span></code>, which represents the deadline. So we can immediately see if the deadline has been reached or not.</p>
+<p>If it has not been reached, we write a log message and stop, otherwise we continue and construct the <code class="docutils literal notranslate"><span class="pre">VestingParam</span></code>.</p>
+<p>Then, we look up the UTxOs that are sitting at this address. Address is not a constant anymore, it takes a parameter. So, now, we will only get UTxOs which are for us and that
+have a deadline that has been reached. We don’t need to filter anything.</p>
+<p>If there are none, we log a message to that effect and stop, otherwise we do more or less what we did before.</p>
 <div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab</span> <span class="n">d</span> <span class="ow">=</span> <span class="kr">do</span>
+<span class="nf">now</span>   <span class="ow">&lt;-</span> <span class="n">currentTime</span>
+<span class="nf">pkh</span>   <span class="ow">&lt;-</span> <span class="n">pubKeyHash</span> <span class="o">&lt;$&gt;</span> <span class="n">ownPubKey</span>
+<span class="kr">if</span> <span class="n">now</span> <span class="o">&lt;</span> <span class="n">d</span>
+    <span class="kr">then</span> <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;too early&quot;</span>
+    <span class="kr">else</span> <span class="kr">do</span>
+        <span class="kr">let</span> <span class="n">p</span> <span class="ow">=</span> <span class="kt">VestingParam</span>
+                    <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">=</span> <span class="n">pkh</span>
+                    <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">=</span> <span class="n">d</span>
+                    <span class="p">}</span>
+                    <span class="n">utxos</span> <span class="ow">&lt;-</span> <span class="n">utxoAt</span> <span class="o">$</span> <span class="n">scrAddress</span> <span class="n">p</span>
+                    <span class="kr">if</span> <span class="kt">Map</span><span class="o">.</span><span class="n">null</span> <span class="n">utxos</span>
+                        <span class="kr">then</span> <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;no gifts available&quot;</span>
+                        <span class="kr">else</span> <span class="kr">do</span>
+                            <span class="kr">let</span> <span class="n">orefs</span>   <span class="ow">=</span> <span class="n">fst</span> <span class="o">&lt;$&gt;</span> <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="n">utxos</span>
+                                <span class="n">lookups</span> <span class="ow">=</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">unspentOutputs</span> <span class="n">utxos</span>      <span class="o">&lt;&gt;</span>
+                                          <span class="kt">Constraints</span><span class="o">.</span><span class="n">otherScript</span> <span class="p">(</span><span class="n">validator</span> <span class="n">p</span><span class="p">)</span>
+                                <span class="n">tx</span> <span class="ow">::</span> <span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span>
+                                <span class="n">tx</span>      <span class="ow">=</span> <span class="n">mconcat</span> <span class="p">[</span><span class="n">mustSpendScriptOutput</span> <span class="n">oref</span> <span class="o">$</span> <span class="kt">Redeemer</span> <span class="o">$</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">toData</span> <span class="nb">()</span> <span class="o">|</span> <span class="n">oref</span> <span class="ow">&lt;-</span> <span class="n">orefs</span><span class="p">]</span> <span class="o">&lt;&gt;</span>
+                                          <span class="n">mustValidateIn</span> <span class="p">(</span><span class="n">from</span> <span class="n">now</span><span class="p">)</span>
+                            <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraintsWith</span> <span class="o">@</span><span class="kt">Void</span> <span class="n">lookups</span> <span class="n">tx</span>
+                            <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
+                            <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;collected gifts&quot;</span>
 </pre></div>
 </div>
-<p>And we can use that to construct the parameters, along with our own
-public key hash.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">let</span> <span class="n">p</span> <span class="ow">=</span> <span class="kt">VestingParam</span>
-            <span class="p">{</span> <span class="n">beneficiary</span> <span class="ow">=</span> <span class="n">pkh</span>
-            <span class="p">,</span> <span class="n">deadline</span>    <span class="ow">=</span> <span class="n">d</span>
-            <span class="p">}</span>
+<p>The <code class="docutils literal notranslate"><span class="pre">endpoints</span></code> function is slightly different due to the new parameter for <code class="docutils literal notranslate"><span class="pre">grab</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">endpoints</span> <span class="ow">::</span> <span class="kt">Contract</span> <span class="nb">()</span> <span class="kt">VestingSchema</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">endpoints</span> <span class="ow">=</span> <span class="p">(</span><span class="n">give&#39;</span> <span class="p">`</span><span class="n">select</span><span class="p">`</span> <span class="n">grab&#39;</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">endpoints</span>
+  <span class="kr">where</span>
+    <span class="n">give&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;give&quot;</span> <span class="o">&gt;&gt;=</span> <span class="n">give</span>
+    <span class="n">grab&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;grab&quot;</span> <span class="o">&gt;&gt;=</span> <span class="n">grab</span>
 </pre></div>
-</div>
-<p>And again, when we use something like <em>scrAddress</em>, we need to pass in
-the parameters.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">utxos</span> <span class="ow">&lt;-</span> <span class="n">utxoAt</span> <span class="o">$</span> <span class="n">scrAddress</span> <span class="n">p</span>
-</pre></div>
-</div>
-<p>Now, the good thing with this is that we don’t need the filter helper
-function <em>isSuitable</em> anymore. Previously, we got all the UTxOs sitting
-at the script address and filtered them based on beneficiary and
-deadline. But now, it’s much easier because the script is already
-parameterized by beneficiary, so we know that this script will only hold
-UTxOs that are for us.</p>
-<p>So, all we need to do is to check that <em>now</em> is not earlier than the
-deadline.</p>
-<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">if</span> <span class="n">now</span> <span class="o">&lt;</span> <span class="n">d</span>
-   <span class="kr">then</span> <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;too early&quot;</span>
-   <span class="kr">else</span> <span class="kr">do</span>
-   <span class="o">...</span>
-</pre></div>
-</div>
 </div>
 </div>
 <div class="section" id="back-to-the-playground">
 <h3><span class="section-number">4.5.3. </span>Back to the playground<a class="headerlink" href="#back-to-the-playground" title="Permalink to this headline">¶</a></h3>
-<p>If we copy paste this new contract into the playground and setup the
-same scenario as before…</p>
+<p>We will now copy and paste this new contract into the playground and setup a new scenario.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">give</span></code> transactions are the same.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00020.png" />
+<img alt="_images/pic__000591.png" src="_images/pic__000591.png" />
 </div>
-<p>We can see that now, one of the disadvantages to doing it this way is
-that the wallets now need to know the deadline in order to construct the
-script address.</p>
-<p>If you evaluate this, you will see that it succeeds.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">grab</span></code> is slightly different. In our earlier implementation, one wallet could grab UTxOs with different deadlines provided that the deadlines had passed. Now the deadline
+is part of the script parameter, so we need to specify it in order to get the script address. This means that Wallet 2 cannot grab the gifts for slots 10 and 20 at the same time,
+at least not in the way that we have implemented it.</p>
+<p>First we can wait until slot 10 and then Wallet 2 should be able to grab its first gift and Wallet 3 should be able to claim its single gift.</p>
+<p>We’ll add a <code class="docutils literal notranslate"><span class="pre">grab</span></code> for Wallets 2 and 3. Here, we don’t need to wain in between each transaction because it is two different wallets.</p>
+<p>We then wait until slot 20 and perform Wallet 2’s second <code class="docutils literal notranslate"><span class="pre">grab</span></code> and then wait for 1 block, as usual.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00021.png" />
+<img alt="_images/pic__000601.png" src="_images/pic__000601.png" />
 </div>
-<p>But now, compare the script address that Wallet 1 sends to with the
-script address that Wallet 2 sends to.</p>
+<p>So let’s see if it works by clicking <code class="docutils literal notranslate"><span class="pre">Evaluate</span></code>.</p>
 <div class="figure align-default">
-<img alt="" src="_images/week03__00022.png" />
+<img alt="_images/pic__000611.png" src="_images/pic__000611.png" />
 </div>
-<p>They are now different. The UTxOs are being held at different addresses.</p>
-<p>This is because of the parameters. The same script but with different
-parameters will have a different hash.</p>
-<p>Whether this is a good thing or a bad thing will depend on the use case.</p>
+<p>Take note of the script address for that transaction out at slot 1.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000621.png" src="_images/pic__000621.png" />
+</div>
+<p>And compare this with the script address for the transaction output at slot 2.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000631.png" src="_images/pic__000631.png" />
+</div>
+<p>Notice that the script address for the UTxOs is different. In our first version of the vesting contract, the script address was a constant. This meant that all our gifts ended up
+at the same script address and only the datum in each UTxO was different.</p>
+<p>Now, the datum is just <code class="docutils literal notranslate"><span class="pre">()</span></code> and the beneficiary and the deadline are included as part of the script itself, so the addresses are now different depending on the beneficiary and
+deadline parameters.</p>
+<p>For the gift to Wallet 3 we see yet another address.</p>
+<div class="figure align-default">
+<img alt="_images/pic__00064.png" src="_images/pic__00064.png" />
+</div>
+<p>We see two grabs in slot 10, one by Wallets 2 and one by Wallet 3. The order in which they are processed is not deterministic.</p>
+<p>Then, finally in slot 20, Wallet 2 grabs its remaining gift.</p>
+<p>And the final balances reflect the transactions that have occurred.</p>
+<div class="figure align-default">
+<img alt="_images/pic__000651.png" src="_images/pic__000651.png" />
+</div>
 </div>
 </div>
 </div>
