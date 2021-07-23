@@ -29,8 +29,8 @@ Recap
 
 When we explained the (E)UTxO model in the first lecture, we mentioned that in
 order to unlock a script address, the script attached to the address is
-run, and that script gets three pieces of information - the *Datum*, the
-*Redeemer* and the *Context*.
+run, and that script gets three pieces of information - the *datum*, the
+*redeemer* and the *context*.
 
 In the second lecture, we saw examples of that, and we saw how it
 actually works in Haskell.
@@ -39,7 +39,7 @@ We saw the low-level implementation, where all three arguments are
 represented by the ``Data`` type. We also saw that in practice this is not
 used.
 
-Instead, we use the typed version, where the datum and redeemer* can be
+Instead, we use the typed version, where the datum and redeemer can be
 custom types (as long as they implement the ``IsData`` type class), and
 where the third argument is of type ``ScriptContext``.
 
