@@ -15,6 +15,7 @@ module Week05.Homework1 where
 import           Control.Monad              hiding (fmap)
 import           Control.Monad.Freer.Extras as Extras
 import           Data.Aeson                 (ToJSON, FromJSON)
+import           Data.Default               (Default (..))
 import           Data.Text                  (Text)
 import           Data.Void                  (Void)
 import           GHC.Generics               (Generic)
@@ -24,6 +25,7 @@ import qualified PlutusTx
 import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
 import           Ledger                     hiding (mint, singleton)
 import           Ledger.Constraints         as Constraints
+import           Ledger.TimeSlot
 import qualified Ledger.Typed.Scripts       as Scripts
 import           Ledger.Value               as Value
 import           Playground.Contract        (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
@@ -63,7 +65,7 @@ mint mp = do
         else do
             let val     = Value.singleton (curSymbol pkh deadline) (mpTokenName mp) (mpAmount mp)
                 lookups = Constraints.mintingPolicy $ policy pkh deadline
-                tx      = Constraints.mustMintValue val <> Constraints.mustValidateIn (to deadline)
+                tx      = Constraints.mustMintValue val <> Constraints.mustValidatlIn (to $ now + 5000)
             ledgerTx <- submitTxConstraintsWith @Void lookups tx
             void $ awaitTxConfirmed $ txId ledgerTx
             Contract.logInfo @String $ printf "forged %s" (show val)
@@ -80,7 +82,7 @@ mkKnownCurrencies []
 test :: IO ()
 test = runEmulatorTraceIO $ do
     let tn       = "ABC"
-        deadline = 10
+        deadline = slotToBeginPOSIXTime def 10
     h <- activateContractWallet (Wallet 1) endpoints
     callEndpoint @"mint" h $ MintParams
         { mpTokenName = tn
