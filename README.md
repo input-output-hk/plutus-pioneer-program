@@ -30,12 +30,19 @@
   - The `EmulatorTrace`-monad.
   - The `Contract`-monad.
 
+- [Lecture #5](https://youtu.be/SsaVjSsPPcg)
+
+  - Values.
+  - Native Tokens.
+  - NFT's.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
 - Lecture #2:  [Simple validation](code/week02)
 - Lecture #3:  [Script Context & Parameterized Contracts](code/week03)
 - Lecture #4:  [Monad, Traces & Contracts](code/week04)
+- Lecture #5:  [Native Tokens](code/week05)
 
 ## Exercises
 
@@ -73,6 +80,11 @@
 
   - Implement function `payTrace` in the [Homework](code/week04/src/Week04/Homework.hs) module.
   - Handle exceptions thrown by `submitTx` in function `payContract` in the same module.
+
+- Week #5
+
+  - Add a deadline to the minting policy in the [Homework1](code/week05/src/Week05/Homework1.hs) module.
+  - Fix the token name to the empty ByteString in the NFT contract in the [Homework2](code/week05/src/Week05/Homework2.hs) module.
 
 ## Some Plutus Modules
 
