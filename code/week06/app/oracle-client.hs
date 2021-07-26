@@ -51,7 +51,7 @@ getExchangeRate = runReq defaultHttpConfig $ do
         NoReqBody
         bsResponse
         mempty
-    let priceRegex      = "priceValue___11gHJ\">\\$([\\.0-9]*)" :: ByteString
+    let priceRegex      = "priceValue___11gHJ \">\\$([\\.0-9]*)" :: ByteString
         (_, _, _, [bs]) = responseBody v =~ priceRegex :: (ByteString, ByteString, ByteString, [ByteString])
         d               = read $ unpack bs :: Double
         x               = round $ 1_000_000 * d
