@@ -7,6 +7,7 @@
    :maxdepth: 4
    :caption: Contents:
    :numbered:
+   :title: Plutus Pioneer Program Video Notes
 
    overview.rst
    week1.rst
