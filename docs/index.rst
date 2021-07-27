@@ -13,8 +13,7 @@ These are my notes from the `series of videos by Lars Brünjes <https://github.c
 
 The source code for the lectures can be found `here <https://github.com/input-output-hk/plutus-pioneer-program/tree/main/code>`_.
 
-These notes can be downloaded in PDF or ePub formats using the links at the bottom left of the page. Both formats are auto-generated and probably look ok, but I've
-not yet spent any time making adjustments to work on any issues with their presentation.
+These notes can be downloaded in PDF or ePub formats using the links at the bottom left of the page.
 
 To stay up-to-date with changes to these notes, you can follow me on Twitter @PoolChess. They are currently being updated for the second iteration of the program.
 
