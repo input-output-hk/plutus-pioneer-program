@@ -3,11 +3,17 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+Welcome to the Plutus Pioneer Program video notes. These are written versions
+of the YouTube video tutorials by Lars Brünjes. 
+
+They are currently being updated for the second iteration of the program.
+
+.. note:: If you find these notes useful and would like to support me, please consider delegating some ADA to `CHESS Pool <https://chess.ihpapp.com>`__
+
 .. toctree::
    :maxdepth: 4
    :caption: Contents:
    :numbered:
-   :title: Plutus Pioneer Program Video Notes
 
    overview.rst
    week1.rst
