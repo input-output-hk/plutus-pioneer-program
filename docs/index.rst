@@ -7,19 +7,22 @@
 Plutus Pioneer Program Video Notes
 ==================================
 
-Welcome to the Plutus Pioneer Program video notes. These are written versions
-of the YouTube video tutorials by Lars Brünjes. 
-
-They are currently being updated for the second iteration of the program.
+These are my notes from the `series of videos by Lars Brünjes <https://github.com/input-output-hk/plutus-pioneer-program>`_ for the Plutus Pioneers Program.
 
 .. note:: If you find these notes useful and would like give support, please consider delegating some ADA to `CHESS Pool <https://chess.ihpapp.com>`__.
 
+The source code for the lectures can be found `here <https://github.com/input-output-hk/plutus-pioneer-program/tree/main/code>`_.
+
+These notes can be downloaded in PDF or ePub formats using the links at the bottom left of the page. Both formats are auto-generated and probably look ok, but I've
+not yet spent any time making adjustments to work on any issues with their presentation.
+
+To stay up-to-date with changes to these notes, you can follow me on Twitter @PoolChess. They are currently being updated for the second iteration of the program.
+
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 1
    :caption: Contents:
    :numbered:
 
-   overview.rst
    week1.rst
    week2.rst
    week3.rst
