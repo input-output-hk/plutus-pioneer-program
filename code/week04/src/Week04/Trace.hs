@@ -25,10 +25,9 @@ myTrace = do
     h2 <- activateContractWallet (Wallet 2) endpoints
     callEndpoint @"give" h1 $ GiveParams
         { gpBeneficiary = pubKeyHash $ walletPubKey $ Wallet 2
-        , gpDeadline    = slotToBeginPOSIXTime def 20
-        , gpAmount      = 10000000
-        }
+        , gpDeadline = slotToBeginPOSIXTime def $ Slot 20
+        , gpAmount = 10000000}
     void $ waitUntilSlot 20
     callEndpoint @"grab" h2 ()
     s <- waitNSlots 1
-    Extras.logInfo $ "reached " ++ show s
+    Extras.logInfo $ "reached " ++ show s -- extra logging

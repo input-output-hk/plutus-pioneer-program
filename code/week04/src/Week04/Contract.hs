@@ -17,8 +17,8 @@ import Wallet.Emulator.Wallet
 -- EmulatorTrace a
 
 myContract1 :: Contract () Empty Text ()
-myContract1 = do
-    void $ Contract.throwError "BOOM!"
+myContract1 = do 
+    void $ Contract.throwError "BOOM"
     Contract.logInfo @String "hello from the contract"
 
 myTrace1 :: EmulatorTrace ()

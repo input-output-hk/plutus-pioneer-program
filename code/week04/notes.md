@@ -77,7 +77,7 @@ Superfeatures a Contract Monad has
 * Contract Monad is the Offchain Part of Plutus
 * In the Writer Monad there is the tell function is available (Log messages)
 
-# Trace
+# Trace Monac
 in Cabal repl
 `:l src/Week04/Trace.hs`
 `import Plutus.Contract.Trace`
@@ -85,3 +85,32 @@ Then we can use `defaultDist` for the default Token distribution where each Wall
 We can specify the Wallets for the distribution if needed
 `defaultDist [Wallet 1, Wallet 2]`
 
+# Run the Emulator
+`import Data.Default`
+`import Plutus.Trace.Emulator`
+Find out default Emulator config
+`def :: EmulatorConfig`
+
+`import Ledger.Fee`
+Find out Fee Config
+`dev :: FeeConfig`
+
+## Run the Emulator with nothing
+`runEmulatorTrace def def $ return ()` where the first def is default Emulator Config (10 Wallets with 100 ADA each) and the second is the default Fee config
+The last argument `return ()` is the simplest possible EmulatorTrace Monad which does nothing.
+
+## Run the Emulator with IO
+`runEmulatorTraceIO $ return ()` which runs the same but prints out something to the screen
+
+To run the Emulator with a TraceConfig we can use `runEmulatorTraceIO'`
+
+# Contract Monad
+Type operator to combine types:
+`.\/`
+
+# Run Haddock Documentation
+run inside plutus repository
+`nix-shell`
+`nix-build -A plutus-playground.haddock`
+`cd result/share/doc/`
+`serve .`
