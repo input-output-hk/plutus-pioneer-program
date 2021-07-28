@@ -143,7 +143,7 @@ findSwaps oracle p = do
 retrieveSwaps :: Oracle -> Contract w s Text ()
 retrieveSwaps oracle = do
     pkh <- pubKeyHash <$> ownPubKey
-    xs <- findSwaps oracle (== pkh)
+    xs  <- findSwaps oracle (== pkh)
     case xs of
         [] -> logInfo @String "no swaps found"
         _  -> do
@@ -180,7 +180,7 @@ useSwap oracle = do
                                   Constraints.mustPayToOtherScript
                                     (validatorHash $ oracleValidator oracle)
                                     (Datum $ PlutusTx.toBuiltinData x)
-                                    v                                                                      <>
+                                    v                                                                             <>
                                   Constraints.mustPayToPubKey pkh' p
                     ledgerTx <- submitTxConstraintsWith @Swapping lookups tx
                     awaitTxConfirmed $ txId ledgerTx
