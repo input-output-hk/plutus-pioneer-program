@@ -39,6 +39,9 @@ ____________________
 Install Nix
 ___________
 
+We use a little trick here to let Nix use a symlinked directory. This is not recommended if you plan to have setups on multiple machines with potentially different configurations,
+but that doesn't matter here.
+
 .. code:: bash
 
     mkdir /data/nix
