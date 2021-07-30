@@ -57,6 +57,10 @@ _________________________
     git clone https://github.com/input-output-hk/cardano-node
     cd cardano-node
     git checkout tags/alonzo-white-1.1 -b alonzo_white_1_1
+
+Build the node
+______________
+
     nix-build -A scripts.alonzo-white.node -o result/alonzo-white/cardano-node-alonzo-white
     nix-build -A cardano-cli -o result/alonzo-white/cardano-cli
 
