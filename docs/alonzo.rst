@@ -102,8 +102,11 @@ You can use ``jt`` if you ever want to get some specific information, for exampl
     $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
     100.0
 
-Clone the test scripts repo
----------------------------
+Get some test Ada
+~~~~~~~~~~~~~~~~~
+
+Some Helper Scripts
+___________________
 
 I have a repo that contains a few helper scripts that I use. It's rough and ready, but saves a little time.
 
@@ -113,7 +116,7 @@ I have a repo that contains a few helper scripts that I use. It's rough and read
     git clone https://github.com/chris-moreton/plutus-scripts
 
 Generate test addresses
-~~~~~~~~~~~~~~~~~~~~~~~
+_______________________
 
 Run the generate wallets script to generate a few addresses.
 
@@ -124,8 +127,8 @@ Run the generate wallets script to generate a few addresses.
 
 This will create some ``.addr``, ``.skey`` and ``.vkey`` files in the ``wallets`` directory.    
 
-Get some test Ada
-~~~~~~~~~~~~~~~~~
+Use the Faucet
+______________
 
 If you have access to the testnet faucet, transfer some test Ada to the ``main`` wallet.
 
