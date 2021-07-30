@@ -16,7 +16,7 @@ I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4
 AWS Node Setup
 --------------
 
-Mount the ``data`` volume.
+Mount the data volume.
 
 .. code:: bash
 
