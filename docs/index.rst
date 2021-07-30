@@ -32,7 +32,7 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
    week8.rst
    week9.rst
    week10.rst
-   alonzo.rst
+   alonzowhiteex1.rst
    
 
    
