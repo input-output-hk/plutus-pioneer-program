@@ -1,9 +1,9 @@
 Alonzo White Exercise 1
 =======================
 
-These are my notes taken while working through the Alonzo White exercises.
+These are my notes taken while working through Alonzo White exercise 1.
 
-This is a work in progress. Currently it just shows how to get the node up-and-running. 
+This is the setup I used, but there are several other ways to run the node and config the environment.
 
 .. note::
     
@@ -25,7 +25,8 @@ Mount the ``data`` volume.
     sudo mount /dev/xvdh /data
     sudo chown ubuntu:ubuntu /data
 
-Setup the IOHK Binary Cache
+Setup the IOHK Cache
+____________________
 
 .. code:: bash
 
@@ -36,6 +37,7 @@ Setup the IOHK Binary Cache
     EOF
 
 Install Nix
+___________
 
 .. code:: bash
 
@@ -47,6 +49,7 @@ Install Nix
     . /home/ubuntu/.nix-profile/etc/profile.d/nix.sh
 
 Download the Cardano Node
+_________________________
 
 .. code:: bash
 
@@ -58,6 +61,7 @@ Download the Cardano Node
     nix-build -A cardano-cli -o result/alonzo-white/cardano-cli
 
 Start the node
+______________
 
 .. code:: bash
 
@@ -66,7 +70,8 @@ Start the node
 
 Leave this running and open another shell.
 
-Setup some handy environment variables
+Setup some environment variables
+________________________________
 
 .. code:: bash
 
@@ -101,9 +106,6 @@ You can use ``jt`` if you ever want to get some specific information, for exampl
     sudo apt install jq -y
     $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
     100.0
-
-Get some test Ada
-~~~~~~~~~~~~~~~~~
 
 Some Helper Scripts
 ___________________
