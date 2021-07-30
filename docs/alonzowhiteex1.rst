@@ -103,7 +103,7 @@ You should see something like this:
         "syncProgress": "100.00"
     }
 
-You can use ``jt`` if you ever want to get some specific information, for example:
+You can use ``jq`` if you ever want to get some specific information, for example:
 
 .. code:: bash
 
