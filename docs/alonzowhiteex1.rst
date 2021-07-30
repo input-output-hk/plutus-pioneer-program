@@ -107,6 +107,9 @@ You can use ``jt`` if you ever want to get some specific information, for exampl
     $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
     100.0
 
+Get some test Ada
+~~~~~~~~~~~~~~~~~
+
 Some Helper Scripts
 ___________________
 
