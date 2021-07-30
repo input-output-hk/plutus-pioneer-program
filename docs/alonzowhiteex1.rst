@@ -3,7 +3,7 @@ Alonzo White Exercise 1
 
 These are my notes taken while working through Alonzo White exercise 1.
 
-This is the setup I used, but there are several other ways to run the node and config the environment.
+This is the setup I used, but there are several other ways to run the node and configure the environment.
 
 .. note::
     
