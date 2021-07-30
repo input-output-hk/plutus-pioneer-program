@@ -3,7 +3,13 @@ Alonzo White Walk-through
 
 These are my notes taken while working through the Alonzo White exercises.
 
-This is a work in progress. Currently it just shows how to get the node up-and-running.
+This is a work in progress. Currently it just shows how to get the node up-and-running. 
+
+.. node::
+    
+    The exercises are only possible if you have some test Ada from the Alonzo White faucet. Test Ada is currently only available to members
+    of the Alonzo test group and is used to control the traffic on the network. The number of people in the Alonzo test group is increasingly rapidly,
+    so if you are not able to get test Ada, you soon will be to.
 
 I started with a fresh AWS Ubuntu EC2 instance. I used a ``t2.large`` with a 20Gb data volume.
 
