@@ -1,5 +1,5 @@
-Alonzo White Walk-through
-=========================
+Alonzo White Notes
+==================
 
 These are my notes taken while working through the Alonzo White exercises.
 
@@ -13,8 +13,8 @@ This is a work in progress. Currently it just shows how to get the node up-and-r
 
 I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 20Gb data volume.
 
-Build the Cardano Node
-----------------------
+AWS Node Setup
+--------------
 
 Mount the ``data`` volume.
 
@@ -81,8 +81,43 @@ You can check on the status of the node with:
 
     $CARDANO_CLI query tip --testnet-magic $TESTNET_MAGIC_NUM
 
+You should see something like this:
 
+.. code:: json
 
+    {
+        "epoch": 289,
+        "hash": "7521f071d0bfc050cde302f1352ed44c2fc74927f1e28afea1b1df2c4c012d5c",
+        "slot": 2079664,
+        "block": 102026,
+        "era": "Alonzo",
+        "syncProgress": "100.00"
+    }
+
+You can use ``jt`` if you ever want to get some specific information, for example:
+
+.. code:: bash
+
+    sudo apt install jq -y
+    $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
+    100.0
+
+Clone the test scripts repo
+---------------------------
+
+.. code:: bash
+    
+    cd /data
+    git clone https://github.com/chris-moreton/plutus-scripts
+
+Run the generate wallets script to generate a few addresses.
+
+.. code:: bash
+
+    cd /data/plutus-scripts
+    ./generateAddresses.sh
+
+This will create some ``.addr``, ``.skey`` and ``.vkey`` files in the ``wallets`` directory.    
 
 
 
