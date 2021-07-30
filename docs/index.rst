@@ -21,7 +21,7 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
    :maxdepth: 1
    :caption: Contents:
    :numbered:
-
+   
    week1.rst
    week2.rst
    week3.rst
@@ -32,6 +32,7 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
    week8.rst
    week9.rst
    week10.rst
+   alonzo.rst
    
 
    
