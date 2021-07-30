@@ -1,5 +1,5 @@
-Alonzo White Notes
-==================
+Alonzo White Exercise 1
+=======================
 
 These are my notes taken while working through the Alonzo White exercises.
 
@@ -104,6 +104,8 @@ You can use ``jt`` if you ever want to get some specific information, for exampl
 
 Clone the test scripts repo
 ---------------------------
+
+I have a repo that contains a few helper scripts that I use. It's rough and ready, but saves a little time.
 
 .. code:: bash
     
