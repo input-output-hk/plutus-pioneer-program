@@ -8,8 +8,7 @@ This is the setup I used, but there are several other ways to run the node and c
 .. note::
     
     The exercises are only possible if you have some test Ada from the Alonzo White faucet. Test Ada is currently only available to members
-    of the Alonzo test group and is used to control the traffic on the network. The number of people in the Alonzo test group is increasingly rapidly,
-    so if you are not able to get test Ada, you soon will be.
+    of the Alonzo test group in order to control usage of the network. Alonzo testnet is moving towards a public phase within a matter of weeks.
 
 I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 20Gb data volume.
 
