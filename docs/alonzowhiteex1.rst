@@ -107,11 +107,12 @@ You should see something like this:
         "syncProgress": "100.00"
     }
 
-You can use ``jq`` if you ever want to get some specific information, for example:
+You can use ``jq`` if you ever want to get some specific information on its own, for example:
 
 .. code:: bash
 
     sudo apt install jq -y
+    
     $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
     100.0
 
@@ -238,4 +239,40 @@ correct datum hash.
 
     $CARDANO_CLI transaction hash-script-data --script-data-value 6666
     9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710
+
+If there are too many, you could use ``grep`` to filter out the ones with the correct balance.
+
+.. code:: bash
+
+    ./contractBalance.sh AlwaysSucceeds | grep 99000000
+    843f4ffa4aafc5ed968d0a9f0fb8a203796b66327343246bfd8d4ca1d361c2f8     0        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+
+Unlock the Funds in the Script
+______________________________
+
+When trying to consume UTxOs locked in a script, you need to provide collateral that will cover the costs if validation fails. For this we can use a separate wallet for storing
+collateral UTxOs, to keep things tidy. One of the several wallets we created earlier on was named ``collateral``.
+
+Under normal circumstances, collateral should never be lost because the wallet can perform validation in a deterministic fashion and only
+submit the transaction if validation is guaranteed to pass.
+
+.. code:: bash
+
+    ./sendFromWallet.sh main
+
+                            TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    bd7422ef2cd55d1c5a33601a3b75b080bc3742856e5ddb8dfdfae07f583c7af1     1        998999800000 lovelace + TxOutDatumHashNone
+    TX row number: 1  
+    Lovelace to send: 1000000000
+    Receiving wallet name: collateral
+    Transaction successfully submitted.
+
+We should check that it's arrived in our ``collateral`` wallet.
+
+    ./balance.sh collateral
+                            TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    7678d8d6b95ed026d7c690fb53419bdaa580cb00c56450ac3bd97712dd71ca4e     0        1000000000 lovelace + TxOutDatumHashNone
+
     
