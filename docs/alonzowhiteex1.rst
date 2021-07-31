@@ -270,9 +270,10 @@ submit the transaction if validation is guaranteed to pass.
 
 We should check that it's arrived in our ``collateral`` wallet.
 
+.. code:: bash
+
     ./balance.sh collateral
                             TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
     7678d8d6b95ed026d7c690fb53419bdaa580cb00c56450ac3bd97712dd71ca4e     0        1000000000 lovelace + TxOutDatumHashNone
 
-    
