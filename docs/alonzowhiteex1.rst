@@ -186,3 +186,56 @@ Check that it has arrived.
     --------------------------------------------------------------------------------------
     bd7422ef2cd55d1c5a33601a3b75b080bc3742856e5ddb8dfdfae07f583c7af1     0        1000000000 lovelace + TxOutDatumHashNone
 
+Lock Ada in a Plutus Script
+___________________________
+
+Plutus scripts get compiled down to the following format. This is the ``AlwaysSuccess.plutus`` script whose validator always succeeds, which means that anyone will be able to
+consume any UTxO sitting at its address.
+
+.. code:: json
+
+    {
+        "type": "PlutusScriptV1",
+        "description": "",
+        "cborHex": "585c585a010000332233322233333322222233222220051200120012122222300500622122222330040070062122222300300621222223002006212222230010062001112200212212233001004003120011122123300100300211200101"
+    }   
+    
+This script is in the /data/plutus-scripts/scripts directory. Using the ``payToScript.sh`` helper script, you can send ``99000000`` lovelace from ``wallet`` to the ``AlwaysSucceeds.plutus`` 
+script with a datum of ``6666``, allowing for fees for ``200000``.
+
+.. code:: bash
+
+    ./payToScript.sh 99000000 200000 AlwaysSucceeds 6666 wallet1
+
+    TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    bd7422ef2cd55d1c5a33601a3b75b080bc3742856e5ddb8dfdfae07f583c7af1     0        1000000000 lovelace + TxOutDatumHashNone
+    TX row number: 1
+    Transaction successfully submitted.
+
+Check that the funds arrive in the script using the ``contractBalance.sh`` script. You may see a lot of UTxOs sitting at the ``AlwaysSucceeds`` script address and hopefully
+one of them will be yours.
+
+.. code:: bash
+
+    ./contractBalance.sh AlwaysSucceeds
+
+    TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    063a62b69e51296417687077f8df67f1b2fe1568830ad56fb0f04d22739e69e2     0        5000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b7a4cc0f36854309590c132e75dad06a4f6045e57ac93e6dafc9bf0d0018247d"
+    44412566ec42af806660fe9846a71b50eae1b7028116a3d666cab3ba1f02d7ee     0        1000000000000 lovelace + TxOutDatumHashNone
+    56382a3e1789df882114b2322787f1785eac71b19675ee88fd1dc6ca807ddc02     0        999888777 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    843f4ffa4aafc5ed968d0a9f0fb8a203796b66327343246bfd8d4ca1d361c2f8     0        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    8657ff66828f90ab7d45fb2e9f10286d9887f49bc83f7cf3d7b45e8fd1068aaf     0        10000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e1199a988ba72ffd6e9c269cadb3b53b5f360ff99f112d9b2ee30c4d74ad88b"
+    8c5f24a4eee17773d2ddef2ee1493248b1c45c56e6851d6f330deee1dc23a21f     0        1010011010 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "915e807fa63409181d1533195753e3170587b1edc089be670ab483da8f9bcd48"
+    8f75351368cc2521315ac9908f0532a00e996e35644cbd9db4d616a7122c7491     0        979199655182 lovelace + TxOutDatumHashNone
+    f441da5a5f04ee6057a98650bf4c2a4931906e37acfd2d705cb208eda48cef92     0        10000000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "df5078aee07dd171a343fb99d5fc1b5462fb3c94d82bf72dc1b77d9c0aceec29"
+
+In this case, the balance of UTxO number 4 is ``99000000`` and the datum hash is ``9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710``. We can check that this is the
+correct datum hash.
+
+.. code:: bash
+
+    $CARDANO_CLI transaction hash-script-data --script-data-value 6666
+    9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710
+    
