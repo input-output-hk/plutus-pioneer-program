@@ -63,6 +63,8 @@ _________________________
 Build the node
 ______________
 
+.. code:: bash
+
     nix-build -A scripts.alonzo-white.node -o result/alonzo-white/cardano-node-alonzo-white
     nix-build -A cardano-cli -o result/alonzo-white/cardano-cli
 
