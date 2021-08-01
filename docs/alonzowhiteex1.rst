@@ -3,6 +3,10 @@ Alonzo White Walkthrough
 
 These are my notes taken while working through the Alonzo White exercises.
 
+The notes take you through the process of setting up an AWS instance running an Alonzo White node, and using the command line to 
+move ADA between wallets and submit and executing smart contracts. It uses several helper scripts to simplify the creation of the commands. The helper scripts are
+simple bash scripts that create ``cardano-cli`` commands and should be easy to understand to get a grip on what is going on behind the scenes.
+
 This is the setup I chose to use, but there are several other ways to run the node and configure the environment.
 
 .. note::
@@ -204,7 +208,7 @@ This is the ``AlwaysSuccess.plutus`` script whose validator always succeeds, whi
 Pay to the Script
 _________________
 
-Using the ``payToScript.sh`` helper script, you can send ``99000000`` lovelace from ``wallet`` to the ``AlwaysSucceeds.plutus`` script with a datum of ``6666``, allowing for fees for ``200000``.
+Using the ``payToScript.sh`` helper script, you can send ``99000000`` lovelace from ``wallet`` to the ``AlwaysSucceeds.plutus`` script with a datum of ``6666``, allowing for fees of ``200000``.
 
 .. code:: bash
 
