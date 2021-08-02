@@ -104,6 +104,8 @@ Let's look at the UTxOs locked in the script.
 We see a lot of them, including our first one which has a datum hash of ``8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1``. We know this is the hash of the correct datum, so
 we should be able to spend this UTxO. We don't see any others with this datum hash, which means that those ones are locked forever.
 
+.. code:: bash
+
     ./contractBalance.sh HelloWorld
                             TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
