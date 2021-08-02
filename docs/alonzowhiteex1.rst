@@ -14,7 +14,7 @@ This is the setup I chose to use, but there are several other ways to run the no
     The exercises are only possible if you have some test Ada from the Alonzo White faucet. Test Ada is currently only available to members
     of the Alonzo test group in order to control usage of the network. Alonzo testnet is moving towards a public phase within a matter of weeks.
 
-I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 20Gb data volume.
+I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 60Gb data volume.
 
 AWS Node Setup
 --------------
@@ -49,7 +49,7 @@ but that doesn't matter here.
 
     mkdir /data/nix
     sudo ln -s /data/nix /nix
-    echo "export NIX_IGNORE_SYMLINK_STORE=1" >> "~/.bashrc
+    echo "export NIX_IGNORE_SYMLINK_STORE=1" >> ~/.bashrc
     source ~/.bashrc
     curl -L https://nixos.org/nix/install | sh
     . /home/ubuntu/.nix-profile/etc/profile.d/nix.sh
@@ -100,6 +100,19 @@ You can check on the status of the node with:
 
 You should see something like this:
 
+.. code:: bash
+
+    {
+        "epoch": 60,
+        "hash": "eb9453a91760928b286ea5137d6f9325f89f78b9c643f1e789c63c74b1934fa3",
+        "slot": 431693,
+        "block": 21187,
+        "era": "Mary",
+        "syncProgress": "19.01"
+    }
+
+When the node has fully synced you will see that the era has changed to ``Alonzo``.
+
 .. code:: json
 
     {
@@ -115,6 +128,7 @@ You can use ``jq`` if you ever want to get some specific information on its own,
 
 .. code:: bash
 
+    sudo apt update
     sudo apt install jq -y
     
     $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
@@ -150,7 +164,7 @@ ______________
 
 If you have access to the testnet faucet, transfer some test Ada to the ``main`` wallet.
 
-Then, check that it has arrived.
+Then, check that it has arrived. It should arrive within a minute or so.
 
 .. code:: bash
 
@@ -374,7 +388,6 @@ Check that it has arrived.
     29f82f40603c4328e6efffb7c6e8851fe9540d18ddc0930b188896f6b016e141     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
     5589e823cf148597cbf64dc7cb5ebcd3957d5fc83c3521b281daa9f9c490c8ab     0        999888777 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
-
 Now we try to get some funds from the script.
 
 .. code:: bash
@@ -423,4 +436,26 @@ HelloWorld Script
 
 Compiling Plutus Scripts
 ________________________
+
+If you look in the ``plutus-helloworld.cabal`` file in the directory ``/data/plutus-scripts/plutus-sources/plutus-helloworld``, you'll find some executables defined, one of which is called ``plutus-helloworld``. 
+
+Running this executable will create compiled Plutus code as output.
+
+First, we need to go into a Nix shell. The shell from ``cardano-node`` doesn't work for me, so I've clone the ``plutus`` repository and used its shell instead.
+
+.. code:: bash
+
+    cd /data
+    git clone https://github.com/input-output-hk/plutus
+    cd plutus
+    nix-shell
+
+Now, we can change to the ``plutus-helloworld`` directory and run the code.
+
+.. code:: bash
+
+    cd /data/plutus-scripts/plutus-sources/plutus-helloworld
+    cabal run plutus-helloworld
+
+
 
