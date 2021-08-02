@@ -1,7 +1,9 @@
 AWS Node Setup
 --------------
 
-Mount the data volume.
+I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 60Gb data volume.
+
+First, mount the data volume.
 
 .. code:: bash
 

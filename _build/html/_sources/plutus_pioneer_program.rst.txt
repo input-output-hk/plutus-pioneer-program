@@ -1,13 +1,18 @@
 Plutus Pioneer Program
 ......................
 
-.. include:: pioneer/week1.rst
-.. include:: pioneer/week2.rst
-.. include:: pioneer/week3.rst
-.. include:: pioneer/week4.rst
-.. include:: pioneer/week5.rst
-.. include:: pioneer/week6.rst
-.. include:: pioneer/week7.rst
-.. include:: pioneer/week8.rst
-.. include:: pioneer/week9.rst
-.. include:: pioneer/week10.rst
+.. toctree::
+    :maxdepth: 2
+    :caption: Contents:
+    :numbered:
+
+    pioneer/week1.rst
+    pioneer/week2.rst
+    pioneer/week3.rst
+    pioneer/week4.rst
+    pioneer/week5.rst
+    pioneer/week6.rst
+    pioneer/week7.rst
+    pioneer/week8.rst
+    pioneer/week9.rst
+    pioneer/week10.rst

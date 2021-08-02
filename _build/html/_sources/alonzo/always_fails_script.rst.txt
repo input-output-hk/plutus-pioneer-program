@@ -1,0 +1,70 @@
+AlwaysFails Script
+------------------
+
+Now we will try similar transactions with a script whose validator always fails. This time we will lose our collateral.
+
+First, lock some lovelace in the AlwaysFails script which will be picked up from the ``./scripts`` directory of the cloned ``plutus-scripts`` repository.
+
+.. code:: bash
+
+    ./payToScript.sh 99000000 200000 AlwaysFails 6666 wallet1
+
+    TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    843f4ffa4aafc5ed968d0a9f0fb8a203796b66327343246bfd8d4ca1d361c2f8     1        900800000 lovelace + TxOutDatumHashNone
+    TX row number: 1
+    Transaction successfully submitted.
+    
+Check that it has arrived.
+
+.. code:: bash
+
+    ./contractBalance.sh AlwaysFails
+
+    TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    0913d72c55b3d6e765eb51f1a5da1436ea0554a89d499fe3398d20517f0b455e     0        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    29f82f40603c4328e6efffb7c6e8851fe9540d18ddc0930b188896f6b016e141     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
+    5589e823cf148597cbf64dc7cb5ebcd3957d5fc83c3521b281daa9f9c490c8ab     0        999888777 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+
+Now we try to get some funds from the script.
+
+.. code:: bash
+
+    ./getFromScript.sh 1000000 110180417 AlwaysFails 6666
+    ============================================================================================
+    Select Script UTxO
+    ============================================================================================
+                               TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    0913d72c55b3d6e765eb51f1a5da1436ea0554a89d499fe3398d20517f0b455e     0        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    29f82f40603c4328e6efffb7c6e8851fe9540d18ddc0930b188896f6b016e141     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
+    5589e823cf148597cbf64dc7cb5ebcd3957d5fc83c3521b281daa9f9c490c8ab     0        999888777 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    TX row number: 1
+    ============================================================================================
+    Select Collateral UTxO
+    ============================================================================================
+    Wallet Name: fees
+                               TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     0        889819803 lovelace + TxOutDatumHashNone
+    TX row number: 1
+    Receiving Wallet: wallet2
+    Transaction successfully submitted.
+
+But will we now find that the collateral has gone. The validation failed.
+
+.. code:: bash
+
+    ./balance.sh fees
+    TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+
+And the funds will never arrive. We still have just one UTxO, the one we got from the ``AlwaysSucceeds`` script.
+
+.. code:: bash
+
+    ./balance.sh wallet2
+                           TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     1        1000000 lovelace + TxOutDatumHashNone
