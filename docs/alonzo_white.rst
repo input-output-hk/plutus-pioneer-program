@@ -1,3 +1,5 @@
+.. _alonzo_white:
+
 Alonzo White Walkthrough
 ........................
 
