@@ -18,7 +18,9 @@ This is the ``AlwaysSuccess.plutus`` script whose validator always succeeds, whi
 Pay to the Script
 _________________
 
-Using the ``payToScript.sh`` helper script, you can send ``99000000`` lovelace from ``wallet`` to the ``AlwaysSucceeds.plutus`` script with a datum of ``6666``, allowing for fees of ``200000``.
+Using the ``payToScript.sh`` helper script, you can send ``99000000`` lovelace from ``wallet1`` to the ``AlwaysSucceeds.plutus`` script with a datum of ``6666``, allowing for fees of ``200000``.
+
+The helper script ``payToScript.sh`` constructs a transaction, and, as one of its inputs, it reads the ``AlwaysSucceeds.plutus`` file in the ``scripts`` directory.
 
 .. code:: bash
 
