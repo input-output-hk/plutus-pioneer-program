@@ -1,7 +1,7 @@
 AlwaysFails Script
 ------------------
 
-.. include:: notes/setup.rst
+.. include:: ../notes/setup.rst
 
 Now we will try similar transactions with a script whose validator always fails. This time we will lose our collateral.
 

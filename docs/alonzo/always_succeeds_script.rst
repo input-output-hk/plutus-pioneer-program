@@ -1,7 +1,7 @@
 AlwaysSucceeds Script
 ---------------------
 
-.. include:: notes/setup.rst
+.. include:: ../notes/setup.rst
 
 Plutus scripts get compiled down to the following format. 
 

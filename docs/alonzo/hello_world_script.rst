@@ -1,7 +1,7 @@
 HelloWorld Script
 -----------------
 
-.. include:: notes/setup.rst
+.. include:: ../notes/setup.rst
 
 Compiling Plutus Scripts
 ________________________
