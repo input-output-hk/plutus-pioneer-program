@@ -3,11 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-==================================
-Plutus Pioneer Program Video Notes
-==================================
+===========================================
+Plutus Pioneer Program & Alonzo White Notes
+===========================================
 
-These are my notes from the `series of videos by Lars Brünjes <https://github.com/input-output-hk/plutus-pioneer-program>`_ for the Plutus Pioneers Program.
+These are my notes from the `series of videos by Lars Brünjes <https://github.com/input-output-hk/plutus-pioneer-program>`_ for the Plutus Pioneers Program. I have also documented my journey through the Alonzo White testnet 
+with instructions on how to run a node and how to compile and deploy Plutus code.
 
 .. note:: If you find these notes useful and would like give support, please consider delegating some ADA to `CHESS Pool <https://chess.ihpapp.com>`__.
 
