@@ -1,0 +1,1046 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Week 02 - Validation &mdash; Plutus Pioneer Program Lecture Notes  documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> Plutus Pioneer Program Lecture Notes
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../plutus_pioneer_program.html">1. Plutus Pioneer Program</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../alonzo_white.html">2. Alonzo White Walkthrough</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Plutus Pioneer Program Lecture Notes</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Week 02 - Validation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="../_sources/pioneer/week2.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="week-02-validation">
+<h1>Week 02 - Validation<a class="headerlink" href="#week-02-validation" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is a written version of <a class="reference external" href="https://www.youtube.com/watch?v=sN3BIa3GAOc">Lecture
+#2, Iteration #2</a>.</p>
+<p>It covers low-level, untyped on-chain validation scripts and high-level,
+typed on-chain validation scripts.</p>
+<p>The code in this lecture uses the Plutus commit 81ba78edb1d634a13371397d8c8b19829345ce0d</p>
+</div>
+<div class="section" id="before-we-start">
+<h2>Before We Start<a class="headerlink" href="#before-we-start" title="Permalink to this headline">¶</a></h2>
+<p>Let’s talk about an important point that was brought up by one of the pioneers following lecture #1.</p>
+<p>You will recall in the auction example, we created three endpoints - <code class="docutils literal notranslate"><span class="pre">start</span></code>, <code class="docutils literal notranslate"><span class="pre">bid</span></code> and <code class="docutils literal notranslate"><span class="pre">close</span></code>. For <code class="docutils literal notranslate"><span class="pre">close</span></code> there were two scenarios. If there was a
+high-enough bid, the token goes to the highest bidder. If there was not a high-enough bid, the token goes back to the seller.</p>
+<p>What would happen if the <code class="docutils literal notranslate"><span class="pre">close</span></code> endpoint wasn’t there? Could the money be locked forever in the contract?</p>
+<p>This is a really important point, because what you have to realise is that that UTxOs on the blockchain are just data, they are absolutely passive. In order
+for anything to happen there must be a transaction. In order to make progress and to change the state of the blockchain, there must be a new transaction submitted
+that consumes various UTxOs and produces new UTxOs.</p>
+<p>Only new transactions change the state. A UTxO will never spring into action by itself and do something. You can’t have a smart contract that sits on the blockchain and
+the, at some point, suddenly performs an action.</p>
+<p>So, we really need the <code class="docutils literal notranslate"><span class="pre">close</span></code> endpoint if we want the auction to be settled. In our case, the endpoint was manually triggered. You could write a contract that
+runs in the wallet that would automatically generate the <code class="docutils literal notranslate"><span class="pre">close</span></code> transaction - it is possible to write quite sophisticated off-chain code.</p>
+<p>However, from the point-of-view of the blockchain, it is always an external trigger that does something. Nothing happens if it is not externally triggered.</p>
+<p>So, if there were no <code class="docutils literal notranslate"><span class="pre">close</span></code> endpoint, or the <code class="docutils literal notranslate"><span class="pre">close</span></code> endpoint never got triggered, the funds would remain sitting at the script address forever.</p>
+</div>
+<div class="section" id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>We saw in the first lecture that there are two sides to a smart contract
+- an on-chain part and an off-chain part.</p>
+<p>The on-chain part is about validation. It allows nodes to validate a
+given transaction and whether it is allowed to consume a given UTxO.</p>
+<p>The off-chain part lives in the user’s wallet. It constructs and submits
+suitable transactions.</p>
+<p>Both are important topics. We have to master both in order to write
+smart contracts, but for now we will concentrate on the on-chain part.</p>
+<p>Let’s recall the Extended UTxO model where the idea is that we introduce
+a new type of address.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/1.png" src="pioneer/img/1.png" />
+</div>
+<p>In the simple UTxO model are so-called public key addresses, where the
+address is given by the hash of the public key. If a UTxO sits at such a
+public key address, then a transaction can consume that UTxO as an input
+if the signature belonging to that public key is included in the
+transaction.</p>
+<p>What the (E)UTxO model does is extend this by adding script addresses
+that can run arbitrary logic.</p>
+<p>When a transaction wants to consume a UTxO sitting at a script address
+is validated by a node, the node will run the script and then, depending
+on the result of the script, decide whether the transaction is valid or
+not.</p>
+<p>And recall that two were three more additions:</p>
+<ol class="arabic simple">
+<li><p>Instead of just having signatures on transactions, we have so-called
+Redeemers - arbitrary pieces of data.</p></li>
+<li><p>On the UTxO output side, we have an additional arbitrary piece of
+data called Datum, which you can think of as a little piece of state
+that sits on the UTxO.</p></li>
+</ol>
+<p>Finally, we have the context. There are various choices of what this context can be. It can be very restrictive, consisting just of the Redeemer (as in Bitcoin), or very global, consisting of the whole
+state of the blockchain (as in Ethereum). In Cardano, it is the transaction that is being validated, including all its inputs and outputs.</p>
+<p>So, there are three pieces of data that a Plutus script gets. The Datum,
+sitting at the UTxO, the redeemer, coming from the input and the
+validation, and the context, consisting of the transaction being
+validated and its inputs and outputs.</p>
+<p>In a concrete implementation like Plutus, these pieces of information need to be represented by a concrete data type - a Haskell data type. As it happens,
+the choice was made to use the same data type for all three of them. At least at the low-level implementation.</p>
+<p>We will look at that first, but in real life nobody would actually use this low-level approach. There are more convenient ways to use more suitable data
+types for these things, and we will come to that later in this lecture.</p>
+</div>
+<div class="section" id="plutustx-data">
+<h2>PlutusTx.Data<a class="headerlink" href="#plutustx-data" title="Permalink to this headline">¶</a></h2>
+<p>As mentioned, the datum, redeemer and context share a data type.</p>
+<p>That data type is defined in the package <code class="docutils literal notranslate"><span class="pre">plutus-core</span></code>, in the module <code class="docutils literal notranslate"><span class="pre">PlutusCore.Data</span></code>.</p>
+<p>It is called, simply, <code class="docutils literal notranslate"><span class="pre">Data</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Data</span> <span class="ow">=</span>
+     <span class="kt">Constr</span> <span class="kt">Integer</span> <span class="p">[</span><span class="kt">Data</span><span class="p">]</span>
+   <span class="o">|</span> <span class="kt">Map</span> <span class="p">[(</span><span class="kt">Data</span><span class="p">,</span> <span class="kt">Data</span><span class="p">)]</span>
+   <span class="o">|</span> <span class="kt">List</span> <span class="p">[</span><span class="kt">Data</span><span class="p">]</span>
+   <span class="o">|</span> <span class="kt">I</span> <span class="kt">Integer</span>
+   <span class="o">|</span> <span class="kt">B</span> <span class="kt">BS</span><span class="o">.</span><span class="kt">ByteString</span>
+   <span class="kr">deriving</span> <span class="n">stock</span> <span class="p">(</span><span class="kt">Show</span><span class="p">,</span> <span class="kt">Eq</span><span class="p">,</span> <span class="kt">Ord</span><span class="p">,</span> <span class="kt">Generic</span><span class="p">)</span>
+   <span class="kr">deriving</span> <span class="n">anyclass</span> <span class="p">(</span><span class="kt">NFData</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It has five constructors.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Constr</span></code> takes an Integer and, recursively, a list of <code class="docutils literal notranslate"><span class="pre">Data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Map</span></code> takes a list of pairs of <em>Data</em>. You can think of this as a lookup table of key-value pairs where both the key and the value are of type <code class="docutils literal notranslate"><span class="pre">Data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">List</span></code> takes a list of <code class="docutils literal notranslate"><span class="pre">Data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">I</span></code> takes a single Integer</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">B</span></code> takes a Bytestring</p></li>
+</ul>
+<p>For those familiar with the JSON format, this is very similar. The constructors are not exactly the same, but, like JSON, you can represent
+numbers, strings, lists of data and key-value pairs. It can represent arbitrary data, which makes it very suitable for our purpose.</p>
+<p>We can also explore this type in the REPL.</p>
+<p>Run the following from the plutus-pioneers-program repository. You may need to start a nix-shell from the Plutus repository before changing into the <code class="docutils literal notranslate"><span class="pre">week02</span></code> directory.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="n">code</span><span class="o">/</span><span class="n">week02</span>
+<span class="n">cabal</span> <span class="n">repl</span>
+</pre></div>
+</div>
+<p>From with the REPL, we need to import <code class="docutils literal notranslate"><span class="pre">PlutusTx</span></code> so that we have access to the <code class="docutils literal notranslate"><span class="pre">Data</span></code> type. <code class="docutils literal notranslate"><span class="pre">Data</span></code> is not defined in <code class="docutils literal notranslate"><span class="pre">PlutusTx</span></code>, but it gets re-exported from there.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">PlutusTx</span>
+</pre></div>
+</div>
+<p>We can now get some information about <code class="docutils literal notranslate"><span class="pre">Data</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">:</span><span class="n">i</span> <span class="n">Data</span>
+</pre></div>
+</div>
+<p>This will give information about the type <em>Data</em>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">PlutusTx</span>
+<span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Data</span>
+<span class="kr">type</span> <span class="kt">Data</span> <span class="ow">::</span> <span class="o">*</span>
+<span class="kr">data</span> <span class="kt">Data</span>
+  <span class="ow">=</span> <span class="kt">Constr</span> <span class="kt">Integer</span> <span class="p">[</span><span class="kt">Data</span><span class="p">]</span>
+  <span class="o">|</span> <span class="kt">Map</span> <span class="p">[(</span><span class="kt">Data</span><span class="p">,</span> <span class="kt">Data</span><span class="p">)]</span>
+  <span class="o">|</span> <span class="kt">List</span> <span class="p">[</span><span class="kt">Data</span><span class="p">]</span>
+  <span class="o">|</span> <span class="kt">I</span> <span class="kt">Integer</span>
+  <span class="o">|</span> <span class="kt">B</span> <span class="n">bytestring</span><span class="o">-</span><span class="mf">0.10</span><span class="o">.</span><span class="mf">12.0</span><span class="kt">:Data</span><span class="o">.</span><span class="kt">ByteString</span><span class="o">.</span><span class="kt">Internal</span><span class="o">.</span><span class="kt">ByteString</span>
+        <span class="c1">-- Defined in ‘plutus-core-0.1.0.0:PlutusCore.Data’</span>
+<span class="kr">instance</span> <span class="kt">Eq</span> <span class="kt">Data</span>
+  <span class="c1">-- Defined in ‘plutus-core-0.1.0.0:PlutusCore.Data’</span>
+<span class="kr">instance</span> <span class="kt">Ord</span> <span class="kt">Data</span>
+  <span class="c1">-- Defined in ‘plutus-core-0.1.0.0:PlutusCore.Data’</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Data</span>
+  <span class="c1">-- Defined in ‘plutus-core-0.1.0.0:PlutusCore.Data’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="kt">Data</span> <span class="c1">-- Defined in ‘PlutusTx.IsData.Class’</span>
+</pre></div>
+</div>
+<p>Now we can play with it. We can use the <code class="docutils literal notranslate"><span class="pre">I</span></code> constructor to create a value of type <code class="docutils literal notranslate"><span class="pre">Data</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Data</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">I</span> <span class="mi">42</span>
+<span class="kt">I</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<p>We can ask for its type, and confirm that it is indeed of type <code class="docutils literal notranslate"><span class="pre">Data</span></code>:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Data</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">I</span> <span class="mi">42</span>
+<span class="kt">I</span> <span class="mi">42</span> <span class="ow">::</span> <span class="kt">Data</span>
+</pre></div>
+</div>
+<p>The easiest way to create a value of type <code class="docutils literal notranslate"><span class="pre">Data</span></code> using the <code class="docutils literal notranslate"><span class="pre">B</span></code> constructor is to use the GHC Extension <code class="docutils literal notranslate"><span class="pre">OverloadedStrings</span></code>. This allows
+literal strings to be used in place of string-like data types and the compiler will interpret them as their intended type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Data</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">set</span> <span class="o">-</span><span class="kt">XOverloadedStrings</span>
+<span class="kt">Prelude</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Data</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">B</span> <span class="s">&quot;Haskell&quot;</span>
+<span class="kt">B</span> <span class="s">&quot;Haskell&quot;</span> <span class="ow">::</span> <span class="kt">Data</span>
+</pre></div>
+</div>
+<p>We can also use more complicated constructors, like <code class="docutils literal notranslate"><span class="pre">Map</span></code> and <code class="docutils literal notranslate"><span class="pre">List</span></code>:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Data</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">Map</span> <span class="p">[(</span><span class="kt">I</span> <span class="mi">42</span><span class="p">,</span> <span class="kt">B</span> <span class="s">&quot;Haskell&quot;</span><span class="p">),</span> <span class="p">(</span><span class="kt">List</span> <span class="p">[</span><span class="kt">I</span> <span class="mi">0</span><span class="p">],</span> <span class="kt">I</span> <span class="mi">1000</span><span class="p">)]</span>
+<span class="kt">Map</span> <span class="p">[(</span><span class="kt">I</span> <span class="mi">42</span><span class="p">,</span> <span class="kt">B</span> <span class="s">&quot;Haskell&quot;</span><span class="p">),</span> <span class="p">(</span><span class="kt">List</span> <span class="p">[</span><span class="kt">I</span> <span class="mi">0</span><span class="p">],</span> <span class="kt">I</span> <span class="mi">1000</span><span class="p">)]</span> <span class="ow">::</span> <span class="kt">Data</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="plutus-validator">
+<h2>Plutus Validator<a class="headerlink" href="#plutus-validator" title="Permalink to this headline">¶</a></h2>
+<p>Now we are ready to implement our very first validator.</p>
+<div class="section" id="example-1-the-gift-contract">
+<h3>Example 1 - The Gift Contract<a class="headerlink" href="#example-1-the-gift-contract" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="the-code">
+<h4>The Code<a class="headerlink" href="#the-code" title="Permalink to this headline">¶</a></h4>
+<p>We start the script by copy pasting a list of GHC language extensions, plus some dependency imports from the example we used in the last lecture.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# LANGUAGE DataKinds           #-}</span>
+<span class="cm">{-# LANGUAGE FlexibleContexts    #-}</span>
+<span class="o">...</span>
+
+<span class="kr">module</span> <span class="nn">Week02.Gift</span> <span class="kr">where</span>
+
+<span class="kr">import</span>           <span class="nn">Control.Monad</span>       <span class="k">hiding</span> <span class="p">(</span><span class="nf">fmap</span><span class="p">)</span>
+<span class="kr">import</span>           <span class="nn">Data.Map</span>            <span class="k">as</span> <span class="n">Map</span>
+<span class="o">...</span>
+<span class="kr">import</span>           <span class="nn">Text.Printf</span>         <span class="p">(</span><span class="nf">printf</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Then, we write the validator. Ultimately, the validator will be a script, living on the blockchain in Plutus Core, which is a lower-level language based on the
+lambda calculus. But, we don’t have to write Plutus Core. We can write Haskell and we will see later how we convert that Haskell into Plutus Core script.</p>
+<p>So, we write a Haskell function that represents our validator. As we know, a validator is a script that takes three pieces of
+input - the datum, the redeemer and the context, respectively, which, at the lowest level are represented by the <code class="docutils literal notranslate"><span class="pre">Data</span></code> data type.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>Somewhat surprisingly, the result of the function is <code class="docutils literal notranslate"><span class="pre">()</span></code>. This is the Haskell <code class="docutils literal notranslate"><span class="pre">Unit</span></code> type, similar to <code class="docutils literal notranslate"><span class="pre">void</span></code> in some other languages, like C
+or C# or Java - it’s the type that carries no information.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Unit</span></code> is a built-in type in Haskell and it has just one value, which is written in the same way as the type itself, as we can see from the REPL.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="nb">()</span>
+<span class="nb">()</span>
+<span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="nb">()</span>
+<span class="nb">()</span> <span class="ow">::</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>A function with a return type of <code class="docutils literal notranslate"><span class="pre">()</span></code> is quite unusual in Haskell. In more mainstream languages, it is quite common for functions or procedures to
+return no value. In these situations, the functions are only important for their side-effects, such as a Java function that prints something to
+the console.</p>
+<p>But Haskell is a pure language. If you want side-effects, this will be shown by the type system. For example if the mkValidator were to perform
+any IO, it would have a type signature of:</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">IO</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>This would indicate a function that performs IO side-effects but has no interesting return value.</p>
+<p>But, as we know that the real <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function performs no side-effects and returns no value, there is really nothing useful that it can do.</p>
+<p>However, there is something that the function can do as well as returning <code class="docutils literal notranslate"><span class="pre">()</span></code>, namely it can throw an exception or have an error. And that’s what Plutus uses.</p>
+<p>The idea is that if the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function does not run into an error or throw an exception, then validation succeeds. If it throws an error then
+validation fails and the transaction is rejected.</p>
+<p>Let’s write the simplest validator that we can.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>The first argument is the datum, the second argument is the redeemer and the third argument is the context. The most simple thing we can do is to completely ignore all three arguments and immediately return <code class="docutils literal notranslate"><span class="pre">()</span></code>.</p>
+<p>What this means is that the script address that corresponds to this validator doesn’t care about the datum, it doesn’t care about the redeemer, and
+it doesn’t care about the Context. It will always succeed, and this means that any transaction can consume the script at this address as an input. It does not matter
+what datum exists for a UTxO at this script address, it doesn’t matter which redeemer is used for the transaction and it doesn’t matter what structure the transaction has.</p>
+<p>If you send any funds to this script address, anybody can immediately take it.</p>
+<p>This function is not yet Plutus code, it is just a Haskell function. In order to turn it into a Plutus script, we need to compile it.</p>
+<p>The result of our compilation to Plutus will be of type <code class="docutils literal notranslate"><span class="pre">Validator</span></code>. Below the function in <code class="docutils literal notranslate"><span class="pre">Gift.hs</span></code>, we add the following code.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">validator</span> <span class="ow">::</span> <span class="kt">Validator</span>
+<span class="nf">validator</span> <span class="ow">=</span> <span class="n">mkValidatorScript</span> <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">mkValidatorScript</span></code> function takes the type <code class="docutils literal notranslate"><span class="pre">CompiledCode</span> <span class="pre">(Data</span> <span class="pre">-&gt;</span> <span class="pre">Data</span> <span class="pre">-&gt;</span> <span class="pre">Data</span> <span class="pre">-&gt;</span> <span class="pre">())</span> <span class="pre">-&gt;</span> <span class="pre">Validator</span></code>. In order to create this type, we must compile
+the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> script using something called Template Haskell.</p>
+<p>Template Haskell is an advanced feature of Haskell that solves a similar problem as macro systems in other languages. A macro being something that gets
+expanded at compile time.</p>
+<p>So, with this code</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>We are asking the compiler to write the code for the <code class="docutils literal notranslate"><span class="pre">validator</span></code> function at compile time based on our <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function, and then proceed
+with the normal compilation.</p>
+<p>You do not need to understand very much about Template Haskell to write Plutus as it is always the same pattern. Once you have seen a couple of
+examples, you can more or less just copy and paste.</p>
+<p>Template Haskell expects all the code to be available within the Oxford Brackets - <code class="docutils literal notranslate"><span class="pre">[|</span> <span class="pre">|]</span></code>.</p>
+<p>With more complicated validators you will likely be relying on multiple helper functions, and you do not want to have to add them within the Oxford Brackets. To avoid this, there is one thing we
+need to do to the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function, and that is to make it inlinable by adding the <code class="docutils literal notranslate"><span class="pre">INLINABLE</span></code> pragma.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>You will see this often in Plutus scripts, and it is usually an indication that a function is meant to be used within a validation script. All
+the functions on which the validator depends must be inlinable.</p>
+<p>Let’s go back to the REPL and take a look at the validator.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span>:l src/Week02/Gift.hs
+Ok, one module loaded.
+Prelude PlutusTx Week02.Gift&gt; import Ledger.Scripts
+Prelude PlutusTx Ledger.Scripts Week02.Gift&gt; validator
+Validator { &lt;script&gt; }
+</pre></div>
+</div>
+<p>We can ask for information about <code class="docutils literal notranslate"><span class="pre">Validator</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Scripts</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Validator</span>
+<span class="kr">type</span> <span class="kt">Validator</span> <span class="ow">::</span> <span class="o">*</span>
+<span class="kr">newtype</span> <span class="kt">Validator</span> <span class="ow">=</span> <span class="kt">Validator</span> <span class="p">{</span><span class="n">getValidator</span> <span class="ow">::</span> <span class="kt">Script</span><span class="p">}</span>
+        <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+<span class="kr">instance</span> <span class="kt">Eq</span> <span class="kt">Validator</span>
+  <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+<span class="kr">instance</span> <span class="kt">Ord</span> <span class="kt">Validator</span>
+  <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Validator</span>
+  <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+</pre></div>
+</div>
+<p>We see that it is a wrapper around <code class="docutils literal notranslate"><span class="pre">getValidator</span></code></p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Scripts</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="n">getValidator</span> <span class="n">validator</span>
+<span class="o">&lt;</span><span class="kt">Script</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>We can then get some information about <code class="docutils literal notranslate"><span class="pre">Script</span></code></p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Scripts</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">Script</span>
+<span class="kr">type</span> <span class="kt">Script</span> <span class="ow">::</span> <span class="o">*</span>
+<span class="kr">newtype</span> <span class="kt">Script</span>
+  <span class="ow">=</span> <span class="kt">Script</span> <span class="p">{</span><span class="n">unScript</span> <span class="ow">::</span> <span class="n">plutus</span><span class="o">-</span><span class="n">core</span><span class="o">-</span><span class="mf">0.1</span><span class="o">.</span><span class="mf">0.0</span><span class="kt">:UntypedPlutusCore</span><span class="o">.</span><span class="kt">Core</span><span class="o">.</span><span class="kt">Type</span><span class="o">.</span><span class="kt">Program</span>
+                          <span class="n">plutus</span><span class="o">-</span><span class="n">core</span><span class="o">-</span><span class="mf">0.1</span><span class="o">.</span><span class="mf">0.0</span><span class="kt">:PlutusCore</span><span class="o">.</span><span class="kt">DeBruijn</span><span class="o">.</span><span class="kt">Internal</span><span class="o">.</span><span class="kt">DeBruijn</span>
+                          <span class="n">plutus</span><span class="o">-</span><span class="n">core</span><span class="o">-</span><span class="mf">0.1</span><span class="o">.</span><span class="mf">0.0</span><span class="kt">:PlutusCore</span><span class="o">.</span><span class="kt">Default</span><span class="o">.</span><span class="kt">Universe</span><span class="o">.</span><span class="kt">DefaultUni</span>
+                          <span class="n">plutus</span><span class="o">-</span><span class="n">core</span><span class="o">-</span><span class="mf">0.1</span><span class="o">.</span><span class="mf">0.0</span><span class="kt">:PlutusCore</span><span class="o">.</span><span class="kt">Default</span><span class="o">.</span><span class="kt">Builtins</span><span class="o">.</span><span class="kt">DefaultFun</span>
+                          <span class="nb">()</span><span class="p">}</span>
+        <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+<span class="kr">instance</span> <span class="kt">Eq</span> <span class="kt">Script</span>
+  <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+<span class="kr">instance</span> <span class="kt">Ord</span> <span class="kt">Script</span>
+  <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+<span class="kr">instance</span> <span class="kt">Show</span> <span class="kt">Script</span>
+  <span class="c1">-- Defined in ‘plutus-ledger-api-0.1.0.0:Plutus.V1.Ledger.Scripts’</span>
+</pre></div>
+</div>
+<p>And here we see that we have an <code class="docutils literal notranslate"><span class="pre">unScript</span></code> function, which we can run</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Scripts</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="n">unScript</span> <span class="o">$</span> <span class="n">getValidator</span> <span class="n">validator</span>
+<span class="kt">Program</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Version</span> <span class="nb">()</span> <span class="mi">1</span> <span class="mi">0</span> <span class="mi">0</span><span class="p">)</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">})))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">5</span><span class="p">}))))))))</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">})))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}))))))))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">5</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">6</span><span class="p">})))))))))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">4</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">7</span><span class="p">})))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">6</span><span class="p">}))))))))))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">6</span><span class="p">})))))))))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">6</span><span class="p">})))))))))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">6</span><span class="p">})))))))))))</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">})))))))</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">})))))))</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">4</span><span class="p">})))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">}))))))))))</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">})))))))</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Apply</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">3</span><span class="p">})))</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">2</span><span class="p">}))))))))))</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">Delay</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">LamAbs</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">0</span><span class="p">})</span> <span class="p">(</span><span class="kt">Var</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">DeBruijn</span> <span class="p">{</span><span class="n">dbnIndex</span> <span class="ow">=</span> <span class="mi">1</span><span class="p">}))))))</span>
+</pre></div>
+</div>
+<p>And here you can see an honest-to-goodness representation of the Plutus Core script for the validator.</p>
+<p>Back to the code.</p>
+<p>Now we have our first validator, there are two more types that we can define.</p>
+<p>One is the <code class="docutils literal notranslate"><span class="pre">ValidatorHash</span></code>, which, as the name suggests is the hash of the validator.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">valHash</span> <span class="ow">::</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">ValidatorHash</span>
+<span class="nf">valHash</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorHash</span> <span class="n">validator</span>
+</pre></div>
+</div>
+<p>And, we can also turn the validator into a script address, which is the script’s address on the blockchain.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">scrAddress</span> <span class="ow">::</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Address</span>
+<span class="nf">scrAddress</span> <span class="ow">=</span> <span class="kt">ScriptAddress</span> <span class="n">valHash</span>
+</pre></div>
+</div>
+<p>Now we have a script address represented as <code class="docutils literal notranslate"><span class="pre">scrAddress</span></code>.</p>
+<p>We can look at these two results in the REPL</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Scripts</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="n">valHash</span>
+<span class="nf">c3168d465a84b7f50c2eeb51ccacd53a305bd7883787adb54236d8d17535ca14</span>
+
+<span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Scripts</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Gift</span><span class="o">&gt;</span> <span class="n">scrAddress</span>
+<span class="kt">Address</span> <span class="p">{</span><span class="n">addressCredential</span> <span class="ow">=</span> <span class="kt">ScriptCredential</span> <span class="n">c3168d465a84b7f50c2eeb51ccacd53a305bd7883787adb54236d8d17535ca14</span><span class="p">,</span> <span class="n">addressStakingCredential</span> <span class="ow">=</span> <span class="kt">Nothing</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>With the exception of the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function logic (in our case, one
+line), the rest of the code we have written so far is boilerplate and
+will be very similar for all Plutus scripts.</p>
+<p>In order to actually try this script, we need wallet code. The focus of
+this lecture is validation and not wallet code, but briefly, here is the
+rest of the code.</p>
+<p>Two endpoints are defined. Endpoints are ways for a user to trigger something with input parameters.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint will take an <code class="docutils literal notranslate"><span class="pre">Integer</span></code> argument to specify the number of lovelace that will be deposited to the contract.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint will take no argument and will simply look for UTxOs at this script address and consume them.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">type</span> <span class="kt">GiftSchema</span> <span class="ow">=</span>
+            <span class="kt">Endpoint</span> <span class="s">&quot;give&quot;</span> <span class="kt">Integer</span>
+        <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;grab&quot;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint uses the helper function <code class="docutils literal notranslate"><span class="pre">mustPayToOtherScript</span></code> which takes the <code class="docutils literal notranslate"><span class="pre">valHash</span></code> of the recipient script and a <code class="docutils literal notranslate"><span class="pre">Datum</span></code> that, in this example, is
+completely ignored. It uses the <code class="docutils literal notranslate"><span class="pre">Datum</span></code> constructor to turn a <code class="docutils literal notranslate"><span class="pre">Data</span></code> into a <code class="docutils literal notranslate"><span class="pre">Datum</span></code>. In this case the <code class="docutils literal notranslate"><span class="pre">Data</span></code> is created using
+the <code class="docutils literal notranslate"><span class="pre">Constr</span></code> constructor taking a 0 and an empty list.</p>
+<p>Finally the amount to send to the address is specified using the helper function <code class="docutils literal notranslate"><span class="pre">Ada.lovelaceValueOf</span></code>.</p>
+<p>The transaction is then submitted, the script waits for it to be confirmed and then prints a log message.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">give</span> <span class="ow">::</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<span class="nf">give</span> <span class="n">amount</span> <span class="ow">=</span> <span class="kr">do</span>
+   <span class="kr">let</span> <span class="n">tx</span> <span class="ow">=</span> <span class="n">mustPayToOtherScript</span> <span class="n">valHash</span> <span class="p">(</span><span class="kt">Datum</span> <span class="o">$</span> <span class="kt">Constr</span> <span class="mi">0</span> <span class="kt">[]</span><span class="p">)</span> <span class="o">$</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="n">amount</span>
+   <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTx</span> <span class="n">tx</span>
+   <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
+   <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="n">printf</span> <span class="s">&quot;made a gift of %d lovelace&quot;</span> <span class="n">amount</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint is a little bit more complicated.</p>
+<p>We use <code class="docutils literal notranslate"><span class="pre">utxoAt</span></code> with our new script address <code class="docutils literal notranslate"><span class="pre">scrAddress</span></code> to lookup all the UTxOs sitting at that address. We then need lookups, which will be used by the wallet
+to construct the transaction. Here, we tell the wallet where to find all the UTxOs, and we inform it about the validator. Remember, if you want to consume a UTxO
+sitting at a script address, then the spending transaction needs to provide the validator code, whereas the transaction that produces the UTxO only needs to provide the hash.</p>
+<p>We then define the transaction by using <code class="docutils literal notranslate"><span class="pre">mustSpendScriptOutput</span></code> for each UTxO found. This is saying that every UTxO sitting at this script address must be spent
+by the transaction we are constructing.</p>
+<p>We also pass a redeemer which is completely ignored in our example, so we can put anything there - in this case a redeemer created using the <code class="docutils literal notranslate"><span class="pre">I</span></code> constructor of type <code class="docutils literal notranslate"><span class="pre">Data</span></code> with a value of <code class="docutils literal notranslate"><span class="pre">17</span></code>.</p>
+<p>Again, we submit, wait for confirmation, and then write a log message.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab</span> <span class="ow">::</span> <span class="n">forall</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span><span class="o">.</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<span class="nf">grab</span> <span class="ow">=</span> <span class="kr">do</span>
+   <span class="n">utxos</span> <span class="ow">&lt;-</span> <span class="n">utxoAt</span> <span class="n">scrAddress</span>
+   <span class="kr">let</span> <span class="n">orefs</span>   <span class="ow">=</span> <span class="n">fst</span> <span class="o">&lt;$&gt;</span> <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="n">utxos</span>
+      <span class="n">lookups</span>  <span class="ow">=</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">unspentOutputs</span> <span class="n">utxos</span>      <span class="o">&lt;&gt;</span>
+                 <span class="kt">Constraints</span><span class="o">.</span><span class="n">otherScript</span> <span class="n">validator</span>
+      <span class="n">tx</span> <span class="ow">::</span> <span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span>
+      <span class="n">tx</span>       <span class="ow">=</span> <span class="n">mconcat</span> <span class="p">[</span><span class="n">mustSpendScriptOutput</span> <span class="n">oref</span> <span class="o">$</span> <span class="kt">Redeemer</span> <span class="o">$</span> <span class="kt">I</span> <span class="mi">17</span> <span class="o">|</span> <span class="n">oref</span> <span class="ow">&lt;-</span> <span class="n">orefs</span><span class="p">]</span>
+   <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraintsWith</span> <span class="o">@</span><span class="kt">Void</span> <span class="n">lookups</span> <span class="n">tx</span>
+   <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
+   <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;collected gifts&quot;</span>
+</pre></div>
+</div>
+<p>Finally, we put it all together in the <code class="docutils literal notranslate"><span class="pre">endpoints</span></code> function. This is boilerplate code that is telling the wallet to give the option of certain endpoints to
+the user and then, once one has been selected, to recurse and continue to offer the same options again and again. In the case of <code class="docutils literal notranslate"><span class="pre">give</span></code> the user will be
+required to provide the <code class="docutils literal notranslate"><span class="pre">Integer</span></code> argument.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">endpoints</span> <span class="ow">::</span> <span class="kt">Contract</span> <span class="nb">()</span> <span class="kt">GiftSchema</span> <span class="kt">Text</span> <span class="nb">()</span>
+<span class="nf">endpoints</span> <span class="ow">=</span> <span class="p">(</span><span class="n">give&#39;</span> <span class="p">`</span><span class="n">select</span><span class="p">`</span> <span class="n">grab&#39;</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="n">endpoints</span>
+  <span class="kr">where</span>
+    <span class="n">give&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;give&quot;</span> <span class="o">&gt;&gt;=</span> <span class="n">give</span>
+    <span class="n">grab&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;grab&quot;</span> <span class="o">&gt;&gt;</span>  <span class="n">grab</span>
+</pre></div>
+</div>
+<p>Then we have a little piece of boilerplate.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkSchemaDefinitions</span> <span class="kt">&#39;&#39;GiftSchema</span>
+</pre></div>
+</div>
+<p>And then some code that is used only by the Plutus Playground which allows us to specify additional tokens that can be used for testing.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkKnownCurrencies</span> <span class="kt">[]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="testing">
+<h4>Testing<a class="headerlink" href="#testing" title="Permalink to this headline">¶</a></h4>
+<p>We will now test the <code class="docutils literal notranslate"><span class="pre">Gift</span></code> script in the playground.</p>
+<p>Copy the <code class="docutils literal notranslate"><span class="pre">Gift</span></code> script into the playground, then compile the script in the playground and press the <code class="docutils literal notranslate"><span class="pre">Simulate</span></code> button.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/playground_week2_1.png" src="pioneer/img/playground_week2_1.png" />
+</div>
+<p>And let’s add a third wallet and give all the wallets 10 Ada (10 million lovelace).</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00024.png" src="pioneer/img/iteration2/pic__00024.png" />
+</div>
+<p>We will create a scenario where wallets 1 and 2 give lovelace, and wallet 3 grabs all of it.</p>
+<p>You will see that the playground has rendered UI buttons for the two endpoints <code class="docutils literal notranslate"><span class="pre">give</span></code> and <code class="docutils literal notranslate"><span class="pre">grab</span></code>. Use the <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint for to make wallet 1 give 4 Ada and
+to make wallet 2 give 6 Ada. Then add a wait action to wait for 1 block, and then use to <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint to make wallet 3 grab the funds. Then add another wait action to wait
+for 1 block.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00025.png" src="pioneer/img/iteration2/pic__00025.png" />
+</div>
+<p>And now click <code class="docutils literal notranslate"><span class="pre">Evaluate</span></code>. We see that there have been four transactions.</p>
+<p>The first transaction is, as always, the genesis transaction that distributes the initial funds to the wallets.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00026.png" src="pioneer/img/iteration2/pic__00026.png" />
+</div>
+<p>And there are two transactions which occur at slot 1. They are the two <code class="docutils literal notranslate"><span class="pre">give</span></code> transactions.</p>
+<p>The first one, Tx 0, is from wallet 2. The order here is not determined by the order that we created the transactions in the simulator. The important thing to note is that
+both <code class="docutils literal notranslate"><span class="pre">give</span></code> transactions occurred at the same slot.</p>
+<p>We see the three outputs. The first output is the 10 lovelace fee paid by wallet 2. The second output is the 6 Ada sent to the script address, and the third output is the returning of the change to wallet 2, which is 4 Ada minus the fees.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00027.png" src="pioneer/img/iteration2/pic__00027.png" />
+</div>
+<p>And the second, Tx 1, is from wallet 1. Again, with similar output UTxOs.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00028.png" src="pioneer/img/iteration2/pic__00028.png" />
+</div>
+<p>We now have two UTxOs sitting at the script address.</p>
+<p>Then we have the <code class="docutils literal notranslate"><span class="pre">grab</span></code> at slot 2 triggered by wallet 3. We see the two UTxOs from the script as inputs, and then two outputs. One output is the fees and the other
+is the output, paid to wallet 3, is of 10 Ada minus those fees. You’ll notice that the fees are now higher than we saw before, and this is because a script has now been
+executed, which makes it more expensive. However, the fees here are not yet entirely calibrated with those that would be charged on the real blockchain.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00029.png" src="pioneer/img/iteration2/pic__00029.png" />
+</div>
+<p>And, by scrolling down, we see the final wallet balances.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00030.png" src="pioneer/img/iteration2/pic__00030.png" />
+</div>
+<p>If you were to scroll down further you would see some traces and log outputs that would give more detail about the execution.</p>
+<p>As mentioned, this script uses the simplest validator possible, one that always succeeds. But this silly little validator may be useful in a
+situation where someone wants to donate some lovelace to the community and leave it up for grabs!</p>
+</div>
+</div>
+<div class="section" id="example-2-burn">
+<h3>Example 2 - Burn<a class="headerlink" href="#example-2-burn" title="Permalink to this headline">¶</a></h3>
+<p>Let’s look at the second example of validation.</p>
+<p>We will start by copying the <code class="docutils literal notranslate"><span class="pre">Gift.hs</span></code> code and renaming it <code class="docutils literal notranslate"><span class="pre">Burn.hs</span></code>.</p>
+<p>In the <code class="docutils literal notranslate"><span class="pre">Gift</span></code> example we had a validator that would always succeed. In this example, we want to do the opposite - a validator that always fails.</p>
+<p>Recall that a validator indicates failure by throwing an error. So we can modify our validator accordingly.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="ne">error</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>If we load the module in the REPL and look at <em>error</em></p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="ne">error</span>
+<span class="ne">error</span> <span class="ow">::</span> <span class="p">[</span><span class="kt">Char</span><span class="p">]</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>We see the definition for the <code class="docutils literal notranslate"><span class="pre">error</span></code> function defined in the standard Haskell <code class="docutils literal notranslate"><span class="pre">Prelude</span></code>. However, the one in scope in our code is in fact the following <code class="docutils literal notranslate"><span class="pre">error</span></code> function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Prelude</span><span class="o">.</span><span class="ne">error</span>
+<span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Prelude</span><span class="o">.</span><span class="ne">error</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>In regular Haskell, you have the <code class="docutils literal notranslate"><span class="pre">error</span></code> function which takes an error message string and triggers an error. In Plutus, the <code class="docutils literal notranslate"><span class="pre">error</span></code>
+function does not take a string - it just takes <code class="docutils literal notranslate"><span class="pre">()</span></code> and returns an arbitrary type.</p>
+<p>And that takes us to an important point.</p>
+<p>We mentioned earlier that we use the <code class="docutils literal notranslate"><span class="pre">INLINABLE</span></code> pragma on the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> function in order to allow it to be used by the Template Haskell code.
+In Haskell there are many functions available via the <code class="docutils literal notranslate"><span class="pre">Prelude</span></code> module, but these will not be usable in Plutus as they are not defined as inlinable.
+So, the Plutus team have provided an alternative Prelude that can be used in validation.</p>
+<p>The way that the Plutus Prelude is able to take precedence over the Haskell Prelude, which is normally in scope by default, is by using the following <code class="docutils literal notranslate"><span class="pre">LANGUAGE</span></code> pragma in the code.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# LANGUAGE NoImplicitPrelude   #-}</span>
+</pre></div>
+</div>
+<p>Then, by importing <code class="docutils literal notranslate"><span class="pre">PlutusTx.Prelude</span></code>, its functions are used in place of the standard Prelude functions.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">import</span> <span class="nn">PlutusTx.Prelude</span> <span class="k">hiding</span> <span class="p">(</span><span class="kt">Semigroup</span><span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="nf">unless</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>You may also notice that the standard Prelude is also imported. However, it is only in order to bring in some functions that have nothing to do with validation but is
+for the off-chain code and the playground.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">import</span> <span class="nn">Prelude</span> <span class="p">(</span><span class="kt">IO</span><span class="p">,</span> <span class="kt">Semigroup</span> <span class="p">(</span><span class="o">..</span><span class="p">),</span> <span class="kt">String</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It can be confusing. A lot of the functions in the Plutus Prelude do have the same signatures and same behaviour as their namesakes in the standard Prelude, but that
+is not always the case, and <code class="docutils literal notranslate"><span class="pre">error</span></code> is an example.</p>
+<p>Just remember that when you are using something in a Plutus script that looks like a function from the standard Prelude, what you are actually using is a
+function from the Plutus Prelude. Often they will have the same signature, but they are not always identical - for example operator precedents may not be the same</p>
+<p>Looking again at our new validator, we now have a validator that will always fail.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="ne">error</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>We will leave everything else as it was and check the effect of this change, using the playground. After clicking <code class="docutils literal notranslate"><span class="pre">Compile</span></code>, the previous scenario
+should still be present in the simulator. And after clicking <code class="docutils literal notranslate"><span class="pre">Evaluate</span></code> and scrolling down a little, we can see that wallets 1 and 2 have made their gifts but
+wallet 3 has been unable to grab.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00031.png" src="pioneer/img/iteration2/pic__00031.png" />
+</div>
+<p>If we scroll down further, we will find a log message showing that validation failed.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">,</span> <span class="n">Slot</span> <span class="mi">2</span><span class="p">:</span> <span class="mi">00000000</span><span class="o">-</span><span class="mi">0000</span><span class="o">-</span><span class="mi">4000</span><span class="o">-</span><span class="mi">8000</span><span class="o">-</span><span class="mi">000000000002</span> <span class="p">{</span><span class="n">Contract</span> <span class="n">instance</span> <span class="k">for</span> <span class="n">wallet</span> <span class="mi">3</span><span class="p">}:</span>
+      <span class="n">Contract</span> <span class="n">instance</span> <span class="n">stopped</span> <span class="k">with</span> <span class="n">error</span><span class="p">:</span> <span class="s2">&quot;WalletError (ValidationError (ScriptFailure (EvaluationError [])))&quot;</span> <span class="p">]</span>
+</pre></div>
+</div>
+<p>So, in our first example we had a validator that would always succeed and would allow anyone to grab the UTxOs from it. In the second example,
+we have a validator that always fails and any UTxOs sent to this script address can never be retrieved. This is basically a way to burn funds,
+which may be useful under some circumstances.</p>
+<p>When we look at the logs, we see that validation fails, but we have no clue why it fails. here’s a way to change that by using a variant of
+error - <code class="docutils literal notranslate"><span class="pre">traceError</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Burn</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">t</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Prelude</span><span class="o">.</span><span class="n">traceError</span>
+<span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Prelude</span><span class="o">.</span><span class="n">traceError</span> <span class="ow">::</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Builtins</span><span class="o">.</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="n">a</span>
+</pre></div>
+</div>
+<p>The function takes a string, but not a Haskell string. It is a Plutus
+string. In order for this to compile, we need to use the <code class="docutils literal notranslate"><span class="pre">OverloadedStrings</span></code> GHC extension.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# LANGUAGE OverloadedStrings   #-}</span>
+</pre></div>
+</div>
+<p>Then, we can update our validator.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="kr">_</span> <span class="kr">_</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">traceError</span> <span class="s">&quot;BURNT!&quot;</span>
+</pre></div>
+</div>
+<p>If we now run the same scenario in the playground with the new code, we will see the custom error message that we added.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">,</span> <span class="n">Slot</span> <span class="mi">2</span><span class="p">:</span> <span class="mi">00000000</span><span class="o">-</span><span class="mi">0000</span><span class="o">-</span><span class="mi">4000</span><span class="o">-</span><span class="mi">8000</span><span class="o">-</span><span class="mi">000000000002</span> <span class="p">{</span><span class="n">Contract</span> <span class="n">instance</span> <span class="k">for</span> <span class="n">wallet</span> <span class="mi">3</span><span class="p">}:</span>
+      <span class="n">Contract</span> <span class="n">instance</span> <span class="n">stopped</span> <span class="k">with</span> <span class="n">error</span><span class="p">:</span> <span class="s2">&quot;WalletError (ValidationError (ScriptFailure (EvaluationError [</span><span class="se">\&quot;</span><span class="s2">BURNT!</span><span class="se">\&quot;</span><span class="s2">])))&quot;</span> <span class="p">]</span>
+</pre></div>
+</div>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00032.png" src="pioneer/img/iteration2/pic__00032.png" />
+</div>
+</div>
+<div class="section" id="example-3-forty-two">
+<h3>Example 3 - Forty Two<a class="headerlink" href="#example-3-forty-two" title="Permalink to this headline">¶</a></h3>
+<p>For the next example, we will write a validator that does not completely ignore all its arguments. We’ll write one that expects a simple redeemer.</p>
+<p>Now that we care about the redeemer, we need to be able to reference it. Let’s call it <code class="docutils literal notranslate"><span class="pre">r</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="n">r</span> <span class="kr">_</span>
+</pre></div>
+</div>
+<p>Let’s say that we want validation to pass if the redeemer is <code class="docutils literal notranslate"><span class="pre">I</span> <span class="pre">42</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="n">r</span> <span class="kr">_</span>
+   <span class="o">|</span> <span class="n">r</span> <span class="o">==</span> <span class="kt">I</span> <span class="mi">42</span> <span class="ow">=</span> <span class="nb">()</span>
+   <span class="o">|</span> <span class="n">otherwise</span> <span class="ow">=</span> <span class="n">traceError</span> <span class="s">&quot;wrong redeemer&quot;</span>
+</pre></div>
+</div>
+<p>If we were to run this now in the playground, validation would always fail. We need to modify the off-chain code to add an input to the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint so that
+wallet 3 can pass in an <code class="docutils literal notranslate"><span class="pre">Integer</span></code> which we can then pass to the validator as the redeemer.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">type</span> <span class="kt">GiftSchema</span> <span class="ow">=</span>
+          <span class="kt">Endpoint</span> <span class="s">&quot;give&quot;</span> <span class="kt">Integer</span>
+      <span class="o">.\/</span> <span class="kt">Endpoint</span> <span class="s">&quot;grab&quot;</span> <span class="kt">Integer</span>
+</pre></div>
+</div>
+<p>We add the redeemer argument to the <code class="docutils literal notranslate"><span class="pre">grab</span></code> declaration. Note the addition of the <code class="docutils literal notranslate"><span class="pre">Integer</span></code> in the function signature, as well as the new
+<code class="docutils literal notranslate"><span class="pre">n</span></code> parameter which is used to reference it.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab</span> <span class="ow">::</span> <span class="n">forall</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span><span class="o">.</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<span class="nf">grab</span> <span class="n">n</span> <span class="ow">=</span> <span class="kr">do</span>
+</pre></div>
+</div>
+<p>We can then pass it to the <code class="docutils literal notranslate"><span class="pre">mustSpendScriptOutput</span></code> function instead of the throw-away value we used earlier.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">tx</span> <span class="ow">=</span> <span class="n">mconcat</span> <span class="p">[</span><span class="n">mustSpendScriptOutput</span> <span class="n">oref</span> <span class="o">$</span> <span class="kt">Redeemer</span> <span class="o">$</span> <span class="kt">I</span> <span class="n">n</span> <span class="o">|</span> <span class="n">oref</span> <span class="ow">&lt;-</span> <span class="n">orefs</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>One more change, we need to change the <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span></code> to <code class="docutils literal notranslate"><span class="pre">&gt;&gt;=</span></code> in the following code, now that <code class="docutils literal notranslate"><span class="pre">grab</span></code> has an argument. You can use the REPL to look at
+the types <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span></code> and <code class="docutils literal notranslate"><span class="pre">&gt;&gt;=</span></code> to see why the second one is now needed. Basically, they both sequence actions, but <code class="docutils literal notranslate"><span class="pre">&gt;&gt;</span></code> ignores any wrapped values,
+whereas <code class="docutils literal notranslate"><span class="pre">&gt;&gt;=</span></code> accesses the wrapped value and passes it to the next action.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab&#39;</span> <span class="ow">=</span> <span class="n">endpoint</span> <span class="o">@</span><span class="s">&quot;grab&quot;</span> <span class="o">&gt;&gt;=</span> <span class="n">grab</span>
+</pre></div>
+</div>
+<p>Now we can try it out in the playground. After adding the new code and clicking <code class="docutils literal notranslate"><span class="pre">Simulate</span></code> you will notice that the old scenario has gone. That
+is because the endpoints have changed and the old scenario is no longer valid.</p>
+<p>Let’s set up a scenario that uses just two wallets. Wallet one is going to give 3 Ada oo the contract, and wallet 2 is going to try to grab them, but
+this time, wallet 2 will need to pass in a value which will be used to construct the redeemer.</p>
+<p>For our first attempt, we will add the wrong redeemer value, in this case 100.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00033.png" src="pioneer/img/iteration2/pic__00033.png" />
+</div>
+<p>If we click <code class="docutils literal notranslate"><span class="pre">Evaluate</span></code>, we see that we only have two transactions, and we see that the Ada remains in the script, which shows that wallet 2 failed to grab it.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00034.png" src="pioneer/img/iteration2/pic__00034.png" />
+</div>
+<p>The final balances also show this.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00035.png" src="pioneer/img/iteration2/pic__00035.png" />
+</div>
+<p>And, if we look at the trace, we find the error.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">,</span> <span class="n">Slot</span> <span class="mi">2</span><span class="p">:</span> <span class="mi">00000000</span><span class="o">-</span><span class="mi">0000</span><span class="o">-</span><span class="mi">4000</span><span class="o">-</span><span class="mi">8000</span><span class="o">-</span><span class="mi">000000000001</span> <span class="p">{</span><span class="n">Contract</span> <span class="n">instance</span> <span class="k">for</span> <span class="n">wallet</span> <span class="mi">2</span><span class="p">}:</span>
+      <span class="n">Contract</span> <span class="n">instance</span> <span class="n">stopped</span> <span class="k">with</span> <span class="n">error</span><span class="p">:</span> <span class="s2">&quot;WalletError (ValidationError (ScriptFailure (EvaluationError [</span><span class="se">\&quot;</span><span class="s2">wrong redeemer</span><span class="se">\&quot;</span><span class="s2">])))&quot;</span> <span class="p">]</span>
+</pre></div>
+</div>
+<p>If we go back to scenario, change the value to <code class="docutils literal notranslate"><span class="pre">42</span></code> and click <code class="docutils literal notranslate"><span class="pre">Evaluate</span></code> again, we should see that validation succeeds.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00036.png" src="pioneer/img/iteration2/pic__00036.png" />
+</div>
+<p>Now we see the third transaction where wallet 2 manages to collect the funds, minus fees.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00037.png" src="pioneer/img/iteration2/pic__00037.png" />
+</div>
+<p>We see that the final balances are as we expect, and also the logs show that validation did not throw an error, which means that validation succeeded.</p>
+<p>So that’s the first example of a validator that looks at at least one of its arguments.</p>
+</div>
+<div class="section" id="example-4-typed">
+<h3>Example 4 - Typed<a class="headerlink" href="#example-4-typed" title="Permalink to this headline">¶</a></h3>
+<p>It was mentioned at the beginning of the lecture, this is low-level Plutus and in reality, no-one will write validation functions like this.</p>
+<p>Now we will see how it is actually done using a typed version.</p>
+<p>Even though the <code class="docutils literal notranslate"><span class="pre">Data</span></code> type is powerful and you can encode all sorts of data into it, it doesn’t really feel like Haskell. It is almost like you
+are writing in an untyped language like Javascript or Python. It is just a like a blob of data, it can contain anything so you don’t really have
+any type safety. You will always need to check, for example, if you are expecting an integer that you are indeed given an integer.</p>
+<p>It is especially bad with the third argument, the context. Even though it’s easy to imagine that you can somehow encode a transaction with its inputs and outputs into
+the <code class="docutils literal notranslate"><span class="pre">Data</span></code> type, it is not at all clear how that is done.</p>
+<p>We would rather use more specific data types that are tailored to the business logic.</p>
+<p>This is indeed possible with so-called Typed Validators. What this means is that we can replace the occurrences of <code class="docutils literal notranslate"><span class="pre">Data</span></code> in the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> signature
+with more suitable types.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>In our silly little example, we completely ignore the Datum, so a more
+suitable type would be just the Unit type - ().</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>For the redeemer, in this example, we are only dealing with integers, so
+it would probably make more sense to use Integer instead.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>For the context, there is a much nicer type called <code class="docutils literal notranslate"><span class="pre">ScriptContext</span></code> that’s made exactly for this purpose.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="nb">()</span>
+</pre></div>
+</div>
+<p>Finally, we have already mentioned that it is a bit unusual to use <code class="docutils literal notranslate"><span class="pre">()</span></code> as a return type. Much more natural would be to use <code class="docutils literal notranslate"><span class="pre">Bool</span></code> to indicate
+successful or failed validation.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>So, this is a better way to write validation code. The last two types <code class="docutils literal notranslate"><span class="pre">SciprtContext</span></code> and <code class="docutils literal notranslate"><span class="pre">Bool</span></code>, but the first two types can be different depending on the situation.</p>
+<p>In this case, let’s now rewrite the function accordingly using these new types. The parameter <code class="docutils literal notranslate"><span class="pre">r</span></code> is now no longer of type <code class="docutils literal notranslate"><span class="pre">Data</span></code> - it is an <code class="docutils literal notranslate"><span class="pre">Integer</span></code>, so
+we can simply check that it is equal to 42 rather than checking it against a constructed <code class="docutils literal notranslate"><span class="pre">Data</span></code> type.</p>
+<p>And, as we are now returning a <code class="docutils literal notranslate"><span class="pre">Bool</span></code>, we can we just make the function a boolean expression.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="n">r</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<p>This will have the same problem that we had before in that, in the case of an error, we won’t get a nice error message. There is a nice Plutus function
+called <code class="docutils literal notranslate"><span class="pre">traceIfFalse</span></code> which takes a <code class="docutils literal notranslate"><span class="pre">String</span></code> and a <code class="docutils literal notranslate"><span class="pre">Bool</span></code> and returns a <code class="docutils literal notranslate"><span class="pre">Bool</span></code>. If the first <code class="docutils literal notranslate"><span class="pre">Bool</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, the result will be <code class="docutils literal notranslate"><span class="pre">True</span></code> and the <code class="docutils literal notranslate"><span class="pre">String</span></code> is
+ignored. However, if the first <code class="docutils literal notranslate"><span class="pre">Bool</span></code> is <code class="docutils literal notranslate"><span class="pre">False</span></code>, then the result will be <code class="docutils literal notranslate"><span class="pre">False</span></code> and the <code class="docutils literal notranslate"><span class="pre">String</span></code> will be logged.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Prelude</span><span class="o">.</span><span class="n">traceIfFalse</span>
+      <span class="ow">::</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">Builtins</span><span class="o">.</span><span class="kt">String</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+</pre></div>
+</div>
+<p>This is exactly what we need.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">mkValidator</span> <span class="kr">_</span> <span class="n">r</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">traceIfFalse</span> <span class="s">&quot;wrong redeemer&quot;</span> <span class="o">$</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<p>This will not yet compile as other parts of the code are not yet type correct. We need to adapt our boilerplate.</p>
+<p>First, we introduce a new dummy data type, which here we call <code class="docutils literal notranslate"><span class="pre">Typed</span></code>, simply based on the name of the script. For this type we must provide an instance
+of <code class="docutils literal notranslate"><span class="pre">Scripts.ValidatorTypes</span></code>.</p>
+<p>The purpose of this instance is to declare the types for the datum and the redeemer.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Typed</span>
+<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ValidatorTypes</span> <span class="kt">Typed</span> <span class="kr">where</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">DatumType</span> <span class="kt">Typed</span> <span class="ow">=</span> <span class="nb">()</span>
+    <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Typed</span> <span class="ow">=</span> <span class="kt">Integer</span>
+</pre></div>
+</div>
+<p>This is quite advanced Haskell, so-called type-level programming, but just like the Template Haskell we have already encountered, you don’t
+really need a deep understanding of it as all scripts will follow the same pattern.</p>
+<p>Now we need to compile the validator. Where previously we used <code class="docutils literal notranslate"><span class="pre">mkValidatorScript</span></code>, now we use something called <code class="docutils literal notranslate"><span class="pre">mkTypedValidator</span></code>, which takes our
+new data type as parameter and produces something of type <code class="docutils literal notranslate"><span class="pre">TypedValidator</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">typedValidator</span> <span class="ow">::</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">TypedValidator</span> <span class="kt">Typed</span>
+<span class="nf">typedValidator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">mkTypedValidator</span> <span class="o">@</span><span class="kt">Typed</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">mkValidator</span> <span class="o">||</span><span class="p">])</span>
+    <span class="o">$$</span><span class="p">(</span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">compile</span> <span class="p">[</span><span class="o">||</span> <span class="n">wrap</span> <span class="o">||</span><span class="p">])</span>
+  <span class="kr">where</span>
+    <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="nb">()</span> <span class="o">@</span><span class="kt">Integer</span>
+</pre></div>
+</div>
+<p>This is similar to the <code class="docutils literal notranslate"><span class="pre">mkValidator</span></code> code, but this type we also compile a <code class="docutils literal notranslate"><span class="pre">wrapValidator</span></code> function that takes the datum and redeemer types.</p>
+<p>In order for this to work we first need one more import.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">import</span> <span class="k">qualified</span> <span class="nn">Ledger.Typed.Scripts</span> <span class="k">as</span> <span class="n">Scripts</span>
+</pre></div>
+</div>
+<p>In this example, it is being imported qualified and using the <code class="docutils literal notranslate"><span class="pre">Scripts</span></code> prefix, but this is arbitrary and you could pick some other way of referencing the module.</p>
+<p>We these changes, the Haskell code will compile, and we now need to change the Template Haskell boilerplate that creates the <code class="docutils literal notranslate"><span class="pre">validator</span></code> function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">validator</span> <span class="ow">::</span> <span class="kt">Validator</span>
+<span class="nf">validator</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorScript</span> <span class="n">typedValidator</span>
+</pre></div>
+</div>
+<p>Here we have used the <code class="docutils literal notranslate"><span class="pre">validatorScript</span></code> function to create an untyped validator from our typed version.</p>
+<p>To get the hash we could, of course, use the validator we now have and turn it into a <code class="docutils literal notranslate"><span class="pre">ValidatorHash</span></code> as we did before, but there is a more direct way, which looks
+identical, but in this case <code class="docutils literal notranslate"><span class="pre">Scripts</span></code> is coming from the module <code class="docutils literal notranslate"><span class="pre">Ledger.Typed.Scripts</span></code> rather than <code class="docutils literal notranslate"><span class="pre">Ledger.Scripts</span></code>. This version takes the typed validator directly.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">valHash</span> <span class="ow">::</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">ValidatorHash</span>
+<span class="nf">valHash</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">validatorHash</span> <span class="n">typedValidator</span>
+</pre></div>
+</div>
+<p>The script address is calculated as before.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">scrAddress</span> <span class="ow">::</span> <span class="kt">Ledger</span><span class="o">.</span><span class="kt">Address</span>
+<span class="nf">scrAddress</span> <span class="ow">=</span> <span class="n">scriptAddress</span> <span class="n">validator</span>
+</pre></div>
+</div>
+<p>In this extremely simply example, it probably doesn’t seem worth the effort, but for realistic contracts, it is much nicer to do it like this.</p>
+<p>The off-chain code is almost identical.</p>
+<p>There is a small change change to the <code class="docutils literal notranslate"><span class="pre">give</span></code> endpoint. Although we have not yet gone over this part of the code in detail, the following changes can be made.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">let</span> <span class="n">tx</span> <span class="ow">=</span> <span class="n">mustPayToTheScript</span> <span class="nb">()</span> <span class="o">$</span> <span class="kt">Ada</span><span class="o">.</span><span class="n">lovelaceValueOf</span> <span class="n">amount</span>
+<span class="nf">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraints</span> <span class="n">inst</span> <span class="n">tx</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">mustPayToOtherScript</span></code> function has been replaced with <code class="docutils literal notranslate"><span class="pre">mustPayToTheScript</span></code>. This is a convenience script which allows us to pass
+in just () as we longer need to construct a value of type <code class="docutils literal notranslate"><span class="pre">Data</span></code>. We also no longer need to pass in the script hash.</p>
+<p>The behaviour of this code will be identical to the behaviour in the previous example, so we won’t go over it in the playground.</p>
+<p>Now we will explain how that actually works. How does Plutus convert these custom data types to the actual low-level implementation - the <code class="docutils literal notranslate"><span class="pre">Data</span></code> type.</p>
+<p>We can look at the code in the <code class="docutils literal notranslate"><span class="pre">PlutusTx.IsData.Class</span></code> module.</p>
+<p>Here we see that there is a quite simple type class defined called <code class="docutils literal notranslate"><span class="pre">IsData</span></code>.</p>
+<div class="figure align-default">
+<img alt="pioneer/img/iteration2/pic__00037.png" src="pioneer/img/iteration2/pic__00037.png" />
+</div>
+<p>This class provides two functions</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">toData</span></code> takes a value and converts it to <code class="docutils literal notranslate"><span class="pre">Data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fromData</span></code> takes a value of type <code class="docutils literal notranslate"><span class="pre">Data</span></code> and attempts to convert it to an instance of type <code class="docutils literal notranslate"><span class="pre">IsData</span></code>. This can fail because not all values of
+type <code class="docutils literal notranslate"><span class="pre">Data</span></code> will be convertible to the target type.</p></li>
+</ul>
+<p>Let’s try this out in the REPL.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">PlutusTx</span>
+<span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="kr">import</span> <span class="nn">PlutusTx.IsData.Class</span>
+<span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">IsData</span><span class="o">.</span><span class="kt">Class</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">IsData</span>
+</pre></div>
+</div>
+<p>We know that <code class="docutils literal notranslate"><span class="pre">()</span></code> and <code class="docutils literal notranslate"><span class="pre">Integer</span></code> are both instances of <code class="docutils literal notranslate"><span class="pre">IsData</span></code> because they worked in our example.</p>
+<p>Let’s convert an <code class="docutils literal notranslate"><span class="pre">Integer</span></code> to <code class="docutils literal notranslate"><span class="pre">Data</span></code></p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">IsData</span><span class="o">.</span><span class="kt">Class</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="n">toData</span> <span class="p">(</span><span class="mi">42</span> <span class="ow">::</span> <span class="kt">Integer</span><span class="p">)</span>
+<span class="kt">I</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<p>We see that this has been converted to an instance of type <code class="docutils literal notranslate"><span class="pre">Data</span></code> using the <code class="docutils literal notranslate"><span class="pre">I</span></code> constructor, which we did manually before we used typed
+validation.</p>
+<p>Now let’s do it the other way around</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">IsData</span><span class="o">.</span><span class="kt">Class</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="n">fromData</span> <span class="p">(</span><span class="kt">I</span> <span class="mi">42</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>
+<span class="kt">Just</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<p>We get a <code class="docutils literal notranslate"><span class="pre">Just</span> <span class="pre">42</span></code> back - <code class="docutils literal notranslate"><span class="pre">Just</span></code> being the <code class="docutils literal notranslate"><span class="pre">Maybe</span></code> constructor when <code class="docutils literal notranslate"><span class="pre">Maybe</span></code> is not <code class="docutils literal notranslate"><span class="pre">Nothing</span></code>.</p>
+<p>And when it fails, when it can’t convert to the target type, we will get back <code class="docutils literal notranslate"><span class="pre">Nothing</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">IsData</span><span class="o">.</span><span class="kt">Class</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="n">fromData</span> <span class="p">(</span><span class="kt">List</span> <span class="kt">[]</span><span class="p">)</span> <span class="ow">::</span> <span class="kt">Maybe</span> <span class="kt">Integer</span>
+<span class="kt">Nothing</span>
+</pre></div>
+</div>
+<p>If we examine <code class="docutils literal notranslate"><span class="pre">IsData</span></code> we can see all the types that this pattern will work for all the types that have an <code class="docutils literal notranslate"><span class="pre">IsData</span></code> instance defined.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">Prelude</span> <span class="kt">PlutusTx</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="kt">IsData</span><span class="o">.</span><span class="kt">Class</span> <span class="kt">Week02</span><span class="o">.</span><span class="kt">Typed</span><span class="o">&gt;</span> <span class="kt">:</span><span class="n">i</span> <span class="kt">IsData</span>
+<span class="kr">type</span> <span class="kt">IsData</span> <span class="ow">::</span> <span class="o">*</span> <span class="ow">-&gt;</span> <span class="kt">Constraint</span>
+<span class="kr">class</span> <span class="kt">IsData</span> <span class="n">a</span> <span class="kr">where</span>
+  <span class="n">toData</span> <span class="ow">::</span> <span class="n">a</span> <span class="ow">-&gt;</span> <span class="kt">Data</span>
+  <span class="n">fromData</span> <span class="ow">::</span> <span class="kt">Data</span> <span class="ow">-&gt;</span> <span class="kt">Maybe</span> <span class="n">a</span>
+  <span class="cm">{-# MINIMAL toData, fromData #-}</span>
+        <span class="c1">-- Defined in ‘PlutusTx.IsData.Class’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">IsData</span> <span class="p">(</span><span class="kt">Maybe</span> <span class="n">a</span><span class="p">)</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">IsData</span> <span class="n">a</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">IsData</span> <span class="p">(</span><span class="kt">Either</span> <span class="n">a</span> <span class="n">b</span><span class="p">)</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="kt">Bool</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">IsData</span> <span class="n">a</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">b</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">c</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">d</span><span class="p">)</span> <span class="ow">=&gt;</span>
+         <span class="kt">IsData</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">IsData</span> <span class="n">a</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">b</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">c</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">IsData</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">IsData</span> <span class="n">a</span><span class="p">,</span> <span class="kt">IsData</span> <span class="n">b</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">IsData</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="nb">()</span>
+  <span class="c1">-- Defined in ‘plutus-tx-0.1.0.0:PlutusTx.IsData.Instances’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="n">a</span> <span class="ow">=&gt;</span> <span class="kt">IsData</span> <span class="p">[</span><span class="n">a</span><span class="p">]</span>
+  <span class="c1">-- Defined in ‘PlutusTx.IsData.Class’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="kt">Integer</span> <span class="c1">-- Defined in ‘PlutusTx.IsData.Class’</span>
+<span class="kr">instance</span> <span class="p">(</span><span class="kt">TypeError</span> <span class="o">...</span><span class="p">)</span> <span class="ow">=&gt;</span> <span class="kt">IsData</span> <span class="kt">Int</span>
+  <span class="c1">-- Defined in ‘PlutusTx.IsData.Class’</span>
+<span class="kr">instance</span> <span class="kt">IsData</span> <span class="kt">Data</span> <span class="c1">-- Defined in ‘PlutusTx.IsData.Class’</span>
+</pre></div>
+</div>
+<p>This is still quite a short list of possible types. We would like to use many more types than this for our datum and redeemer.</p>
+<p>In order to do this, we would normally need to define an <code class="docutils literal notranslate"><span class="pre">IsData</span></code> instance for any type that we wish to use. This will allow us to tell the
+compiler how to do the back and forth conversions. However, this again would be tedious as it is such a mechanical process. So, there
+is a mechanism in Plutus that does this for us.</p>
+</div>
+<div class="section" id="example-5-custom-isdata-types">
+<h3>Example 5 - Custom IsData types<a class="headerlink" href="#example-5-custom-isdata-types" title="Permalink to this headline">¶</a></h3>
+<p>Now let’s talk about custom data types. Let’s define a silly one and use it in our validator function.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">newtype</span> <span class="kt">MySillyRedeemer</span> <span class="ow">=</span> <span class="kt">MySillyRedeemer</span> <span class="kt">Integer</span>
+
+<span class="kt">PlutusTx</span><span class="o">.</span><span class="n">unstableMakeIsData</span> <span class="kt">&#39;&#39;MySillyRedeemer</span>
+
+<span class="cm">{-# INLINABLE mkValidator #-}</span>
+<span class="nf">mkValidator</span> <span class="ow">::</span> <span class="nb">()</span> <span class="ow">-&gt;</span> <span class="kt">MySillyRedeemer</span> <span class="ow">-&gt;</span> <span class="kt">ScriptContext</span> <span class="ow">-&gt;</span> <span class="kt">Bool</span>
+<span class="nf">mkValidator</span> <span class="nb">()</span> <span class="p">(</span><span class="kt">MySillyRedeemer</span> <span class="n">r</span><span class="p">)</span> <span class="kr">_</span> <span class="ow">=</span> <span class="n">traceIfFalse</span> <span class="s">&quot;wrong redeemer&quot;</span> <span class="o">$</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">42</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There is also a stable version of the <code class="docutils literal notranslate"><span class="pre">PlutusTx.unstableMakeIsData</span></code> function, and the stable version should always be used in production code. The difference between the two is
+that, in the case where more than one <code class="docutils literal notranslate"><span class="pre">Data</span></code> constructor is required, the unstable version makes no guarantee, between Plutus versions, that the
+order of constructors will be preserved.</p>
+</div>
+<p>And we need to change some of the boilerplate.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kr">data</span> <span class="kt">Typed</span>
+<span class="kr">instance</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">ValidatorTypes</span> <span class="kt">Typed</span> <span class="kr">where</span>
+<span class="o">...</span>
+   <span class="kr">type</span> <span class="kr">instance</span> <span class="kt">RedeemerType</span> <span class="kt">Typed</span> <span class="ow">=</span> <span class="kt">MySillyRedeemer</span>
+
+<span class="nf">typedValidator</span> <span class="ow">::</span> <span class="kt">Scripts</span><span class="o">.</span><span class="kt">TypedValidator</span> <span class="kt">Typed</span>
+<span class="o">...</span>
+<span class="kr">where</span>
+   <span class="n">wrap</span> <span class="ow">=</span> <span class="kt">Scripts</span><span class="o">.</span><span class="n">wrapValidator</span> <span class="o">@</span><span class="nb">()</span> <span class="o">@</span><span class="kt">MySillyRedeemer</span>
+</pre></div>
+</div>
+<p>We also need to change some off-chain code in the <code class="docutils literal notranslate"><span class="pre">grab</span></code> endpoint.</p>
+<p>Instead of using <code class="docutils literal notranslate"><span class="pre">I</span> <span class="pre">r</span></code>, we will use <code class="docutils literal notranslate"><span class="pre">toData</span> <span class="pre">(MySillyRedeemer</span> <span class="pre">r)</span></code>.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="nf">grab</span> <span class="ow">::</span> <span class="n">forall</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span><span class="o">.</span> <span class="kt">AsContractError</span> <span class="n">e</span> <span class="ow">=&gt;</span> <span class="kt">Integer</span> <span class="ow">-&gt;</span> <span class="kt">Contract</span> <span class="n">w</span> <span class="n">s</span> <span class="n">e</span> <span class="nb">()</span>
+<span class="nf">grab</span> <span class="n">r</span> <span class="ow">=</span> <span class="kr">do</span>
+    <span class="n">utxos</span> <span class="ow">&lt;-</span> <span class="n">utxoAt</span> <span class="n">scrAddress</span>
+    <span class="kr">let</span> <span class="n">orefs</span>   <span class="ow">=</span> <span class="n">fst</span> <span class="o">&lt;$&gt;</span> <span class="kt">Map</span><span class="o">.</span><span class="n">toList</span> <span class="n">utxos</span>
+        <span class="n">lookups</span> <span class="ow">=</span> <span class="kt">Constraints</span><span class="o">.</span><span class="n">unspentOutputs</span> <span class="n">utxos</span>      <span class="o">&lt;&gt;</span>
+                  <span class="kt">Constraints</span><span class="o">.</span><span class="n">otherScript</span> <span class="n">validator</span>
+        <span class="n">tx</span> <span class="ow">::</span> <span class="kt">TxConstraints</span> <span class="kt">Void</span> <span class="kt">Void</span>
+        <span class="n">tx</span>      <span class="ow">=</span> <span class="n">mconcat</span> <span class="p">[</span><span class="n">mustSpendScriptOutput</span> <span class="n">oref</span> <span class="o">$</span> <span class="kt">Redeemer</span> <span class="o">$</span> <span class="kt">PlutusTx</span><span class="o">.</span><span class="n">toData</span> <span class="p">(</span><span class="kt">MySillyRedeemer</span> <span class="n">r</span><span class="p">)</span> <span class="o">|</span> <span class="n">oref</span> <span class="ow">&lt;-</span> <span class="n">orefs</span><span class="p">]</span>
+    <span class="n">ledgerTx</span> <span class="ow">&lt;-</span> <span class="n">submitTxConstraintsWith</span> <span class="o">@</span><span class="kt">Void</span> <span class="n">lookups</span> <span class="n">tx</span>
+    <span class="n">void</span> <span class="o">$</span> <span class="n">awaitTxConfirmed</span> <span class="o">$</span> <span class="n">txId</span> <span class="n">ledgerTx</span>
+    <span class="n">logInfo</span> <span class="o">@</span><span class="kt">String</span> <span class="o">$</span> <span class="s">&quot;collected gifts&quot;</span>
+</pre></div>
+</div>
+<p>If we try to compile the code now, either on the command line or in the playground, we will get an error because Plutus doesn’t know how to
+convert back and forth between <code class="docutils literal notranslate"><span class="pre">IsData</span></code> and <code class="docutils literal notranslate"><span class="pre">MySillyRedeemer</span></code>.</p>
+<p>We could write an instance of <code class="docutils literal notranslate"><span class="pre">IsData</span></code> for <code class="docutils literal notranslate"><span class="pre">MySillyRedeemer</span></code> by hand. But, we don’t need to.</p>
+<p>Instead we can use another bit of Template Haskell magic.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span><span class="kt">PlutusTx</span><span class="o">.</span><span class="n">unstableMakeIsData</span> <span class="kt">&#39;&#39;MySillyRedeemer</span>
+</pre></div>
+</div>
+<p>At compile time, the compiler will use the Template Haskell to write an <code class="docutils literal notranslate"><span class="pre">IsData</span></code> instance for us. And now, it will compile.</p>
+<p>Let’s check it in the REPL.</p>
+<div class="highlight-haskell notranslate"><div class="highlight"><pre><span></span>Prelude PlutusTx PlutusTx.IsData.Class&gt; :l src/Week02/IsData.hs
+Ok, one module loaded.
+Prelude PlutusTx PlutusTx.IsData.Class Week02.IsData&gt; toData (MySillyRedeemer 42)
+Constr 0 [I 42]
+</pre></div>
+</div>
+<p>If you try this code, which is in <code class="docutils literal notranslate"><span class="pre">IsData.hs</span></code>, in the playground, you should see that it behaves in the same way as before.</p>
+</div>
+</div>
+<div class="section" id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Permalink to this headline">¶</a></h2>
+<p>We have seen a couple of examples of simple validators.</p>
+<p>We started with a validator that will always succeed, completely ignoring its arguments. Then we looked at a validator that always fails, again completely ignoring
+its arguments. Then we looked at one that examines its redeemer to check for a certain predefined value.</p>
+<p>We then turned this validator into a typed version which is the one which would be used in practice. First we used built-in data types and then we saw how we can use
+custom data types.</p>
+<p>We have not yet looked at examples where the datum or the context are inspected, which would be required for more realistic examples.</p>
+<p>We will look at that in the next lecture.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright .
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

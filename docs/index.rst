@@ -18,21 +18,12 @@ These notes can be downloaded in PDF or ePub formats using the links at the bott
 To stay up-to-date with changes to these notes, you can follow me on Twitter @PoolChess. They are currently being updated for the second iteration of the program.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Contents:
    :numbered:
    
-   week1.rst
-   week2.rst
-   week3.rst
-   week4.rst
-   week5.rst
-   week6.rst
-   week7.rst
-   week8.rst
-   week9.rst
-   week10.rst
-   alonzowhiteex1.rst
+   plutus_pioneer_program.rst
+   alonzo_white.rst
    
 
    

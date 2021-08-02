@@ -14,111 +14,9 @@ This is the setup I chose to use, but there are several other ways to run the no
     The exercises are only possible if you have some test Ada from the Alonzo White faucet. Test Ada is currently only available to members
     of the Alonzo test group in order to control usage of the network. Alonzo testnet is moving towards a public phase within a matter of weeks.
 
-I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 20Gb data volume.
+I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 60Gb data volume.
 
-AWS Node Setup
---------------
-
-Mount the data volume.
-
-.. code:: bash
-
-    sudo mkfs -t xfs /dev/xvdh
-    sudo mkdir /data
-    sudo mount /dev/xvdh /data
-    sudo chown ubuntu:ubuntu /data
-
-Setup the IOHK Cache
-____________________
-
-.. code:: bash
-
-    sudo mkdir -p /etc/nix
-    cat <<EOF | sudo tee /etc/nix/nix.conf
-    substituters = https://cache.nixos.org https://hydra.iohk.io https://iohk.cachix.org
-    trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo=
-    EOF
-
-Install Nix
-___________
-
-We use a little trick here to let Nix use a symlinked directory. This is not recommended if you plan to have setups on multiple machines with potentially different configurations,
-but that doesn't matter here.
-
-.. code:: bash
-
-    mkdir /data/nix
-    sudo ln -s /data/nix /nix
-    echo "export NIX_IGNORE_SYMLINK_STORE=1" >> "~/.bashrc
-    source ~/.bashrc
-    curl -L https://nixos.org/nix/install | sh
-    . /home/ubuntu/.nix-profile/etc/profile.d/nix.sh
-
-Download the Cardano Node
-_________________________
-
-.. code:: bash
-
-    cd /data
-    git clone https://github.com/input-output-hk/cardano-node
-    cd cardano-node
-    git checkout tags/alonzo-white-1.1 -b alonzo_white_1_1
-
-Build the node
-______________
-
-.. code:: bash
-
-    nix-build -A scripts.alonzo-white.node -o result/alonzo-white/cardano-node-alonzo-white
-    nix-build -A cardano-cli -o result/alonzo-white/cardano-cli
-
-Start the node
-______________
-
-.. code:: bash
-
-    cd /data/cardano-node/result/alonzo-white
-    ./cardano-node-alonzo-white/bin/cardano-node-alonzo-white
-
-Leave this running and open another shell.
-
-Setup some environment variables
-________________________________
-
-.. code:: bash
-
-    echo "export CARDANO_CLI=/data/cardano-node/result/alonzo-white/cardano-cli/bin/cardano-cli" >> ~/.bashrc
-    echo "export TESTNET_MAGIC_NUM=7" >> ~/.bashrc
-    echo "export CARDANO_NODE_SOCKET_PATH=/data/cardano-node/result/alonzo-white/state-node-alonzo-white/node.socket" >> ~/.bashrc
-    source ~/.bashrc
-
-You can check on the status of the node with:
-
-.. code:: bash
-
-    $CARDANO_CLI query tip --testnet-magic $TESTNET_MAGIC_NUM
-
-You should see something like this:
-
-.. code:: json
-
-    {
-        "epoch": 289,
-        "hash": "7521f071d0bfc050cde302f1352ed44c2fc74927f1e28afea1b1df2c4c012d5c",
-        "slot": 2079664,
-        "block": 102026,
-        "era": "Alonzo",
-        "syncProgress": "100.00"
-    }
-
-You can use ``jq`` if you ever want to get some specific information on its own, for example:
-
-.. code:: bash
-
-    sudo apt install jq -y
-    
-    $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
-    100.0
+.. include:: alonzo/aws_node_setup.rst
 
 Some Helper Scripts
 -------------------
@@ -150,7 +48,7 @@ ______________
 
 If you have access to the testnet faucet, transfer some test Ada to the ``main`` wallet.
 
-Then, check that it has arrived.
+Then, check that it has arrived. It should arrive within a minute or so.
 
 .. code:: bash
 
@@ -374,7 +272,6 @@ Check that it has arrived.
     29f82f40603c4328e6efffb7c6e8851fe9540d18ddc0930b188896f6b016e141     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
     5589e823cf148597cbf64dc7cb5ebcd3957d5fc83c3521b281daa9f9c490c8ab     0        999888777 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
-
 Now we try to get some funds from the script.
 
 .. code:: bash
@@ -400,10 +297,78 @@ Now we try to get some funds from the script.
     Receiving Wallet: wallet2
     Transaction successfully submitted.
 
+But will we now find that the collateral has gone. The validation failed.
+
+.. code:: bash
+
+    ./balance.sh fees
+    TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+
+And the funds will never arrive. We still have just one UTxO, the one we got from the ``AlwaysSucceeds`` script.
+
+.. code:: bash
+
+    ./balance.sh wallet2
+                           TxHash                                 TxIx        Amount
+    --------------------------------------------------------------------------------------
+    ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     1        1000000 lovelace + TxOutDatumHashNone
+
 
 HelloWorld Script
 -----------------
 
 Compiling Plutus Scripts
 ________________________
+
+First, we need to go into a Nix shell. The shell from ``cardano-node`` doesn't work for me, so I cloned the ``plutus`` repository and used its shell instead.
+
+.. code:: bash
+
+    cd /data
+    git clone https://github.com/input-output-hk/plutus
+    cd plutus
+    nix-shell
+
+Now, we can change to the ``plutus-helloworld`` directory and run the code.
+
+.. code:: bash
+
+    cd /data/plutus-scripts/plutus-sources/plutus-helloworld
+
+If you look in the ``plutus-helloworld.cabal`` file in, you'll find some executables defined, one of which is called ``plutus-helloworld``. 
+
+Running this executable will create compiled Plutus code as output.
+
+.. code:: bash
+
+    cabal update
+    cabal run plutus-helloworld
+
+This outputs, among other things, something like the following.
+
+.. code:: bash
+
+    ExBudget {_exBudgetCPU = ExCPU 9814000, _exBudgetMemory = ExMemory 2260}
+
+These value represent the expected CPU and memory usage required to run the script. Fees for running scripts are calculated using these values.
+
+It also outputs a file called ``result.plutus``, which contains the compiled Plutus code.
+
+.. code:: json
+
+    {
+        "type": "PlutusScriptV1",
+        "description": "",
+        "cborHex": "5902355902320100003232323332223322333222323232323322333333222222323232323232222333530163335006300812001003300412001201b23500601b01a2300a4830af38f1ab6649049848004d400888004d400488008d55540584888cc00c888ccccd4c01c0088cccccd4c02000888cc04c00c0088880608805c8805c8805c06088cccccd4c02400c88060888ccd4c060cc05001400c8ccd4c05c48004c02c4800401400c80680708806088060880600648cccccd4c0200088805c88806088cc04800c0088805c8805c0608cccccd4c0200088805c8880608805c88ccd4c05048004c0204800400c0088805c0608cccccd4c0200088805c8880608805c8805c88ccd4c0504800401c00c00806088d4d5403000888d4d5403800c88ccd4c058ccc020480040100088ccc0244800401000880600688488888c01401888488888cc01001c0188488888c00c0188488888c0080188488888c0040188004448848cc00400c00844800488c8ccd5ea00201201066e9002001223233357a80080400399bc0008004d4004800448c004d54028884888ccd4d40300088ccd4d4034008802c888030030888ccd4d403c0108030888ccd4c034cc02401800c8ccd4c0304800402801800c803c04403802c48800848800480044800480044488008488488cc00401000c48004448c8c00400488cc00cc8c00400400800444448cd4008848cc0048d400c88c00800c8d400c88c00400c00448c8c8c00400488cc00cc8c0040040080048848d4c01048d4c01000cd400c0040041"
+    }
+
+We can now move this script to our ``scripts`` directory and give it a more useful name.
+
+.. code:: bash
+
+    mv result.plutus ../../scripts/HelloWorld.plutus
+
+
+
 
