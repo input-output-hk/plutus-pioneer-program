@@ -1,6 +1,11 @@
 HelloWorld Script
 -----------------
 
+.. note::
+
+    These instructions should work as presented if you have followed the `AWS Node setup`_ section and the `Wallets and Funds`_ section. If not, you may need
+    to improvise a little.
+
 Compiling Plutus Scripts
 ________________________
 
