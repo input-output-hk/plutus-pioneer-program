@@ -1,5 +1,5 @@
 AlwaysFails Script
-------------------
+==================
 
 .. include:: ../notes/setup.rst
 

@@ -1,5 +1,5 @@
 AWS Node Setup
---------------
+==============
 
 I started with a fresh ``t2.large`` AWS Ubuntu EC2 instance using AMI ``ami-0ff4c8fb495a5a50d`` and adding a 60Gb data volume.
 
