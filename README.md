@@ -41,6 +41,11 @@
   - Oracles.
   - Using the PAB.
 
+- [Lecture #7](https://youtu.be/uwZ903Zd0DU)
+
+  - Commit schemes.
+  - State machines.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
@@ -49,6 +54,7 @@
 - Lecture #4:  [Monad, Traces & Contracts](code/week04)
 - Lecture #5:  [Native Tokens](code/week05)
 - Lecture #6:  [Oracles](code/week06)
+- Lecture #7:  [State Machines](code/week07)
 
 ## Exercises
 
@@ -95,6 +101,10 @@
 - Week #6
 
   - Get the Oracle demo running and extend it in some way.
+
+- Week #7
+
+  - Implement the game of "Rock, Paper, Scissors" using state machines.
 
 ## Some Plutus Modules
 
