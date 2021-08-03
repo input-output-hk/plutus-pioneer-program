@@ -61,7 +61,7 @@ I submitted three transactions, two with the correct datum and one without.
     ce0b7f4978b7cd6dae6946a1e150964908491583cacb9436085ac52975ee56c8     0        12500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
     e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
 
-Now we have to put some ugly strings on the command line because I'm not very good with *bash*.
+Now we have to put some ugly strings on the command line because I'm not very good with *bash*. The final argument is the redeemer.
 
 .. code:: bash
 
@@ -104,3 +104,17 @@ After waiting a minute, we check that we managed to grab some funds.
     099a2a3d025d4e30e95410be19d67e3a27b6c237b378ac8e3f89806d7d1922a7     1        20000000 lovelace + TxOutDatumHashNone
     36a1072bd69c6f7307fdb017e796ccd0fdd953a21dc9fb34bf015fad1cb1560c     1        1000000 lovelace + TxOutDatumHashNone
     6d5b5c760fdf83af12fd071e4d89b7058afb42be98ed8557cc3fe30047047a2f     1        6500000 lovelace + TxOutDatumHashNone
+
+If you pass an incorrect datum, you will receive an error message and the transaction will not enter validation.
+
+.. code:: bash
+
+    ./getFromScript.sh 1500000 120000000 HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\""
+    ...
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"]) (fromList [SafeHash "d658ccd4fce5643c6186657cc2f88f2d110acb88c8b94cd90d9acb088562a19a"]))])
+
+If you pass the correct datum but an incorrect redeemer, then you will lose your collateral.
+
+.. code:: bash
+
+    ./getFromScript.sh 1500000 120000000 HelloWorldPerson "\"Sam Jones\"" "\"1975/12/23\""
