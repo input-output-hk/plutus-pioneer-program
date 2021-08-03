@@ -28,6 +28,7 @@ This is the setup I chose to use, but there are several other ways to run the no
     alonzo/always_succeeds_script.rst
     alonzo/always_fails_script.rst
     alonzo/hello_world_script.rst
+    alonzo/hello_world_person.rst
 
 
 

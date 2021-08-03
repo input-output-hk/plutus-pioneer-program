@@ -1,5 +1,5 @@
 AlwaysSucceeds Script
----------------------
+=====================
 
 .. include:: ../notes/setup.rst
 
