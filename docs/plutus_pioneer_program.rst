@@ -1,4 +1,4 @@
-.. _plutus_pioneer_proram:
+.. _plutus_pioneer_program:
 
 Plutus Pioneer Program
 ......................
