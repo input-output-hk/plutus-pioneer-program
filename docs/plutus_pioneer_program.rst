@@ -1,3 +1,5 @@
+.. _plutus_pioneer_proram:
+
 Plutus Pioneer Program
 ......................
 
