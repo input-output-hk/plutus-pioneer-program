@@ -13,7 +13,7 @@ Plutus scripts get compiled down to the following format.
         "cborHex": "585c585a010000332233322233333322222233222220051200120012122222300500622122222330040070062122222300300621222223002006212222230010062001112200212212233001004003120011122123300100300211200101"
     }   
     
-This is the ``AlwaysSuccess.plutus`` script whose validator always succeeds, which means that anyone will be able to consume any UTxO sitting at its address. The script can be found in the ``/data/plutus-scripts/scripts`` directory. 
+This is the ``AlwaysSucceeds.plutus`` script whose validator always succeeds, which means that anyone will be able to consume any UTxO sitting at its address. The script can be found in the ``/data/plutus-scripts/scripts`` directory. 
 
 Pay to the Script
 _________________

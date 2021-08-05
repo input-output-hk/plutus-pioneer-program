@@ -5,8 +5,8 @@ Alonzo White Walkthrough
 
 These are my notes taken while working through the Alonzo White exercises.
 
-The notes take you through the process of setting up an AWS instance running an Alonzo White node, and using the command line to 
-move ADA between wallets and submit and executing smart contracts. 
+The notes take you through the process of setting up an AWS instance running an Alonzo White node, using the command line to 
+move ADA between wallets and submitting and executing smart contracts. 
 
 It uses several helper scripts to simplify the creation of the commands. The helper scripts are
 simple bash scripts that create ``cardano-cli`` commands and should be easy to understand to get a grip on what is going on behind the scenes.
