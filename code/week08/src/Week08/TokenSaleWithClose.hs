@@ -27,7 +27,6 @@ import           Data.Text                    (Text, pack)
 import           GHC.Generics                 (Generic)
 import           Plutus.Contract              as Contract
 import           Plutus.Contract.StateMachine
-import qualified Plutus.Contracts.Currency    as C
 import qualified PlutusTx
 import           PlutusTx.Prelude             hiding (Semigroup(..), check, unless)
 import           Ledger                       hiding (singleton)
@@ -113,9 +112,6 @@ tsAddress = scriptAddress . tsValidator
 
 tsClient :: TokenSale -> StateMachineClient (Maybe Integer) TSRedeemer
 tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsInst ts)
-
-mapErrorC :: Contract w s C.CurrencyError a -> Contract w s Text a
-mapErrorC = mapError $ pack . show
 
 mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
 mapErrorSM = mapError $ pack . show
