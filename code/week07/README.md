@@ -26,6 +26,7 @@ The first implementation of the game is a bit verbose, it only makes use of Plut
 
 A state machine is basically a system that reacts to inputs by transitioning to other states, it is represented as a directed graph which transitions state. Eg. in our diagram for the Alice/Bob game
 
+```
              ______              __________
 --Alice-->  | Hasb |  --Bob-->  | hasb, cb |----------|
             |______|    play    |__________|          |
@@ -37,3 +38,5 @@ A state machine is basically a system that reacts to inputs by transitioning to 
                        \        _____________       /
                         \--->  | Final state |  <--/
                                |_____________|
+
+```                               
