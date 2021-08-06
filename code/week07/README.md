@@ -22,4 +22,18 @@ The first implementation of the game is a bit verbose, it only makes use of Plut
 - `data Game` -> type that contains information about the steps of the game (much like the table above) plus it adds varaibles for deadlines.
 - `data GameDatum` -> type that concatenates a bytestring 
 
+## State Machines
 
+A state machine is basically a system that reacts to inputs by transitioning to other states, it is represented as a directed graph which transitions state. Eg. in our diagram for the Alice/Bob game
+
+             ______              __________
+--Alice-->  | Hasb |  --Bob-->  | hasb, cb |----------|
+            |______|    play    |__________|          |
+                  \                   |               |
+                   \                  |           Bob | claim
+              Alice \ claim     Alice | reveal        |
+                     \                |               /
+                      \               v              /
+                       \        _____________       /
+                        \--->  | Final state |  <--/
+                               |_____________|
