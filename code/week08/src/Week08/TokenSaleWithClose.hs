@@ -97,26 +97,26 @@ mkTSValidator = mkValidator . tsStateMachine
 
 type TS = StateMachine (Maybe Integer) TSRedeemer
 
-tsInst :: TokenSale -> Scripts.TypedValidator TS
-tsInst ts = Scripts.mkTypedValidator @TS
+tsTypedValidator :: TokenSale -> Scripts.TypedValidator TS
+tsTypedValidator ts = Scripts.mkTypedValidator @TS
     ($$(PlutusTx.compile [|| mkTSValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode ts)
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @(Maybe Integer) @TSRedeemer
 
 tsValidator :: TokenSale -> Validator
-tsValidator = Scripts.validatorScript . tsInst
+tsValidator = Scripts.validatorScript . tsTypedValidator
 
 tsAddress :: TokenSale -> Ledger.Address
 tsAddress = scriptAddress . tsValidator
 
 tsClient :: TokenSale -> StateMachineClient (Maybe Integer) TSRedeemer
-tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsInst ts)
+tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsTypedValidator ts)
 
 mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
 mapErrorSM = mapError $ pack . show
 
-startTS :: AssetClass -> Bool -> Contract (Last TokenSale) s Text TokenSale
+startTS :: AssetClass -> Bool -> Contract (Last TokenSale) s Text ()
 startTS token useTT = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
     tt  <- if useTT then Just <$> mapErrorSM getThreadToken else return Nothing
@@ -129,7 +129,6 @@ startTS token useTT = do
     void $ mapErrorSM $ runInitialise client (Just 0) mempty
     tell $ Last $ Just ts
     logInfo $ "started token sale " ++ show ts
-    return ts
 
 setPrice :: TokenSale -> Integer -> Contract w s Text ()
 setPrice ts p = void $ mapErrorSM $ runStep (tsClient ts) $ SetPrice p
@@ -158,7 +157,9 @@ type TSUseSchema =
 startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
 startEndpoint = startTS' >> startEndpoint
   where
-    startTS' = handleError logError $ void $ awaitPromise $ endpoint @"start" $ \(cs, tn, useTT) -> startTS (AssetClass (cs, tn)) useTT
+    startTS' = handleError logError
+             $ awaitPromise
+             $ endpoint @"start" $ \(cs, tn, useTT) -> startTS (AssetClass (cs, tn)) useTT
 
 useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
 useEndpoints ts = forever $ handleError logError $ awaitPromise $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw' `select` close'
