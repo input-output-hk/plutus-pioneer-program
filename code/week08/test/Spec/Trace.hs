@@ -51,7 +51,7 @@ emCfg :: EmulatorConfig
 emCfg = EmulatorConfig (Left $ Map.fromList [(Wallet w, v) | w <- [1 .. 3]]) def def
   where
     v :: Value
-    v = Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
+    v = Ada.lovelaceValueOf 1_000_000_000 <> assetClassValue token 1000
 
 currency :: CurrencySymbol
 currency = "aa"
@@ -65,7 +65,7 @@ token = AssetClass (currency, name)
 myTrace :: EmulatorTrace ()
 myTrace = do
     h <- activateContractWallet (Wallet 1) startEndpoint
-    callEndpoint @"start" h (currency, name, False)
+    callEndpoint @"start" h (currency, name, True)
     void $ Emulator.waitNSlots 5
     Last m <- observableState h
     case m of

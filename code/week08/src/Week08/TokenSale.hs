@@ -112,7 +112,7 @@ tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (t
 mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
 mapErrorSM = mapError $ pack . show
 
-startTS :: AssetClass -> Bool -> Contract (Last TokenSale) s Text TokenSale
+startTS :: AssetClass -> Bool -> Contract (Last TokenSale) s Text ()
 startTS token useTT = do
     pkh <- pubKeyHash <$> Contract.ownPubKey
     tt  <- if useTT then Just <$> mapErrorSM getThreadToken else return Nothing
@@ -125,13 +125,12 @@ startTS token useTT = do
     void $ mapErrorSM $ runInitialise client 0 mempty
     tell $ Last $ Just ts
     logInfo $ "started token sale " ++ show ts
-    return ts
 
 setPrice :: TokenSale -> Integer -> Contract w s Text ()
 setPrice ts p = void $ mapErrorSM $ runStep (tsClient ts) $ SetPrice p
 
 addTokens :: TokenSale -> Integer -> Contract w s Text ()
-addTokens ts n = void (mapErrorSM $ runStep (tsClient ts) $ AddTokens n)
+addTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ AddTokens n
 
 buyTokens :: TokenSale -> Integer -> Contract w s Text ()
 buyTokens ts n = void $ mapErrorSM $ runStep (tsClient ts) $ BuyTokens n
@@ -148,12 +147,16 @@ type TSUseSchema =
     .\/ Endpoint "withdraw"   (Integer, Integer)
 
 startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
-startEndpoint = startTS' >> startEndpoint
-  where
-    startTS' = handleError logError $ void $ awaitPromise $ endpoint @"start" $ \(cs, tn, useTT) -> startTS (AssetClass (cs, tn)) useTT
+startEndpoint = forever
+              $ handleError logError
+              $ awaitPromise
+              $ endpoint @"start" $ \(cs, tn, useTT) -> startTS (AssetClass (cs, tn)) useTT
 
 useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
-useEndpoints ts = forever $ handleError logError $ awaitPromise $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw'
+useEndpoints ts = forever
+                $ handleError logError
+                $ awaitPromise
+                $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw'
   where
     setPrice'  = endpoint @"set price"  $ setPrice ts
     addTokens' = endpoint @"add tokens" $ addTokens ts
