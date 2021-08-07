@@ -1,9 +1,9 @@
 .. _alonzo_white:
 
-Alonzo White Walkthrough
-........................
+Alonzo Walkthrough
+..................
 
-These are my notes taken while working through the Alonzo White exercises.
+These are my notes taken while working with the Alonzo testnet.
 
 The notes take you through the process of setting up an AWS instance running an Alonzo White node, using the command line to 
 move ADA between wallets and submitting and executing smart contracts. 
