@@ -19,7 +19,7 @@ simple bash scripts that create ``cardano-cli`` commands and should be easy to u
 This is the setup I chose to use, but there are several other ways to run the node and configure the environment.
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 1
     :caption: Contents:
     :numbered:
 
