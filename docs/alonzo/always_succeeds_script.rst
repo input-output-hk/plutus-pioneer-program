@@ -71,7 +71,7 @@ Unlock the Funds in the Script
 ______________________________
 
 When trying to consume UTxOs locked in a script, you need to provide collateral that will cover the costs if validation fails. For this we can use a separate wallet for storing
-collateral UTxOs, to keep things tidy. One of the several wallets we created earlier on was named ``fees``.
+collateral UTxOs, to keep things tidy. One of the several wallets we created earlier on was named ``fees``, which we will use for fees and for collateral.
 
 Under normal circumstances, collateral should never be lost because the wallet can perform validation in a deterministic fashion and only
 submit the transaction if validation is guaranteed to pass.
