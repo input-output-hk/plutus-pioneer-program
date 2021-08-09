@@ -52,21 +52,5 @@ Now we try to get some funds from the script.
     ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     0        889819803 lovelace + TxOutDatumHashNone
     TX row number: 1
     Receiving Wallet: wallet2
-    Transaction successfully submitted.
 
-But will we now find that the collateral has gone. The validation failed.
-
-.. code:: bash
-
-    ./balance.sh fees
-    TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-
-And the funds will never arrive. We still have just one UTxO, the one we got from the ``AlwaysSucceeds`` script.
-
-.. code:: bash
-
-    ./balance.sh wallet2
-                           TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-    ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     1        1000000 lovelace + TxOutDatumHashNone
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (UtxosFailure (ValidationTagMismatch (IsValid True)))))])
