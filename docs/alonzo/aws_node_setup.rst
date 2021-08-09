@@ -46,23 +46,23 @@ _________________________
     cd /data
     git clone https://github.com/input-output-hk/cardano-node
     cd cardano-node
-    git checkout tags/alonzo-white-1.1 -b alonzo_white_1_1
+    git checkout tags/alonzo-purple-1.0.1 -b alonzo_purple_1_0_1
 
 Build the node
 ______________
 
 .. code:: bash
 
-    nix-build -A scripts.alonzo-white.node -o result/alonzo-white/cardano-node-alonzo-white
-    nix-build -A cardano-cli -o result/alonzo-white/cardano-cli
+    nix-build -A scripts.alonzo-purple.node -o result/alonzo-purple/cardano-node-alonzo-purple
+    nix-build -A cardano-cli -o result/alonzo-purple/cardano-cli
 
 Start the node
 ______________
 
 .. code:: bash
 
-    cd /data/cardano-node/result/alonzo-white
-    ./cardano-node-alonzo-white/bin/cardano-node-alonzo-white
+    cd /data/cardano-node/result/alonzo-purple
+    ./cardano-node-alonzo-purple/bin/cardano-node-alonzo-purple
 
 Leave this running and open another shell.
 
@@ -71,9 +71,9 @@ ________________________________
 
 .. code:: bash
 
-    echo "export CARDANO_CLI=/data/cardano-node/result/alonzo-white/cardano-cli/bin/cardano-cli" >> ~/.bashrc
-    echo "export TESTNET_MAGIC_NUM=7" >> ~/.bashrc
-    echo "export CARDANO_NODE_SOCKET_PATH=/data/cardano-node/result/alonzo-white/state-node-alonzo-white/node.socket" >> ~/.bashrc
+    echo "export CARDANO_CLI=/data/cardano-node/result/alonzo-purple/cardano-cli/bin/cardano-cli" >> ~/.bashrc
+    echo "export TESTNET_MAGIC_NUM=8" >> ~/.bashrc
+    echo "export CARDANO_NODE_SOCKET_PATH=/data/cardano-node/result/alonzo-purple/state-node-alonzo-purple/node.socket" >> ~/.bashrc
     source ~/.bashrc
 
 You can check on the status of the node with:
