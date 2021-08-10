@@ -84,7 +84,7 @@ submit the transaction if validation is guaranteed to pass.
     --------------------------------------------------------------------------------------
     bd7422ef2cd55d1c5a33601a3b75b080bc3742856e5ddb8dfdfae07f583c7af1     1        998999800000 lovelace + TxOutDatumHashNone
     TX row number: 1  
-    Lovelace to send: 1000000000
+    Lovelace to send: 100000000000
     Receiving wallet name: fees
     Transaction successfully submitted.
 
@@ -97,11 +97,11 @@ We should check that it's arrived in our ``fees`` wallet.
     --------------------------------------------------------------------------------------
     7678d8d6b95ed026d7c690fb53419bdaa580cb00c56450ac3bd97712dd71ca4e     0        1000000000 lovelace + TxOutDatumHashNone
 
-The following command will try to get 1000000 lovelace from the script using fees of ``100000000`` and a datum of ``6666``, which is the correct datum.
+The following command will try to get the UTxO from the script using a datum of ``6666``, which is the correct datum.
 
 .. code:: bash
 
-    ./getFromScript.sh 10000000 AlwaysSucceeds 6666 wallet1
+    ./getFromScript.sh AlwaysSucceeds 6666 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================
@@ -127,32 +127,17 @@ The following command will try to get 1000000 lovelace from the script using fee
     TX row number: 1
     Receiving Wallet: wallet2
 
-    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (FeeTooSmallUTxO (Coin 110180197) (Coin 100000000))))])
-    
-Here the transaction has failed because the fees were too low. It tells us what the fees should be, so we can try again with.
-
-.. code:: bash
-
-    ./getFromScript.sh 10000000 AlwaysSucceeds 6666 wallet1
-    ...
     Transaction successfully submitted.
 
-Let's check that it arrived in ``wallet2`` as expected.
+Let's check that it arrived in ``wallet1`` as expected.
 
 .. code:: bash
 
-    ./balance.sh wallet2
+    ./balance.sh wallet1
 
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
-    ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     1        1000000 lovelace + TxOutDatumHashNone
+    ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     1        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
-We have managed to extract 1,000,000 lovelace from the contract.
+We did it.
 
-Let's try it with an invalid datum.
-
-.. code:: bash
-    
-    ./getFromScript.sh 1000000 110180197 AlwaysSucceeds 5555
-    ...
-    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "9e1199a988ba72ffd6e9c269cadb3b53b5f360ff99f112d9b2ee30c4d74ad88b"]) (fromList [SafeHash "71f5a96d948593ef12667c22d49b5dbbed7f00c7a3e88083cdf7391c5cc3ba73"]))])    

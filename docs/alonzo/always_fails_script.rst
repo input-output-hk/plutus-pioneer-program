@@ -33,7 +33,7 @@ Now we try to get some funds from the script.
 
 .. code:: bash
 
-    ./getFromScript.sh 1000000 AlwaysFails 6666 wallet1
+    ./getFromScript.sh AlwaysFails 6666 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================

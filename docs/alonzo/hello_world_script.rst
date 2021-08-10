@@ -136,7 +136,7 @@ If we pass in a datum that is not ``89600447942433``, we'll get the following er
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 HelloWorld 69600447942433 wallet1
+    ./getFromScript.sh HelloWorld 69600447942433 wallet1
 
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"]) (fromList [SafeHash "d5172cca64a56e0f9d4886ff43bad0195df3300c97db74008978a7a66a116d7d"]))])
 
@@ -144,7 +144,7 @@ So, we'll pass in the matching datum.
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 HelloWorld 89600447942433 wallet1
+    ./getFromScript.sh HelloWorld 89600447942433 wallet1
 
     ============================================================================================
     Select Script UTxO
@@ -170,15 +170,13 @@ So, we'll pass in the matching datum.
 
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (UtxosFailure (ValidationTagMismatch (IsValid True)))))])
 
-If you get a message that the fees are too low, you'll have to update the second argument accordingly.
-
 This time, the datums match, but the value of the datum is incorrect, and we fail validation and so do not submit the transaction to the blockchain. 
 
 So, let's try to get some funds from the UTxO with the ``hello world`` message as a datum. The validator script will let us unlock that one.
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 HelloWorld 79600447942433 wallet1
+    ./getFromScript.sh HelloWorld 79600447942433 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================
@@ -206,7 +204,7 @@ So, let's try to get some funds from the UTxO with the ``hello world`` message a
     Receiving Wallet: wallet2
     Transaction successfully submitted.
 
-Now, after a minute or so, when we look at the UTxOs in ``wallet2``, we see that we have got some new lovelace.
+Now, after a minute or so, when we look at the UTxOs in ``wallet1``, we see that we have got some new lovelace.
 
 .. code:: bash
 
@@ -214,7 +212,7 @@ Now, after a minute or so, when we look at the UTxOs in ``wallet2``, we see that
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
     099a2a3d025d4e30e95410be19d67e3a27b6c237b378ac8e3f89806d7d1922a7     1        20000000 lovelace + TxOutDatumHashNone
-    36a1072bd69c6f7307fdb017e796ccd0fdd953a21dc9fb34bf015fad1cb1560c     1        1000000 lovelace + TxOutDatumHashNone
+    dda26275646739b9ff2edc4e58d7cb97fba85ee4804726cdfd2f83b0f252e5cb     1        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"
 
 We did not lose our collateral, although we did get charged some fees.
 

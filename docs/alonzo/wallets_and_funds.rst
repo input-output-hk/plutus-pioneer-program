@@ -53,7 +53,7 @@ We will transfer some funds to ``wallet1``. This uses another helper script, whi
     40f0fa60a71e247e3eca46147fc159080aa7667763ae8c3be00b2e48400bbccd     0        1000000000000 lovelace + TxOutDatumHashNone
 
     TX row number: 1
-    Lovelace to send: 1000000000
+    Lovelace to send: 100000000000
     Receiving wallet name: wallet1
 
     Transaction successfully submitted.
