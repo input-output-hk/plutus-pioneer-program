@@ -22,7 +22,7 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
    :numbered:
    
    plutus_pioneer_program.rst
-   alonzo_white.rst
+   alonzo.rst
    
 
    

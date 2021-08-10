@@ -123,31 +123,15 @@ we should be able to spend this UTxO. We don't see any others with this datum ha
     e97ca5246c9b1565250e2cc5078d770564463a57c13125a37e4906c1f7dc0680     0        50000000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9ad30ffde0d1931ed4f145fa0a0d320a067051bfab1b08cbdb79e9f26df55df3"
     f6179d20172fec17caae32791623da52e2aa3bff04304389f693672aa1e3dae3     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
-Before we try to get the funds, we need to transfer some more funds to our ``fees`` wallet.
+We will try to get some funds from the one with the ``123456789`` datum. 
+
+If we pass in a datum that is not ``123456789``, we'll get the following error.
 
 .. code:: bash
 
-    ./sendFromWallet.sh main
-    TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-    6ef6d9abaa4f6cfb271614a78b1476f20583d0414d26d134375c0bbff21b51e7     1        997999600000 lovelace + TxOutDatumHashNone
-    TX row number: 1
-    Lovelace to send: 1000000000
-    Receiving wallet name: fees
-    Transaction successfully submitted.
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "3519b7fbee1f70218539524e3b50ba8fa67b6d769cfa6fee4d4356e800342956"]) (fromList [SafeHash "be10b490c35501e475186eb2a04bea1cb0aa87bb3ddfd44a7b0a7009bca57633"])),UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (UtxosFailure (ValidationTagMismatch (IsValid True)))))])
 
-I did this twice because we are going to run two transactions and on the first one we are going to lose our collateral. You will need to wait for the first transfer to complete before
-running it for a second time.
-
-.. code:: bash
-
-    ./balance.sh fees
-    TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-    65e74914ad63e7e3372da140a3285b3d7eea879d02d6b814cf1f23df40c44418     0        1000000000 lovelace + TxOutDatumHashNone
-    c5b11e878a7dcebe5a52eb32eff5d83c3c76e35d13a2106aab811535dff5e3f6     0        1000000000 lovelace + TxOutDatumHashNone
-
-We will try to get some funds from the one with the ``123456789`` datum. We have to pass in the matching datum, otherwise the transaction won't even start validating.
+So, we'll pass in the matching datum.
 
 .. code:: bash
 
@@ -174,39 +158,16 @@ We will try to get some funds from the one with the ``123456789`` datum. We have
     c5b11e878a7dcebe5a52eb32eff5d83c3c76e35d13a2106aab811535dff5e3f6     0        1000000000 lovelace + TxOutDatumHashNone
     TX row number: 1
     Receiving Wallet: wallet2
-    Transaction successfully submitted.
-    
+
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (UtxosFailure (ValidationTagMismatch (IsValid True)))))])
+
 If you get a message that the fees are too low, you'll have to update the second argument accordingly.
 
-A few things have happened. After about a minute of waiting, we see that ``wallet2`` has not received any new funds.
+This time, the datums match, but the value of the datum is incorrect, and we fail validation and so do not submit the transaction to the blockchain. 
 
-.. code:: bash
+.. warning::
 
-    ./balance.sh wallet2
-    TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-    36a1072bd69c6f7307fdb017e796ccd0fdd953a21dc9fb34bf015fad1cb1560c     1        1000000 lovelace + TxOutDatumHashNone    
-
-We have lost our collateral.
-
-.. code:: bash
-
-    ./balance.sh fees
-    TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-    c5b11e878a7dcebe5a52eb32eff5d83c3c76e35d13a2106aab811535dff5e3f6     0        1000000000 lovelace + TxOutDatumHashNone
-
-And the UTxO we were trying to spend is left untouched.
-
-.. code:: bash
-
-    ./contractBalance.sh HelloWorld
-                            TxHash                                 TxIx        Amount
-    --------------------------------------------------------------------------------------
-    0dfec1295895d877edf15f323df63f43aa4501bfc8ee0483512c13550b6f4a65     0        98000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
-    2d9400af7637b05b34e96c66781f087c7a28c7da8b4482b98897807dfe84efd6     0        32500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "3519b7fbee1f70218539524e3b50ba8fa67b6d769cfa6fee4d4356e800342956"
-    ...
-    a05563264c201047514185b38f6af833cc62122074aba5d217506b2be4f5955e     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"
+    At this point during Alonzo Purple testing, things stopped working. I am currently fixing the notes from this section onwards.
 
 So, let's try to get some funds from the UTxO with the ``hello world`` message as a datum. The validator script will let us unlock that one.
 
