@@ -68,7 +68,7 @@ message converted to an Integer and shortened to fit within the 8-byte limit for
 
     cd /data/plutus-scripts
 
-    ./payToScript.sh 62500000 200000 HelloWorld 79600447942433
+    ./payToScript.sh 62500000 HelloWorld 79600447942433 wallet1
     Wallet Name: wallet1
                                TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
@@ -94,7 +94,7 @@ So, let's lock some more lovelace in the script but with a different datum.
 
 .. code:: bash
 
-    ./payToScript.sh 32500000 200000 HelloWorld 89600447942433
+    ./payToScript.sh 32500000 HelloWorld 89600447942433 wallet1
     Wallet Name: wallet1
                                TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
@@ -136,7 +136,7 @@ If we pass in a datum that is not ``89600447942433``, we'll get the following er
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 160000000 HelloWorld 69600447942433
+    ./getFromScript.sh 20000000 HelloWorld 69600447942433 wallet1
 
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"]) (fromList [SafeHash "d5172cca64a56e0f9d4886ff43bad0195df3300c97db74008978a7a66a116d7d"]))])
 
@@ -144,7 +144,7 @@ So, we'll pass in the matching datum.
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 160000000 HelloWorld 89600447942433
+    ./getFromScript.sh 20000000 HelloWorld 89600447942433 wallet1
 
     ============================================================================================
     Select Script UTxO
@@ -178,7 +178,7 @@ So, let's try to get some funds from the UTxO with the ``hello world`` message a
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 160000000 HelloWorld 79600447942433
+    ./getFromScript.sh 20000000 HelloWorld 79600447942433 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================

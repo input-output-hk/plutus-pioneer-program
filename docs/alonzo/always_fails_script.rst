@@ -9,7 +9,7 @@ First, lock some lovelace in the AlwaysFails script which will be picked up from
 
 .. code:: bash
 
-    ./payToScript.sh 99000000 200000 AlwaysFails 6666 wallet1
+    ./payToScript.sh 99000000 AlwaysFails 6666 wallet1
 
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ Now we try to get some funds from the script.
 
 .. code:: bash
 
-    ./getFromScript.sh 1000000 110180417 AlwaysFails 6666
+    ./getFromScript.sh 1000000 AlwaysFails 6666 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================

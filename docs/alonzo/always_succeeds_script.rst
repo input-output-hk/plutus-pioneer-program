@@ -24,7 +24,7 @@ The helper script ``payToScript.sh`` constructs a transaction, and, as one of it
 
 .. code:: bash
 
-    ./payToScript.sh 99000000 200000 AlwaysSucceeds 6666 wallet1
+    ./payToScript.sh 99000000 AlwaysSucceeds 6666 wallet1
 
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
@@ -101,7 +101,7 @@ The following command will try to get 1000000 lovelace from the script using fee
 
 .. code:: bash
 
-    ./getFromScript.sh 1000000 100000000 AlwaysSucceeds 6666
+    ./getFromScript.sh 10000000 AlwaysSucceeds 6666 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================
@@ -133,7 +133,7 @@ Here the transaction has failed because the fees were too low. It tells us what 
 
 .. code:: bash
 
-    ./getFromScript.sh 1000000 110180197 AlwaysSucceeds 6666
+    ./getFromScript.sh 10000000 AlwaysSucceeds 6666 wallet1
     ...
     Transaction successfully submitted.
 

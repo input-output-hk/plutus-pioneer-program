@@ -42,7 +42,7 @@ Then we can pay some funds to this script.
 .. code:: bash
 
     cd /data/plutus-scripts
-    ./payToScript.sh 62500000 200000 HelloWorldPerson "\"Sam Jones\""
+    ./payToScript.sh 62500000 HelloWorldPerson "\"Sam Jones\"" wallet1
     Wallet Name: wallet1
                             TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
@@ -54,8 +54,8 @@ I submitted two more transactions to make a total of two with the correct datum 
 
 .. code:: bash
 
-    ./payToScript.sh 12500000 200000 HelloWorldPerson "\"Sam Jones\""
-    ./payToScript.sh 52500000 200000 HelloWorldPerson "\"Sammy Jones\""
+    ./payToScript.sh 12500000 HelloWorldPerson "\"Sam Jones\"" wallet1
+    ./payToScript.sh 52500000 HelloWorldPerson "\"Sammy Jones\"" wallet1
 
 .. code:: bash
 
@@ -71,7 +71,7 @@ Now we have to put some ugly strings on the command line because I'm not very go
 
 .. code:: bash
 
-    ./getFromScript.sh 6500000 120000000 HelloWorldPerson "\"Sam Jones\"" "\"1974/12/23\""
+    ./getFromScript.sh 6500000 HelloWorldPerson "\"Sam Jones\"" "\"1974/12/23\"" wallet1
 
     ============================================================================================
     Select Script UTxO
@@ -115,7 +115,7 @@ If you pass an incorrect datum, you will receive an error message and the transa
 
 .. code:: bash
 
-    ./getFromScript.sh 1500000 160000000 HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\""
+    ./getFromScript.sh 1500000 HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\"" wallet1
     ...
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"]) (fromList [SafeHash "d658ccd4fce5643c6186657cc2f88f2d110acb88c8b94cd90d9acb088562a19a"]))])
 
@@ -123,4 +123,4 @@ If you pass the correct datum but an incorrect redeemer, then you will lose your
 
 .. code:: bash
 
-    ./getFromScript.sh 1500000 160000000 HelloWorldPerson "\"Sam Jones\"" "\"1975/12/23\""
+    ./getFromScript.sh 1500000 HelloWorldPerson "\"Sam Jones\"" "\"1975/12/23\"" wallet1
