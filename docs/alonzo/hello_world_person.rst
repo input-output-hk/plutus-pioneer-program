@@ -41,6 +41,7 @@ Then we can pay some funds to this script.
 
 .. code:: bash
 
+    cd /data/plutus-scripts
     ./payToScript.sh 62500000 200000 HelloWorldPerson "\"Sam Jones\""
     Wallet Name: wallet1
                             TxHash                                 TxIx        Amount

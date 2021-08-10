@@ -59,7 +59,7 @@ We can now move this script to our ``scripts`` directory and give it a more usef
 
 .. code:: bash
 
-    mv result.plutus ../../scripts/HelloWorld.plutus
+    mv result.plutus /data/plutus-scripts/scripts/HelloWorld.plutus
 
 Now we will lock some funds in the script. We will use the datum ``79600447942433``. You will see from the comments in the ``HelloWorld.hs`` file that this is the ``hello world``
 message converted to an Integer and shortened to fit within the 8-byte limit for an ``int`` datum.
@@ -94,7 +94,7 @@ So, let's lock some more lovelace in the script but with a different datum.
 
 .. code:: bash
 
-    ./payToScript.sh 32500000 200000 HelloWorld 123456789
+    ./payToScript.sh 32500000 200000 HelloWorld 89600447942433
     Wallet Name: wallet1
                                TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
@@ -117,7 +117,7 @@ we should be able to spend this UTxO. We don't see any others with this datum ha
                             TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
     0dfec1295895d877edf15f323df63f43aa4501bfc8ee0483512c13550b6f4a65     0        98000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
-    2d9400af7637b05b34e96c66781f087c7a28c7da8b4482b98897807dfe84efd6     0        32500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "3519b7fbee1f70218539524e3b50ba8fa67b6d769cfa6fee4d4356e800342956"
+    867226273c7de3bbeb9e94f2451bafc10f20a66d3018142e87490349c92b9db0     0        32500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ea7db071348c44ee3ba423fbf61c57edc91167f78835d037c5c7503ed1a5fa5d"
     325704fa84cc1bfbbf69688a21d66157ddc7145be92567b6068d31de31bbb33c     0        1000000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "74fa514fdca080be51ea4fce15f6033b754c5dc3455cb9db8dfd930623a2b4bb"
     5ae97b8af41817ed4866360d10b48d9a535421fe3ee3497a09e6f4fe2d44251e     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "52d800d39486d8234e08050de3fa06296497a3a44343b4494801eb502ce38f93"
     71c1fcf524dbd24be33e27ed9a0f9e3a8648609401d47c41c66299573052dbbd     0        6666666 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
@@ -130,19 +130,21 @@ we should be able to spend this UTxO. We don't see any others with this datum ha
     e97ca5246c9b1565250e2cc5078d770564463a57c13125a37e4906c1f7dc0680     0        50000000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9ad30ffde0d1931ed4f145fa0a0d320a067051bfab1b08cbdb79e9f26df55df3"
     f6179d20172fec17caae32791623da52e2aa3bff04304389f693672aa1e3dae3     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
-We will try to get some funds from the one with the ``123456789`` datum. 
+We will try to get some funds from the one with the ``89600447942433`` datum. 
 
-If we pass in a datum that is not ``123456789``, we'll get the following error.
+If we pass in a datum that is not ``89600447942433``, we'll get the following error.
 
 .. code:: bash
 
-    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "3519b7fbee1f70218539524e3b50ba8fa67b6d769cfa6fee4d4356e800342956"]) (fromList [SafeHash "be10b490c35501e475186eb2a04bea1cb0aa87bb3ddfd44a7b0a7009bca57633"])),UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (UtxosFailure (ValidationTagMismatch (IsValid True)))))])
+    ./getFromScript.sh 20000000 160000000 HelloWorld 69600447942433
+
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"]) (fromList [SafeHash "d5172cca64a56e0f9d4886ff43bad0195df3300c97db74008978a7a66a116d7d"]))])
 
 So, we'll pass in the matching datum.
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 110201141 HelloWorld 123456789
+    ./getFromScript.sh 20000000 160000000 HelloWorld 89600447942433
 
     ============================================================================================
     Select Script UTxO
@@ -172,15 +174,11 @@ If you get a message that the fees are too low, you'll have to update the second
 
 This time, the datums match, but the value of the datum is incorrect, and we fail validation and so do not submit the transaction to the blockchain. 
 
-.. warning::
-
-    At this point during Alonzo Purple testing, things stopped working. I am currently fixing the notes from this section onwards.
-
 So, let's try to get some funds from the UTxO with the ``hello world`` message as a datum. The validator script will let us unlock that one.
 
 .. code:: bash
 
-    ./getFromScript.sh 20000000 110201317 HelloWorld 79600447942433
+    ./getFromScript.sh 20000000 160000000 HelloWorld 79600447942433
     ============================================================================================
     Select Script UTxO
     ============================================================================================
