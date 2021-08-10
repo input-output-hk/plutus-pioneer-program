@@ -50,7 +50,12 @@ Then we can pay some funds to this script.
     TX row number: 1
     Transaction successfully submitted.
 
-I submitted three transactions, two with the correct datum and one without.
+I submitted two more transactions to make a total of two with the correct datum and one without.
+
+.. code:: bash
+
+    ./payToScript.sh 12500000 200000 HelloWorldPerson "\"Sam Jones\""
+    ./payToScript.sh 52500000 200000 HelloWorldPerson "\"Sammy Jones\""
 
 .. code:: bash
 
@@ -60,7 +65,7 @@ I submitted three transactions, two with the correct datum and one without.
     --------------------------------------------------------------------------------------
     48b33ea5694c8b7d65384eb67470bdc28202d7fe211a60045d0b667c795a22b6     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
     ce0b7f4978b7cd6dae6946a1e150964908491583cacb9436085ac52975ee56c8     0        12500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
-    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
+    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        52500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
 
 Now we have to put some ugly strings on the command line because I'm not very good with *bash*. The final argument is the redeemer.
 
@@ -75,7 +80,7 @@ Now we have to put some ugly strings on the command line because I'm not very go
     --------------------------------------------------------------------------------------
     48b33ea5694c8b7d65384eb67470bdc28202d7fe211a60045d0b667c795a22b6     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
     ce0b7f4978b7cd6dae6946a1e150964908491583cacb9436085ac52975ee56c8     0        12500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
-    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
+    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        52500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
     TX row number: 2
     ============================================================================================
     Select Collateral UTxO
@@ -97,7 +102,7 @@ After waiting a minute, we check that we managed to grab some funds.
     --------------------------------------------------------------------------------------
     48b33ea5694c8b7d65384eb67470bdc28202d7fe211a60045d0b667c795a22b6     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
     6d5b5c760fdf83af12fd071e4d89b7058afb42be98ed8557cc3fe30047047a2f     2        6000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
-    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
+    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        52500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
 
     ./balance.sh wallet2
     TxHash                                 TxIx        Amount
@@ -110,7 +115,7 @@ If you pass an incorrect datum, you will receive an error message and the transa
 
 .. code:: bash
 
-    ./getFromScript.sh 1500000 120000000 HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\""
+    ./getFromScript.sh 1500000 160000000 HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\""
     ...
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"]) (fromList [SafeHash "d658ccd4fce5643c6186657cc2f88f2d110acb88c8b94cd90d9acb088562a19a"]))])
 
@@ -118,4 +123,4 @@ If you pass the correct datum but an incorrect redeemer, then you will lose your
 
 .. code:: bash
 
-    ./getFromScript.sh 1500000 120000000 HelloWorldPerson "\"Sam Jones\"" "\"1975/12/23\""
+    ./getFromScript.sh 1500000 160000000 HelloWorldPerson "\"Sam Jones\"" "\"1975/12/23\""
