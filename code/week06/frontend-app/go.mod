@@ -1,6 +1,6 @@
 module github.com/toky03/oracle-swap-demo
 
-go 1.14
+go 1.15
 
 require (
 	github.com/gorilla/handlers v1.5.1 // indirect

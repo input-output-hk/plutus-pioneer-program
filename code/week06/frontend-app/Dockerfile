@@ -1,7 +1,7 @@
-FROM golang:1.14 as builder
+FROM golang:1.16  as builder
 # Git is required for fetching the dependencies.
 # Ca-certificates is required to call HTTPS endpoints.
-RUN apt-get update && apt-get install git ca-certificates && update-ca-certificates
+RUN apt-get update -y && apt-get install git -y ca-certificates && update-ca-certificates -y
 ENV USER=appuser
 ENV UID=10001
 RUN adduser \
@@ -19,18 +19,9 @@ COPY . .
 
 RUN GO111MODULE=on go mod download
 RUN go mod verify
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /go/bin/oracle-swap-demo
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /app/frontent-app/oracle-swap-demo
 
-
-# STEP 2 build a small image
-############################
-FROM scratch
-
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-
-COPY --from=builder /go/bin/oracle-swap-demo /app/frontent-app/oracle-swap-demo
+RUN chmod +x /app/frontent-app/oracle-swap-demo
 COPY ./static /app/frontent-app/static
 
 USER appuser:appuser

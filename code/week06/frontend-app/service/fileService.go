@@ -29,7 +29,11 @@ func readWallets() map[string]string {
 }
 
 func readDirectory() (wallets []string, err error) {
-	file, err := os.Open("../")
+	cidRootDirectory := os.Getenv("CID_ROOT")
+	if cidRootDirectory == "" {
+		cidRootDirectory = "../"
+	}
+	file, err := os.Open(cidRootDirectory)
 	defer file.Close()
 	list, err := file.Readdirnames(0)
 	wallets = make([]string, 0, len(list))
@@ -51,7 +55,11 @@ func readDirectory() (wallets []string, err error) {
 }
 
 func readFile(filename string) string {
-	data, err := ioutil.ReadFile("../" + filename)
+	cidRootDirectory := os.Getenv("CID_ROOT")
+	if cidRootDirectory == "" {
+		cidRootDirectory = ".."
+	}
+	data, err := ioutil.ReadFile(cidRootDirectory + "/" + filename)
 	if err != nil {
 		fmt.Println("File reading error", err)
 		return ""
