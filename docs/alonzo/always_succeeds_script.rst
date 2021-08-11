@@ -16,7 +16,7 @@ Plutus scripts get compiled down to the following format.
 This is the ``AlwaysSucceeds.plutus`` script whose validator always succeeds, which means that anyone will be able to consume any UTxO sitting at its address. The script can be found in the ``/data/plutus-scripts/scripts`` directory. 
 
 Pay to the Script
-_________________
+-----------------
 
 Using the ``payToScript.sh`` helper script, you can send ``99000000`` lovelace from ``wallet1`` to the ``AlwaysSucceeds.plutus`` script with a datum of ``6666``, allowing for fees of ``200000``.
 
@@ -68,7 +68,7 @@ If there are too many, you could use ``grep`` to filter out the ones with the co
     843f4ffa4aafc5ed968d0a9f0fb8a203796b66327343246bfd8d4ca1d361c2f8     0        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
 Unlock the Funds in the Script
-______________________________
+------------------------------
 
 When trying to consume UTxOs locked in a script, you need to provide collateral that will cover the costs if validation fails. For this we can use a separate wallet for storing
 collateral UTxOs, to keep things tidy. One of the several wallets we created earlier on was named ``fees``, which we will use for fees and for collateral.

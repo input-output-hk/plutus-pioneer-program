@@ -12,7 +12,7 @@ I have a repo that contains a few helper scripts that I use. It's rough and read
     git clone https://github.com/chris-moreton/plutus-scripts
 
 Generate test addresses
-_______________________
+-----------------------
 
 Run the generate wallets script to generate a few addresses.
 
@@ -24,7 +24,7 @@ Run the generate wallets script to generate a few addresses.
 This will create some ``.addr``, ``.skey`` and ``.vkey`` files in the ``wallets`` directory.    
 
 Use the Faucet
-______________
+--------------
 
 If you have access to the testnet faucet, transfer some test Ada to the ``main`` wallet.
 
@@ -40,7 +40,7 @@ Then, check that it has arrived. It should arrive within a minute or so.
     40f0fa60a71e247e3eca46147fc159080aa7667763ae8c3be00b2e48400bbccd     0        1000000000000 lovelace + TxOutDatumHashNone
 
 Transfer some funds
-____________________
+-------------------
 
 We will transfer some funds to ``wallet1``. This uses another helper script, which takes the sending wallet as an argument and then asks for the UTxO, amount and receiving wallet name.
 

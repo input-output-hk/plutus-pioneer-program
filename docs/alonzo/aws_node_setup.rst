@@ -13,7 +13,7 @@ First, mount the data volume.
     sudo chown ubuntu:ubuntu /data
 
 Setup the IOHK Cache
-____________________
+--------------------
 
 .. code:: bash
 
@@ -24,7 +24,7 @@ ____________________
     EOF
 
 Install Nix
-___________
+-----------
 
 We use a little trick here to let Nix use a symlinked directory. This is not recommended if you plan to have setups on multiple machines with potentially different configurations,
 but that doesn't matter here.
@@ -39,7 +39,7 @@ but that doesn't matter here.
     . /home/ubuntu/.nix-profile/etc/profile.d/nix.sh
 
 Download the Cardano Node
-_________________________
+-------------------------
 
 .. code:: bash
 
@@ -49,7 +49,7 @@ _________________________
     git checkout tags/alonzo-purple-1.0.1 -b alonzo_purple_1_0_1
 
 Build the node
-______________
+--------------
 
 .. code:: bash
 
@@ -57,7 +57,7 @@ ______________
     nix-build -A cardano-cli -o result/alonzo-purple/cardano-cli
 
 Start the node
-______________
+--------------
 
 .. code:: bash
 
@@ -67,7 +67,7 @@ ______________
 Leave this running and open another shell.
 
 Setup some environment variables
-________________________________
+--------------------------------
 
 .. code:: bash
 

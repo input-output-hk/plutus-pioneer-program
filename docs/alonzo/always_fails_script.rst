@@ -5,6 +5,9 @@ AlwaysFails Script
 
 Now we will try similar transactions with a script whose validator always fails. This time we will lose our collateral.
 
+Sending
+-------
+
 First, lock some lovelace in the AlwaysFails script which will be picked up from the ``./scripts`` directory of the cloned ``plutus-scripts`` repository.
 
 .. code:: bash
@@ -28,6 +31,9 @@ Check that it has arrived.
     0913d72c55b3d6e765eb51f1a5da1436ea0554a89d499fe3398d20517f0b455e     0        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
     29f82f40603c4328e6efffb7c6e8851fe9540d18ddc0930b188896f6b016e141     0        100000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "ee5c9e2778c6c398366c5b9cfd67a888081f7626ca0ac392faca5981e59ff759"
     5589e823cf148597cbf64dc7cb5ebcd3957d5fc83c3521b281daa9f9c490c8ab     0        999888777 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+
+Grabbing
+--------
 
 Now we try to get some funds from the script.
 
