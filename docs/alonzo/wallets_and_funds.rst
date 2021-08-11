@@ -21,6 +21,12 @@ Run the generate wallets script to generate a few addresses.
     cd /data/plutus-scripts
     ./generateAddresses.sh
 
+This script wraps the following command.
+
+.. code:: bash
+
+    $CARDANO_CLI address key-gen --verification-key-file main.vkey --signing-key-file main.skey    
+
 This will create some ``.addr``, ``.skey`` and ``.vkey`` files in the ``wallets`` directory.    
 
 Use the Faucet
@@ -38,6 +44,12 @@ Then, check that it has arrived. It should arrive within a minute or so.
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
     40f0fa60a71e247e3eca46147fc159080aa7667763ae8c3be00b2e48400bbccd     0        1000000000000 lovelace + TxOutDatumHashNone
+
+The ``balance.sh`` script wraps the following command.
+
+.. code:: bash
+
+    $CARDANO_CLI query utxo --address $(cat ./wallets/$1.addr) --testnet-magic $TESTNET_MAGIC_NUM
 
 Transfer some funds
 -------------------
@@ -58,6 +70,26 @@ We will transfer some funds to ``wallet1``. This uses another helper script, whi
 
     Transaction successfully submitted.
 
+The ``sendFromWallet.sh`` script wraps the following commands.
+
+.. code:: bash
+
+    $CARDANO_CLI transaction build \
+        --tx-in ${FROM_UTXO} \
+        --tx-out ${TO_WALLET_ADDRESS}+${LOVELACE_TO_SEND} \
+        --change-address=${FROM_WALLET_ADDRESS} \
+        --testnet-magic ${TESTNET_MAGIC_NUM} \
+        --out-file tx.build \
+        --alonzo-era
+    
+    $CARDANO_CLI transaction sign \
+        --tx-body-file tx.build \
+        --signing-key-file ./wallets/${FROM_WALLET_NAME}.skey \
+        --out-file tx.signed
+    
+    $CARDANO_CLI transaction submit --tx-file tx.signed --testnet-magic $TESTNET_MAGIC_NUM
+    
+   
 Check that it has arrived.
 
 .. code:: bash

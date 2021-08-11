@@ -32,6 +32,27 @@ The helper script ``payToScript.sh`` constructs a transaction, and, as one of it
     TX row number: 1
     Transaction successfully submitted.
 
+The ``payToScript.sh`` script wraps the following commands.
+
+.. code:: bash
+
+    $CARDANO_CLI transaction build \
+        --tx-in ${SELECTED_UTXO} \
+        --tx-out ${TO_ADDR}+${PAYMENT} \
+        --tx-out-datum-hash ${DATUM_HASH} \
+        --change-address=${FROM_ADDR} \
+        --testnet-magic $TESTNET_MAGIC_NUM \
+        --out-file tx.build \
+        --alonzo-era
+    
+    $CARDANO_CLI transaction sign \
+        --tx-body-file tx.build \
+        --signing-key-file ./wallets/${SELECTED_WALLET_NAME}.skey \
+        --testnet-magic $TESTNET_MAGIC_NUM \
+        --out-file tx.signed \
+    
+    $CARDANO_CLI transaction submit --tx-file tx.signed --testnet-magic $TESTNET_MAGIC_NUM
+
 Check that the funds arrive in the script using the ``contractBalance.sh`` script. You may see a lot of UTxOs sitting at the ``AlwaysSucceeds`` script address and hopefully
 one of them will be yours.
 
@@ -51,6 +72,8 @@ The UTxOs at this address are now *locked* in the sense that they are guarded by
     8c5f24a4eee17773d2ddef2ee1493248b1c45c56e6851d6f330deee1dc23a21f     0        1010011010 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "915e807fa63409181d1533195753e3170587b1edc089be670ab483da8f9bcd48"
     8f75351368cc2521315ac9908f0532a00e996e35644cbd9db4d616a7122c7491     0        979199655182 lovelace + TxOutDatumHashNone
     f441da5a5f04ee6057a98650bf4c2a4931906e37acfd2d705cb208eda48cef92     0        10000000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "df5078aee07dd171a343fb99d5fc1b5462fb3c94d82bf72dc1b77d9c0aceec29"
+
+The ``contractBalance.sh`` script is an extension of the ``balance.sh``. It just has the extra step of determining the address of the contract.
 
 In this case, the balance of UTxO number 4 is ``99000000`` and the datum hash is ``9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710``. We can check that this is the
 correct datum hash.
