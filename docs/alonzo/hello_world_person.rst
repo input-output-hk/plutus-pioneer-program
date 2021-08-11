@@ -52,6 +52,12 @@ Then we can pay some funds to this script.
 
 I submitted two more transactions to make a total of two with the correct datum and one without.
 
+.. note::
+
+    When running subsequent transactions, you may be presented with the option to use the same UTxO that was used for a previous transaction. This won't be allowed, so you need
+    to choose a different UTxO, or, if none exist with enough funds, you need to wait for the previous transaction to complete, by which time a new UTxO (the change from the previous transaction)
+    will be available.
+
 .. code:: bash
 
     ./payToScript.sh 12500000 HelloWorldPerson "\"Sam Jones\"" wallet1

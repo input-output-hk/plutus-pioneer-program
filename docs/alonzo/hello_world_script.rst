@@ -138,7 +138,8 @@ If we pass in a datum that is not ``89600447942433``, we'll get the following er
 
     ./getFromScript.sh HelloWorld 69600447942433 wallet1
 
-    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"]) (fromList [SafeHash "d5172cca64a56e0f9d4886ff43bad0195df3300c97db74008978a7a66a116d7d"]))])
+    Command failed: transaction build  Error: The following scripts have execution failures: the script for transaction input 0 (in the order of the TxIds) failed with The Plutus script witness has the wrong datum (according to the UTxO). The expected datum value has hash "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (ValueNotConservedUTxO (Value 0 (fromList [])) (Value 9738994653 (fromList []))))),UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (BadInputsUTxO (fromList [TxInCompact (TxId {_unTxId = SafeHash "8ae6249f7df83f3f465e843c419985a816f27f0ff8ab5214ae7dc68c20d52da7"}) 0]))))])
 
 So, we'll pass in the matching datum.
 
