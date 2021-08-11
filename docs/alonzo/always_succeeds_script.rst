@@ -151,6 +151,35 @@ The following command will try to get the UTxO from the script using a datum of 
 
     Transaction successfully submitted.
 
+The ``getFromScript.sh`` script wraps the following commands.
+
+.. code:: bash
+
+    $CARDANO_CLI query protocol-parameters --testnet-magic $TESTNET_MAGIC_NUM > params.json
+
+    $CARDANO_CLI transaction build \
+        --tx-in ${COLLATERAL_TX} \
+        --tx-in ${SCRIPT_UTXO} \
+        --tx-in-datum-value "${DATUM_VALUE}" \
+        --tx-in-redeemer-value "${REDEEMER_VALUE}" \
+        --tx-in-script-file $SCRIPT_FILE \
+        --tx-in-collateral=${COLLATERAL_TX} \
+        --change-address=${FEE_ADDR} \
+        --tx-out ${TO_ADDR}+${PAYMENT} \
+        --tx-out-datum-hash ${DATUM_HASH} \
+        --out-file tx.build \
+        --testnet-magic $TESTNET_MAGIC_NUM \
+        --protocol-params-file "params.json" \
+        --alonzo-era
+    
+    $CARDANO_CLI transaction sign \
+        --tx-body-file tx.build \
+        --signing-key-file ./wallets/${SIGNING_WALLET}.skey \
+        --testnet-magic $TESTNET_MAGIC_NUM \
+        --out-file tx.signed \
+    
+    $CARDANO_CLI transaction submit --tx-file tx.signed --testnet-magic $TESTNET_MAGIC_NUM
+    
 Let's check that it arrived in ``wallet1`` as expected.
 
 .. code:: bash
