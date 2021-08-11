@@ -125,7 +125,6 @@ The following command will try to get the UTxO from the script using a datum of 
     --------------------------------------------------------------------------------------
     7678d8d6b95ed026d7c690fb53419bdaa580cb00c56450ac3bd97712dd71ca4e     0        1000000000 lovelace + TxOutDatumHashNone
     TX row number: 1
-    Receiving Wallet: wallet2
 
     Transaction successfully submitted.
 
