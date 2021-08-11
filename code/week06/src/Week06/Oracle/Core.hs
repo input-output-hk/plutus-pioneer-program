@@ -69,7 +69,7 @@ oracleAsset oracle = AssetClass (oSymbol oracle, oracleTokenName)
 {-# INLINABLE oracleValue #-}
 oracleValue :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe Integer
 oracleValue o f = do
-    dh      <- txOutDatum o
+    dh      <- txOutDatum o --dh for datumHash
     Datum d <- f dh
     PlutusTx.fromBuiltinData d
 
