@@ -46,6 +46,14 @@
   - Commit schemes.
   - State machines.
 
+- [Lecture #8](https://youtu.be/zW3D2iM5uVg)
+
+  - Another state machine example: token sale.
+  - Automatic testing using emulator traces.
+  - Interlude: optics.
+  - Property based testing with QuickCheck.
+  - Testing Plutus contracts with property based testing.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
@@ -55,6 +63,7 @@
 - Lecture #5:  [Native Tokens](code/week05)
 - Lecture #6:  [Oracles](code/week06)
 - Lecture #7:  [State Machines](code/week07)
+- Lecture #8:  [Testing](code/week08)
 
 ## Exercises
 
@@ -105,6 +114,11 @@
 - Week #7
 
   - Implement the game of "Rock, Paper, Scissors" using state machines.
+
+- Week #8
+
+  - Add a new operation close to the TokenSale-contract that allows the seller to close the contract and retrieve all remaining funds.
+  - Modify the tests accordingly.
 
 ## Some Plutus Modules
 
