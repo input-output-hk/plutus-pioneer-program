@@ -121,12 +121,7 @@ If you pass an incorrect datum, you will receive an error message and the transa
 
 .. code:: bash
 
-    ./getFromScript.sh 1500000 HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\"" wallet1
+    ./getFromScript.sh HelloWorldPerson "\"Sammy Jones\"" "\"1974/12/23\"" wallet1
     ...
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (MissingRequiredDatums (fromList [SafeHash "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"]) (fromList [SafeHash "d658ccd4fce5643c6186657cc2f88f2d110acb88c8b94cd90d9acb088562a19a"]))])
 
-If you pass the correct datum but an incorrect redeemer, then you will lose your collateral.
-
-.. code:: bash
-
-    ./getFromScript.sh 1500000 HelloWorldPerson "\"Sam Jones\"" "\"1975/12/23\"" wallet1
