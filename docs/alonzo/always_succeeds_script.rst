@@ -190,5 +190,4 @@ Let's check that it arrived in ``wallet1`` as expected.
     --------------------------------------------------------------------------------------
     ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     1        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
 
-We did it.
 

@@ -77,7 +77,7 @@ Now we have to put some ugly strings on the command line because I'm not very go
 
 .. code:: bash
 
-    ./getFromScript.sh 6500000 HelloWorldPerson "\"Sam Jones\"" "\"1974/12/23\"" wallet1
+    ./getFromScript.sh HelloWorldPerson "\"Sam Jones\"" "\"1974/12/23\"" wallet1
 
     ============================================================================================
     Select Script UTxO
