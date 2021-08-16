@@ -109,7 +109,7 @@ After waiting a minute, we check that we managed to grab the funds.
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
     48b33ea5694c8b7d65384eb67470bdc28202d7fe211a60045d0b667c795a22b6     0        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "b3c689968968928e5b87c4a74675b85f311c475a011ec2f168261ce0ae85774a"
-    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        52500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
+    e81da06411acf518cd3e988de27455db757ad5dcdd39bf403bdc1c173880593d     0        72500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "7cfec515f56d4413375aa9775f5de15ee60180861e9eaa954bcf9d015054857c"
 
     ./balance.sh wallet1
     TxHash                                 TxIx        Amount
