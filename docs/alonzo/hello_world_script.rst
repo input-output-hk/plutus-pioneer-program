@@ -41,7 +41,7 @@ This outputs, among other things, something like the following.
 
 .. code:: bash
 
-    ExBudget {_exBudgetCPU = ExCPU 9814000, _exBudgetMemory = ExMemory 2260}
+    ExBudget {_exBudgetCPU = ExCPU 2443000, _exBudgetMemory = ExMemory 370}
 
 These value represent the expected CPU and memory usage required to run the script. Fees for running scripts are calculated using these values.
 
@@ -69,12 +69,13 @@ message converted to an Integer and shortened to fit within the 8-byte limit for
     cd /data/plutus-scripts
 
     ./payToScript.sh 62500000 HelloWorld 79600447942433 wallet1
-    Wallet Name: wallet1
+    Wallet Name:  wallet1
                                TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
-    9bb5bd8ad57125c89a6804795740d41975c6406c543424062a0c03ae319e7724     1        790400000 lovelace + TxOutDatumHashNone
-    TX row number: 1
-    Transaction successfully submitted.    
+    060aa2af10655a4b893bb4b828aa2288a5a18f1dd8941a7f99ffe8d3bd1d71f1     1        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    ae892df5c983f98dff69e7a748d8d8609f823e7a67c9d2a8834d9bd1927a91ae     0        99801663102 lovelace + TxOutDatumHashNone
+    TX row number: 2
+    Transaction successfully submitted.      
 
 The ``hello world`` value is defined in the script as
 
@@ -132,12 +133,13 @@ we should be able to spend this UTxO. We don't see any others with this datum ha
 
 We will try to get some funds from the one with the ``89600447942433`` datum. 
 
-If we pass in a datum that is not ``89600447942433``, we'll get the following error.
+If we pass in a datum that is not ``89600447942433``, we'll get the following error. The ``42`` here is a redeemer value that is ignored in this case.
 
 .. code:: bash
 
-    ./getFromScript.sh HelloWorld 69600447942433 wallet1
-
+    ./getFromScript.sh HelloWorld 69600447942433 42 wallet1
+    ...
+    ...
     Command failed: transaction build  Error: The following scripts have execution failures: the script for transaction input 0 (in the order of the TxIds) failed with The Plutus script witness has the wrong datum (according to the UTxO). The expected datum value has hash "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"
     Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (ValueNotConservedUTxO (Value 0 (fromList [])) (Value 9738994653 (fromList []))))),UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (BadInputsUTxO (fromList [TxInCompact (TxId {_unTxId = SafeHash "8ae6249f7df83f3f465e843c419985a816f27f0ff8ab5214ae7dc68c20d52da7"}) 0]))))])
 
@@ -145,7 +147,7 @@ So, we'll pass in the matching datum.
 
 .. code:: bash
 
-    ./getFromScript.sh HelloWorld 89600447942433 wallet1
+    ./getFromScript.sh HelloWorld 89600447942433 42 wallet1
 
     ============================================================================================
     Select Script UTxO
@@ -177,7 +179,7 @@ So, let's try to get some funds from the UTxO with the ``hello world`` message a
 
 .. code:: bash
 
-    ./getFromScript.sh HelloWorld 79600447942433 wallet1
+    ./getFromScript.sh HelloWorld 79600447942433 42 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================
@@ -202,18 +204,18 @@ So, let's try to get some funds from the UTxO with the ``hello world`` message a
     c5b11e878a7dcebe5a52eb32eff5d83c3c76e35d13a2106aab811535dff5e3f6     0        1000000000 lovelace + TxOutDatumHashNone
 
     TX row number: 1
-    Receiving Wallet: wallet2
     Transaction successfully submitted.
 
 Now, after a minute or so, when we look at the UTxOs in ``wallet1``, we see that we have got some new lovelace.
 
 .. code:: bash
 
-    ./balance.sh wallet2
+    ./balance.sh wallet1
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
-    099a2a3d025d4e30e95410be19d67e3a27b6c237b378ac8e3f89806d7d1922a7     1        20000000 lovelace + TxOutDatumHashNone
-    dda26275646739b9ff2edc4e58d7cb97fba85ee4804726cdfd2f83b0f252e5cb     1        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"
+    060aa2af10655a4b893bb4b828aa2288a5a18f1dd8941a7f99ffe8d3bd1d71f1     1        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    11248966667145ab998933075d4eca6305e96b58e03684c7d1c8100a410c17df     1        62500000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "8fb8d1694f8180e8a59f23cce7a70abf0b3a92122565702529ff39baf01f87f1"
+    7760e20988b77005a557e937e493aaf98103ec46e6b9ddc90ed27485bf8602d0     0        99706326204 lovelace + TxOutDatumHashNone
 
 We did not lose our collateral, although we did get charged some fees.
 
@@ -222,7 +224,7 @@ We did not lose our collateral, although we did get charged some fees.
     ./balance.sh fees
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
-    099a2a3d025d4e30e95410be19d67e3a27b6c237b378ac8e3f89806d7d1922a7     0        889798683 lovelace + TxOutDatumHashNone
+    11248966667145ab998933075d4eca6305e96b58e03684c7d1c8100a410c17df     0        99999577494 lovelace + TxOutDatumHashNone
 
 And the UTxO we spent has gone, but has been replaced with a new UTxO with a reduced balance, but the same datum, leaving us free to take more funds from it later.
 
