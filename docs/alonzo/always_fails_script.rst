@@ -13,12 +13,14 @@ First, lock some lovelace in the AlwaysFails script which will be picked up from
 .. code:: bash
 
     ./payToScript.sh 99000000 AlwaysFails 6666 wallet1
-
-    TxHash                                 TxIx        Amount
+    Wallet Name:  wallet1
+                               TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
-    843f4ffa4aafc5ed968d0a9f0fb8a203796b66327343246bfd8d4ca1d361c2f8     1        900800000 lovelace + TxOutDatumHashNone
-    TX row number: 1
+    060aa2af10655a4b893bb4b828aa2288a5a18f1dd8941a7f99ffe8d3bd1d71f1     1        99000000 lovelace + TxOutDatumHash ScriptDataInAlonzoEra "9e478573ab81ea7a8e31891ce0648b81229f408d596a3483e6f4f9b92d3cf710"
+    c1658d652d7e318ae990da7973a0bbca6d787130e079102a16c1b3568ccfe8df     0        99900831551 lovelace + TxOutDatumHashNone
+    TX row number: 2
     Transaction successfully submitted.
+    
     
 Check that it has arrived.
 
@@ -35,11 +37,11 @@ Check that it has arrived.
 Grabbing
 --------
 
-Now we try to get some funds from the script.
+Now we try to get some funds from the script, but it can't succeed.
 
 .. code:: bash
 
-    ./getFromScript.sh AlwaysFails 6666 wallet1
+    ./getFromScript.sh AlwaysFails 6666 42 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================
@@ -57,6 +59,9 @@ Now we try to get some funds from the script.
     --------------------------------------------------------------------------------------
     ee22529028220bb2d2cbda634fbe982602afd5baf7f173341e2c8f9157e2912d     0        889819803 lovelace + TxOutDatumHashNone
     TX row number: 1
-    Receiving Wallet: wallet2
 
-    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (UtxosFailure (ValidationTagMismatch (IsValid True)))))])
+    Command failed: transaction build  Error: The following scripts have execution failures:
+    the script for transaction input 1 (in the order of the TxIds) failed with The Plutus script evaluation failed: An error has occurred:  User error:
+    The provided Plutus code called 'error'.
+
+    Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraAlonzo (ApplyTxError [UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (ValueNotConservedUTxO (Value 0 (fromList [])) (Value 99900831551 (fromList []))))),UtxowFailure (WrappedShelleyEraFailure (UtxoFailure (BadInputsUTxO (fromList [TxInCompact (TxId {_unTxId = SafeHash "c1658d652d7e318ae990da7973a0bbca6d787130e079102a16c1b3568ccfe8df"}) 0]))))])
