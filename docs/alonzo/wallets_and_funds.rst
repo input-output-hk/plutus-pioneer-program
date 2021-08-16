@@ -25,6 +25,7 @@ This script wraps the following command.
 
 .. code:: bash
 
+    # example only, don't run this
     $CARDANO_CLI address key-gen --verification-key-file main.vkey --signing-key-file main.skey    
 
 This will create some ``.addr``, ``.skey`` and ``.vkey`` files in the ``wallets`` directory.    
@@ -34,6 +35,10 @@ Use the Faucet
 
 If you have access to the testnet faucet, transfer some test Ada to the ``main`` wallet.
 
+.. code:: bash
+
+    ./faucet.sh SECRET_KEY
+    
 Then, check that it has arrived. It should arrive within a minute or so.
 
 .. code:: bash
@@ -49,6 +54,7 @@ The ``balance.sh`` script wraps the following command.
 
 .. code:: bash
 
+    # example only, don't run this
     $CARDANO_CLI query utxo --address $(cat ./wallets/$1.addr) --testnet-magic $TESTNET_MAGIC_NUM
 
 Transfer some funds
@@ -73,6 +79,8 @@ We will transfer some funds to ``wallet1``. This uses another helper script, whi
 The ``sendFromWallet.sh`` script wraps the following commands.
 
 .. code:: bash
+
+    # example only, don't run these
 
     $CARDANO_CLI transaction build \
         --tx-in ${FROM_UTXO} \

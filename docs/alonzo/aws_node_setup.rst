@@ -115,5 +115,5 @@ You can use ``jq`` if you ever want to get some specific information on its own,
     sudo apt update
     sudo apt install jq -y
     
-    $CARDANO_CLI query tip --testnet-magic 7 | jq -r '.syncProgress'
+    $CARDANO_CLI query tip --testnet-magic $TESTNET_MAGIC_NUM | jq -r '.syncProgress'
     100.0
