@@ -111,7 +111,7 @@ submit the transaction if validation is guaranteed to pass.
     Receiving wallet name: fees
     Transaction successfully submitted.
 
-We should check that it's arrived in our ``fees`` wallet.
+We should wait a few moments and then check that it's arrived in our ``fees`` wallet.
 
 .. code:: bash
 
@@ -120,11 +120,11 @@ We should check that it's arrived in our ``fees`` wallet.
     --------------------------------------------------------------------------------------
     7678d8d6b95ed026d7c690fb53419bdaa580cb00c56450ac3bd97712dd71ca4e     0        1000000000 lovelace + TxOutDatumHashNone
 
-The following command will try to get the UTxO from the script using a datum of ``6666``, which is the correct datum.
+The following command will try to get the UTxO from the script using a datum of ``6666``, which is the correct datum. The ``42`` is an arbitrary value for the redeemer, but this value is ignored here.
 
 .. code:: bash
 
-    ./getFromScript.sh AlwaysSucceeds 6666 wallet1
+    ./getFromScript.sh AlwaysSucceeds 6666 42 wallet1
     ============================================================================================
     Select Script UTxO
     ============================================================================================
