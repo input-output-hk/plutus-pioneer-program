@@ -54,6 +54,12 @@
   - Property based testing with QuickCheck.
   - Testing Plutus contracts with property based testing.
 
+- [Lecture #9](https://youtu.be/H1WPL01qWCc)
+
+  - Marlowe overview ([slides](Marlowe_Plutus_Pioneers_June_2021.pdf)).
+  - Marlowe in Plutus.
+  - Marlowe Playground demo.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
@@ -64,6 +70,7 @@
 - Lecture #6:  [Oracles](code/week06)
 - Lecture #7:  [State Machines](code/week07)
 - Lecture #8:  [Testing](code/week08)
+- Lecture #9:  [Marlowe](code/week09)
 
 ## Exercises
 
@@ -113,6 +120,10 @@
 
   - Add a new operation close to the TokenSale-contract that allows the seller to close the contract and retrieve all remaining funds.
   - Modify the tests accordingly.
+
+- Week #9
+
+  - Modify the example Marlowe contract, so that Charlie must put down twice the deposit in the very beginning, which gets split between Alice and Bob if Charlie refuses to make his choice.
 
 ## Some Plutus Modules
 
