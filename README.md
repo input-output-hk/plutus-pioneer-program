@@ -60,6 +60,14 @@
   - Marlowe in Plutus.
   - Marlowe Playground demo.
 
+- [Lecture #10](https://youtu.be/CPfcyDaDtt8)
+
+  - Uniswap overview.
+  - Uniswap implementation in Plutus.
+  - Deploying Uniswap with the PAB.
+  - Demo.
+  - Using `curl` to interact with the PAB.
+
 ## Code Examples
 
 - Lecture #1:  [English Auction](code/week01)
@@ -71,6 +79,7 @@
 - Lecture #7:  [State Machines](code/week07)
 - Lecture #8:  [Testing](code/week08)
 - Lecture #9:  [Marlowe](code/week09)
+- Lecture #10: [Uniswap](code/week10)
 
 ## Exercises
 
@@ -122,8 +131,10 @@
   - Modify the tests accordingly.
 
 - Week #9
-
   - Modify the example Marlowe contract, so that Charlie must put down twice the deposit in the very beginning, which gets split between Alice and Bob if Charlie refuses to make his choice.
+
+- Week #10
+  - Get the Uniswap demo running and extend it in some way.
 
 ## Some Plutus Modules
 
