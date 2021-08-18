@@ -36,7 +36,6 @@ import           Uniswap                             as US
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
-    logString @(Builtin UniswapContracts) "Starting Uniswap PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
     cidInit  <- Simulator.activateContract (Wallet 1) Init

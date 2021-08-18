@@ -200,12 +200,13 @@ swap cid sp = do
 
 getStatus :: UUID -> IO (Either Text US.UserContractState)
 getStatus cid = runReq defaultHttpConfig $ do
+    liftIO $ printf "\nget request to 127.0.1:9080/api/contract/instance/%s/status\n" (show cid)
     w <- req
         GET
-        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show cid) /: "status")
+        (http "127.0.0.1" /: "api"  /: "contract" /: "instance" /: pack (show cid) /: "status")
         NoReqBody
         (Proxy :: Proxy (JsonResponse (ContractInstanceClientState UniswapContracts)))
-        (port 8080)
+        (port 9080)
     case fromJSON $ observableState $ cicCurrentState $ responseBody w of
         Success (Last Nothing)  -> liftIO $ threadDelay 1_000_000 >> getStatus cid
         Success (Last (Just e)) -> return e
@@ -213,14 +214,14 @@ getStatus cid = runReq defaultHttpConfig $ do
 
 callEndpoint :: ToJSON a => UUID -> String -> a -> IO ()
 callEndpoint cid name a = handle h $ runReq defaultHttpConfig $ do
-    liftIO $ printf "\npost request to 127.0.1:8080/api/new/contract/instance/%s/endpoint/%s\n" (show cid) name
+    liftIO $ printf "\npost request to 127.0.1:9080/api/contract/instance/%s/endpoint/%s\n" (show cid) name
     liftIO $ printf "request body: %s\n\n" $ B8.unpack $ encode a
     v <- req
         POST
-        (http "127.0.0.1" /: "api"  /: "new" /: "contract" /: "instance" /: pack (show cid) /: "endpoint" /: pack name)
+        (http "127.0.0.1" /: "api"  /: "contract" /: "instance" /: pack (show cid) /: "endpoint" /: pack name)
         (ReqBodyJson a)
         (Proxy :: Proxy (JsonResponse ()))
-        (port 8080)
+        (port 9080)
     when (responseStatusCode v /= 200) $
         liftIO $ ioError $ userError $ "error calling endpoint " ++ name
   where
