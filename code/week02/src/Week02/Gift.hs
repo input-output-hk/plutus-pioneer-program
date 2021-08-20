@@ -21,10 +21,9 @@ import           Ledger              hiding (singleton)
 import           Ledger.Constraints  as Constraints
 import qualified Ledger.Scripts      as Scripts
 import           Ledger.Ada          as Ada
-import           Playground.Contract (printJson, printSchemas, ensureKnownCurrencies, stage)
 import           Playground.TH       (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types    (KnownCurrency (..))
-import           Prelude             (IO, Semigroup (..), String)
+import           Prelude             (Semigroup (..), String)
 import           Text.Printf         (printf)
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
