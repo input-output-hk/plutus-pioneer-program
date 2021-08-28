@@ -5,6 +5,9 @@ Minting Tokens
 
 We will mint a native token.
 
+Create Policy
+-------------
+
 First, we will create a policy that allows a new wallet, ``minter`` to mint tokens.
 
 .. code:: bash
@@ -12,6 +15,9 @@ First, we will create a policy that allows a new wallet, ``minter`` to mint toke
     ./createPolicy.sh minter
 
 This will create ``minter.skey`` and ``minter.vkey`` in the ``wallets`` directory, and ``minter.script`` in the ``policies`` directory.
+
+Fund a Minting Wallet
+---------------------
 
 Next, we will add some funds to the ``wallet2`` wallet.
 
@@ -35,6 +41,9 @@ Then check the balance until it arrives.
     TxHash                                 TxIx        Amount
     --------------------------------------------------------------------------------------
     fbe3d7e3d3b802eaa2a1e9f4df2a017796abb2c7dd83a476f04f6b92391adea8     1        1000000000 lovelace + TxOutDatumHashNone    
+
+Mint Tokens
+-----------
 
 Now, we will mint 100 ``Chess`` tokens in ``wallet2``.
 
