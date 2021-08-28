@@ -11,11 +11,6 @@ move ADA between wallets and submitting and executing smart contracts.
 It uses several helper scripts to simplify the creation of the commands. The helper scripts are
 simple bash scripts that create ``cardano-cli`` commands and should be easy to understand to get a grip on what is going on behind the scenes.
 
-.. note::
-    
-    The exercises are only possible if you have some test Ada from the Alonzo White faucet. Test Ada is currently only available to members
-    of the Alonzo test group in order to control usage of the network. Alonzo testnet is moving towards a public phase within a matter of weeks.
-
 This is the setup I chose to use, but there are several other ways to run the node and configure the environment.
 
 .. toctree::
