@@ -46,7 +46,7 @@ Download the Cardano Node
     cd /data
     git clone https://github.com/input-output-hk/cardano-node
     cd cardano-node
-    git checkout tags/alonzo-purple-1.0.1 -b alonzo_purple_1_0_1
+    git checkout tags/1.29.0 -b 1_29_0
 
 Build the node
 --------------
