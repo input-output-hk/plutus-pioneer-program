@@ -3,9 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-===========================================
-Plutus Pioneer Program & Alonzo White Notes
-===========================================
+=============================================
+Plutus Pioneer Program & Alonzo Testnet Notes
+=============================================
 
 These are my notes from the `series of videos by Lars Brünjes <https://github.com/input-output-hk/plutus-pioneer-program>`_ for the Plutus Pioneers Program. I have also documented my journey through the Alonzo White testnet 
 with instructions on how to run a node and how to compile and deploy Plutus code.
@@ -18,11 +18,31 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Plutus Pioneer Program
    :numbered:
    
-   plutus_pioneer_program.rst
-   alonzo.rst
-   
+   pioneer/week1.rst
+   pioneer/week2.rst
+   pioneer/week3.rst
+   pioneer/week4.rst
+   pioneer/week5.rst
+   pioneer/week6.rst
+   pioneer/week7.rst
+   pioneer/week8.rst
+   pioneer/week9.rst
+   pioneer/week10.rst
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Alonzo Testnet Exercises
+   :numbered:
+
+   alonzo/aws_node_setup
+   alonzo/wallets_and_funds
+   alonzo/always_succeeds_script
+   alonzo/always_fails_script
+   alonzo/hello_world_script
+   alonzo/hello_world_person
+   alonzo/minting_tokens
 
    
