@@ -34,11 +34,15 @@ Setup some environment variables
 Install some dependencies
 -------------------------
 
+.. code:: bash
+
     sudo apt-get update -y
     sudo apt-get install automake build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf -y
 
 Install Cabal
 -------------
+
+.. code:: bash
 
     mkdir /data/Downloads
     cd /data/Downloads
@@ -54,6 +58,8 @@ Install Cabal
 Install GHC
 -----------
 
+.. code:: bash
+
     wget https://downloads.haskell.org/ghc/$GHC_VERSION/ghc-$GHC_VERSION-x86_64-deb9-linux.tar.xz
     tar -xf ghc-$GHC_VERSION-x86_64-deb9-linux.tar.xz
     rm ghc-$GHC_VERSION-x86_64-deb9-linux.tar.xz
@@ -63,6 +69,8 @@ Install GHC
 
 Install libsodium
 -----------------
+
+.. code:: bash
 
     cd ~/Downloads
     git clone https://github.com/input-output-hk/libsodium
@@ -77,6 +85,8 @@ Install libsodium
 Build the Cardano node
 ----------------------
 
+.. code:: bash
+
     cd /data
     git clone https://github.com/input-output-hk/cardano-node.git
     cd cardano-node
@@ -87,12 +97,16 @@ Build the Cardano node
 Copy the binaries
 -----------------
 
+.. code:: bash
+
     cp -p dist-newstyle/build/x86_64-linux/ghc-$GHC_VERSION/cardano-node-$CARDANO_TAG/x/cardano-node/build/cardano-node/cardano-node ~/.local/bin/
     cp -p dist-newstyle/build/x86_64-linux/ghc-$GHC_VERSION/cardano-cli-$CARDANO_TAG/x/cardano-cli/build/cardano-cli/cardano-cli ~/.local/bin
     cardano-cli --version
 
 Get the config files
 --------------------
+
+.. code:: bash
 
     cd /data/Pool
     mkdir node

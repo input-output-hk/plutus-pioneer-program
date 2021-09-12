@@ -47,7 +47,7 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
 
 .. toctree::
    :maxdepth: 2
-   :caption: Stake Pool Setup
+   :caption: Node Administration
    :numbered:
 
-   pool/aws_node_setup
+   setup/aws_node_setup
