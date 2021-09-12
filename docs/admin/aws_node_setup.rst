@@ -25,9 +25,8 @@ Setup some environment variables
     echo "export PKG_CONFIG_PATH=\"/usr/local/lib/pkgconfig:\$PKG_CONFIG_PATH\"" >> ~/.bashrc
     echo "export CARDANO_NODE_SOCKET_PATH=\"/data/Pool/node/db.socket\"" >> ~/.bashrc
     echo "export CABAL_VERSION=3.2.0.0" >> ~/.bashrc
-    echo "export NODE_TYPE=producer" >> ~/.bashrc
     echo "export CARDANO_TAG=1.29.0" >> ~/.bashrc
-    echo "export GHC_VERSION=8.10.2"" >> ~/.bashrc
+    echo "export GHC_VERSION=8.10.2" >> ~/.bashrc
 
     source ~/.bashrc
 
@@ -72,7 +71,7 @@ Install libsodium
 
 .. code:: bash
 
-    cd ~/Downloads
+    cd /data/Downloads
     git clone https://github.com/input-output-hk/libsodium
     cd libsodium
     git checkout 66f017f1
