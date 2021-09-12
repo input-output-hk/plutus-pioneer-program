@@ -50,4 +50,4 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
    :caption: Node Administration
    :numbered:
 
-   setup/aws_node_setup
+   admin/aws_node_setup
