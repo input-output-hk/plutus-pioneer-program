@@ -45,4 +45,9 @@ To stay up-to-date with changes to these notes, you can follow me on Twitter @Po
    alonzo/hello_world_person
    alonzo/minting_tokens
 
-   
+.. toctree::
+   :maxdepth: 2
+   :caption: Stake Pool Setup
+   :numbered:
+
+   pool/aws_node_setup
