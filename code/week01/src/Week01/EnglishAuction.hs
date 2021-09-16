@@ -25,10 +25,10 @@ import           Data.List.NonEmpty   (NonEmpty (..))
 import           Data.Map             as Map
 import           Data.Text            (pack, Text)
 import           GHC.Generics         (Generic)
-import           Plutus.Contract
-import qualified PlutusTx             as PlutusTx
-import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
-import qualified PlutusTx.Prelude     as Plutus
+import           Language.Plutus.Contract
+import qualified Language.PlutusTx             as PlutusTx
+import           Language.PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import qualified Language.PlutusTx.Prelude     as Plutus
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Scripts       as Scripts
