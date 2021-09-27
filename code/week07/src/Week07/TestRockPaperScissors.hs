@@ -45,11 +45,11 @@ myTrace :: GameChoice -> GameChoice -> EmulatorTrace ()
 myTrace c1 c2 = do
     Extras.logInfo $ "first move: " ++ show c1 ++ ", second move: " ++ show c2
 
-    h1 <- activateContractWallet (Wallet 1) endpoints
-    h2 <- activateContractWallet (Wallet 2) endpoints
+    h1 <- activateContractWallet (knownWallet 1) endpoints
+    h2 <- activateContractWallet (knownWallet 2) endpoints
 
-    let pkh1      = pubKeyHash $ walletPubKey $ Wallet 1
-        pkh2      = pubKeyHash $ walletPubKey $ Wallet 2
+    let pkh1      = pubKeyHash $ walletPubKey $ knownWallet 1
+        pkh2      = pubKeyHash $ walletPubKey $ knownWallet 2
         stake     = 5_000_000
         deadline1 = slotToEndPOSIXTime def 5
         deadline2 = slotToEndPOSIXTime def 10
