@@ -38,9 +38,9 @@ tests :: TestTree
 tests = checkPredicateOptions
     (defaultCheckOptions & emulatorConfig .~ emCfg)
     "token sale (with close) trace"
-    (     walletFundsChange (Wallet 1) (Ada.lovelaceValueOf   25_000_000  <> assetClassValue token (-25))
-     .&&. walletFundsChange (Wallet 2) (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)
-     .&&. walletFundsChange (Wallet 3) (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
+    (     walletFundsChange (knownWallet 1) (Ada.lovelaceValueOf   25_000_000  <> assetClassValue token (-25))
+     .&&. walletFundsChange (knownWallet 2) (Ada.lovelaceValueOf (-20_000_000) <> assetClassValue token   20)
+     .&&. walletFundsChange (knownWallet 3) (Ada.lovelaceValueOf (- 5_000_000) <> assetClassValue token    5)
     )
     myTrace
 
@@ -48,7 +48,7 @@ runMyTrace :: IO ()
 runMyTrace = runEmulatorTraceIO' def emCfg myTrace
 
 emCfg :: EmulatorConfig
-emCfg = EmulatorConfig (Left $ Map.fromList [(Wallet w, v) | w <- [1 .. 3]]) def def
+emCfg = EmulatorConfig (Left $ Map.fromList [(knownWallet w, v) | w <- [1 .. 3]]) def def
   where
     v :: Value
     v = Ada.lovelaceValueOf 1000_000_000 <> assetClassValue token 1000
@@ -64,7 +64,7 @@ token = AssetClass (tokenCurrency, tokenName')
 
 myTrace :: EmulatorTrace ()
 myTrace = do
-    h <- activateContractWallet (Wallet 1) startEndpoint
+    h <- activateContractWallet (knownWallet 1) startEndpoint
     callEndpoint @"start" h (tokenCurrency, tokenName', False)
     void $ Emulator.waitNSlots 5
     Last m <- observableState h
@@ -73,9 +73,9 @@ myTrace = do
         Just ts -> do
             Extras.logInfo $ "started token sale " ++ show ts
 
-            h1 <- activateContractWallet (Wallet 1) $ useEndpoints ts
-            h2 <- activateContractWallet (Wallet 2) $ useEndpoints ts
-            h3 <- activateContractWallet (Wallet 3) $ useEndpoints ts
+            h1 <- activateContractWallet (knownWallet 1) $ useEndpoints ts
+            h2 <- activateContractWallet (knownWallet 2) $ useEndpoints ts
+            h3 <- activateContractWallet (knownWallet 3) $ useEndpoints ts
 
             callEndpoint @"set price" h1 1_000_000
             void $ Emulator.waitNSlots 5

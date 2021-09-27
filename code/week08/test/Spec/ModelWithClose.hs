@@ -171,11 +171,11 @@ hasStarted :: Wallet -> Spec TSModel Bool
 hasStarted v = isJust <$> getTSState v
 
 w1, w2 :: Wallet
-w1 = Wallet 1
-w2 = Wallet 2
+w1 = knownWallet 1
+w2 = knownWallet 2
 
 wallets :: [Wallet]
-wallets = [w1, w2]
+wallets = [Plutus.Contract.Test.w1, Plutus.Contract.Test.w2]
 
 tokenCurrencies :: Map Wallet CurrencySymbol
 tokenCurrencies = Map.fromList $ zip wallets ["aa", "bb"]

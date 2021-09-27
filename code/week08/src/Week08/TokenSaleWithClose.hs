@@ -166,5 +166,5 @@ useEndpoints ts = forever $ handleError logError $ awaitPromise $ setPrice' `sel
     setPrice'  = endpoint @"set price"  $ setPrice ts
     addTokens' = endpoint @"add tokens" $ addTokens ts
     buyTokens' = endpoint @"buy tokens" $ buyTokens ts
-    withdraw'  = endpoint @"withdraw"   $ uncurry (withdraw ts)
+    withdraw'  = endpoint @"withdraw"   $ PlutusTx.Prelude.uncurry (withdraw ts)
     close'     = endpoint @"close"      $ const $ close ts

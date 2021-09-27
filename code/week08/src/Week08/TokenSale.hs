@@ -161,4 +161,4 @@ useEndpoints ts = forever
     setPrice'  = endpoint @"set price"  $ setPrice ts
     addTokens' = endpoint @"add tokens" $ addTokens ts
     buyTokens' = endpoint @"buy tokens" $ buyTokens ts
-    withdraw'  = endpoint @"withdraw"   $ uncurry (withdraw ts)
+    withdraw'  = endpoint @"withdraw"   $ PlutusTx.Prelude.uncurry (withdraw ts)
