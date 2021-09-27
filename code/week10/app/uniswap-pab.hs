@@ -29,7 +29,7 @@ import           Plutus.PAB.Simulator                (SimulatorEffectHandlers, l
 import qualified Plutus.PAB.Simulator                as Simulator
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Prelude                             hiding (init)
-import           Wallet.Emulator.Types               (Wallet (..))
+import           Wallet.Emulator.Types               (knownWallet)
 import           Wallet.Types                        (ContractInstanceId (..))
 
 import           Uniswap                             as US
@@ -38,7 +38,7 @@ main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
     shutdown <- PAB.Server.startServerDebug
 
-    cidInit  <- Simulator.activateContract (Wallet 1) Init
+    cidInit  <- Simulator.activateContract (knownWallet 1) Init
     cs       <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
                     Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
                     _                                   -> Nothing
@@ -47,7 +47,7 @@ main = void $ Simulator.runSimulationWith handlers $ do
     liftIO $ LB.writeFile "symbol.json" $ encode cs
     logString @(Builtin UniswapContracts) $ "Initialization finished. Minted: " ++ show cs
 
-    cidStart <- Simulator.activateContract (Wallet 1) UniswapStart
+    cidStart <- Simulator.activateContract (knownWallet 1) UniswapStart
     us       <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.Uniswap))) of
                     Success (Monoid.Last (Just (Right us))) -> Just us
                     _                                       -> Nothing

@@ -27,13 +27,13 @@ import           System.Environment                      (getArgs)
 import           System.Exit                             (exitFailure)
 import           Text.Printf                             (printf)
 import           Text.Read                               (readMaybe)
-import           Wallet.Emulator.Types                   (Wallet (..))
+import           Wallet.Emulator.Types                   (knownWallet)
 
 import           Uniswap                                 (cidFile, UniswapContracts)
 
 main :: IO ()
 main = do
-    w   <- Wallet . read . head <$> getArgs
+    w   <- knownWallet . read . head <$> getArgs
     cid <- read                 <$> readFile (cidFile w)
     mcs <- decode               <$> LB.readFile "symbol.json"
     case mcs of

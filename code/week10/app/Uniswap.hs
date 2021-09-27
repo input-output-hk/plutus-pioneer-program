@@ -25,6 +25,7 @@ import qualified Plutus.Contracts.Currency           as Currency
 import qualified Plutus.Contracts.Uniswap            as Uniswap
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Wallet.Emulator.Types               (Wallet (..), walletPubKey)
+import           Wallet.Emulator.Wallet              hiding (ownPubKey)
 
 data UniswapContracts =
       Init
@@ -63,10 +64,10 @@ initContract = do
     amount = 1000000
 
 wallets :: [Wallet]
-wallets = [Wallet i | i <- [1 .. 4]]
+wallets = [knownWallet i | i <- [1 .. 4]]
 
 tokenNames :: [TokenName]
 tokenNames = ["A", "B", "C", "D"]
 
 cidFile :: Wallet -> FilePath
-cidFile w = "W" ++ show (getWallet w) ++ ".cid"
+cidFile w = "W" ++ show (getWallet (toWalletNumber w)) ++ ".cid"
