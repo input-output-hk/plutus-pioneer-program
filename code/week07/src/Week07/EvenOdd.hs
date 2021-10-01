@@ -23,6 +23,7 @@ module Week07.EvenOdd
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (FromJSON, ToJSON)
+import           Data.Default         (Default (..))
 import qualified Data.Map             as Map
 import           Data.Text            (Text)
 import           GHC.Generics         (Generic)
@@ -31,6 +32,7 @@ import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Ada           as Ada
 import           Ledger.Value
+import           Ledger.TimeSlot      hiding (currentSlot)
 import           Playground.Contract  (ToSchema)
 import           Plutus.Contract      as Contract
 import qualified PlutusTx
@@ -179,14 +181,12 @@ findGameOutput game = do
     return $ do
         (oref, o) <- find f $ Map.toList utxos
         case o of
-          PublicKeyChainIndexTxOut {..} -> Nothing
+          PublicKeyChainIndexTxOut {} -> Nothing
           ScriptChainIndexTxOut    {..} -> case _ciTxOutDatum of
             Right (Datum d)  -> case PlutusTx.fromBuiltinData d of
               Nothing  -> Nothing
               Just dat -> return (oref, o, dat)
-            -- Left  dh -> case 
-        -- dat       <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
-        -- return (oref, o, dat)
+            Left _           -> Nothing
   where
     f :: (TxOutRef, ChainIndexTxOut) -> Bool
     f (_, ScriptChainIndexTxOut {..}) = assetClassValueOf _ciTxOutValue (gToken game) == 1
@@ -196,7 +196,7 @@ waitUntilTimeHasPassed :: AsContractError e => POSIXTime -> Contract w s e ()
 waitUntilTimeHasPassed t = do
     s1 <- currentSlot
     logInfo @String $ "current slot: " ++ show s1 ++ ", waiting until " ++ show t
-    void $ awaitTime t >> waitNSlots 1
+    void $ awaitSlot (posixTimeToEnclosingSlot def t) >> waitNSlots 1
     s2 <- currentSlot
     logInfo @String $ "waited until: " ++ show s2
 
@@ -253,7 +253,7 @@ firstGame fp = do
                 let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
                               Constraints.otherScript (gameValidator game)
                     tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Reveal $ fpNonce fp) <>
-                              Constraints.mustValidateIn (to $ now + 1000)
+                              Constraints.mustValidateIn (to now)
                 ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                 void $ awaitTxConfirmed $ txId ledgerTx'
                 logInfo @String "victory"

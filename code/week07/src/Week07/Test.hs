@@ -32,12 +32,12 @@ import           Wallet.Emulator.Wallet
 import           Week07.EvenOdd
 
 test :: IO ()
-test = undefined -- do
-    -- test' Zero Zero
-    -- test' Zero One
-    -- test' One Zero
-    -- test' One One
-{- 
+test = do
+    test' Zero Zero
+    test' Zero One
+    test' One Zero
+    test' One One
+
 test' :: GameChoice -> GameChoice -> IO ()
 test' c1 c2 = runEmulatorTraceIO' def emCfg $ myTrace c1 c2
   where
@@ -96,4 +96,3 @@ myTrace c1 c2 = do
     callEndpoint @"second" h2 sp
 
     void $ Emulator.waitNSlots 10
--}
