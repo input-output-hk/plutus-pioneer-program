@@ -16,18 +16,20 @@ import           Control.Monad          hiding (fmap)
 import qualified Data.Map               as Map
 import           Data.Text              (Text)
 import           Data.Void              (Void)
-import           Plutus.Contract        as Contract
-import           Plutus.Trace.Emulator  as Emulator
-import qualified PlutusTx
-import           PlutusTx.Prelude       hiding (Semigroup(..), unless)
 import           Ledger                 hiding (mint, singleton)
 import           Ledger.Constraints     as Constraints
 import qualified Ledger.Typed.Scripts   as Scripts
 import           Ledger.Value           as Value
-import           Playground.Contract    (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
+import           Playground.Contract    (ToSchema, ensureKnownCurrencies,
+                                         printJson, printSchemas, stage)
 import           Playground.TH          (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types       (KnownCurrency (..))
-import           Prelude                (IO, Semigroup (..), Show (..), String, undefined)
+import           Plutus.Contract        as Contract
+import           Plutus.Trace.Emulator  as Emulator
+import qualified PlutusTx
+import           PlutusTx.Prelude       hiding (Semigroup (..), unless)
+import           Prelude                (IO, Semigroup (..), Show (..), String,
+                                         undefined)
 import           Text.Printf            (printf)
 import           Wallet.Emulator.Wallet
 
@@ -45,13 +47,15 @@ curSymbol = undefined -- IMPLEMENT ME!
 
 type NFTSchema = Endpoint "mint" ()
 
-mint :: Contract w NFTSchema Text ()
+mint :: () -> Contract w NFTSchema Text ()
 mint = undefined -- IMPLEMENT ME!
 
 endpoints :: Contract () NFTSchema Text ()
-endpoints = mint' >> endpoints
-  where
-    mint' = endpoint @"mint" >> mint
+endpoints = forever
+          $ handleError logError
+          $ awaitPromise
+          $ endpoint @"mint" $ mint
+
 
 mkSchemaDefinitions ''NFTSchema
 

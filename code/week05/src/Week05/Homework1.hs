@@ -14,24 +14,27 @@ module Week05.Homework1 where
 
 import           Control.Monad              hiding (fmap)
 import           Control.Monad.Freer.Extras as Extras
-import           Data.Aeson                 (ToJSON, FromJSON)
+import           Data.Aeson                 (FromJSON, ToJSON)
 import           Data.Default               (Default (..))
 import           Data.Text                  (Text)
 import           Data.Void                  (Void)
 import           GHC.Generics               (Generic)
-import           Plutus.Contract            as Contract
-import           Plutus.Trace.Emulator      as Emulator
-import qualified PlutusTx
-import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
 import           Ledger                     hiding (mint, singleton)
 import           Ledger.Constraints         as Constraints
 import           Ledger.TimeSlot
 import qualified Ledger.Typed.Scripts       as Scripts
 import           Ledger.Value               as Value
-import           Playground.Contract        (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
-import           Playground.TH              (mkKnownCurrencies, mkSchemaDefinitions)
+import           Playground.Contract        (ToSchema, ensureKnownCurrencies,
+                                             printJson, printSchemas, stage)
+import           Playground.TH              (mkKnownCurrencies,
+                                             mkSchemaDefinitions)
 import           Playground.Types           (KnownCurrency (..))
-import           Prelude                    (IO, Semigroup (..), Show (..), String, undefined)
+import           Plutus.Contract            as Contract
+import           Plutus.Trace.Emulator      as Emulator
+import qualified PlutusTx
+import           PlutusTx.Prelude           hiding (Semigroup (..), unless)
+import           Prelude                    (IO, Semigroup (..), Show (..),
+                                             String, undefined)
 import           Text.Printf                (printf)
 import           Wallet.Emulator.Wallet
 
@@ -71,9 +74,11 @@ mint mp = do
             Contract.logInfo @String $ printf "forged %s" (show val)
 
 endpoints :: Contract () SignedSchema Text ()
-endpoints = mint' >> endpoints
-  where
-    mint' = endpoint @"mint" >>= mint
+endpoints = forever
+          $ handleError Contract.logError
+          $ awaitPromise
+          $ endpoint @"mint" $ mint
+
 
 mkSchemaDefinitions ''SignedSchema
 
