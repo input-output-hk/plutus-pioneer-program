@@ -29,7 +29,7 @@ import           Data.Maybe                         (isJust, isNothing)
 import           Data.Monoid                        (Last (..))
 import           Data.String                        (IsString (..))
 import           Data.Text                          (Text)
-import           Plutus.Contract.Test
+import           Plutus.Contract.Test               hiding (w1, w2)
 import           Plutus.Contract.Test.ContractModel
 import           Plutus.Trace.Emulator
 import           Ledger                             hiding (singleton)
@@ -160,7 +160,7 @@ w1 = knownWallet 1
 w2 = knownWallet 2
 
 wallets :: [Wallet]
-wallets = [Plutus.Contract.Test.w1, Plutus.Contract.Test.w2]
+wallets = [w1, w2]
 
 tokenCurrencies :: Map Wallet CurrencySymbol
 tokenCurrencies = Map.fromList $ zip wallets ["aa", "bb"]
