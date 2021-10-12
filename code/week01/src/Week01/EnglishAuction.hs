@@ -29,12 +29,14 @@ import           Plutus.Contract
 import qualified PlutusTx             as PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import qualified PlutusTx.Prelude     as Plutus
+import           Plutus.ChainIndex.Tx (ChainIndexTx (..))
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Scripts       as Scripts
 import qualified Ledger.Typed.Scripts as Scripts hiding (validatorHash)
 import           Ledger.Value         as Value
 import           Ledger.Ada           as Ada
+import           Ledger.Tx            (ChainIndexTxOut (..))
 import           Playground.Contract  (ensureKnownCurrencies, printSchemas, stage, printJson)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
@@ -159,7 +161,7 @@ mkAuctionValidator ad redeemer ctx =
             Nothing   -> traceError "wrong output type"
             Just h -> case findDatum h info of
                 Nothing        -> traceError "datum not found"
-                Just (Datum d) ->  case PlutusTx.fromData d of
+                Just (Datum d) ->  case PlutusTx.fromBuiltinData d of
                     Just ad' -> (o, ad')
                     Nothing  -> traceError "error decoding data"
         _   -> traceError "expected exactly one continuing output"
@@ -269,7 +271,7 @@ bid BidParams{..} = do
     let b  = Bid {bBidder = pkh, bBid = bpBid}
         d' = d {adHighestBid = Just b}
         v  = Value.singleton bpCurrency bpToken 1 <> Ada.lovelaceValueOf bpBid
-        r  = Redeemer $ PlutusTx.toData $ MkBid b
+        r  = Redeemer $ PlutusTx.toBuiltinData $ MkBid b
 
         lookups = Constraints.typedValidatorLookups auctionTypedValidator <>
                   Constraints.otherScript auctionValidator                <>
@@ -296,7 +298,7 @@ close CloseParams{..} = do
     logInfo @String $ printf "found auction utxo with datum %s" (show d)
 
     let t      = Value.singleton cpCurrency cpToken 1
-        r      = Redeemer $ PlutusTx.toData Close
+        r      = Redeemer $ PlutusTx.toBuiltinData Close
         seller = aSeller adAuction
 
         lookups = Constraints.typedValidatorLookups auctionTypedValidator <>
@@ -317,31 +319,32 @@ close CloseParams{..} = do
         (show cpCurrency)
         (show cpToken)
 
-findAuction :: CurrencySymbol -> TokenName -> Contract w s Text (TxOutRef, TxOutTx, AuctionDatum)
+findAuction :: CurrencySymbol -> TokenName -> Contract w s Text (TxOutRef, ChainIndexTxOut, AuctionDatum) 
 findAuction cs tn = do
-    utxos <- utxoAt $ scriptAddress auctionValidator
-    let xs = [ (oref, o)
-             | (oref, o) <- Map.toList utxos
-             , Value.valueOf (txOutValue $ txOutTxOut o) cs tn == 1
+    utxos <- utxosTxOutTxAt $ scriptAddress auctionValidator
+    let xs = [ (oref, (utxo, tx))
+             | (oref, (utxo, tx)) <- Map.toList utxos
+             , Value.valueOf (_ciTxOutValue utxo) cs tn == 1
              ]
     case xs of
-        [(oref, o)] -> case txOutDatumHash $ txOutTxOut o of
+        [(oref, (utxo, tx))] -> case txOutDatumHash $ toTxOut utxo of
             Nothing   -> throwError "unexpected out type"
-            Just h -> case Map.lookup h $ txData $ txOutTxTx o of
+            Just h -> case Map.lookup h $ _citxData tx of 
                 Nothing        -> throwError "datum not found"
-                Just (Datum e) -> case PlutusTx.fromData e of
+                Just (Datum e) -> case PlutusTx.fromBuiltinData e of
                     Nothing -> throwError "datum has wrong type"
                     Just d@AuctionDatum{..}
-                        | aCurrency adAuction == cs && aToken adAuction == tn -> return (oref, o, d)
+                        | aCurrency adAuction == cs && aToken adAuction == tn -> return (oref, utxo, d)
                         | otherwise                                           -> throwError "auction token missmatch"
         _           -> throwError "auction utxo not found"
 
 endpoints :: Contract () AuctionSchema Text ()
-endpoints = (start' `select` bid' `select` close') >> endpoints
-  where
-    start' = endpoint @"start" >>= start
-    bid'   = endpoint @"bid"   >>= bid
-    close' = endpoint @"close" >>= close
+endpoints = awaitPromise
+           $ start' `select` bid' `select` close'
+ where
+   start' = endpoint @"start"  start
+   bid'   = endpoint @"bid"    bid
+   close' = endpoint @"close"  close
 
 mkSchemaDefinitions ''AuctionSchema
 
