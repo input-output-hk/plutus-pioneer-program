@@ -29,7 +29,7 @@ import           Data.Maybe                         (isJust, isNothing)
 import           Data.Monoid                        (Last (..))
 import           Data.String                        (IsString (..))
 import           Data.Text                          (Text)
-import           Plutus.Contract.Test
+import           Plutus.Contract.Test               hiding (w1, w2)
 import           Plutus.Contract.Test.ContractModel
 import           Plutus.Trace.Emulator
 import           Ledger                             hiding (singleton)
@@ -171,8 +171,8 @@ hasStarted :: Wallet -> Spec TSModel Bool
 hasStarted v = isJust <$> getTSState v
 
 w1, w2 :: Wallet
-w1 = Wallet 1
-w2 = Wallet 2
+w1 = knownWallet 1
+w2 = knownWallet 2
 
 wallets :: [Wallet]
 wallets = [w1, w2]
