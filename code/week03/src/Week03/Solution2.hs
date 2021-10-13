@@ -24,14 +24,17 @@ import           GHC.Generics         (Generic)
 import           Plutus.Contract
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import           Plutus.ChainIndex.Tx  (ChainIndexTx (..))  
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Ada           as Ada
+import           Ledger.Tx            (ChainIndexTxOut (..))  
 import           Playground.Contract  (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
 import           Prelude              (IO, Semigroup (..), Show (..), String)
+import qualified Prelude              as P  
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
@@ -93,34 +96,35 @@ grab :: forall w s e. AsContractError e => Contract w s e ()
 grab = do
     now   <- currentTime
     pkh   <- pubKeyHash <$> ownPubKey
-    utxos <- Map.filter (isSuitable now) <$> utxoAt (scrAddress pkh)
+    utxos <- Map.filter (isSuitable now) <$> utxosTxOutTxAt (scrAddress pkh)
     if Map.null utxos
         then logInfo @String $ "no gifts available"
         else do
             let orefs   = fst <$> Map.toList utxos
-                lookups = Constraints.unspentOutputs utxos        <>
+                lookups = Constraints.unspentOutputs (fst P.<$> utxos)     <>
                           Constraints.otherScript (validator pkh)
                 tx :: TxConstraints Void Void
-                tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | oref <- orefs] <>
+                tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData () | oref <- orefs] <>
                           mustValidateIn (from now)
             ledgerTx <- submitTxConstraintsWith @Void lookups tx
             void $ awaitTxConfirmed $ txId ledgerTx
             logInfo @String $ "collected gifts"
   where
-    isSuitable :: POSIXTime -> TxOutTx -> Bool
-    isSuitable now o = case txOutDatumHash $ txOutTxOut o of
+    isSuitable :: POSIXTime -> (ChainIndexTxOut, ChainIndexTx) -> Bool
+    isSuitable now (utxo, tx) = case txOutDatumHash $ toTxOut utxo  of
         Nothing -> False
-        Just h  -> case Map.lookup h $ txData $ txOutTxTx o of
+        Just h  -> case Map.lookup h $ _citxData tx of
             Nothing        -> False
-            Just (Datum e) -> case PlutusTx.fromData e of
+            Just (Datum e) -> case PlutusTx.fromBuiltinData e of
                 Nothing -> False
                 Just d  -> d <= now
 
 endpoints :: Contract () VestingSchema Text ()
-endpoints = (give' `select` grab') >> endpoints
+endpoints = awaitPromise
+          $ give' `select` grab'
   where
-    give' = endpoint @"give" >>= give
-    grab' = endpoint @"grab" >>  grab
+    give' = endpoint @"give" give
+    grab' = endpoint @"grab" (const grab)
 
 mkSchemaDefinitions ''VestingSchema
 

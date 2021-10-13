@@ -23,10 +23,12 @@ import           GHC.Generics         (Generic)
 import           Plutus.Contract
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (unless)
+import           Plutus.ChainIndex.Tx (ChainIndexTx (..))
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Ada           as Ada
+import           Ledger.Tx             (ChainIndexTxOut (..))
 import           Playground.Contract  (printJson, printSchemas, ensureKnownCurrencies, stage, ToSchema)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
@@ -99,39 +101,40 @@ grab :: forall w s e. AsContractError e => Contract w s e ()
 grab = do
     now    <- currentTime
     pkh    <- pubKeyHash <$> ownPubKey
-    utxos  <- utxoAt scrAddress
+    utxos  <- utxosTxOutTxAt scrAddress
     let utxos1 = Map.filter (isSuitable $ \dat -> beneficiary1 dat == pkh && now <= deadline dat) utxos
         utxos2 = Map.filter (isSuitable $ \dat -> beneficiary2 dat == pkh && now >  deadline dat) utxos
     logInfo @P.String $ printf "found %d gift(s) to grab" (Map.size utxos1 P.+ Map.size utxos2)
     unless (Map.null utxos1) $ do
         let orefs   = fst <$> Map.toList utxos1
-            lookups = Constraints.unspentOutputs utxos1 P.<>
+            lookups = Constraints.unspentOutputs (fst P.<$> utxos1) P.<>
                       Constraints.otherScript validator
             tx :: TxConstraints Void Void
-            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | oref <- orefs] P.<>
+            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData () | oref <- orefs] P.<>
                       mustValidateIn (to now)
         void $ submitTxConstraintsWith @Void lookups tx
     unless (Map.null utxos2) $ do
         let orefs   = fst <$> Map.toList utxos2
-            lookups = Constraints.unspentOutputs utxos2 P.<>
+            lookups = Constraints.unspentOutputs (fst P.<$> utxos2) P.<>
                       Constraints.otherScript validator
             tx :: TxConstraints Void Void
-            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | oref <- orefs] P.<>
+            tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData () | oref <- orefs] P.<>
                       mustValidateIn (from now)
         void $ submitTxConstraintsWith @Void lookups tx
   where
-    isSuitable :: (VestingDatum -> Bool) -> TxOutTx -> Bool
-    isSuitable p o = case txOutDatumHash $ txOutTxOut o of
+    isSuitable :: (VestingDatum -> Bool) -> (ChainIndexTxOut, ChainIndexTx) -> Bool
+    isSuitable p (utxo, tx) = case txOutDatumHash $ toTxOut utxo of
         Nothing -> False
-        Just h  -> case Map.lookup h $ txData $ txOutTxTx o of
+        Just h  -> case Map.lookup h $ _citxData tx of
             Nothing        -> False
-            Just (Datum e) -> maybe False p $ PlutusTx.fromData e
+            Just (Datum e) -> maybe False p $ PlutusTx.fromBuiltinData e
 
 endpoints :: Contract () VestingSchema Text ()
-endpoints = (give' `select` grab') >> endpoints
+endpoints = awaitPromise
+          $ give' `select` grab' 
   where
-    give' = endpoint @"give" >>= give
-    grab' = endpoint @"grab" >>  grab
+    give' = endpoint @"give" give
+    grab' = endpoint @"grab" (const grab)
 
 mkSchemaDefinitions ''VestingSchema
 
