@@ -32,7 +32,7 @@ import           Prelude                             hiding (init)
 import           Wallet.Emulator.Types               (knownWallet)
 import           Wallet.Types                        (ContractInstanceId (..))
 
-import           Uniswap                             as US
+import           Week10.Uniswap                      as US
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
