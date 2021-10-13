@@ -34,6 +34,7 @@ import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
 import           Prelude              (IO, Semigroup (..), Show (..), String)
 import           Text.Printf          (printf)
+import qualified Prelude              as P
 
 data VestingParam = VestingParam
     { beneficiary :: PubKeyHash
@@ -112,25 +113,26 @@ grab d = do
                         { beneficiary = pkh
                         , deadline    = d
                         }
-            utxos <- utxoAt $ scrAddress p
+            utxos <- utxosTxOutTxAt $ scrAddress p
             if Map.null utxos
                 then logInfo @String $ "no gifts available"
                 else do
                     let orefs   = fst <$> Map.toList utxos
-                        lookups = Constraints.unspentOutputs utxos      <>
+                        lookups = Constraints.unspentOutputs (fst P.<$> utxos)      <>
                                   Constraints.otherScript (validator p)
                         tx :: TxConstraints Void Void
-                        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData () | oref <- orefs] <>
+                        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData () | oref <- orefs] <>
                                   mustValidateIn (from now)
                     ledgerTx <- submitTxConstraintsWith @Void lookups tx
                     void $ awaitTxConfirmed $ txId ledgerTx
                     logInfo @String $ "collected gifts"
 
 endpoints :: Contract () VestingSchema Text ()
-endpoints = (give' `select` grab') >> endpoints
+endpoints = awaitPromise
+          $ give' `select` grab'
   where
-    give' = endpoint @"give" >>= give
-    grab' = endpoint @"grab" >>= grab
+    give' = endpoint @"give" give
+    grab' = endpoint @"grab" grab
 
 mkSchemaDefinitions ''VestingSchema
 
