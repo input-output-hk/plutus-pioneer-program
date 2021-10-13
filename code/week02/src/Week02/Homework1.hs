@@ -27,6 +27,7 @@ import           Playground.Contract  (printJson, printSchemas, ensureKnownCurre
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
 import           Prelude              (IO, Semigroup (..), String, undefined)
+import qualified Prelude              as P
 import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
@@ -63,21 +64,22 @@ give amount = do
 
 grab :: forall w s e. AsContractError e => (Bool, Bool) -> Contract w s e ()
 grab bs = do
-    utxos <- utxoAt scrAddress
+    utxos <- utxosTxOutTxAt scrAddress
     let orefs   = fst <$> Map.toList utxos
-        lookups = Constraints.unspentOutputs utxos      <>
+        lookups = Constraints.unspentOutputs (fst P.<$> utxos)      <>
                   Constraints.otherScript validator
         tx :: TxConstraints Void Void
-        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toData bs | oref <- orefs]
+        tx      = mconcat [mustSpendScriptOutput oref $ Redeemer $ PlutusTx.toBuiltinData bs | oref <- orefs]
     ledgerTx <- submitTxConstraintsWith @Void lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "collected gifts"
 
 endpoints :: Contract () GiftSchema Text ()
-endpoints = (give' `select` grab') >> endpoints
+endpoints = awaitPromise
+          $ give' `select` grab'
   where
-    give' = endpoint @"give" >>= give
-    grab' = endpoint @"grab" >>= grab
+    give' = endpoint @"give" give
+    grab' = endpoint @"grab" grab
 
 mkSchemaDefinitions ''GiftSchema
 
