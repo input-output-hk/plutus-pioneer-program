@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
@@ -22,6 +23,7 @@ module Week07.EvenOdd
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (FromJSON, ToJSON)
+import           Data.Default         (Default (..))
 import qualified Data.Map             as Map
 import           Data.Text            (Text)
 import           GHC.Generics         (Generic)
@@ -30,6 +32,7 @@ import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Ada           as Ada
 import           Ledger.Value
+import           Ledger.TimeSlot      hiding (currentSlot)
 import           Playground.Contract  (ToSchema)
 import           Plutus.Contract      as Contract
 import qualified PlutusTx
@@ -59,7 +62,7 @@ instance Eq GameChoice where
 
 PlutusTx.unstableMakeIsData ''GameChoice
 
-data GameDatum = GameDatum ByteString (Maybe GameChoice)
+data GameDatum = GameDatum BuiltinByteString (Maybe GameChoice)
     deriving Show
 
 instance Eq GameDatum where
@@ -68,7 +71,7 @@ instance Eq GameDatum where
 
 PlutusTx.unstableMakeIsData ''GameDatum
 
-data GameRedeemer = Play GameChoice | Reveal ByteString | ClaimFirst | ClaimSecond
+data GameRedeemer = Play GameChoice | Reveal BuiltinByteString | ClaimFirst | ClaimSecond
     deriving Show
 
 PlutusTx.unstableMakeIsData ''GameRedeemer
@@ -85,7 +88,7 @@ gameDatum o f = do
     PlutusTx.fromBuiltinData d
 
 {-# INLINABLE mkGameValidator #-}
-mkGameValidator :: Game -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
+mkGameValidator :: Game -> BuiltinByteString -> BuiltinByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
 mkGameValidator game bsZero' bsOne' dat red ctx =
     traceIfFalse "token missing from input" (assetClassValueOf (txOutValue ownInput) (gToken game) == 1) &&
     case (dat, red) of
@@ -136,10 +139,10 @@ mkGameValidator game bsZero' bsOne' dat red ctx =
         Nothing -> traceError "game output datum not found"
         Just d  -> d
 
-    checkNonce :: ByteString -> ByteString -> GameChoice -> Bool
-    checkNonce bs nonce cSecond = sha2_256 (nonce `concatenate` cFirst) == bs
+    checkNonce :: BuiltinByteString -> BuiltinByteString -> GameChoice -> Bool
+    checkNonce bs nonce cSecond = sha2_256 (nonce `appendByteString` cFirst) == bs
       where
-        cFirst :: ByteString
+        cFirst :: BuiltinByteString
         cFirst = case cSecond of
             Zero -> bsZero'
             One  -> bsOne'
@@ -152,7 +155,7 @@ instance Scripts.ValidatorTypes Gaming where
     type instance DatumType Gaming = GameDatum
     type instance RedeemerType Gaming = GameRedeemer
 
-bsZero, bsOne :: ByteString
+bsZero, bsOne :: BuiltinByteString
 bsZero = "0"
 bsOne  = "1"
 
@@ -172,22 +175,28 @@ gameValidator = Scripts.validatorScript . typedGameValidator
 gameAddress :: Game -> Ledger.Address
 gameAddress = scriptAddress . gameValidator
 
-findGameOutput :: Game -> Contract w s Text (Maybe (TxOutRef, TxOutTx, GameDatum))
+findGameOutput :: Game -> Contract w s Text (Maybe (TxOutRef, ChainIndexTxOut, GameDatum))
 findGameOutput game = do
-    utxos <- utxoAt $ gameAddress game
+    utxos <- utxosAt $ gameAddress game
     return $ do
         (oref, o) <- find f $ Map.toList utxos
-        dat       <- gameDatum (txOutTxOut o) (`Map.lookup` txData (txOutTxTx o))
-        return (oref, o, dat)
+        case o of
+          PublicKeyChainIndexTxOut {} -> Nothing
+          ScriptChainIndexTxOut    {..} -> case _ciTxOutDatum of
+            Right (Datum d)  -> case PlutusTx.fromBuiltinData d of
+              Nothing  -> Nothing
+              Just dat -> return (oref, o, dat)
+            Left _           -> Nothing
   where
-    f :: (TxOutRef, TxOutTx) -> Bool
-    f (_, o) = assetClassValueOf (txOutValue $ txOutTxOut o) (gToken game) == 1
+    f :: (TxOutRef, ChainIndexTxOut) -> Bool
+    f (_, ScriptChainIndexTxOut {..}) = assetClassValueOf _ciTxOutValue (gToken game) == 1
+    f _                               = False
 
 waitUntilTimeHasPassed :: AsContractError e => POSIXTime -> Contract w s e ()
 waitUntilTimeHasPassed t = do
     s1 <- currentSlot
     logInfo @String $ "current slot: " ++ show s1 ++ ", waiting until " ++ show t
-    void $ awaitTime t >> waitNSlots 1
+    void $ awaitSlot (posixTimeToEnclosingSlot def t) >> waitNSlots 1
     s2 <- currentSlot
     logInfo @String $ "waited until: " ++ show s2
 
@@ -196,7 +205,7 @@ data FirstParams = FirstParams
     , fpStake          :: !Integer
     , fpPlayDeadline   :: !POSIXTime
     , fpRevealDeadline :: !POSIXTime
-    , fpNonce          :: !ByteString
+    , fpNonce          :: !BuiltinByteString
     , fpCurrency       :: !CurrencySymbol
     , fpTokenName      :: !TokenName
     , fpChoice         :: !GameChoice
@@ -215,7 +224,7 @@ firstGame fp = do
             }
         v    = lovelaceValueOf (fpStake fp) <> assetClassValue (gToken game) 1
         c    = fpChoice fp
-        bs   = sha2_256 $ fpNonce fp `concatenate` if c == Zero then bsZero else bsOne
+        bs   = sha2_256 $ fpNonce fp `appendByteString` if c == Zero then bsZero else bsOne
         tx   = Constraints.mustPayToTheScript (GameDatum bs Nothing) v
     ledgerTx <- submitTxConstraints (typedGameValidator game) tx
     void $ awaitTxConfirmed $ txId ledgerTx
@@ -244,7 +253,7 @@ firstGame fp = do
                 let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
                               Constraints.otherScript (gameValidator game)
                     tx'     = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Reveal $ fpNonce fp) <>
-                              Constraints.mustValidateIn (to $ now + 1000)
+                              Constraints.mustValidateIn (to now)
                 ledgerTx' <- submitTxConstraintsWith @Gaming lookups tx'
                 void $ awaitTxConfirmed $ txId ledgerTx'
                 logInfo @String "victory"
@@ -313,7 +322,10 @@ secondGame sp = do
 type GameSchema = Endpoint "first" FirstParams .\/ Endpoint "second" SecondParams
 
 endpoints :: Contract () GameSchema Text ()
-endpoints = (first `select` second) >> endpoints
+endpoints = forever
+          $ handleError logError
+          $ awaitPromise
+          $ first `select` second
   where
-    first  = endpoint @"first"  >>= firstGame
-    second = endpoint @"second" >>= secondGame
+    first  = endpoint @"first" $ firstGame
+    second = endpoint @"second"$ secondGame

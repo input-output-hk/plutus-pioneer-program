@@ -70,7 +70,7 @@ beats Paper    Rock     = True
 beats Scissors Paper    = True
 beats _        _        = False
 
-data GameDatum = GameDatum ByteString (Maybe GameChoice) | Finished
+data GameDatum = GameDatum BuiltinByteString (Maybe GameChoice) | Finished
     deriving Show
 
 instance Eq GameDatum where
@@ -81,7 +81,7 @@ instance Eq GameDatum where
 
 PlutusTx.unstableMakeIsData ''GameDatum
 
-data GameRedeemer = Play GameChoice | Reveal ByteString GameChoice | ClaimFirst | ClaimSecond
+data GameRedeemer = Play GameChoice | Reveal BuiltinByteString GameChoice | ClaimFirst | ClaimSecond
     deriving Show
 
 PlutusTx.unstableMakeIsData ''GameRedeemer
@@ -137,18 +137,18 @@ final Finished = True
 final _        = False
 
 {-# INLINABLE check #-}
-check :: ByteString -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
+check :: BuiltinByteString -> BuiltinByteString -> BuiltinByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
 check bsRock' bsPaper' bsScissors' (GameDatum bs (Just _)) (Reveal nonce c) _ =
-    sha2_256 (nonce `concatenate` toBS c) == bs
+    sha2_256 (nonce `appendByteString` toBS c) == bs
   where
-    toBS :: GameChoice -> ByteString
+    toBS :: GameChoice -> BuiltinByteString
     toBS Rock     = bsRock'
     toBS Paper    = bsPaper'
     toBS Scissors = bsScissors'
 check _ _ _ _ _ _ = True
 
 {-# INLINABLE gameStateMachine #-}
-gameStateMachine :: Game -> ByteString -> ByteString -> ByteString -> StateMachine GameDatum GameRedeemer
+gameStateMachine :: Game -> BuiltinByteString -> BuiltinByteString -> BuiltinByteString -> StateMachine GameDatum GameRedeemer
 gameStateMachine game bsRock' bsPaper' bsScissors' = StateMachine
     { smTransition  = transition game
     , smFinal       = final
@@ -157,12 +157,12 @@ gameStateMachine game bsRock' bsPaper' bsScissors' = StateMachine
     }
 
 {-# INLINABLE mkGameValidator #-}
-mkGameValidator :: Game -> ByteString -> ByteString -> ByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
+mkGameValidator :: Game -> BuiltinByteString -> BuiltinByteString -> BuiltinByteString -> GameDatum -> GameRedeemer -> ScriptContext -> Bool
 mkGameValidator game bsRock' bsPaper' bsScissors' = mkValidator $ gameStateMachine game bsRock' bsPaper' bsScissors'
 
 type Gaming = StateMachine GameDatum GameRedeemer
 
-bsRock, bsPaper, bsScissors :: ByteString
+bsRock, bsPaper, bsScissors :: BuiltinByteString
 bsRock     = "R"
 bsPaper    = "P"
 bsScissors = "S"
@@ -195,7 +195,7 @@ data FirstParams = FirstParams
     , fpStake          :: !Integer
     , fpPlayDeadline   :: !POSIXTime
     , fpRevealDeadline :: !POSIXTime
-    , fpNonce          :: !ByteString
+    , fpNonce          :: !BuiltinByteString
     , fpChoice         :: !GameChoice
     } deriving (Show, Generic, FromJSON, ToJSON)
 
@@ -224,7 +224,7 @@ firstGame fp = do
                     Rock     -> bsRock
                     Paper    -> bsPaper
                     Scissors -> bsScissors
-        bs     = sha2_256 $ fpNonce fp `concatenate` x
+        bs     = sha2_256 $ fpNonce fp `appendByteString` x
     void $ mapError' $ runInitialise client (GameDatum bs Nothing) v
     logInfo @String $ "made first move: " ++ show (fpChoice fp)
     tell $ Last $ Just tt
@@ -234,7 +234,7 @@ firstGame fp = do
     m <- mapError' $ getOnChainState client
     case m of
         Nothing             -> throwError "game output not found"
-        Just ((o, _), _) -> case tyTxOutData o of
+        Just (o, _) -> case tyTxOutData (ocsTxOut o) of
 
             GameDatum _ Nothing -> do
                 logInfo @String "second player did not play"
@@ -272,7 +272,7 @@ secondGame sp = do
     m <- mapError' $ getOnChainState client
     case m of
         Nothing          -> logInfo @String "no running game found"
-        Just ((o, _), _) -> case tyTxOutData o of
+        Just (o, _) -> case tyTxOutData (ocsTxOut o) of
             GameDatum _ Nothing -> do
                 logInfo @String "running game found"
                 void $ mapError' $ runStep client $ Play $ spChoice sp
@@ -293,7 +293,10 @@ secondGame sp = do
 type GameSchema = Endpoint "first" FirstParams .\/ Endpoint "second" SecondParams
 
 endpoints :: Contract (Last ThreadToken) GameSchema Text ()
-endpoints = (first `select` second) >> endpoints
+endpoints = forever
+          $ handleError logError
+          $ awaitPromise
+          $ first `select` second
   where
-    first  = endpoint @"first"  >>= firstGame
-    second = endpoint @"second" >>= secondGame
+    first  = endpoint @"first"  firstGame
+    second = endpoint @"second" secondGame
