@@ -97,7 +97,7 @@
   - Enter a `nix-shell`.
   - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
   - Go to the `plutus-playground-client` folder.
-  - Start the Playground server with `plutus-playground-server`.
+  - Start the Playground server with `plutus-playground-server`(can be found in `plutus-playground-client/result/bin`).
   - Start the Playground client (in another `nix-shell`) with `npm run start`.
   - Copy-paste the auction contract into the Playground editor.
   - Compile.
