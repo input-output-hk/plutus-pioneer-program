@@ -49,9 +49,9 @@ mint :: Contract w NFTSchema Text ()
 mint = undefined -- IMPLEMENT ME!
 
 endpoints :: Contract () NFTSchema Text ()
-endpoints = mint' >> endpoints
+endpoints = forever $ awaitPromise $ mint'
   where
-    mint' = endpoint @"mint" >> mint
+    mint' = endpoint @"mint" $ const mint
 
 mkSchemaDefinitions ''NFTSchema
 
@@ -59,8 +59,8 @@ mkKnownCurrencies []
 
 test :: IO ()
 test = runEmulatorTraceIO $ do
-    h1 <- activateContractWallet (Wallet 1) endpoints
-    h2 <- activateContractWallet (Wallet 2) endpoints
+    h1 <- activateContractWallet (knownWallet 1) endpoints
+    h2 <- activateContractWallet (knownWallet 2) endpoints
     callEndpoint @"mint" h1 ()
     callEndpoint @"mint" h2 ()
     void $ Emulator.waitNSlots 1

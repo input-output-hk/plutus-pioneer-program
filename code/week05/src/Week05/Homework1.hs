@@ -71,9 +71,9 @@ mint mp = do
             Contract.logInfo @String $ printf "forged %s" (show val)
 
 endpoints :: Contract () SignedSchema Text ()
-endpoints = mint' >> endpoints
+endpoints = forever $ awaitPromise $ mint'
   where
-    mint' = endpoint @"mint" >>= mint
+    mint' = endpoint @"mint" mint
 
 mkSchemaDefinitions ''SignedSchema
 
@@ -83,7 +83,7 @@ test :: IO ()
 test = runEmulatorTraceIO $ do
     let tn       = "ABC"
         deadline = slotToBeginPOSIXTime def 10
-    h <- activateContractWallet (Wallet 1) endpoints
+    h <- activateContractWallet (knownWallet 1) endpoints
     callEndpoint @"mint" h $ MintParams
         { mpTokenName = tn
         , mpDeadline  = deadline

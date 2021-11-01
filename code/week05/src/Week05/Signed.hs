@@ -63,9 +63,9 @@ mint mp = do
     Contract.logInfo @String $ printf "forged %s" (show val)
 
 endpoints :: Contract () SignedSchema Text ()
-endpoints = mint' >> endpoints
+endpoints = forever $ awaitPromise $ mint'
   where
-    mint' = endpoint @"mint" >>= mint
+    mint' = endpoint @"mint" mint
 
 mkSchemaDefinitions ''SignedSchema
 
@@ -74,8 +74,8 @@ mkKnownCurrencies []
 test :: IO ()
 test = runEmulatorTraceIO $ do
     let tn = "ABC"
-    h1 <- activateContractWallet (Wallet 1) endpoints
-    h2 <- activateContractWallet (Wallet 2) endpoints
+    h1 <- activateContractWallet (knownWallet 1) endpoints
+    h2 <- activateContractWallet (knownWallet 2) endpoints
     callEndpoint @"mint" h1 $ MintParams
         { mpTokenName = tn
         , mpAmount    = 555
