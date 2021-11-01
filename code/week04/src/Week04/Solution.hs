@@ -7,6 +7,7 @@
 
 module Week04.Solution where
 
+import Control.Monad          (forever)
 import Data.Aeson             (FromJSON, ToJSON)
 import Data.Functor           (void)
 import Data.Text              (Text, unpack)
@@ -26,16 +27,17 @@ data PayParams = PayParams
 type PaySchema = Endpoint "pay" PayParams
 
 payContract :: Contract () PaySchema Text ()
-payContract = do
-    pp <- endpoint @"pay"
-    let tx = mustPayToPubKey (ppRecipient pp) $ lovelaceValueOf $ ppLovelace pp
-    handleError (\err -> Contract.logInfo $ "caught error: " ++ unpack err) $ void $ submitTx tx
-    payContract
+payContract = forever
+    $ handleError (\err -> Contract.logInfo $ "caught error: " ++ unpack err)
+    $ awaitPromise
+    $ endpoint @"pay" $ \pp -> do
+        let tx = mustPayToPubKey (ppRecipient pp) $ lovelaceValueOf $ ppLovelace pp
+        void $ submitTx tx
 
 payTrace :: Integer -> Integer -> EmulatorTrace ()
 payTrace x y = do
-    h <- activateContractWallet (Wallet 1) payContract
-    let pkh = pubKeyHash $ walletPubKey $ Wallet 2
+    h <- activateContractWallet (knownWallet 1) payContract
+    let pkh = pubKeyHash $ walletPubKey $ knownWallet 2
     callEndpoint @"pay" h $ PayParams
         { ppRecipient = pkh
         , ppLovelace  = x

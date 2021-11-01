@@ -7,6 +7,7 @@
 
 module Week04.Homework where
 
+import Control.Monad         (forever)
 import Data.Aeson            (FromJSON, ToJSON)
 import Data.Functor          (void)
 import Data.Text             (Text)
@@ -25,11 +26,11 @@ data PayParams = PayParams
 type PaySchema = Endpoint "pay" PayParams
 
 payContract :: Contract () PaySchema Text ()
-payContract = do
-    pp <- endpoint @"pay"
-    let tx = mustPayToPubKey (ppRecipient pp) $ lovelaceValueOf $ ppLovelace pp
-    void $ submitTx tx
-    payContract
+payContract = forever
+    $ awaitPromise
+    $ endpoint @"pay" $ \pp -> do
+        let tx = mustPayToPubKey (ppRecipient pp) $ lovelaceValueOf $ ppLovelace pp
+        void $ submitTx tx
 
 -- A trace that invokes the pay endpoint of payContract on Wallet 1 twice, each time with Wallet 2 as
 -- recipient, but with amounts given by the two arguments. There should be a delay of one slot
