@@ -21,10 +21,10 @@ test = runEmulatorTraceIO myTrace
 
 myTrace :: EmulatorTrace ()
 myTrace = do
-    h1 <- activateContractWallet (Wallet 1) endpoints
-    h2 <- activateContractWallet (Wallet 2) endpoints
+    h1 <- activateContractWallet (knownWallet 1) endpoints
+    h2 <- activateContractWallet (knownWallet 2) endpoints
     callEndpoint @"give" h1 $ GiveParams
-        { gpBeneficiary = pubKeyHash $ walletPubKey $ Wallet 2
+        { gpBeneficiary = pubKeyHash $ walletPubKey $ knownWallet 2
         , gpDeadline    = slotToBeginPOSIXTime def 20
         , gpAmount      = 10000000
         }

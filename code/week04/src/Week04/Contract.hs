@@ -22,7 +22,7 @@ myContract1 = do
     Contract.logInfo @String "hello from the contract"
 
 myTrace1 :: EmulatorTrace ()
-myTrace1 = void $ activateContractWallet (Wallet 1) myContract1
+myTrace1 = void $ activateContractWallet (knownWallet 1) myContract1
 
 test1 :: IO ()
 test1 = runEmulatorTraceIO myTrace1
@@ -33,7 +33,7 @@ myContract2 = Contract.handleError
     myContract1
 
 myTrace2 :: EmulatorTrace ()
-myTrace2 = void $ activateContractWallet (Wallet 1) myContract2
+myTrace2 = void $ activateContractWallet (knownWallet 1) myContract2
 
 test2 :: IO ()
 test2 = runEmulatorTraceIO myTrace2
@@ -42,14 +42,12 @@ type MySchema = Endpoint "foo" Int .\/ Endpoint "bar" String
 
 myContract3 :: Contract () MySchema Text ()
 myContract3 = do
-    n <- endpoint @"foo"
-    Contract.logInfo n
-    s <- endpoint @"bar"
-    Contract.logInfo s
+    awaitPromise $ endpoint @"foo" $ \s -> Contract.logInfo s
+    awaitPromise $ endpoint @"bar" $ \s -> Contract.logInfo s
 
 myTrace3 :: EmulatorTrace ()
 myTrace3 = do
-    h <- activateContractWallet (Wallet 1) myContract3
+    h <- activateContractWallet (knownWallet 1) myContract3
     callEndpoint @"foo" h 42
     callEndpoint @"bar" h "Haskell"
 
@@ -66,7 +64,7 @@ myContract4 = do
 
 myTrace4 :: EmulatorTrace ()
 myTrace4 = do
-    h <- activateContractWallet (Wallet 1) myContract4
+    h <- activateContractWallet (knownWallet 1) myContract4
 
     void $ Emulator.waitNSlots 5
     xs <- observableState h
