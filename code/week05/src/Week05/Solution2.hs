@@ -47,7 +47,7 @@ mkPolicy oref () ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
     hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
 
     checkMintedAmount :: Bool
-    checkMintedAmount = case flattenValue (txInfoForge info) of
+    checkMintedAmount = case flattenValue (txInfoMint info) of
         [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
         _                -> False
 
@@ -65,7 +65,7 @@ type NFTSchema = Endpoint "mint" ()
 mint :: Contract w NFTSchema Text ()
 mint = do
     pk    <- Contract.ownPubKey
-    utxos <- utxoAt (pubKeyAddress pk)
+    utxos <- utxosAt (pubKeyAddress pk)
     case Map.keys utxos of
         []       -> Contract.logError @String "no utxo found"
         oref : _ -> do
@@ -77,9 +77,9 @@ mint = do
             Contract.logInfo @String $ printf "forged %s" (show val)
 
 endpoints :: Contract () NFTSchema Text ()
-endpoints = mint' >> endpoints
+endpoints = forever $ awaitPromise $ mint'
   where
-    mint' = endpoint @"mint" >> mint
+    mint' = endpoint @"mint" (const mint)
 
 mkSchemaDefinitions ''NFTSchema
 
@@ -87,8 +87,8 @@ mkKnownCurrencies []
 
 test :: IO ()
 test = runEmulatorTraceIO $ do
-    h1 <- activateContractWallet (Wallet 1) endpoints
-    h2 <- activateContractWallet (Wallet 2) endpoints
+    h1 <- activateContractWallet (knownWallet 1) endpoints
+    h2 <- activateContractWallet (knownWallet 2) endpoints
     callEndpoint @"mint" h1 ()
     callEndpoint @"mint" h2 ()
     void $ Emulator.waitNSlots 1
