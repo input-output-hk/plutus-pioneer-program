@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module Week06.Oracle.Swap
     ( SwapSchema
@@ -47,8 +48,8 @@ lovelaces = Ada.getLovelace . Ada.fromValue
 mkSwapValidator :: Oracle -> Address -> PubKeyHash -> () -> ScriptContext -> Bool
 mkSwapValidator oracle addr pkh () ctx =
     txSignedBy info pkh ||
-    (traceIfFalse "expected exactly two script inputs" hasTwoScriptInputs &&
-     traceIfFalse "price not paid"                     sellerPaid)
+    traceIfFalse "expected exactly two script inputs" hasTwoScriptInputs &&
+     traceIfFalse "price not paid"                     sellerPaid
 
   where
     info :: TxInfo
@@ -123,18 +124,19 @@ offerSwap oracle amt = do
     awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ "offered " ++ show amt ++ " lovelace for swap"
 
-findSwaps :: Oracle -> (PubKeyHash -> Bool) -> Contract w s Text [(TxOutRef, TxOutTx, PubKeyHash)]
+findSwaps :: Oracle -> (PubKeyHash -> Bool) -> Contract w s Text [(TxOutRef, ChainIndexTxOut, PubKeyHash)]
 findSwaps oracle p = do
-    utxos <- utxoAt $ swapAddress oracle
+    utxos <- utxosAt $ swapAddress oracle
     return $ mapMaybe g $ Map.toList utxos
   where
-    f :: TxOutTx -> Maybe PubKeyHash
-    f o = do
-        dh        <- txOutDatumHash $ txOutTxOut o
-        (Datum d) <- Map.lookup dh $ txData $ txOutTxTx o
-        PlutusTx.fromBuiltinData d
+    f :: ChainIndexTxOut -> Maybe PubKeyHash
+    f o = case o of
+        PublicKeyChainIndexTxOut {} -> Nothing
+        ScriptChainIndexTxOut    {..} -> case _ciTxOutDatum of
+          Right (Datum d)  -> PlutusTx.fromBuiltinData d
+          Left _           -> Nothing
 
-    g :: (TxOutRef, TxOutTx) -> Maybe (TxOutRef, TxOutTx, PubKeyHash)
+    g :: (TxOutRef, ChainIndexTxOut) -> Maybe (TxOutRef, ChainIndexTxOut, PubKeyHash)
     g (oref, o) = do
         pkh <- f o
         guard $ p pkh
@@ -170,8 +172,8 @@ useSwap oracle = do
             case find (f amt x) swaps of
                 Nothing                -> logInfo @String "no suitable swap found"
                 Just (oref', o', pkh') -> do
-                    let v       = txOutValue (txOutTxOut o) <> lovelaceValueOf (oFee oracle)
-                        p       = assetClassValue (oAsset oracle) $ price (lovelaces $ txOutValue $ txOutTxOut o') x
+                    let v       = _ciTxOutValue o <> lovelaceValueOf (oFee oracle)
+                        p       = assetClassValue (oAsset oracle) $ price (lovelaces $ _ciTxOutValue o') x
                         lookups = Constraints.otherScript (swapValidator oracle)                     <>
                                   Constraints.otherScript (oracleValidator oracle)                   <>
                                   Constraints.unspentOutputs (Map.fromList [(oref, o), (oref', o')])
@@ -186,10 +188,10 @@ useSwap oracle = do
                     awaitTxConfirmed $ txId ledgerTx
                     logInfo @String $ "made swap with price " ++ show (Value.flattenValue p)
   where
-    getPrice :: Integer -> TxOutTx -> Integer
-    getPrice x o = price (lovelaces $ txOutValue $ txOutTxOut o) x
+    getPrice :: Integer -> ChainIndexTxOut -> Integer
+    getPrice x o = price (lovelaces $ _ciTxOutValue o) x
 
-    f :: Integer -> Integer -> (TxOutRef, TxOutTx, PubKeyHash) -> Bool
+    f :: Integer -> Integer -> (TxOutRef, ChainIndexTxOut, PubKeyHash) -> Bool
     f amt x (_, o, _) = getPrice x o <= amt
 
 type SwapSchema =
@@ -199,28 +201,17 @@ type SwapSchema =
         .\/ Endpoint "funds"    ()
 
 swap :: Oracle -> Contract (Last Value) SwapSchema Text ()
-swap oracle = (offer `select` retrieve `select` use `select` funds) >> swap oracle
+swap oracle = forever $ handleError logError $ awaitPromise (offer `select` retrieve `select` use `select` funds)
   where
-    offer :: Contract (Last Value) SwapSchema Text ()
-    offer = h $ do
-        amt <- endpoint @"offer"
+    offer = endpoint @"offer" $ \amt ->
         offerSwap oracle amt
 
-    retrieve :: Contract (Last Value) SwapSchema Text ()
-    retrieve = h $ do
-        endpoint @"retrieve"
+    retrieve = endpoint @"retrieve" $ \_ ->
         retrieveSwaps oracle
 
-    use :: Contract (Last Value) SwapSchema Text ()
-    use = h $ do
-        endpoint @"use"
+    use = endpoint @"use" $ \_ ->
         useSwap oracle
 
-    funds :: Contract (Last Value) SwapSchema Text ()
-    funds = h $ do
-        endpoint @"funds"
+    funds = endpoint @"funds" $ \_ -> do
         v <- ownFunds
         tell $ Last $ Just v
-
-    h :: Contract (Last Value) SwapSchema Text () -> Contract (Last Value) SwapSchema Text ()
-    h = handleError logError

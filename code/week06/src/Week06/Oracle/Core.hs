@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE RecordWildCards       #-}
 
 module Week06.Oracle.Core
     ( Oracle (..)
@@ -27,6 +28,7 @@ module Week06.Oracle.Core
     ) where
 
 import           Control.Monad             hiding (fmap)
+import           Data.OpenApi.Schema       as OpenApi
 import           Data.Aeson                (FromJSON, ToJSON)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
@@ -49,7 +51,7 @@ data Oracle = Oracle
     , oOperator :: !PubKeyHash
     , oFee      :: !Integer
     , oAsset    :: !AssetClass
-    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
+    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord, OpenApi.ToSchema)
 
 PlutusTx.makeLift ''Oracle
 
@@ -173,17 +175,22 @@ updateOracle oracle x = do
             awaitTxConfirmed $ txId ledgerTx
             logInfo @String $ "updated oracle value to " ++ show x
 
-findOracle :: forall w s. Oracle -> Contract w s Text (Maybe (TxOutRef, TxOutTx, Integer))
+findOracle :: forall w s. Oracle -> Contract w s Text (Maybe (TxOutRef, ChainIndexTxOut, Integer))
 findOracle oracle = do
-    utxos <- Map.filter f <$> utxoAt (oracleAddress oracle)
+    utxos <- Map.filter f <$> utxosAt (oracleAddress oracle)
     return $ case Map.toList utxos of
-        [(oref, o)] -> do
-            x <- oracleValue (txOutTxOut o) $ \dh -> Map.lookup dh $ txData $ txOutTxTx o
-            return (oref, o, x)
+        [(oref, o)] -> case o of
+            PublicKeyChainIndexTxOut {}  -> Nothing
+            ScriptChainIndexTxOut   {..} -> case _ciTxOutDatum of
+                                            Right (Datum d) -> case PlutusTx.fromBuiltinData d of
+                                                               Nothing  -> Nothing
+                                                               Just dat -> return (oref, o, dat)
+                                            Left _          -> Nothing
         _           -> Nothing
   where
-    f :: TxOutTx -> Bool
-    f o = assetClassValueOf (txOutValue $ txOutTxOut o) (oracleAsset oracle) == 1
+    f :: ChainIndexTxOut -> Bool
+    f ScriptChainIndexTxOut {..} = assetClassValueOf _ciTxOutValue (oracleAsset oracle) == 1
+    f _ = False
 
 type OracleSchema = Endpoint "update" Integer
 
@@ -194,7 +201,6 @@ runOracle op = do
     go oracle
   where
     go :: Oracle -> Contract (Last Oracle) OracleSchema Text a
-    go oracle = do
-        x <- endpoint @"update"
+    go oracle = awaitPromise $ endpoint @"update" $ \x -> do
         updateOracle oracle x
         go oracle
