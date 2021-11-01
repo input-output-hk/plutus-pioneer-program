@@ -29,10 +29,13 @@ import           Ledger.Value     as Value
 ownFunds :: Contract w s Text Value
 ownFunds = do
     pk    <- ownPubKey
-    utxos <- utxoAt $ pubKeyAddress pk
-    let v = mconcat $ Map.elems $ txOutValue . txOutTxOut <$> utxos
+    utxos <- utxosAt $ pubKeyAddress pk
+    let v = mconcat $ Map.elems $ f <$> utxos
     logInfo @String $ "own funds: " ++ show (Value.flattenValue v)
     return v
+  where
+    f :: ChainIndexTxOut -> Value
+    f o = _ciTxOutValue o
 
 ownFunds' :: Contract (Last Value) Empty Text ()
 ownFunds' = do

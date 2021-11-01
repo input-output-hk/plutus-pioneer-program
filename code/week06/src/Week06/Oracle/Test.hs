@@ -23,6 +23,8 @@ import           Data.Text                  (Text)
 import           Ledger
 import           Ledger.Value               as Value
 import           Ledger.Ada                 as Ada
+import           Ledger.TimeSlot
+import           Ledger.Fee
 import           Plutus.Contract            as Contract
 import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
@@ -40,10 +42,10 @@ assetToken :: TokenName
 assetToken = "USDT"
 
 test :: IO ()
-test = runEmulatorTraceIO' def emCfg def myTrace
+test = runEmulatorTraceIO' def emCfg myTrace
   where
     emCfg :: EmulatorConfig
-    emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
+    emCfg = EmulatorConfig (Left $ Map.fromList [(knownWallet i, v) | i <- [1 .. 10]]) (SlotConfig 1 (POSIXTime 0)) (FeeConfig (Lovelace 100000) (0.002))
 
     v :: Value
     v = Ada.lovelaceValueOf                    100_000_000 <>
@@ -65,23 +67,23 @@ myTrace = do
                 , opToken  = assetToken
                 }
 
-    h1 <- activateContractWallet (Wallet 1) $ runOracle op
+    h1 <- activateContractWallet (knownWallet 1) $ runOracle op
     void $ Emulator.waitNSlots 1
     oracle <- getOracle h1
 
-    void $ activateContractWallet (Wallet 2) $ checkOracle oracle
+    void $ activateContractWallet (knownWallet 2) $ checkOracle oracle
 
     callEndpoint @"update" h1 1_500_000
     void $ Emulator.waitNSlots 3
 
-    void $ activateContractWallet (Wallet 1) ownFunds'
-    void $ activateContractWallet (Wallet 3) ownFunds'
-    void $ activateContractWallet (Wallet 4) ownFunds'
-    void $ activateContractWallet (Wallet 5) ownFunds'
+    void $ activateContractWallet (knownWallet 1) ownFunds'
+    void $ activateContractWallet (knownWallet 3) ownFunds'
+    void $ activateContractWallet (knownWallet 4) ownFunds'
+    void $ activateContractWallet (knownWallet 5) ownFunds'
 
-    h3 <- activateContractWallet (Wallet 3) $ swap oracle
-    h4 <- activateContractWallet (Wallet 4) $ swap oracle
-    h5 <- activateContractWallet (Wallet 5) $ swap oracle
+    h3 <- activateContractWallet (knownWallet 3) $ swap oracle
+    h4 <- activateContractWallet (knownWallet 4) $ swap oracle
+    h5 <- activateContractWallet (knownWallet 5) $ swap oracle
 
     callEndpoint @"offer" h3 10_000_000
     callEndpoint @"offer" h4 20_000_000
