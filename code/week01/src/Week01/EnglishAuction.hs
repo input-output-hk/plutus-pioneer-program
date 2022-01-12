@@ -35,30 +35,31 @@ import           Data.List.NonEmpty   (NonEmpty (..))
 import           Data.Map             as Map
 import           Data.Text            (pack, Text)
 import           GHC.Generics         (Generic)
-import           Plutus.Contract      hiding (when)
-import qualified PlutusTx             as PlutusTx
-import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
-import qualified PlutusTx.Prelude     as Plutus
 import           Ledger               hiding (singleton)
-import           Ledger.Constraints   as Constraints
-import qualified Ledger.Scripts       as Scripts
+import qualified Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Value         as Value
 import           Ledger.Ada           as Ada
-import           Playground.Contract  (ensureKnownCurrencies, printSchemas, stage, printJson)
+import           Playground.Contract  (IO, ensureKnownCurrencies, printSchemas, stage, printJson)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
-import           Prelude              (Semigroup (..))
+import           Plutus.Contract
+import qualified PlutusTx
+import           PlutusTx.Prelude     hiding (unless)
+import qualified Prelude              as P
 import           Schema               (ToSchema)
 import           Text.Printf          (printf)
 
+minLovelace :: Integer
+minLovelace = 2000000
+
 data Auction = Auction
-    { aSeller   :: !PubKeyHash
-    , aDeadline :: !Slot
+    { aSeller   :: !PaymentPubKeyHash
+    , aDeadline :: !POSIXTime
     , aMinBid   :: !Integer
     , aCurrency :: !CurrencySymbol
     , aToken    :: !TokenName
-    } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+    } deriving (P.Show, Generic, ToJSON, FromJSON, ToSchema)
 
 instance Eq Auction where
     {-# INLINABLE (==) #-}
@@ -72,9 +73,9 @@ PlutusTx.unstableMakeIsData ''Auction
 PlutusTx.makeLift ''Auction
 
 data Bid = Bid
-    { bBidder :: !PubKeyHash
+    { bBidder :: !PaymentPubKeyHash
     , bBid    :: !Integer
-    } deriving Show
+    } deriving P.Show
 
 instance Eq Bid where
     {-# INLINABLE (==) #-}
@@ -85,7 +86,7 @@ PlutusTx.unstableMakeIsData ''Bid
 PlutusTx.makeLift ''Bid
 
 data AuctionAction = MkBid Bid | Close
-    deriving Show
+    deriving P.Show
 
 PlutusTx.unstableMakeIsData ''AuctionAction
 PlutusTx.makeLift ''AuctionAction
@@ -93,13 +94,13 @@ PlutusTx.makeLift ''AuctionAction
 data AuctionDatum = AuctionDatum
     { adAuction    :: !Auction
     , adHighestBid :: !(Maybe Bid)
-    } deriving Show
+    } deriving P.Show
 
 PlutusTx.unstableMakeIsData ''AuctionDatum
 PlutusTx.makeLift ''AuctionDatum
 
 data Auctioning
-instance Scripts.ScriptType Auctioning where
+instance Scripts.ValidatorTypes Auctioning where
     type instance RedeemerType Auctioning = AuctionAction
     type instance DatumType Auctioning = AuctionDatum
 
@@ -115,7 +116,7 @@ mkAuctionValidator ad redeemer ctx =
     traceIfFalse "wrong input value" correctInputValue &&
     case redeemer of
         MkBid b@Bid{..} ->
-            traceIfFalse "bid too low" (sufficientBid bBid)                &&
+            traceIfFalse "bid too low"        (sufficientBid bBid)         &&
             traceIfFalse "wrong output datum" (correctBidOutputDatum b)    &&
             traceIfFalse "wrong output value" (correctBidOutputValue bBid) &&
             traceIfFalse "wrong refund"       correctBidRefund             &&
@@ -124,9 +125,9 @@ mkAuctionValidator ad redeemer ctx =
             traceIfFalse "too early" correctCloseSlotRange &&
             case adHighestBid ad of
                 Nothing      ->
-                    traceIfFalse "expected seller to get token" (getsValue (aSeller auction) tokenValue)
+                    traceIfFalse "expected seller to get token" (getsValue (aSeller auction) $ tokenValue <> Ada.lovelaceValueOf minLovelace)
                 Just Bid{..} ->
-                    traceIfFalse "expected highest bidder to get token" (getsValue bBidder tokenValue) &&
+                    traceIfFalse "expected highest bidder to get token" (getsValue bBidder $ tokenValue <> Ada.lovelaceValueOf minLovelace) &&
                     traceIfFalse "expected seller to get highest bid" (getsValue (aSeller auction) $ Ada.lovelaceValueOf bBid)
 
   where
@@ -156,8 +157,8 @@ mkAuctionValidator ad redeemer ctx =
 
     correctInputValue :: Bool
     correctInputValue = inVal == case adHighestBid ad of
-        Nothing      -> tokenValue
-        Just Bid{..} -> tokenValue Plutus.<> Ada.lovelaceValueOf bBid
+        Nothing      -> tokenValue <> Ada.lovelaceValueOf minLovelace
+        Just Bid{..} -> tokenValue <> Ada.lovelaceValueOf (minLovelace + bBid)
 
     sufficientBid :: Integer -> Bool
     sufficientBid amount = amount >= minBid ad
@@ -169,7 +170,7 @@ mkAuctionValidator ad redeemer ctx =
             Nothing   -> traceError "wrong output type"
             Just h -> case findDatum h info of
                 Nothing        -> traceError "datum not found"
-                Just (Datum d) ->  case PlutusTx.fromData d of
+                Just (Datum d) ->  case PlutusTx.fromBuiltinData d of
                     Just ad' -> (o, ad')
                     Nothing  -> traceError "error decoding data"
         _   -> traceError "expected exactly one continuing output"
@@ -180,7 +181,7 @@ mkAuctionValidator ad redeemer ctx =
 
     correctBidOutputValue :: Integer -> Bool
     correctBidOutputValue amount =
-        txOutValue ownOutput == tokenValue Plutus.<> Ada.lovelaceValueOf amount
+        txOutValue ownOutput == tokenValue <> Ada.lovelaceValueOf (minLovelace + amount)
 
     correctBidRefund :: Bool
     correctBidRefund = case adHighestBid ad of
@@ -189,7 +190,7 @@ mkAuctionValidator ad redeemer ctx =
           let
             os = [ o
                  | o <- txInfoOutputs info
-                 , txOutAddress o == pubKeyHashAddress bBidder
+                 , txOutAddress o == pubKeyHashAddress bBidder Nothing
                  ]
           in
             case os of
@@ -202,7 +203,7 @@ mkAuctionValidator ad redeemer ctx =
     correctCloseSlotRange :: Bool
     correctCloseSlotRange = from (aDeadline auction) `contains` txInfoValidRange info
 
-    getsValue :: PubKeyHash -> Value -> Bool
+    getsValue :: PaymentPubKeyHash -> Value -> Bool
     getsValue h v =
       let
         [o] = [ o'
@@ -210,26 +211,26 @@ mkAuctionValidator ad redeemer ctx =
               , txOutValue o' == v
               ]
       in
-        txOutAddress o == pubKeyHashAddress h
+        txOutAddress o == pubKeyHashAddress h Nothing
 
-auctionInstance :: Scripts.ScriptInstance Auctioning
-auctionInstance = Scripts.validator @Auctioning
+typedAuctionValidator :: Scripts.TypedValidator Auctioning
+typedAuctionValidator = Scripts.mkTypedValidator @Auctioning
     $$(PlutusTx.compile [|| mkAuctionValidator ||])
     $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @AuctionDatum @AuctionAction
 
 auctionValidator :: Validator
-auctionValidator = Scripts.validatorScript auctionInstance
+auctionValidator = Scripts.validatorScript typedAuctionValidator
 
 auctionHash :: Ledger.ValidatorHash
-auctionHash = Scripts.validatorHash auctionValidator
+auctionHash = Scripts.validatorHash typedAuctionValidator
 
 auctionAddress :: Ledger.Address
 auctionAddress = scriptHashAddress auctionHash
 
 data StartParams = StartParams
-    { spDeadline :: !Slot
+    { spDeadline :: !POSIXTime
     , spMinBid   :: !Integer
     , spCurrency :: !CurrencySymbol
     , spToken    :: !TokenName
@@ -247,14 +248,13 @@ data CloseParams = CloseParams
     } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
 type AuctionSchema =
-    BlockchainActions
-        .\/ Endpoint "start" StartParams
-        .\/ Endpoint "bid"   BidParams
-        .\/ Endpoint "close" CloseParams
+        Endpoint "start" StartParams
+    .\/ Endpoint "bid"   BidParams
+    .\/ Endpoint "close" CloseParams
 
-start :: (HasBlockchainActions s, AsContractError e) => StartParams -> Contract w s e ()
+start :: AsContractError e => StartParams -> Contract w s e ()
 start StartParams{..} = do
-    pkh <- pubKeyHash <$> ownPubKey
+    pkh <- ownPaymentPubKeyHash
     let a = Auction
                 { aSeller   = pkh
                 , aDeadline = spDeadline
@@ -266,99 +266,96 @@ start StartParams{..} = do
                 { adAuction    = a
                 , adHighestBid = Nothing
                 }
-        v = Value.singleton spCurrency spToken 1
-        tx = mustPayToTheScript d v
-    ledgerTx <- submitTxConstraints auctionInstance tx
-    void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "started auction %s for token %s" (show a) (show v)
+        v = Value.singleton spCurrency spToken 1 <> Ada.lovelaceValueOf minLovelace
+        tx = Constraints.mustPayToTheScript d v
+    ledgerTx <- submitTxConstraints typedAuctionValidator tx
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
+    logInfo @P.String $ printf "started auction %s for token %s" (P.show a) (P.show v)
 
-bid :: forall w s. HasBlockchainActions s => BidParams -> Contract w s Text ()
+bid :: forall w s. BidParams -> Contract w s Text ()
 bid BidParams{..} = do
     (oref, o, d@AuctionDatum{..}) <- findAuction bpCurrency bpToken
-    logInfo @String $ printf "found auction utxo with datum %s" (show d)
+    logInfo @P.String $ printf "found auction utxo with datum %s" (P.show d)
 
     when (bpBid < minBid d) $
         throwError $ pack $ printf "bid lower than minimal bid %d" (minBid d)
-    pkh <- pubKeyHash <$> ownPubKey
+    pkh <- ownPaymentPubKeyHash
     let b  = Bid {bBidder = pkh, bBid = bpBid}
         d' = d {adHighestBid = Just b}
-        v  = Value.singleton bpCurrency bpToken 1 <> Ada.lovelaceValueOf bpBid
-        r  = Redeemer $ PlutusTx.toData $ MkBid b
+        v  = Value.singleton bpCurrency bpToken 1 <> Ada.lovelaceValueOf (minLovelace + bpBid)
+        r  = Redeemer $ PlutusTx.toBuiltinData $ MkBid b
 
-        lookups = Constraints.scriptInstanceLookups auctionInstance <>
-                  Constraints.otherScript auctionValidator          <>
+        lookups = Constraints.typedValidatorLookups typedAuctionValidator P.<>
+                  Constraints.otherScript auctionValidator                P.<>
                   Constraints.unspentOutputs (Map.singleton oref o)
         tx      = case adHighestBid of
-                    Nothing      -> mustPayToTheScript d' v                            <>
-                                    mustValidateIn (to $ aDeadline adAuction)          <>
-                                    mustSpendScriptOutput oref r
-                    Just Bid{..} -> mustPayToTheScript d' v                            <>
-                                    mustPayToPubKey bBidder (Ada.lovelaceValueOf bBid) <>
-                                    mustValidateIn (to $ aDeadline adAuction)          <>
-                                    mustSpendScriptOutput oref r
+                    Nothing      -> Constraints.mustPayToTheScript d' v                            <>
+                                    Constraints.mustValidateIn (to $ aDeadline adAuction)          <>
+                                    Constraints.mustSpendScriptOutput oref r
+                    Just Bid{..} -> Constraints.mustPayToTheScript d' v                            <>
+                                    Constraints.mustPayToPubKey bBidder (Ada.lovelaceValueOf bBid) <>
+                                    Constraints.mustValidateIn (to $ aDeadline adAuction)          <>
+                                    Constraints.mustSpendScriptOutput oref r
     ledgerTx <- submitTxConstraintsWith lookups tx
-    void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "made bid of %d lovelace in auction %s for token (%s, %s)"
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
+    logInfo @P.String $ printf "made bid of %d lovelace in auction %s for token (%s, %s)"
         bpBid
-        (show adAuction)
-        (show bpCurrency)
-        (show bpToken)
+        (P.show adAuction)
+        (P.show bpCurrency)
+        (P.show bpToken)
 
-close :: forall w s. HasBlockchainActions s => CloseParams -> Contract w s Text ()
+close :: forall w s. CloseParams -> Contract w s Text ()
 close CloseParams{..} = do
     (oref, o, d@AuctionDatum{..}) <- findAuction cpCurrency cpToken
-    logInfo @String $ printf "found auction utxo with datum %s" (show d)
+    logInfo @P.String $ printf "found auction utxo with datum %s" (P.show d)
 
     let t      = Value.singleton cpCurrency cpToken 1
-        r      = Redeemer $ PlutusTx.toData Close
+        r      = Redeemer $ PlutusTx.toBuiltinData Close
         seller = aSeller adAuction
 
-        lookups = Constraints.scriptInstanceLookups auctionInstance <>
-                  Constraints.otherScript auctionValidator          <>
+        lookups = Constraints.typedValidatorLookups typedAuctionValidator P.<>
+                  Constraints.otherScript auctionValidator                P.<>
                   Constraints.unspentOutputs (Map.singleton oref o)
         tx      = case adHighestBid of
-                    Nothing      -> mustPayToPubKey seller t                          <>
-                                    mustValidateIn (from $ aDeadline adAuction)       <>
-                                    mustSpendScriptOutput oref r
-                    Just Bid{..} -> mustPayToPubKey bBidder t                         <>
-                                    mustPayToPubKey seller (Ada.lovelaceValueOf bBid) <>
-                                    mustValidateIn (from $ aDeadline adAuction)       <>
-                                    mustSpendScriptOutput oref r
+                    Nothing      -> Constraints.mustPayToPubKey seller (t <> Ada.lovelaceValueOf minLovelace)  <>
+                                    Constraints.mustValidateIn (from $ aDeadline adAuction)                    <>
+                                    Constraints.mustSpendScriptOutput oref r
+                    Just Bid{..} -> Constraints.mustPayToPubKey bBidder (t <> Ada.lovelaceValueOf minLovelace) <>
+                                    Constraints.mustPayToPubKey seller (Ada.lovelaceValueOf bBid)              <>
+                                    Constraints.mustValidateIn (from $ aDeadline adAuction)                    <>
+                                    Constraints.mustSpendScriptOutput oref r
     ledgerTx <- submitTxConstraintsWith lookups tx
-    void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "closed auction %s for token (%s, %s)"
-        (show adAuction)
-        (show cpCurrency)
-        (show cpToken)
+    void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
+    logInfo @P.String $ printf "closed auction %s for token (%s, %s)"
+        (P.show adAuction)
+        (P.show cpCurrency)
+        (P.show cpToken)
 
-findAuction :: HasBlockchainActions s
-            => CurrencySymbol
+findAuction :: CurrencySymbol
             -> TokenName
-            -> Contract w s Text (TxOutRef, TxOutTx, AuctionDatum)
+            -> Contract w s Text (TxOutRef, ChainIndexTxOut, AuctionDatum)
 findAuction cs tn = do
-    utxos <- utxoAt $ scriptHashAddress auctionHash
+    utxos <- utxosAt $ scriptHashAddress auctionHash
     let xs = [ (oref, o)
              | (oref, o) <- Map.toList utxos
-             , Value.valueOf (txOutValue $ txOutTxOut o) cs tn == 1
+             , Value.valueOf (_ciTxOutValue o) cs tn == 1
              ]
     case xs of
-        [(oref, o)] -> case txOutDatumHash $ txOutTxOut o of
-            Nothing   -> throwError "unexpected out type"
-            Just h -> case Map.lookup h $ txData $ txOutTxTx o of
-                Nothing        -> throwError "datum not found"
-                Just (Datum e) -> case PlutusTx.fromData e of
-                    Nothing -> throwError "datum has wrong type"
-                    Just d@AuctionDatum{..}
-                        | aCurrency adAuction == cs && aToken adAuction == tn -> return (oref, o, d)
-                        | otherwise                                           -> throwError "auction token missmatch"
+        [(oref, o)] -> case _ciTxOutDatum o of
+            Left _          -> throwError "datum missing"
+            Right (Datum e) -> case PlutusTx.fromBuiltinData e of
+                Nothing -> throwError "datum has wrong type"
+                Just d@AuctionDatum{..}
+                    | aCurrency adAuction == cs && aToken adAuction == tn -> return (oref, o, d)
+                    | otherwise                                           -> throwError "auction token missmatch"
         _           -> throwError "auction utxo not found"
 
 endpoints :: Contract () AuctionSchema Text ()
-endpoints = (start' `select` bid' `select` close') >> endpoints
+endpoints = awaitPromise (start' `select` bid' `select` close') >> endpoints
   where
-    start' = endpoint @"start" >>= start
-    bid'   = endpoint @"bid"   >>= bid
-    close' = endpoint @"close" >>= close
+    start' = endpoint @"start" start
+    bid'   = endpoint @"bid"   bid
+    close' = endpoint @"close" close
 
 mkSchemaDefinitions ''AuctionSchema
 
