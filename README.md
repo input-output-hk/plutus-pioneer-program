@@ -21,10 +21,10 @@
 
   - Clone the [The Plutus-Apps repository](https://github.com/input-output-hk/plutus-apps), check out the correct commit
     as specified in [cabal.project](code/week01/cabal.project).
-  - Install NixOS cross-referencing the following resources.
+  - Install Nix cross-referencing the following resources.
      - https://nixos.org/download.html
      - https://docs.plutus-community.com
-     - A few resources to understand the what and why regarding NixOS
+     - A few resources to understand the what and why regarding Nix
        - https://nixos.org/manual/nix/stable
        - https://serokell.io/blog/what-is-nix
   - Set-up IOHK binary caches [How to set up the IOHK binary caches](https://github.com/input-output-hk/plutus#iohk-binary-cache). "If you do not do this, you will end up building GHC, which takes several hours. If you find yourself building GHC, *stop* and fix the cache."
