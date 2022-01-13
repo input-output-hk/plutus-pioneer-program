@@ -2,7 +2,7 @@
 
 ## Lectures
 
-### Lecture #1
+### [Lecture #1](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2nLM4fAck2JS6KhFQlXq2N)
 
  - [Part 1 - Welcome and Introduction](https://youtu.be/X80uNXenWF4)
  - [Part 2 - The EUTxO-Model](https://youtu.be/bfofA4MM0QE)
