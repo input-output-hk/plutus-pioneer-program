@@ -49,23 +49,44 @@
 
 - Week #1
 
-  - Clone the [The Plutus-Apps repository](https://github.com/input-output-hk/plutus-apps), check out the correct commit
-    as specified in [cabal.project](code/week01/cabal.project).
-  - Install NixOS cross-referencing the following resources.
-     - https://nixos.org/download.html
-     - https://docs.plutus-community.com
-     - A few resources to understand the what and why regarding NixOS
-       - https://nixos.org/manual/nix/stable
-       - https://serokell.io/blog/what-is-nix
-  - Set-up IOHK binary caches [How to set up the IOHK binary caches](https://github.com/input-output-hk/plutus#iohk-binary-cache). "If you do not do this, you will end up building GHC, which takes several hours. If you find yourself building GHC, *stop* and fix the cache."
-  - Enter a `nix-shell`.
-  - Build the [English Auction](code/week01) contract with `cabal build` (you may need to run `cabal update` first).
-  - Go to the `plutus-playground-client` folder in the `plutus-apps` repository.
-  - Start the Playground server with `plutus-playground-server`.
-  - Start the Playground client (in another `nix-shell`) with `npm start`.
-  - Copy-paste the auction contract into the Playground editor, do not forget to remove the module header.
-  - Compile.
-  - Simulate various auction scenarios.
+  - Clone
+    - this repository, and the
+    - [The Plutus-Apps repository](https://github.com/input-output-hk/plutus-apps)
+      - check out the commit specified in
+        [code/week01/cabal.project](code/week01/cabal.project) (It's
+        specified as `tag` for the plutus-apps
+        source-repository-package)
+  - Set up NixOS
+    - Install NixOS cross-referencing the following resources.
+       - https://nixos.org/download.html
+       - https://docs.plutus-community.com
+       - A few resources to understand the what and why regarding NixOS
+         - https://nixos.org/manual/nix/stable
+         - https://serokell.io/blog/what-is-nix
+    - Set-up IOHK binary caches [How to set up the IOHK binary
+      caches](https://github.com/input-output-hk/plutus#iohk-binary-cache). "If
+      you do not do this, you will end up building GHC, which takes
+      several hours. If you find yourself building GHC, *stop* and fix
+      the cache."
+  - Run Plutus Playground:
+    - Enter a `nix-shell` from the `plutus-apps` repository
+    - Go to the `plutus-playground-client` and start playground server
+      by executing `plutus-playground-server`
+    - Enter another `nix-shell` from `plutus-apps` folder, cd to
+      `plutus-playground-client` and start Playground client with `npm
+      start`.
+    - you should now have the Plutus Playground web app running on
+      https://localhost:8009/
+
+  - Simulate the English auction:
+    - From this repository copy-paste [EnglishAuction.hs code](/code/week01/src/Week01/EnglishAuction.hs) into the
+      playground web app and click "compile"
+    - Simulate various auction scenarios as shown in the video
+
+  You can also verify if you can compile the English Auction code by
+  - starting another `nix-shell` from the `plutus-apps` repository, then
+  - going to the [English Auction folder](code/week01) in this
+    repository and running `cabal build` (you may need to run `cabal update` first).
 
 - Week #2
 
