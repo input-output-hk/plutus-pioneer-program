@@ -11,6 +11,10 @@
  - [Part 5 - Auction Contract on the Playground](https://youtu.be/K61Si6iQ-Js)
  - [Part 6 - Homework](https://youtu.be/tfanOE2ARho)
 
+### [Lecture #2](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0mhPmOjPSHZPtTFpfJo3Nd)
+
+ - [Part 1 - Triggering Change](https://youtu.be/BEr7lcCPjnA)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
