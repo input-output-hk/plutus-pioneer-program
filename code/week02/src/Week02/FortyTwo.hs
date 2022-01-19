@@ -35,7 +35,7 @@ import           Text.Printf         (printf)
 mkValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkValidator _ r _
     | r == Builtins.mkI 42 = ()
-    | otherwise = traceError "wrong redeemer"
+    | otherwise            = traceError "wrong redeemer!"
 
 validator :: Validator
 validator = mkValidatorScript $$(PlutusTx.compile [|| mkValidator ||])
@@ -52,7 +52,7 @@ type GiftSchema =
 
 give :: AsContractError e => Integer -> Contract w s e ()
 give amount = do
-    let tx = mustPayToOtherScript valHash (Datum $ Builtins.mkConstr 0 []) $ Ada.lovelaceValueOf amount
+    let tx = mustPayToOtherScript valHash (Datum $ Builtins.mkI 0) $ Ada.lovelaceValueOf amount
     ledgerTx <- submitTx tx
     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
     logInfo @String $ printf "made a gift of %d lovelace" amount

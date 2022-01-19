@@ -14,10 +14,15 @@
 ### [Lecture #2](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0mhPmOjPSHZPtTFpfJo3Nd)
 
  - [Part 1 - Triggering Change](https://youtu.be/BEr7lcCPjnA)
+ - [Part 2 - Low Level, Untyped Validation Scripts](https://youtu.be/xgnmMl-eIIM)
+ - [Part 3 - High Level, Typed Validation Scripts](https://youtu.be/HoB_PqeZPNc)
+ - [Part 4 - Summary](https://youtu.be/V5P2gKHos48)
+ - [Part 5 - Homework](https://youtu.be/_r-EpXzQGKo)
 
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
+ - Lecture #2: [Simple Validation](code/week02)
 
 ## Exercises
 
@@ -41,7 +46,17 @@
   - Compile.
   - Simulate various auction scenarios.
 
+- Week #2
+
+  - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
+
 ## Some Plutus Modules
+
+  - `Ledger.Scripts`, contains functions related to untyped Plutus scripts.
+  - `Ledger.Typed.Scripts`, contains functions related to typed Plutus scripts.
+  - `PlutusTx`, contains important types like `Data` and `BuiltinData`.
+  - `PlutusTx.IsData.Class`, contains the `ToData` and `FromData` classes and related functions.
 
 ## Additional Resources
 
