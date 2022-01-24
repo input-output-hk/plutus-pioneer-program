@@ -19,6 +19,14 @@
  - [Part 4 - Summary](https://youtu.be/V5P2gKHos48)
  - [Part 5 - Homework](https://youtu.be/_r-EpXzQGKo)
 
+### [Lecture #3](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2zxcfoVGARFExzOHwXFCCL)
+
+ - [Part 1 - Configuring Playground Time Out](https://youtu.be/sLMhsqiWeGU)
+ - [Part 2 - Script Contexts](https://youtu.be/B66xLrGXwmw)
+ - [Part 3 - Handling Time](https://youtu.be/mf06ll-4j2w)
+ - [Part 4 - A Vesting Example](https://youtu.be/ae7U_yKIQ0Y)
+ - [Part 5 - Parameterized Contracts](https://youtu.be/XqFILXV_ACM)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
@@ -55,8 +63,11 @@
 
   - `Ledger.Scripts`, contains functions related to untyped Plutus scripts.
   - `Ledger.Typed.Scripts`, contains functions related to typed Plutus scripts.
+  - `Plutus.V1.Ledger.Interval`, contains the definition of intervals and functions for working with them.
+  - `Plutus.V1.Ledger.Time`, contains time-related types and functions.
   - `PlutusTx`, contains important types like `Data` and `BuiltinData`.
   - `PlutusTx.IsData.Class`, contains the `ToData` and `FromData` classes and related functions.
+  - `Wallet.Emulator`, contains types and functions for dealing with wallets.
 
 ## Additional Resources
 
