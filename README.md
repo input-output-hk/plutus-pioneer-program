@@ -79,8 +79,12 @@
       https://localhost:8009/
 
   - Simulate the English auction:
-    - From this repository copy-paste [EnglishAuction.hs code](/code/week01/src/Week01/EnglishAuction.hs) into the
-      playground web app and click "compile"
+    - From this repository
+      - copy-paste [EnglishAuction.hs
+        code](/code/week01/src/Week01/EnglishAuction.hs) into the
+        playground web app
+      - remove the module header and exports (the `module Week01.EnglishAuction ... where` part), and
+      - click "compile"
     - Simulate various auction scenarios as shown in the video
 
   You can also verify if you can compile the English Auction code by
