@@ -12,7 +12,7 @@
 
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-module Week03.Homework1 where
+module Week03.Solution1 where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (ToJSON, FromJSON)
@@ -47,7 +47,19 @@ PlutusTx.unstableMakeIsData ''VestingDatum
 -- This should validate if either beneficiary1 has signed the transaction and the current slot is before or at the deadline
 -- or if beneficiary2 has signed the transaction and the deadline has passed.
 mkValidator :: VestingDatum -> () -> ScriptContext -> Bool
-mkValidator _ _ _ = False -- FIX ME!
+mkValidator dat () ctx
+    | (unPaymentPubKeyHash (beneficiary1 dat) `elem` sigs) && (to       (deadline dat) `contains` range) = True
+    | (unPaymentPubKeyHash (beneficiary2 dat) `elem` sigs) && (from (1 + deadline dat) `contains` range) = True
+    | otherwise                                                                                          = False
+  where
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    sigs :: [PubKeyHash]
+    sigs = txInfoSignatories info
+
+    range :: POSIXTimeRange
+    range = txInfoValidRange info
 
 data Vesting
 instance Scripts.ValidatorTypes Vesting where

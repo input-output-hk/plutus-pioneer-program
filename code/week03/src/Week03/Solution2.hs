@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week03.Homework2 where
+module Week03.Solution2 where
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (ToJSON, FromJSON)
@@ -37,7 +37,18 @@ import           Text.Printf          (printf)
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: PaymentPubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
-mkValidator _ _ _ _ = False -- FIX ME!
+mkValidator pkh s () ctx =
+    traceIfFalse "beneficiary's signature missing" checkSig      &&
+    traceIfFalse "deadline not reached"            checkDeadline
+  where
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
+
+    checkSig :: Bool
+    checkSig = unPaymentPubKeyHash pkh `elem` txInfoSignatories info
+
+    checkDeadline :: Bool
+    checkDeadline = from s `contains` txInfoValidRange info
 
 data Vesting
 instance Scripts.ValidatorTypes Vesting where
@@ -45,13 +56,17 @@ instance Scripts.ValidatorTypes Vesting where
     type instance RedeemerType Vesting = ()
 
 typedValidator :: PaymentPubKeyHash -> Scripts.TypedValidator Vesting
-typedValidator = undefined -- IMPLEMENT ME!
+typedValidator p = Scripts.mkTypedValidator @Vesting
+    ($$(PlutusTx.compile [|| mkValidator ||]) `PlutusTx.applyCode` PlutusTx.liftCode p)
+    $$(PlutusTx.compile [|| wrap ||])
+  where
+    wrap = Scripts.wrapValidator @POSIXTime @()
 
 validator :: PaymentPubKeyHash -> Validator
-validator = undefined -- IMPLEMENT ME!
+validator = Scripts.validatorScript . typedValidator
 
 scrAddress :: PaymentPubKeyHash -> Ledger.Address
-scrAddress = undefined -- IMPLEMENT ME!
+scrAddress = scriptAddress . validator
 
 data GiveParams = GiveParams
     { gpBeneficiary :: !PaymentPubKeyHash
