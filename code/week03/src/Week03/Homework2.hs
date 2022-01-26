@@ -36,7 +36,7 @@ import           Text.Printf          (printf)
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 {-# INLINABLE mkValidator #-}
-mkValidator :: PubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
+mkValidator :: PaymentPubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
 mkValidator _ _ _ _ = False -- FIX ME!
 
 data Vesting
@@ -96,7 +96,7 @@ grab = do
     isSuitable :: POSIXTime -> ChainIndexTxOut -> Bool
     isSuitable now o = case _ciTxOutDatum o of
         Left _          -> False
-        Right (Datum d) -> case PlutusTx.fromBuiltinData d of
+        Right (Datum e) -> case PlutusTx.fromBuiltinData e of
             Nothing -> False
             Just d  -> d <= now
 
