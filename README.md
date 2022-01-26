@@ -26,11 +26,15 @@
  - [Part 3 - Handling Time](https://youtu.be/mf06ll-4j2w)
  - [Part 4 - A Vesting Example](https://youtu.be/ae7U_yKIQ0Y)
  - [Part 5 - Parameterized Contracts](https://youtu.be/XqFILXV_ACM)
+ - [Part 6 - Deploying to the Testnet](https://youtu.be/ABtffZPoUqU)
+ - [Part 7 - Homework](https://youtu.be/GGUT2O_0urQ)
+ - [Part 8 - Summary](https://youtu.be/uyaPtayBRb8)
 
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
  - Lecture #2: [Simple Validation](code/week02)
+ - Lecture #3: [Script Contexts & Parameterized Contracts](code/week03)
 
 ## Exercises
 
@@ -58,6 +62,11 @@
 
   - Fix and complete the code in the [Homework1](code/week02/src/Week02/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week02/src/Week02/Homework2.hs) module.
+
+- Week #3
+
+  - Fix and complete the code in the [Homework1](code/week03/src/Week03/Homework1.hs) module.
+  - Fix and complete the code in the [Homework2](code/week03/src/Week03/Homework2.hs) module.
 
 ## Some Plutus Modules
 
