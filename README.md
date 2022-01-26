@@ -26,7 +26,7 @@
  - [Part 3 - Handling Time](https://youtu.be/mf06ll-4j2w)
  - [Part 4 - A Vesting Example](https://youtu.be/ae7U_yKIQ0Y)
  - [Part 5 - Parameterized Contracts](https://youtu.be/XqFILXV_ACM)
- - [Part 6 - Deploying to the Testnet](https://youtu.be/ABtffZPoUqU)
+ - [Part 6 - Deploying to the Cardano Testnet](https://youtu.be/ABtffZPoUqU)
  - [Part 7 - Homework](https://youtu.be/GGUT2O_0urQ)
  - [Part 8 - Summary](https://youtu.be/uyaPtayBRb8)
 
