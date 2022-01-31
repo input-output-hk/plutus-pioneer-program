@@ -7,7 +7,7 @@ import Control.Monad.Freer.Extras as Extras
 import Data.Default               (Default (..))
 import Data.Functor               (void)
 import Ledger.TimeSlot
-import Plutus.Trace.Emulator      as Emulator
+import Plutus.Trace
 import Wallet.Emulator.Wallet
 
 import Week04.Vesting
@@ -29,5 +29,5 @@ myTrace = do
         }
     void $ waitUntilSlot 20
     callEndpoint @"grab" h2 ()
-    s <- waitNSlots 1
+    s <- waitNSlots 2
     Extras.logInfo $ "reached " ++ show s
