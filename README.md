@@ -30,6 +30,11 @@
  - [Part 7 - Homework](https://youtu.be/GGUT2O_0urQ)
  - [Part 8 - Summary](https://youtu.be/uyaPtayBRb8)
 
+### [Lecture #4](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x230-g-U02issX5BiWAgmSi)
+
+ - [Part 1 - Introduction](https://youtu.be/gxMW9uXTEj4)
+ - [Part 2 - Monads](https://youtu.be/f2w-MB3X4a0)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
