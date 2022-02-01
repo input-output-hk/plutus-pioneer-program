@@ -34,6 +34,7 @@
 
  - [Part 1 - Introduction](https://youtu.be/gxMW9uXTEj4)
  - [Part 2 - Monads](https://youtu.be/f2w-MB3X4a0)
+ - [Part 3 - The EmulatorTrace Monad](https://youtu.be/qoUfgaHs1CI)
 
 ## Code Examples
 
