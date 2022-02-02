@@ -36,12 +36,14 @@
  - [Part 2 - Monads](https://youtu.be/f2w-MB3X4a0)
  - [Part 3 - The EmulatorTrace Monad](https://youtu.be/qoUfgaHs1CI)
  - [Part 4 - The Contract Monad](https://youtu.be/yKX5Ce8Y0VQ)
+ - [Part 5 - Homework & Summary](https://youtu.be/sxRLzR0jdiY)
 
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
  - Lecture #2: [Simple Validation](code/week02)
  - Lecture #3: [Script Contexts & Parameterized Contracts](code/week03)
+ - Lecture #4: [Monads, Traces & Contracts](code/week04)
 
 ## Exercises
 
@@ -74,6 +76,11 @@
 
   - Fix and complete the code in the [Homework1](code/week03/src/Week03/Homework1.hs) module.
   - Fix and complete the code in the [Homework2](code/week03/src/Week03/Homework2.hs) module.
+
+- Week #4
+
+  - Implement function `payTrace` in the [Homework](code/week04/src/Week04/Homework.hs) module.
+  - Handle exceptions thrown by `submitTx` in function `payContract` in the same module.
 
 ## Some Plutus Modules
 

@@ -1,9 +1,10 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE NumericUnderscores #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TypeApplications   #-}
+{-# LANGUAGE TypeOperators      #-}
 
 module Week04.Solution where
 
@@ -48,7 +49,7 @@ payTrace x y = do
     void $ Emulator.waitNSlots 1
 
 payTest1 :: IO ()
-payTest1 = runEmulatorTraceIO $ payTrace 1000000 2000000
+payTest1 = runEmulatorTraceIO $ payTrace 10_000_000 20_000_000
 
 payTest2 :: IO ()
-payTest2 = runEmulatorTraceIO $ payTrace 1000000000 2000000
+payTest2 = runEmulatorTraceIO $ payTrace 1000_000_000 20_000_000
