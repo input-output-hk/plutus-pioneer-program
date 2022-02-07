@@ -38,6 +38,13 @@
  - [Part 4 - The Contract Monad](https://youtu.be/yKX5Ce8Y0VQ)
  - [Part 5 - Homework & Summary](https://youtu.be/sxRLzR0jdiY)
 
+### [Lecture #5](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0G8V8CDBnRDZ86POVsrfzw)
+
+ - [Part 1 - Start](https://youtu.be/mGPqi9m0EPw)
+ - [Part 2 - Values](https://youtu.be/4iNTgjovMRg)
+ - [Part 3 - A Simple Minting Policy](https://youtu.be/DBUdFsZpW7A)
+ - [Part 4 - A More Realistic Minting Policy](https://youtu.be/4SROikF8JwE)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
@@ -86,7 +93,9 @@
 
   - `Ledger.Scripts`, contains functions related to untyped Plutus scripts.
   - `Ledger.Typed.Scripts`, contains functions related to typed Plutus scripts.
+  - `Plutus.V1.Ledger.Ada`, contains definitions and functions related to _ADA_-values.
   - `Plutus.V1.Ledger.Interval`, contains the definition of intervals and functions for working with them.
+  - `Plutus.V1.Ledger.Value`, contains definitions and functions related to _values_.
   - `Plutus.V1.Ledger.Time`, contains time-related types and functions.
   - `PlutusTx`, contains important types like `Data` and `BuiltinData`.
   - `PlutusTx.IsData.Class`, contains the `ToData` and `FromData` classes and related functions.
