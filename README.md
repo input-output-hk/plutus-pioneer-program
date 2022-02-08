@@ -44,6 +44,7 @@
  - [Part 2 - Values](https://youtu.be/4iNTgjovMRg)
  - [Part 3 - A Simple Minting Policy](https://youtu.be/DBUdFsZpW7A)
  - [Part 4 - A More Realistic Minting Policy](https://youtu.be/4SROikF8JwE)
+ - [Part 5 - NFT's](https://youtu.be/2lKN0ZL_EQU)
 
 ## Code Examples
 
