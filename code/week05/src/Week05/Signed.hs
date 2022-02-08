@@ -40,7 +40,7 @@ policy :: PaymentPubKeyHash -> Scripts.MintingPolicy
 policy pkh = mkMintingPolicyScript $
     $$(PlutusTx.compile [|| Scripts.wrapMintingPolicy . mkPolicy ||])
     `PlutusTx.applyCode`
-    (PlutusTx.liftCode pkh)
+    PlutusTx.liftCode pkh
 
 curSymbol :: PaymentPubKeyHash -> CurrencySymbol
 curSymbol = scriptCurrencySymbol . policy
@@ -50,9 +50,9 @@ data MintParams = MintParams
     , mpAmount    :: !Integer
     } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
-type SignedSchema = Endpoint "mint" MintParams
+type FreeSchema = Endpoint "mint" MintParams
 
-mint :: MintParams -> Contract w SignedSchema Text ()
+mint :: MintParams -> Contract w FreeSchema Text ()
 mint mp = do
     pkh <- Contract.ownPaymentPubKeyHash
     let val     = Value.singleton (curSymbol pkh) (mpTokenName mp) (mpAmount mp)
@@ -62,12 +62,12 @@ mint mp = do
     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
     Contract.logInfo @String $ printf "forged %s" (show val)
 
-endpoints :: Contract () SignedSchema Text ()
+endpoints :: Contract () FreeSchema Text ()
 endpoints = mint' >> endpoints
   where
     mint' = awaitPromise $ endpoint @"mint" mint
 
-mkSchemaDefinitions ''SignedSchema
+mkSchemaDefinitions ''FreeSchema
 
 mkKnownCurrencies []
 
