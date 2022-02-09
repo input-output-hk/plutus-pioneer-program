@@ -65,7 +65,7 @@ mint mp = do
         else do
             let val     = Value.singleton (curSymbol pkh deadline) (mpTokenName mp) (mpAmount mp)
                 lookups = Constraints.mintingPolicy $ policy pkh deadline
-                tx      = Constraints.mustMintValue val <> Constraints.mustValidateIn (to $ now + 5000)
+                tx      = Constraints.mustMintValue val <> Constraints.mustValidateIn (to $ now + 60000)
             ledgerTx <- submitTxConstraintsWith @Void lookups tx
             void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
             Contract.logInfo @String $ printf "forged %s" (show val)
@@ -82,14 +82,14 @@ mkKnownCurrencies []
 test :: IO ()
 test = runEmulatorTraceIO $ do
     let tn       = "ABC"
-        deadline = slotToBeginPOSIXTime def 10
+        deadline = slotToBeginPOSIXTime def 100
     h <- activateContractWallet (knownWallet 1) endpoints
     callEndpoint @"mint" h $ MintParams
         { mpTokenName = tn
         , mpDeadline  = deadline
         , mpAmount    = 555
         }
-    void $ Emulator.waitNSlots 15
+    void $ Emulator.waitNSlots 110
     callEndpoint @"mint" h $ MintParams
         { mpTokenName = tn
         , mpDeadline  = deadline

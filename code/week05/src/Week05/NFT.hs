@@ -43,8 +43,8 @@ mkPolicy oref tn () ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &
 
     checkMintedAmount :: Bool
     checkMintedAmount = case flattenValue (txInfoMint info) of
-        [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
-        _                -> False
+        [(_, tn', amt)] -> tn' == tn && amt == 1
+        _               -> False
 
 policy :: TxOutRef -> TokenName -> Scripts.MintingPolicy
 policy oref tn = mkMintingPolicyScript $
