@@ -45,6 +45,7 @@
  - [Part 3 - A Simple Minting Policy](https://youtu.be/DBUdFsZpW7A)
  - [Part 4 - A More Realistic Minting Policy](https://youtu.be/4SROikF8JwE)
  - [Part 5 - NFT's](https://youtu.be/2lKN0ZL_EQU)
+ - [Part 6 - Homework](https://youtu.be/j7yT2OqGY6U)
 
 ## Code Examples
 
@@ -52,6 +53,7 @@
  - Lecture #2: [Simple Validation](code/week02)
  - Lecture #3: [Script Contexts & Parameterized Contracts](code/week03)
  - Lecture #4: [Monads, Traces & Contracts](code/week04)
+ - Lecture #5: [Native Tokens](code/week05)
 
 ## Exercises
 
@@ -89,6 +91,11 @@
 
   - Implement function `payTrace` in the [Homework](code/week04/src/Week04/Homework.hs) module.
   - Handle exceptions thrown by `submitTx` in function `payContract` in the same module.
+
+- Week #5
+
+  - Implement a Mary-era-style minting policy in the [Homework1](code/week05/src/Week05/Homework1.hs) module.
+  - Fix the token name to the empty ByteString in the NFT contract in the [Homework2](code/week05/src/Week05/Homework2.hs) module.
 
 ## Some Plutus Modules
 
