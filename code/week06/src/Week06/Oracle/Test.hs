@@ -1,16 +1,12 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE NumericUnderscores    #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 
 module Week06.Oracle.Test where
 
@@ -40,10 +36,10 @@ assetToken :: TokenName
 assetToken = "USDT"
 
 test :: IO ()
-test = runEmulatorTraceIO' def emCfg def myTrace
+test = runEmulatorTraceIO' def emCfg myTrace
   where
     emCfg :: EmulatorConfig
-    emCfg = EmulatorConfig $ Left $ Map.fromList [(Wallet i, v) | i <- [1 .. 10]]
+    emCfg = EmulatorConfig (Left $ Map.fromList [(knownWallet i, v) | i <- [1 .. 10]]) def def
 
     v :: Value
     v = Ada.lovelaceValueOf                    100_000_000 <>
@@ -64,24 +60,33 @@ myTrace = do
                 , opSymbol = assetSymbol
                 , opToken  = assetToken
                 }
+    let w1    = knownWallet 1
+        w2    = knownWallet 2
+        w3    = knownWallet 3
+        w4    = knownWallet 4
+        w5    = knownWallet 5
+        addr1 = mockWalletAddress w1
+        addr3 = mockWalletAddress w3
+        addr4 = mockWalletAddress w4
+        addr5 = mockWalletAddress w5
 
-    h1 <- activateContractWallet (Wallet 1) $ runOracle op
+    h1 <- activateContractWallet (knownWallet 1) $ runOracle op
     void $ Emulator.waitNSlots 1
     oracle <- getOracle h1
 
-    void $ activateContractWallet (Wallet 2) $ checkOracle oracle
+    void $ activateContractWallet w2 $ checkOracle oracle
 
     callEndpoint @"update" h1 1_500_000
     void $ Emulator.waitNSlots 3
 
-    void $ activateContractWallet (Wallet 1) ownFunds'
-    void $ activateContractWallet (Wallet 3) ownFunds'
-    void $ activateContractWallet (Wallet 4) ownFunds'
-    void $ activateContractWallet (Wallet 5) ownFunds'
+    void $ activateContractWallet w1 $ funds' addr1
+    void $ activateContractWallet w3 $ funds' addr3
+    void $ activateContractWallet w4 $ funds' addr4
+    void $ activateContractWallet w5 $ funds' addr5
 
-    h3 <- activateContractWallet (Wallet 3) $ swap oracle
-    h4 <- activateContractWallet (Wallet 4) $ swap oracle
-    h5 <- activateContractWallet (Wallet 5) $ swap oracle
+    h3 <- activateContractWallet w3 $ swap oracle addr3
+    h4 <- activateContractWallet w4 $ swap oracle addr4
+    h5 <- activateContractWallet w5 $ swap oracle addr5
 
     callEndpoint @"offer" h3 10_000_000
     callEndpoint @"offer" h4 20_000_000

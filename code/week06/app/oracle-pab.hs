@@ -36,7 +36,7 @@ import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import qualified Plutus.Contracts.Currency           as Currency
 
-import           Wallet.Emulator.Types               (Wallet (..), walletPubKey)
+import           Wallet.Emulator.Types               (Wallet (..))
 import           Wallet.Types                        (ContractInstanceId (..))
 
 import qualified Week06.Oracle.Core                  as Oracle

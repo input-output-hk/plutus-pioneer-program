@@ -12,8 +12,8 @@
 {-# LANGUAGE TypeOperators         #-}
 
 module Week06.Oracle.Funds
-    ( ownFunds
-    , ownFunds'
+    ( funds
+    , funds'
     ) where
 
 import           Control.Monad    hiding (fmap)
@@ -26,16 +26,15 @@ import           Prelude          (Show (..), String, (<$>))
 import           Ledger           hiding (singleton)
 import           Ledger.Value     as Value
 
-ownFunds :: Contract w s Text Value
-ownFunds = do
-    pk    <- ownPubKey
-    utxos <- utxoAt $ pubKeyAddress pk
-    let v = mconcat $ Map.elems $ txOutValue . txOutTxOut <$> utxos
-    logInfo @String $ "own funds: " ++ show (Value.flattenValue v)
+funds :: Address -> Contract w s Text Value
+funds addr = do
+    utxos <- utxosAt addr
+    let v = mconcat $ Map.elems $ _ciTxOutValue <$> utxos
+    logInfo @String $ "funds at " ++ show addr ++ ": " ++ show (Value.flattenValue v)
     return v
 
-ownFunds' :: Contract (Last Value) Empty Text ()
-ownFunds' = do
-    handleError logError $ ownFunds >>= tell . Last . Just
+funds' :: Address -> Contract (Last Value) Empty Text a
+funds' addr = do
+    handleError logError $ funds addr >>= tell . Last . Just
     void $ Contract.waitNSlots 1
-    ownFunds'
+    funds' addr
