@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
 
-module Week06.Oracle.Test where
+module Week06.Test where
 
 import           Control.Monad              hiding (fmap)
 import           Control.Monad.Freer.Extras as Extras
@@ -25,9 +25,10 @@ import           PlutusTx.Prelude           hiding (Semigroup(..), unless)
 import           Prelude                    (IO, Semigroup(..), Show (..))
 import           Wallet.Emulator.Wallet
 
-import           Week06.Oracle.Core
-import           Week06.Oracle.Funds
-import           Week06.Oracle.Swap
+import           Week06.Core
+import           Week06.Funds
+import           Week06.Swap
+import           Week06.Token
 
 assetSymbol :: CurrencySymbol
 assetSymbol = "ff"
@@ -35,8 +36,8 @@ assetSymbol = "ff"
 assetToken :: TokenName
 assetToken = "USDT"
 
-test :: IO ()
-test = runEmulatorTraceIO' def emCfg myTrace
+testOracle :: IO ()
+testOracle = runEmulatorTraceIO' def emCfg myOracleTrace
   where
     emCfg :: EmulatorConfig
     emCfg = EmulatorConfig (Left $ Map.fromList [(knownWallet i, v) | i <- [1 .. 10]]) def def
@@ -44,6 +45,18 @@ test = runEmulatorTraceIO' def emCfg myTrace
     v :: Value
     v = Ada.lovelaceValueOf                    100_000_000 <>
         Value.singleton assetSymbol assetToken 100_000_000
+
+testToken :: IO ()
+testToken = runEmulatorTraceIO myTokenTrace
+
+myTokenTrace :: EmulatorTrace ()
+myTokenTrace = do
+    let w1 = knownWallet 1
+    void $ activateContractWallet w1 $ mintToken TokenParams
+        { tpToken   = "USDT"
+        , tpAmount  = 100_000
+        , tpAddress = mockWalletAddress w1
+        }
 
 checkOracle :: Oracle -> Contract () Empty Text a
 checkOracle oracle = do
@@ -53,8 +66,8 @@ checkOracle oracle = do
         Just (_, _, x) -> Contract.logInfo $ "Oracle value: " ++ show x
     Contract.waitNSlots 1 >> checkOracle oracle
 
-myTrace :: EmulatorTrace ()
-myTrace = do
+myOracleTrace :: EmulatorTrace ()
+myOracleTrace = do
     let op = OracleParams
                 { opFees = 1_000_000
                 , opSymbol = assetSymbol

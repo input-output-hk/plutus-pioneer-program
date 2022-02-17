@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week06.Oracle.Funds
+module Week06.Funds
     ( funds
     , funds'
     ) where

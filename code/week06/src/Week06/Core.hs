@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week06.Oracle.Core
+module Week06.Core
     ( Oracle (..)
     , OracleRedeemer (..)
     , oracleTokenName
@@ -31,6 +31,7 @@ import           Control.Monad             hiding (fmap)
 import           Data.Aeson                (FromJSON, ToJSON)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
+import           Data.OpenApi.Schema       (ToSchema)
 import           Data.Text                 (Text, pack)
 import           GHC.Generics              (Generic)
 import           Plutus.Contract           as Contract
@@ -50,7 +51,7 @@ data Oracle = Oracle
     , oOperator :: !PaymentPubKeyHash
     , oFee      :: !Integer
     , oAsset    :: !AssetClass
-    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
+    } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord, ToSchema)
 
 PlutusTx.makeLift ''Oracle
 
@@ -139,7 +140,7 @@ data OracleParams = OracleParams
     { opFees   :: !Integer
     , opSymbol :: !CurrencySymbol
     , opToken  :: !TokenName
-    } deriving (Show, Generic, FromJSON, ToJSON)
+    } deriving (Show, Prelude.Eq, Prelude.Ord, Generic, FromJSON, ToJSON, ToSchema)
 
 startOracle :: forall w s. OracleParams -> Contract w s Text Oracle
 startOracle op = do

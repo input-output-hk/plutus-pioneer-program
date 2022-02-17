@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
-module Week06.Oracle.Swap
+module Week06.Swap
     ( SwapSchema
     , swap
     ) where
@@ -33,8 +33,8 @@ import           Ledger.Ada           as Ada hiding (divide)
 import           Ledger.Value         as Value
 import           Prelude              (Semigroup (..), Show (..), String)
 
-import           Week06.Oracle.Core
-import           Week06.Oracle.Funds
+import           Week06.Core
+import           Week06.Funds
 
 {-# INLINABLE price #-}
 price :: Integer -> Integer -> Integer

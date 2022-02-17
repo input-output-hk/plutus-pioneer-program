@@ -14,6 +14,16 @@ module Main
     ( main
     ) where
 
+import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
+import           Plutus.PAB.Run                      (runWith)
+
+import           Week06.PAB                          (OracleContracts)
+
+main :: IO ()
+main = do
+    runWith (Builtin.handleBuiltin @OracleContracts)
+
+{-
 import           Control.Monad                       (forM_, void, when)
 import           Control.Monad.Freer                 (Eff, Member, interpret, type (~>))
 import           Control.Monad.Freer.Error           (Error)
@@ -44,7 +54,8 @@ import           Week06.Oracle.PAB                   (OracleContracts (..))
 import qualified Week06.Oracle.Swap                  as Oracle
 
 main :: IO ()
-main = void $ Simulator.runSimulationWith handlers $ do
+main = return ()
+ void $ Simulator.runSimulationWith handlers $ do
     Simulator.logString @(Builtin OracleContracts) "Starting Oracle PAB webserver. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
@@ -122,3 +133,4 @@ initContract = do
   where
     amount :: Integer
     amount = 100_000_000
+-}

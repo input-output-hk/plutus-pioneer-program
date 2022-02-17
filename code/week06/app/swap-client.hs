@@ -22,7 +22,7 @@ import System.Environment                      (getArgs)
 import System.IO
 import Text.Read                               (readMaybe)
 
-import Week06.Oracle.PAB                       (OracleContracts)
+import Week06.PAB                              (OracleContracts)
 
 main :: IO ()
 main = do
