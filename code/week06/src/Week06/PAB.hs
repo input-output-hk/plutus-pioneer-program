@@ -27,7 +27,7 @@ instance HasDefinitions OracleContracts where
 
     getDefinitions = []
 
-    getContract (Mint tp)     = SomeBuiltin $ Token.mintToken tp
+    getContract (Mint tp)     = SomeBuiltin $ Token.mintToken @() @Empty tp
     getContract (Oracle op)   = SomeBuiltin $ Oracle.runOracle op
     getContract (Swap o addr) = SomeBuiltin $ Swap.swap o addr
 

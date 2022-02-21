@@ -1,5 +1,5 @@
 #!/bin/bash
 
-cabal exec -- oracle-pab \
+cabal run -- oracle-pab \
   --config testnet/pab-config.yml webserver \
   --passphrase pab123456789

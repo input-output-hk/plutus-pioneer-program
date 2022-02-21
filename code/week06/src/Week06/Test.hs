@@ -52,7 +52,7 @@ testToken = runEmulatorTraceIO myTokenTrace
 myTokenTrace :: EmulatorTrace ()
 myTokenTrace = do
     let w1 = knownWallet 1
-    void $ activateContractWallet w1 $ mintToken TokenParams
+    void $ activateContractWallet w1 $ void $ mintToken @() @Empty TokenParams
         { tpToken   = "USDT"
         , tpAmount  = 100_000
         , tpAddress = mockWalletAddress w1
@@ -68,11 +68,6 @@ checkOracle oracle = do
 
 myOracleTrace :: EmulatorTrace ()
 myOracleTrace = do
-    let op = OracleParams
-                { opFees = 1_000_000
-                , opSymbol = assetSymbol
-                , opToken  = assetToken
-                }
     let w1    = knownWallet 1
         w2    = knownWallet 2
         w3    = knownWallet 3
@@ -82,6 +77,12 @@ myOracleTrace = do
         addr3 = mockWalletAddress w3
         addr4 = mockWalletAddress w4
         addr5 = mockWalletAddress w5
+        op    = OracleParams
+                { opFees    = 1_000_000
+                , opSymbol  = assetSymbol
+                , opToken   = assetToken
+                , opAddress = addr1
+                }
 
     h1 <- activateContractWallet (knownWallet 1) $ runOracle op
     void $ Emulator.waitNSlots 1

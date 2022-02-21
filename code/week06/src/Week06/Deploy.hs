@@ -11,16 +11,14 @@ module Week06.Deploy
     ) where
 
 import           Cardano.Api                 as API
-import           Cardano.Api.Shelley         (Address (..), PlutusScript (..))
+import           Cardano.Api.Shelley         (Address (..))
 import           Cardano.Crypto.Hash.Class   (hashToBytes)
 import           Cardano.Ledger.Credential   as Ledger
 import           Cardano.Ledger.Crypto       (StandardCrypto)
 import           Cardano.Ledger.Hashes       (ScriptHash (..))
 import           Cardano.Ledger.Keys         (KeyHash (..))
-import           Codec.Serialise             (serialise)
 import           Data.Aeson                  (encode)
 import qualified Data.ByteString.Lazy        as LBS
-import qualified Data.ByteString.Short       as SBS
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (pack)
 import           Plutus.V1.Ledger.Credential as Plutus
@@ -69,9 +67,10 @@ writeOracleParams file = LBS.writeFile file . encode
 
 oracleParams :: OracleParams
 oracleParams = OracleParams
-    { opFees   = 1_000_000
-    , opSymbol = "71066256d2f4850c731819a8e6de155c97ea1ee53dd3dd903f8e3258"
-    , opToken  = "USDT"
+    { opFees    = 1_000_000
+    , opSymbol  = "71066256d2f4850c731819a8e6de155c97ea1ee53dd3dd903f8e3258"
+    , opToken   = "USDT"
+    , opAddress = unsafeReadAddress "addr_test1qzj356wpdmhdchvmc355xx6wel7cqvepyrlam84aygkvx9d04w7v8cu4fshxvv5ukfw05nyzh07zy427mf2eqkcd27aqax2r7e"
     }
 
 writeTokenParams :: FilePath -> TokenParams -> IO ()

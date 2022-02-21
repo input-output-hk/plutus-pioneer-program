@@ -27,24 +27,25 @@ module Week06.Core
     , findOracle
     ) where
 
-import           Control.Monad             hiding (fmap)
-import           Data.Aeson                (FromJSON, ToJSON)
-import qualified Data.Map                  as Map
-import           Data.Monoid               (Last (..))
-import           Data.OpenApi.Schema       (ToSchema)
-import           Data.Text                 (Text, pack)
-import           GHC.Generics              (Generic)
-import           Plutus.Contract           as Contract
+import           Control.Monad        hiding (fmap)
+import           Data.Aeson           (FromJSON, ToJSON)
+import qualified Data.Map             as Map
+import           Data.Monoid          (Last (..))
+import           Data.OpenApi.Schema  (ToSchema)
+import           Data.Text            (Text)
+import           GHC.Generics         (Generic)
+import           Plutus.Contract      as Contract
 import qualified PlutusTx
-import           PlutusTx.Prelude          hiding (Semigroup(..), unless)
-import           Ledger                    hiding (singleton)
-import           Ledger.Constraints        as Constraints
-import qualified Ledger.Typed.Scripts      as Scripts
-import           Ledger.Value              as Value
-import           Ledger.Ada                as Ada
-import           Plutus.Contracts.Currency as Currency
-import           Prelude                   (Semigroup (..), Show (..), String)
+import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import           Ledger               hiding (singleton)
+import           Ledger.Constraints   as Constraints
+import qualified Ledger.Typed.Scripts as Scripts
+import           Ledger.Value         as Value
+import           Ledger.Ada           as Ada
+import           Prelude              (Semigroup (..), Show (..), String)
 import qualified Prelude
+
+import           Week06.Token
 
 data Oracle = Oracle
     { oSymbol   :: !CurrencySymbol
@@ -137,17 +138,22 @@ oracleAddress :: Oracle -> Ledger.Address
 oracleAddress = scriptAddress . oracleValidator
 
 data OracleParams = OracleParams
-    { opFees   :: !Integer
-    , opSymbol :: !CurrencySymbol
-    , opToken  :: !TokenName
+    { opFees    :: !Integer
+    , opSymbol  :: !CurrencySymbol
+    , opToken   :: !TokenName
+    , opAddress :: !Address
     } deriving (Show, Prelude.Eq, Prelude.Ord, Generic, FromJSON, ToJSON, ToSchema)
 
 startOracle :: forall w s. OracleParams -> Contract w s Text Oracle
 startOracle op = do
+    let tp = TokenParams
+            { tpToken   = oracleTokenName
+            , tpAmount  = 1
+            , tpAddress = opAddress op
+            }
+    cs  <- mintToken tp
     pkh <- Contract.ownPaymentPubKeyHash
-    osc <- mapError (pack . show) (mintContract pkh [(oracleTokenName, 1)] :: Contract w s CurrencyError OneShotCurrency)
-    let cs     = Currency.currencySymbol osc
-        oracle = Oracle
+    let oracle = Oracle
             { oSymbol   = cs
             , oOperator = pkh
             , oFee      = opFees op
