@@ -14,16 +14,16 @@ curl -X 'POST' \
         "contents": {
             "tpToken": {"unTokenName": "'"$tn"'"},
             "tpAddress": {
+                "addressCredential": {
+                    "contents": {"getPubKeyHash": "a51a69c16eeedc5d9bc469431b4ecffd80332120ffdd9ebd222cc315"},
+                    "tag": "PubKeyCredential"
+                },
                 "addressStakingCredential": {
                     "contents": {
                         "contents": {"getPubKeyHash": "afabbcc3e3954c2e66329cb25cfa4c82bbfc22555eda55905b0d57ba"},
                         "tag": "PubKeyCredential"
                     },
                     "tag": "StakingHash"
-                },
-                "addressCredential": {
-                    "contents": {"getPubKeyHash": "a51a69c16eeedc5d9bc469431b4ecffd80332120ffdd9ebd222cc315"},
-                    "tag": "PubKeyCredential"
                 }
             },
             "tpAmount": '"$1"'

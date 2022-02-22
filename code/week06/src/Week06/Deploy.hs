@@ -5,6 +5,7 @@
 module Week06.Deploy
     ( writeJSON
     , writeOracleParams
+    , walletAddress
     , oracleParams
     , writeTokenParams
     , tokenParams
@@ -56,6 +57,9 @@ tryReadAddress x = case deserialiseAddress AsAddressAny $ pack x of
         , Plutus.addressStakingCredential = stakeReferenceLedgerToPlutus s
         }
 
+walletAddress :: Plutus.Address
+walletAddress = unsafeReadAddress "addr_test1qzj356wpdmhdchvmc355xx6wel7cqvepyrlam84aygkvx9d04w7v8cu4fshxvv5ukfw05nyzh07zy427mf2eqkcd27aqax2r7e"
+
 unsafeReadAddress :: String -> Plutus.Address
 unsafeReadAddress s = fromMaybe (error $ "can't parse " ++ s ++ " as an address") $ tryReadAddress s
 
@@ -70,7 +74,7 @@ oracleParams = OracleParams
     { opFees    = 1_000_000
     , opSymbol  = "71066256d2f4850c731819a8e6de155c97ea1ee53dd3dd903f8e3258"
     , opToken   = "USDT"
-    , opAddress = unsafeReadAddress "addr_test1qzj356wpdmhdchvmc355xx6wel7cqvepyrlam84aygkvx9d04w7v8cu4fshxvv5ukfw05nyzh07zy427mf2eqkcd27aqax2r7e"
+    , opAddress = walletAddress
     }
 
 writeTokenParams :: FilePath -> TokenParams -> IO ()
@@ -80,5 +84,5 @@ tokenParams :: TokenParams
 tokenParams = TokenParams
     { tpToken   = "USDT"
     , tpAmount  = 100_000
-    , tpAddress = unsafeReadAddress "addr_test1qzj356wpdmhdchvmc355xx6wel7cqvepyrlam84aygkvx9d04w7v8cu4fshxvv5ukfw05nyzh07zy427mf2eqkcd27aqax2r7e"
+    , tpAddress = walletAddress
     }
