@@ -44,6 +44,7 @@ import           Ledger.Value         as Value
 import           Ledger.Ada           as Ada
 import           Prelude              (Semigroup (..), Show (..), String)
 import qualified Prelude
+import           Text.Printf          (printf)
 
 import           Week06.Token
 
@@ -165,12 +166,11 @@ startOracle op = do
 updateOracle :: forall w s. Oracle -> Integer -> Contract w s Text ()
 updateOracle oracle x = do
     m <- findOracle oracle
-    let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1 <> lovelaceValueOf 2_000_000
+    let c = Constraints.mustPayToTheScript x $ assetClassValue (oracleAsset oracle) 1
     case m of
         Nothing -> do
-            ledgerTx <- submitTxConstraints (typedOracleValidator oracle) c
-            awaitTxConfirmed $ getCardanoTxId ledgerTx
-            logInfo @String $ "set initial oracle value to " ++ show x
+            void $ adjustAndSubmit (typedOracleValidator oracle) c
+            logInfo @String $ printf "set initial oracle value to %d" x
         Just (oref, o,  _) -> do
             let lookups = Constraints.unspentOutputs (Map.singleton oref o)     <>
                           Constraints.typedValidatorLookups (typedOracleValidator oracle) <>

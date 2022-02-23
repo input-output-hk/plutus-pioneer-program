@@ -15,6 +15,7 @@ module Week06.Token
     ( tokenPolicy
     , tokenCurSymbol
     , TokenParams (..)
+    , adjustAndSubmit, adjustAndSubmitWith
     , mintToken
     ) where
 
@@ -36,7 +37,7 @@ import           Ledger.Constraints          as Constraints
 import qualified Ledger.Typed.Scripts        as Scripts
 import           Ledger.Value                as Value
 import           Prelude                     (Semigroup (..), Show (..), String)
-import qualified Prelude                     as Prelude
+import qualified Prelude
 import           Text.Printf                 (printf)
 
 {-# INLINABLE mkTokenPolicy #-}
@@ -74,6 +75,33 @@ data TokenParams = TokenParams
     , tpAddress :: !Address
     } deriving (Prelude.Eq, Prelude.Ord, Generic, FromJSON, ToJSON, ToSchema, Show)
 
+adjustAndSubmitWith :: ( PlutusTx.FromData (Scripts.DatumType a)
+                       , PlutusTx.ToData (Scripts.RedeemerType a)
+                       , PlutusTx.ToData (Scripts.DatumType a)
+                       , AsContractError e
+                       )
+                    => ScriptLookups a
+                    -> TxConstraints (Scripts.RedeemerType a) (Scripts.DatumType a)
+                    -> Contract w s e CardanoTx
+adjustAndSubmitWith lookups constraints = do
+    unbalanced <- adjustUnbalancedTx <$> mkTxConstraints lookups constraints
+    Contract.logDebug @String $ printf "unbalanced: %s" $ show unbalanced
+    unsigned <- balanceTx unbalanced
+    Contract.logDebug @String $ printf "balanced: %s" $ show unsigned
+    signed <- submitBalancedTx unsigned
+    Contract.logDebug @String $ printf "signed: %s" $ show signed
+    return signed
+
+adjustAndSubmit :: ( PlutusTx.FromData (Scripts.DatumType a)
+                   , PlutusTx.ToData (Scripts.RedeemerType a)
+                   , PlutusTx.ToData (Scripts.DatumType a)
+                   , AsContractError e
+                   )
+                => Scripts.TypedValidator a
+                -> TxConstraints (Scripts.RedeemerType a) (Scripts.DatumType a)
+                -> Contract w s e CardanoTx
+adjustAndSubmit inst = adjustAndSubmitWith $ Constraints.typedValidatorLookups inst
+
 mintToken :: TokenParams -> Contract w s Text CurrencySymbol
 mintToken tp = do
     Contract.logDebug @String $ printf "started minting: %s" $ show tp
@@ -98,15 +126,7 @@ mintToken tp = do
                               Constraints.mustSpendPubKeyOutput oref <>
                               c
 
-            unbalanced <- adjustUnbalancedTx <$> mkTxConstraints @Void lookups constraints
-            Contract.logDebug @String $ printf "unbalanced: %s" $ show unbalanced
-
-            unsigned <- balanceTx unbalanced
-            Contract.logDebug @String $ printf "balanced: %s" $ show unsigned
-
-            signed <- submitBalancedTx unsigned
-            Contract.logDebug @String $ printf "signed: %s" $ show signed
-
+            void $ adjustAndSubmitWith @Void lookups constraints
             Contract.logInfo @String $ printf "minted %s" (show val)
             return cs
 

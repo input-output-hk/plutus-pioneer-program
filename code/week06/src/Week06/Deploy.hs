@@ -3,8 +3,11 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 module Week06.Deploy
-    ( writeJSON
+    ( tryReadAddress, unsafeReadAddress
+    , tryReadWalletId, unsafeReadWalletId
+    , writeJSON
     , writeOracleParams
+    , wallet
     , walletAddress
     , oracleParams
     , writeTokenParams
@@ -18,7 +21,7 @@ import           Cardano.Ledger.Credential   as Ledger
 import           Cardano.Ledger.Crypto       (StandardCrypto)
 import           Cardano.Ledger.Hashes       (ScriptHash (..))
 import           Cardano.Ledger.Keys         (KeyHash (..))
-import           Data.Aeson                  (encode)
+import           Data.Aeson                  (decode, encode)
 import qualified Data.ByteString.Lazy        as LBS
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (pack)
@@ -28,6 +31,7 @@ import           PlutusTx                    (Data (..))
 import qualified PlutusTx
 import           PlutusTx.Builtins           (toBuiltin)
 import qualified Ledger                      as Plutus
+import           Wallet.Emulator.Wallet      (WalletId (..), Wallet (..))
 
 import           Week06.Core                 (OracleParams (..))
 import           Week06.Token                (TokenParams (..))
@@ -56,6 +60,15 @@ tryReadAddress x = case deserialiseAddress AsAddressAny $ pack x of
         { Plutus.addressCredential        = credentialLedgerToPlutus p
         , Plutus.addressStakingCredential = stakeReferenceLedgerToPlutus s
         }
+
+tryReadWalletId :: String -> Maybe WalletId
+tryReadWalletId = decode . encode
+
+unsafeReadWalletId :: String -> WalletId
+unsafeReadWalletId s = fromMaybe (error $ "can't parse " ++ s ++ " as a WalletId") $ tryReadWalletId s
+
+wallet :: Wallet
+wallet = Wallet $ unsafeReadWalletId "7cc75497535877261173ab585f5abb431f7ba484"
 
 walletAddress :: Plutus.Address
 walletAddress = unsafeReadAddress "addr_test1qzj356wpdmhdchvmc355xx6wel7cqvepyrlam84aygkvx9d04w7v8cu4fshxvv5ukfw05nyzh07zy427mf2eqkcd27aqax2r7e"
