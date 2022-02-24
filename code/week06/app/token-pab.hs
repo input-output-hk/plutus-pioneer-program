@@ -1,14 +1,10 @@
 {-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE TypeOperators      #-}
 
 module Main
     ( main
@@ -17,11 +13,11 @@ module Main
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Run                      (runWith)
 
-import           Week06.PAB                          (OracleContracts)
+import           Week06.PAB                          (TokenContracts)
 
 main :: IO ()
 main = do
-    runWith (Builtin.handleBuiltin @OracleContracts)
+    runWith (Builtin.handleBuiltin @TokenContracts)
 
 {-
 import           Control.Monad                       (forM_, void, when)

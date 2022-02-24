@@ -3,18 +3,13 @@
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE TypeOperators       #-}
 
-module Week06.Token
-    ( tokenPolicy
-    , tokenCurSymbol
-    , TokenParams (..)
+module Week06.Token.OffChain
+    ( TokenParams (..)
     , adjustAndSubmit, adjustAndSubmitWith
     , mintToken
     ) where
@@ -29,7 +24,6 @@ import           Data.Void                   (Void)
 import           GHC.Generics                (Generic)
 import           Plutus.Contract             as Contract
 import           Plutus.Contract.Wallet      (getUnspentOutput)
-import           Plutus.V1.Ledger.Credential
 import qualified PlutusTx
 import           PlutusTx.Prelude            hiding (Semigroup(..), unless)
 import           Ledger                      hiding (mint, singleton)
@@ -40,34 +34,8 @@ import           Prelude                     (Semigroup (..), Show (..), String)
 import qualified Prelude
 import           Text.Printf                 (printf)
 
-{-# INLINABLE mkTokenPolicy #-}
-mkTokenPolicy :: TxOutRef -> TokenName -> Integer -> () -> ScriptContext -> Bool
-mkTokenPolicy oref tn amt () ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
-                                   traceIfFalse "wrong amount minted" checkMintedAmount
-  where
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
-
-    hasUTxO :: Bool
-    hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
-
-    checkMintedAmount :: Bool
-    checkMintedAmount = case flattenValue (txInfoMint info) of
-        [(_, tn', amt')] -> tn' == tn && amt' == amt
-        _                -> False
-
-tokenPolicy :: TxOutRef -> TokenName -> Integer -> Scripts.MintingPolicy
-tokenPolicy oref tn amt = mkMintingPolicyScript $
-    $$(PlutusTx.compile [|| \oref' tn' amt' -> Scripts.wrapMintingPolicy $ mkTokenPolicy oref' tn' amt' ||])
-    `PlutusTx.applyCode`
-    PlutusTx.liftCode oref
-    `PlutusTx.applyCode`
-    PlutusTx.liftCode tn
-    `PlutusTx.applyCode`
-    PlutusTx.liftCode amt
-
-tokenCurSymbol :: TxOutRef -> TokenName -> Integer -> CurrencySymbol
-tokenCurSymbol oref tn = scriptCurrencySymbol . tokenPolicy oref tn
+import           Week06.Token.OnChain
+import           Week06.Utils                (getCredentials)
 
 data TokenParams = TokenParams
     { tpToken   :: !TokenName
@@ -129,17 +97,3 @@ mintToken tp = do
             void $ adjustAndSubmitWith @Void lookups constraints
             Contract.logInfo @String $ printf "minted %s" (show val)
             return cs
-
-getCredentials :: Address -> Maybe (PaymentPubKeyHash, Maybe StakePubKeyHash)
-getCredentials (Address x y) = case x of
-    ScriptCredential _   -> Nothing
-    PubKeyCredential pkh ->
-      let
-        ppkh = PaymentPubKeyHash pkh
-      in
-        case y of
-            Nothing                 -> Just (ppkh, Nothing)
-            Just (StakingPtr _ _ _) -> Nothing
-            Just (StakingHash h)    -> case h of
-                ScriptCredential _    -> Nothing
-                PubKeyCredential pkh' -> Just (ppkh, Just $ StakePubKeyHash pkh')

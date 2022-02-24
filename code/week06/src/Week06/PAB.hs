@@ -3,34 +3,34 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Week06.PAB
-    ( OracleContracts (..)
+    ( Address
+    , TokenParams (..)
+    , TokenContracts (..)
     ) where
 
 import           Data.Aeson                          (FromJSON, ToJSON)
 import           Data.OpenApi.Schema                 (ToSchema)
 import           GHC.Generics                        (Generic)
+import           Ledger                              (Address)
 import           Plutus.PAB.Effects.Contract.Builtin (Empty, HasDefinitions (..), SomeBuiltin (..), endpointsToSchemas)
 import           Prettyprinter                       (Pretty (..), viaShow)
-import           Ledger                              (Address)
 
-import qualified Week06.Core                         as Oracle
-import qualified Week06.Swap                         as Swap
-import qualified Week06.Token                        as Token
+import qualified Week06.Monitor                      as Monitor
+import qualified Week06.Token.OffChain               as Token
+import Week06.Token.OffChain (TokenParams(TokenParams))
 
-data OracleContracts = Mint Token.TokenParams | Oracle Oracle.OracleParams | Swap Oracle.Oracle Address
+data TokenContracts = Mint Token.TokenParams | Monitor Address
     deriving (Eq, Ord, Show, Generic, FromJSON, ToJSON, ToSchema)
 
-instance Pretty OracleContracts where
+instance Pretty TokenContracts where
     pretty = viaShow
 
-instance HasDefinitions OracleContracts where
+instance HasDefinitions TokenContracts where
 
-    getDefinitions = []
+    getDefinitions        = []
 
-    getContract (Mint tp)     = SomeBuiltin $ Token.mintToken @() @Empty tp
-    getContract (Oracle op)   = SomeBuiltin $ Oracle.runOracle op
-    getContract (Swap o addr) = SomeBuiltin $ Swap.swap o addr
+    getContract (Mint tp)      = SomeBuiltin $ Token.mintToken @() @Empty tp
+    getContract (Monitor addr) = SomeBuiltin $ Monitor.monitor addr
 
-    getSchema (Mint _)   = endpointsToSchemas @Empty
-    getSchema (Oracle _) = endpointsToSchemas @Oracle.OracleSchema
-    getSchema (Swap _ _) = endpointsToSchemas @Swap.SwapSchema
+    getSchema (Mint _)    = endpointsToSchemas @Empty
+    getSchema (Monitor _) = endpointsToSchemas @Empty

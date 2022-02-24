@@ -1,17 +1,12 @@
-{-# LANGUAGE GADTs              #-}
-{-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE GADTs #-}
 
-module Week06.Deploy
+module Week06.Utils
     ( tryReadAddress, unsafeReadAddress
     , tryReadWalletId, unsafeReadWalletId
     , writeJSON
-    , writeOracleParams
-    , wallet
-    , walletAddress
-    , oracleParams
-    , writeTokenParams
-    , tokenParams
+    , contractActivationArgs
+    , getCredentials, unsafePaymentPubKeyHash, unsafeStakePubKeyHash
+    , cidToString
     ) where
 
 import           Cardano.Api                 as API
@@ -25,6 +20,7 @@ import           Data.Aeson                  (decode, encode)
 import qualified Data.ByteString.Lazy        as LBS
 import           Data.Maybe                  (fromMaybe)
 import           Data.Text                   (pack)
+import           Plutus.PAB.Webserver.Types  (ContractActivationArgs (..))
 import           Plutus.V1.Ledger.Credential as Plutus
 import           Plutus.V1.Ledger.Crypto     as Plutus
 import           PlutusTx                    (Data (..))
@@ -32,9 +28,7 @@ import qualified PlutusTx
 import           PlutusTx.Builtins           (toBuiltin)
 import qualified Ledger                      as Plutus
 import           Wallet.Emulator.Wallet      (WalletId (..), Wallet (..))
-
-import           Week06.Core                 (OracleParams (..))
-import           Week06.Token                (TokenParams (..))
+import           Wallet.Types                (ContractInstanceId (..))
 
 dataToScriptData :: Data -> ScriptData
 dataToScriptData (Constr n xs) = ScriptDataConstructor n $ dataToScriptData <$> xs
@@ -67,35 +61,40 @@ tryReadWalletId = decode . encode
 unsafeReadWalletId :: String -> WalletId
 unsafeReadWalletId s = fromMaybe (error $ "can't parse " ++ s ++ " as a WalletId") $ tryReadWalletId s
 
-wallet :: Wallet
-wallet = Wallet $ unsafeReadWalletId "7cc75497535877261173ab585f5abb431f7ba484"
-
-walletAddress :: Plutus.Address
-walletAddress = unsafeReadAddress "addr_test1qzj356wpdmhdchvmc355xx6wel7cqvepyrlam84aygkvx9d04w7v8cu4fshxvv5ukfw05nyzh07zy427mf2eqkcd27aqax2r7e"
-
 unsafeReadAddress :: String -> Plutus.Address
 unsafeReadAddress s = fromMaybe (error $ "can't parse " ++ s ++ " as an address") $ tryReadAddress s
 
 writeJSON :: PlutusTx.ToData a => FilePath -> a -> IO ()
 writeJSON file = LBS.writeFile file . encode . scriptDataToJson ScriptDataJsonDetailedSchema . dataToScriptData . PlutusTx.toData
 
-writeOracleParams :: FilePath -> OracleParams -> IO ()
-writeOracleParams file = LBS.writeFile file . encode
-
-oracleParams :: OracleParams
-oracleParams = OracleParams
-    { opFees    = 1_000_000
-    , opSymbol  = "71066256d2f4850c731819a8e6de155c97ea1ee53dd3dd903f8e3258"
-    , opToken   = "USDT"
-    , opAddress = walletAddress
+contractActivationArgs :: WalletId -> a -> ContractActivationArgs a
+contractActivationArgs wid a = ContractActivationArgs
+    { caID = a
+    , caWallet = Just $ Wallet {getWalletId = wid}
     }
 
-writeTokenParams :: FilePath -> TokenParams -> IO ()
-writeTokenParams file = LBS.writeFile file . encode
+getCredentials :: Plutus.Address -> Maybe (Plutus.PaymentPubKeyHash, Maybe Plutus.StakePubKeyHash)
+getCredentials (Plutus.Address x y) = case x of
+    ScriptCredential _   -> Nothing
+    PubKeyCredential pkh ->
+      let
+        ppkh = Plutus.PaymentPubKeyHash pkh
+      in
+        case y of
+            Nothing                        -> Just (ppkh, Nothing)
+            Just (Plutus.StakingPtr _ _ _) -> Nothing
+            Just (StakingHash h)           -> case h of
+                ScriptCredential _    -> Nothing
+                PubKeyCredential pkh' -> Just (ppkh, Just $ Plutus.StakePubKeyHash pkh')
 
-tokenParams :: TokenParams
-tokenParams = TokenParams
-    { tpToken   = "USDT"
-    , tpAmount  = 100_000
-    , tpAddress = walletAddress
-    }
+unsafePaymentPubKeyHash :: Plutus.Address -> Plutus.PaymentPubKeyHash
+unsafePaymentPubKeyHash addr = maybe (error $ "script address " ++ show addr ++ " does not contain a payment key") fst $ getCredentials addr
+
+unsafeStakePubKeyHash :: Plutus.Address -> Plutus.StakePubKeyHash
+unsafeStakePubKeyHash addr = case getCredentials addr of
+    Nothing           -> error $ "unexpected script address " ++ show addr
+    Just (_, Nothing) -> error $ "addres " ++ show addr ++ " contains no stake component"
+    Just (_, Just x)  -> x
+
+cidToString :: ContractInstanceId -> String
+cidToString = show . unContractInstanceId
