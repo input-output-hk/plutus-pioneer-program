@@ -32,9 +32,7 @@ instance HasDefinitions TokenContracts where
     getContract (Mint tp)      = SomeBuiltin $ Token.mintToken @() @Empty tp
     getContract (Monitor addr) = SomeBuiltin $ Monitor.monitor addr
 
-    getSchema (Mint _)    = endpointsToSchemas @Empty
-    getSchema (Monitor _) = endpointsToSchemas @Empty
-
+    getSchema = const $ endpointsToSchemas @Empty
 
 exampleAddr :: Address
 exampleAddr = mockWalletAddress $ knownWallet 1
