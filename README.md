@@ -52,6 +52,8 @@
  - [Part 1 - Introduction](https://youtu.be/TfWKxdli4eI)
  - [Part 2 - The Minting Policy](https://youtu.be/w7_27sQIqkY)
  - [Part 3 - Minting with the CLI](https://youtu.be/kfvzrC9J02k)
+ - [Part 4 - Deployment Scenarios](https://youtu.be/tW7uoY16gC0)
+ - [Part 5 - The Contracts](https://youtu.be/JgNhY_uuuGA)
 
 ## Code Examples
 
@@ -60,6 +62,7 @@
  - Lecture #3: [Script Contexts & Parameterized Contracts](code/week03)
  - Lecture #4: [Monads, Traces & Contracts](code/week04)
  - Lecture #5: [Native Tokens](code/week05)
+ - Lecture #6: [Deployment](code/week06)
 
 ## Exercises
 
