@@ -15,27 +15,27 @@ echo "signing key file: $skeyFile"
 ppFile=testnet/protocol-parameters.json
 cardano-cli query protocol-parameters $MAGIC --out-file $ppFile
 
+policyFile=testnet/token.plutus
+cabal exec token-policy $policyFile $oref $amt $tn
+
 unsignedFile=testnet/tx.unsigned
 signedFile=testnet/tx.signed
-policyFile=testnet/token.plutus
 pid=$(cardano-cli transaction policyid --script-file $policyFile)
 tnHex=$(cabal exec token-name -- $tn)
 addr=$(cat $addrFile)
-v1="$amt $pid.$tnHex"
+v="$amt $pid.$tnHex"
 
 echo "currency symbol: $pid"
 echo "token name (hex): $tnHex"
-echo "minted value: $v1"
+echo "minted value: $v"
 echo "address: $addr"
-
-cabal exec token-policy testnet/token.plutus $oref $amt $tn
 
 cardano-cli transaction build \
     $MAGIC \
     --tx-in $oref \
     --tx-in-collateral $oref \
-    --tx-out "$addr + 1500000 lovelace + $v1" \
-    --mint "$v1" \
+    --tx-out "$addr + 1500000 lovelace + $v" \
+    --mint "$v" \
     --mint-script-file $policyFile \
     --mint-redeemer-file testnet/unit.json \
     --change-address $addr \

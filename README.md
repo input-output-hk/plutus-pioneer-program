@@ -47,6 +47,12 @@
  - [Part 5 - NFT's](https://youtu.be/2lKN0ZL_EQU)
  - [Part 6 - Homework](https://youtu.be/j7yT2OqGY6U)
 
+### [Lecture #6](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2sBWXHdFBRgkzPF6N-1LVi)
+
+ - [Part 1 - Introduction](https://youtu.be/TfWKxdli4eI)
+ - [Part 2 - The Minting Policy](https://youtu.be/w7_27sQIqkY)
+ - [Part 3 - Minting with the CLI](https://youtu.be/kfvzrC9J02k)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
