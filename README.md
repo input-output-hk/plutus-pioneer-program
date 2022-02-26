@@ -54,6 +54,8 @@
  - [Part 3 - Minting with the CLI](https://youtu.be/kfvzrC9J02k)
  - [Part 4 - Deployment Scenarios](https://youtu.be/tW7uoY16gC0)
  - [Part 5 - The Contracts](https://youtu.be/JgNhY_uuuGA)
+ - [Part 6 - Minting with the PAB](https://youtu.be/X6AyZIZ0vaE)
+ - [Part 7 - Summary](https://youtu.be/KmNOFltlRiA)
 
 ## Code Examples
 
@@ -105,6 +107,10 @@
 
   - Implement a Mary-era-style minting policy in the [Homework1](code/week05/src/Week05/Homework1.hs) module.
   - Fix the token name to the empty ByteString in the NFT contract in the [Homework2](code/week05/src/Week05/Homework2.hs) module.
+
+- Week #6
+
+  - Try to replicate what is done in the lecture - minting tokens with the `cardano-cli` and the PAB.
 
 ## Some Plutus Modules
 
