@@ -31,7 +31,7 @@ curl -X 'POST' \
                     "tag": "StakingHash"
                 }
             },
-            "tpAmount": '"$1"'
+            "tpAmount": '"$amt"'
         },
         "tag": "Mint"
     }
