@@ -57,6 +57,11 @@
  - [Part 6 - Minting with the PAB](https://youtu.be/X6AyZIZ0vaE)
  - [Part 7 - Summary](https://youtu.be/KmNOFltlRiA)
 
+### [Lecture #7](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3Y5xvAsVqq46S9xkHopSGU)
+
+ - [Part 1 - Introduction](https://youtu.be/CLOHdIGgy90)
+ - [Part 2 - Commit Schemes](https://youtu.be/JXKf1JwVAOE)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
