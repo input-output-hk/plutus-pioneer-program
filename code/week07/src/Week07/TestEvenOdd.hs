@@ -1,18 +1,18 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE NumericUnderscores    #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 
-module Week07.Test where
+module Week07.TestEvenOdd
+    ( test
+    , test'
+    , GameChoice (..)
+    ) where
 
 import           Control.Monad              hiding (fmap)
 import           Control.Monad.Freer.Extras as Extras
@@ -68,7 +68,7 @@ myTrace c1 c2 = do
 
     let pkh1      = mockWalletPaymentPubKeyHash w1
         pkh2      = mockWalletPaymentPubKeyHash w2
-        stake     = 5_000_000
+        stake     = 100_000_000
         deadline1 = slotToBeginPOSIXTime def 5
         deadline2 = slotToBeginPOSIXTime def 10
 

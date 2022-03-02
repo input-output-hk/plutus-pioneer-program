@@ -302,7 +302,7 @@ secondGame sp = do
                                    Constraints.otherScript (gameValidator game)
                         tx'      = Constraints.mustSpendScriptOutput oref' (Redeemer $ PlutusTx.toBuiltinData ClaimSecond) <>
                                    Constraints.mustValidateIn (from now')                                                  <>
-                                   Constraints.mustPayToPubKey (spFirst sp) token
+                                   Constraints.mustPayToPubKey (spFirst sp) (token <> adaValueOf (getAda minAdaTxOut))
                     ledgerTx' <- submitTxConstraintsWith @Gaming lookups' tx'
                     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx'
                     logInfo @String "second player won"
