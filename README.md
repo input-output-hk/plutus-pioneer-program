@@ -61,6 +61,7 @@
 
  - [Part 1 - Introduction](https://youtu.be/CLOHdIGgy90)
  - [Part 2 - Commit Schemes](https://youtu.be/JXKf1JwVAOE)
+ - [Part 3 - Implementation without State Machines](https://youtu.be/yczHkTzDnpk)
 
 ## Code Examples
 
@@ -121,6 +122,8 @@
 
   - `Ledger.Scripts`, contains functions related to untyped Plutus scripts.
   - `Ledger.Typed.Scripts`, contains functions related to typed Plutus scripts.
+  - `Plutus.Contract`, contains definitions and functions for writing offchain code.
+  - `Plutus.Contract.StateMachine`, contains definitions and functions for working with _state machines_.
   - `Plutus.V1.Ledger.Ada`, contains definitions and functions related to _ADA_-values.
   - `Plutus.V1.Ledger.Interval`, contains the definition of intervals and functions for working with them.
   - `Plutus.V1.Ledger.Value`, contains definitions and functions related to _values_.
