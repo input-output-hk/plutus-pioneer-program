@@ -40,7 +40,7 @@ import qualified Prelude
 data TokenSale = TokenSale
     { tsSeller :: !PaymentPubKeyHash
     , tsToken  :: !AssetClass
-    , tsTT     :: !(Maybe ThreadToken)
+    , tsTT     :: !ThreadToken
     } deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq)
 
 PlutusTx.makeLift ''TokenSale
@@ -89,7 +89,7 @@ transition ts s r = case (stateValue s, stateData s, r) of
 
 {-# INLINABLE tsStateMachine #-}
 tsStateMachine :: TokenSale -> StateMachine (Maybe Integer) TSRedeemer
-tsStateMachine ts = mkStateMachine (tsTT ts) (transition ts) isNothing
+tsStateMachine ts = mkStateMachine (Just $ tsTT ts) (transition ts) isNothing
 
 {-# INLINABLE mkTSValidator #-}
 mkTSValidator :: TokenSale -> Maybe Integer -> TSRedeemer -> ScriptContext -> Bool
@@ -116,10 +116,10 @@ tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (t
 mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
 mapErrorSM = mapError $ pack . show
 
-startTS :: AssetClass -> Bool -> Contract (Last TokenSale) s Text ()
-startTS token useTT = do
+startTS :: AssetClass -> Contract (Last TokenSale) s Text ()
+startTS token = do
     pkh <- Contract.ownPaymentPubKeyHash
-    tt  <- if useTT then Just <$> mapErrorSM getThreadToken else return Nothing
+    tt  <- mapErrorSM getThreadToken
     let ts = TokenSale
             { tsSeller = pkh
             , tsToken  = token
@@ -146,7 +146,7 @@ close :: TokenSale -> Contract w s Text ()
 close ts = void $ mapErrorSM $ runStep (tsClient ts) Close
 
 type TSStartSchema =
-        Endpoint "start"      (CurrencySymbol, TokenName, Bool)
+        Endpoint "start"      (CurrencySymbol, TokenName)
 type TSUseSchema =
         Endpoint "set price"  Integer
     .\/ Endpoint "add tokens" Integer
@@ -158,7 +158,7 @@ startEndpoint :: Contract (Last TokenSale) TSStartSchema Text ()
 startEndpoint = forever
               $ handleError logError
               $ awaitPromise
-              $ endpoint @"start" $ \(cs, tn, useTT) -> startTS (AssetClass (cs, tn)) useTT
+              $ endpoint @"start" $ startTS . AssetClass
 
 useEndpoints :: TokenSale -> Contract () TSUseSchema Text ()
 useEndpoints ts = forever $ handleError logError $ awaitPromise $ setPrice' `select` addTokens' `select` buyTokens' `select` withdraw' `select` close'
@@ -166,5 +166,5 @@ useEndpoints ts = forever $ handleError logError $ awaitPromise $ setPrice' `sel
     setPrice'  = endpoint @"set price"  $ setPrice ts
     addTokens' = endpoint @"add tokens" $ addTokens ts
     buyTokens' = endpoint @"buy tokens" $ buyTokens ts
-    withdraw'  = endpoint @"withdraw"   $ Prelude.uncurry (withdraw ts)
+    withdraw'  = endpoint @"withdraw"   $ Prelude.uncurry $ withdraw ts
     close'     = endpoint @"close"      $ const $ close ts

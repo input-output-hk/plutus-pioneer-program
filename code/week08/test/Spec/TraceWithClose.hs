@@ -65,7 +65,7 @@ token = AssetClass (tokenCurrency, tokenName')
 myTrace :: EmulatorTrace ()
 myTrace = do
     h <- activateContractWallet w1 startEndpoint
-    callEndpoint @"start" h (tokenCurrency, tokenName', False)
+    callEndpoint @"start" h (tokenCurrency, tokenName')
     void $ Emulator.waitNSlots 5
     Last m <- observableState h
     case m of

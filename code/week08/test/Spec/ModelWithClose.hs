@@ -188,7 +188,7 @@ tss :: Map Wallet TokenSale
 tss = Map.fromList
     [ (w, TokenSale { tsSeller = mockWalletPaymentPubKeyHash w
                     , tsToken  = tokens Map.! w
-                    , tsTT     = Nothing
+                    , tsTT     = undefined
                     })
     | w <- wallets
     ]
