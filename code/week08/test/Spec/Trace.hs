@@ -32,6 +32,7 @@ import           System.Exit                   (ExitCode (..))
 import           Test.Tasty
 import qualified Test.Tasty.HUnit              as HUnit
 
+import           Week08.Coverage               (renderCoverageReport)
 import           Week08.TokenSale
 
 tests :: TestTree
@@ -51,11 +52,11 @@ testCoverage = do
         myPredicate
         myTrace
     case e of
-        Left ExitSuccess -> do
+        Left (c :: ExitCode) -> do
+            putStrLn $ "Tasty exited with: " ++ show c
             report <- readCoverageRef cref
-            putStrLn $ "read coverage report"
-            print report
-        x -> putStrLn $ "unexpected tasty result" ++ show x
+            renderCoverageReport report
+        Right () -> putStrLn $ "unexpected tasty result"
 
 myOptions :: CheckOptions
 myOptions = defaultCheckOptions & emulatorConfig .~ emCfg
