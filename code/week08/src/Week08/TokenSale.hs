@@ -11,6 +11,8 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
 
+{-# OPTIONS_GHC -g -fplugin-opt PlutusTx.Plugin:coverage-all #-}
+
 module Week08.TokenSale
     ( TokenSale (..)
     , TSRedeemer (..)
