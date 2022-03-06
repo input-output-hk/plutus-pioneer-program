@@ -13,26 +13,26 @@ module Spec.Trace
     , runMyTrace
     ) where
 
-import           Control.Exception             (try)
+import           Control.Exception                            (try)
 import           Control.Lens
-import           Control.Monad                 hiding (fmap)
-import           Control.Monad.Freer.Extras    as Extras
-import           Data.Default                  (Default (..))
+import           Control.Monad                                hiding (fmap)
+import           Control.Monad.Freer.Extras                   as Extras
+import           Data.Default                                 (Default (..))
 import           Data.IORef
-import qualified Data.Map                      as Map
-import           Data.Monoid                   (Last (..))
+import qualified Data.Map                                     as Map
+import           Data.Monoid                                  (Last (..))
 import           Ledger
 import           Ledger.Value
-import           Ledger.Ada                    as Ada
+import           Ledger.Ada                                   as Ada
 import           Plutus.Contract.Test
 import           Plutus.Contract.Test.Coverage
-import           Plutus.Trace.Emulator         as Emulator
-import qualified PlutusTx.Prelude              as Plutus
-import           System.Exit                   (ExitCode (..))
+import           Plutus.Trace.Emulator                        as Emulator
+import qualified PlutusTx.Prelude                             as Plutus
+import           System.Exit                                  (ExitCode (..))
 import           Test.Tasty
-import qualified Test.Tasty.HUnit              as HUnit
+import qualified Test.Tasty.HUnit                             as HUnit
 
-import           Week08.Coverage               (renderCoverageReport)
+import           Plutus.Contract.Test.Coverage.ReportCoverage (writeCoverageReport)
 import           Week08.TokenSale
 
 tests :: TestTree
@@ -55,7 +55,7 @@ testCoverage = do
         Left (c :: ExitCode) -> do
             putStrLn $ "Tasty exited with: " ++ show c
             report <- readCoverageRef cref
-            renderCoverageReport report
+            writeCoverageReport "TokenSaleTrace" tsCovIdx report
         Right () -> putStrLn $ "unexpected tasty result"
 
 myOptions :: CheckOptions

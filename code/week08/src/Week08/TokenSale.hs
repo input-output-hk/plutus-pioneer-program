@@ -16,6 +16,7 @@
 module Week08.TokenSale
     ( TokenSale (..)
     , TSRedeemer (..)
+    , tsCovIdx
     , TSStartSchema
     , TSUseSchema
     , startEndpoint
@@ -30,6 +31,8 @@ import           GHC.Generics                 (Generic)
 import           Plutus.Contract              as Contract
 import           Plutus.Contract.StateMachine
 import qualified PlutusTx
+import           PlutusTx.Code                (getCovIdx)
+import           PlutusTx.Coverage            (CoverageIndex)
 import           PlutusTx.Prelude             hiding (Semigroup(..), check, unless)
 import           Ledger                       hiding (singleton)
 import           Ledger.Ada                   as Ada
@@ -110,6 +113,9 @@ tsAddress = scriptAddress . tsValidator
 
 tsClient :: TokenSale -> StateMachineClient Integer TSRedeemer
 tsClient ts = mkStateMachineClient $ StateMachineInstance (tsStateMachine ts) (tsTypedValidator ts)
+
+tsCovIdx :: CoverageIndex
+tsCovIdx = getCovIdx $$(PlutusTx.compile [|| mkTSValidator ||])
 
 mapErrorSM :: Contract w s SMContractError a -> Contract w s Text a
 mapErrorSM = mapError $ pack . show
