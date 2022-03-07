@@ -65,6 +65,10 @@
  - [Part 4 - State Machines](https://youtu.be/7jiaQRA-wKI)
  - [Part 5 - Homework](https://youtu.be/J0rD_hmsMVo)
 
+### [Lecture #8](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0UIixvEQG2Y2mmFL6__pEJ)
+
+ - [Part 1 - Introduction](https://youtu.be/mqHifIPefus)
+
 ## Code Examples
 
  - Lecture #1: [English Auction](code/week01)
@@ -74,6 +78,7 @@
  - Lecture #5: [Native Tokens](code/week05)
  - Lecture #6: [Deployment](code/week06)
  - Lecture #7: [State Machines](code/week07)
+ - Lecture #8: [Testing](code/week08)
 
 ## Exercises
 
