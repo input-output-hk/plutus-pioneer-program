@@ -177,57 +177,6 @@ instance ContractModel TSModel where
 withWait :: ModelState TSModel -> SpecificationEmulatorTrace () -> SpecificationEmulatorTrace ()
 withWait m c = void $ c >> waitUntilSlot ((m ^. Test.currentSlot) + 3)
 
-{-
-    arbitraryAction _ = oneof $
-        (Start <$> genWallet) :
-        [ SetPrice  <$> genWallet <*> genWallet <*> genNonNeg ]               ++
-        [ AddTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
-        [ BuyTokens <$> genWallet <*> genWallet <*> genNonNeg ]               ++
-        [ Withdraw  <$> genWallet <*> genWallet <*> genNonNeg <*> genNonNeg ]
-
-
-
-    nextState (BuyTokens v w n) = do
-        when (n > 0) $ do
-            m <- getTSState v
-            case m of
-                Just t
-                    | t ^. tssToken >= n -> do
-                        let p = t ^. tssPrice
-                            l = p * n
-                        withdraw w $ lovelaceValueOf l
-                        deposit w $ assetClassValue (tokens Map.! v) n
-                        (tsModel . ix v . tssLovelace) $~ (+ l)
-                        (tsModel . ix v . tssToken)    $~ (+ (- n))
-                _ -> return ()
-        wait 1
-
-    nextState (Withdraw v w n l) = do
-        when (v == w) $ do
-            m <- getTSState v
-            case m of
-                Just t
-                    | t ^. tssToken >= n && t ^. tssLovelace >= l -> do
-                        deposit w $ lovelaceValueOf l <> assetClassValue (tokens Map.! w) n
-                        (tsModel . ix v . tssLovelace) $~ (+ (- l))
-                        (tsModel . ix v . tssToken) $~ (+ (- n))
-                _ -> return ()
-        wait 1
-
-    perform h _ cmd = case cmd of
-        (Start w)          -> callEndpoint @"start"      (h $ StartKey w) (tokenCurrencies Map.! w, tokenNames Map.! w, False) >> delay 1
-        (SetPrice v w p)   -> callEndpoint @"set price"  (h $ UseKey v w) p                                                    >> delay 1
-        (AddTokens v w n)  -> callEndpoint @"add tokens" (h $ UseKey v w) n                                                    >> delay 1
-        (BuyTokens v w n)  -> callEndpoint @"buy tokens" (h $ UseKey v w) n                                                    >> delay 1
-        (Withdraw v w n l) -> callEndpoint @"withdraw"   (h $ UseKey v w) (n, l)                                               >> delay 1
-
-    precondition s (Start w)          = isNothing $ getTSState' s w
-    precondition s (SetPrice v _ _)   = isJust    $ getTSState' s v
-    precondition s (AddTokens v _ _)  = isJust    $ getTSState' s v
-    precondition s (BuyTokens v _ _)  = isJust    $ getTSState' s v
-    precondition s (Withdraw v _ _ _) = isJust    $ getTSState' s v
--}
-
 deriving instance Eq (ContractInstanceKey TSModel w s e p)
 deriving instance Show (ContractInstanceKey TSModel w s e p)
 
@@ -266,7 +215,6 @@ tokenAmt = 1_000
 prop_TS :: Actions TSModel -> Property
 prop_TS = withMaxSuccess 100 . propRunActionsWithOptions
     (defaultCheckOptions & emulatorConfig . initialChainState .~ Left d)
---                         & emulatorConfig . feeConfig         .~ FeeConfig 1 1)
     defaultCoverageOptions
     (const $ pure True)
   where

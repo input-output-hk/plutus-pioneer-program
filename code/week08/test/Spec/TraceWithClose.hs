@@ -90,5 +90,4 @@ myTrace = do
             void $ Emulator.waitNSlots 5
 
             callEndpoint @"close" h1 ()
---          callEndpoint @"withdraw" h1 (40, 10_000_000)
             void $ Emulator.waitNSlots 5
