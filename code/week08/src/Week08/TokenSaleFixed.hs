@@ -13,7 +13,7 @@
 
 {-# OPTIONS_GHC -g -fplugin-opt PlutusTx.Plugin:coverage-all #-}
 
-module Week08.TokenSale
+module Week08.TokenSaleFixed
     ( TokenSale (..)
     , TSRedeemer (..)
     , tsCovIdx
@@ -67,27 +67,30 @@ lovelaces = Ada.getLovelace . Ada.fromValue
 {-# INLINABLE transition #-}
 transition :: TokenSale -> State Integer -> TSRedeemer -> Maybe (TxConstraints Void Void, State Integer)
 transition ts s r = case (stateValue s, stateData s, r) of
-    (v, _, SetPrice p)   | p >= 0           -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                                    , State p v
-                                                    )
-    (v, p, AddTokens n)  | n > 0            -> Just ( mempty
-                                                    , State p $
-                                                      v                                       <>
-                                                      assetClassValue (tsToken ts) n
-                                                    )
-    (v, p, BuyTokens n)  | n > 0            -> Just ( mempty
-                                                    , State p $
-                                                      v                                       <>
-                                                      assetClassValue (tsToken ts) (negate n) <>
-                                                      lovelaceValueOf (n * p)
-                                                    )
-    (v, p, Withdraw n l) | n >= 0 && l >= 0 -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
-                                                    , State p $
-                                                      v                                       <>
-                                                      assetClassValue (tsToken ts) (negate n) <>
-                                                      lovelaceValueOf (negate l)
-                                                    )
-    _                                       -> Nothing
+    (v, _, SetPrice p)   | p >= 0                             -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                                      , State p v
+                                                                      )
+    (v, p, AddTokens n)  | n > 0                              -> Just ( mempty
+                                                                      , State p $
+                                                                        v                                       <>
+                                                                        assetClassValue (tsToken ts) n
+                                                                      )
+    (v, p, BuyTokens n)  | n > 0                              -> Just ( mempty
+                                                                      , State p $
+                                                                        v                                       <>
+                                                                        assetClassValue (tsToken ts) (negate n) <>
+                                                                        lovelaceValueOf (n * p)
+                                                                      )
+    (v, p, Withdraw n l) | n >= 0 && l >= 0 &&
+                           v `geq` (w <> toValue minAdaTxOut) -> Just ( Constraints.mustBeSignedBy (tsSeller ts)
+                                                                      , State p $
+                                                                        v                                       <>
+                                                                        negate w
+                                                                      )
+      where
+        w = assetClassValue (tsToken ts) n <>
+            lovelaceValueOf l
+    _                                                         -> Nothing
 
 {-# INLINABLE tsStateMachine #-}
 tsStateMachine :: TokenSale -> StateMachine Integer TSRedeemer
