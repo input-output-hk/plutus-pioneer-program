@@ -151,6 +151,10 @@
   - Add a new operation close to the TokenSale-contract that allows the seller to close the contract and retrieve all remaining funds.
   - Modify the tests accordingly.
 
+- Week #9m
+
+  - Modify the example Marlowe contract, so that Charlie must put down twice the deposit in the very beginning, which gets split between Alice and Bob if Charlie refuses to make his choice.
+
 ## Some Plutus Modules
 
   - `Ledger.Scripts`, contains functions related to untyped Plutus scripts.
