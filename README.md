@@ -73,6 +73,8 @@
  - [Part 4 - Test Coverage](https://youtu.be/wJQnQtLxi2E)
  - [Part 5 - Interlude: Optics](https://youtu.be/naLA0OMIF1Q)
  - [Part 6 - Property-Based Testing with QuickCheck](https://youtu.be/9mrYT9UXLO8)
+ - [Part 7 - Property-Based Testing of Plutus Contracts](https://youtu.be/49oAwySp6Ys)
+ - [Part 8 - Homework](https://youtu.be/u2Plwc3Gkrs)
 
 ## Code Examples
 
@@ -133,6 +135,11 @@
 
 - Week #7
   - Implement the game of "Rock, Paper, Scissors" using state machines.
+
+- Week #8
+
+  - Add a new operation close to the TokenSale-contract that allows the seller to close the contract and retrieve all remaining funds.
+  - Modify the tests accordingly.
 
 ## Some Plutus Modules
 
