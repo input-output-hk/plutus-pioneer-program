@@ -76,7 +76,7 @@
  - [Part 7 - Property-Based Testing of Plutus Contracts](https://youtu.be/49oAwySp6Ys)
  - [Part 8 - Homework](https://youtu.be/u2Plwc3Gkrs)
 
-### [Lecture #9](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0UIixvEQG2Y2mmFL6__pEJ)
+### [Lecture #9](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2zSFnzWA4Gbr_AVTz-4rzf)
 
  - [Part 1 - Introduction](https://youtu.be/433VbouC-30)
  - [Part 2 - Simon Thompson: Marlowe Overview](https://youtu.be/ce_Yv8BlW7c)
