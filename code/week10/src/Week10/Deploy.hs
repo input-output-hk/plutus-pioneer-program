@@ -1,11 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 
-module Week03.Deploy
+module Week10.Deploy
     ( writeJSON
-    , writeValidator
     , writeUnit
-    , writeVestingValidator
+    , writeStakeValidator
     ) where
 
 import           Cardano.Api
@@ -18,7 +17,7 @@ import           PlutusTx              (Data (..))
 import qualified PlutusTx
 import qualified Ledger
 
-import           Week03.Parameterized
+import           Week10.Staking
 
 dataToScriptData :: Data -> ScriptData
 dataToScriptData (Constr n xs) = ScriptDataConstructor n $ dataToScriptData <$> xs
@@ -30,11 +29,13 @@ dataToScriptData (B bs)        = ScriptDataBytes bs
 writeJSON :: PlutusTx.ToData a => FilePath -> a -> IO ()
 writeJSON file = LBS.writeFile file . encode . scriptDataToJson ScriptDataJsonDetailedSchema . dataToScriptData . PlutusTx.toData
 
-writeValidator :: FilePath -> Ledger.Validator -> IO (Either (FileError ()) ())
-writeValidator file = writeFileTextEnvelope @(PlutusScript PlutusScriptV1) file Nothing . PlutusScriptSerialised . SBS.toShort . LBS.toStrict . serialise . Ledger.unValidatorScript
+writeStakeValidator :: FilePath -> Ledger.Address -> IO (Either (FileError ()) ())
+writeStakeValidator file = writeFileTextEnvelope @(PlutusScript PlutusScriptV1) file Nothing . PlutusScriptSerialised . SBS.toShort . LBS.toStrict . serialise . Ledger.getStakeValidator . stakeValidator
 
 writeUnit :: IO ()
 writeUnit = writeJSON "testnet/unit.json" ()
 
+{-
 writeVestingValidator :: IO (Either (FileError ()) ())
 writeVestingValidator = writeValidator "testnet/vesting.plutus" validator
+-}
