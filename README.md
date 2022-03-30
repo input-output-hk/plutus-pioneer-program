@@ -85,17 +85,22 @@
  - [Part 5 - Marlowe Playground Demo](https://youtu.be/l0LXjh8J-go)
  - [Part 6 - Homework](https://youtu.be/iYdyUaq_enA)
 
+### [Lecture #10](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3EV7FKhlogJgS27dWgwI9B)
+ - [Part 1 - Introduction](https://youtu.be/3KyBgD2YiRw)
+ - [Part 2 - The Private Testnet](https://youtu.be/xhEMEH0C2XU)
+
 ## Code Examples
 
- - Lecture #1: [English Auction](code/week01)
- - Lecture #2: [Simple Validation](code/week02)
- - Lecture #3: [Script Contexts & Parameterized Contracts](code/week03)
- - Lecture #4: [Monads, Traces & Contracts](code/week04)
- - Lecture #5: [Native Tokens](code/week05)
- - Lecture #6: [Deployment](code/week06)
- - Lecture #7: [State Machines](code/week07)
- - Lecture #8: [Testing](code/week08)
- - Lecture #9: [Marlowe](code/week09)
+ - Lecture #1:  [English Auction](code/week01)
+ - Lecture #2:  [Simple Validation](code/week02)
+ - Lecture #3:  [Script Contexts & Parameterized Contracts](code/week03)
+ - Lecture #4:  [Monads, Traces & Contracts](code/week04)
+ - Lecture #5:  [Native Tokens](code/week05)
+ - Lecture #6:  [Deployment](code/week06)
+ - Lecture #7:  [State Machines](code/week07)
+ - Lecture #8:  [Testing](code/week08)
+ - Lecture #9:  [Marlowe](code/week09)
+ - Lecture #10: [Staking](code/week10)
 
 ## Exercises
 
@@ -179,3 +184,4 @@
   [remastered](https://hansruec.github.io/learn-you-a-haskell-remastered/01-first-things-first.html) and
   [interactive notebook](https://hub.gke2.mybinder.org/user/jamesdbrock-lea-askell-notebook-24dgdx7w/lab/tree/learn_you_a_haskell/00-preface.ipynb)
 - [Haskell & Cryptocurrencies course Mongolia](https://www.youtube.com/playlist?list=PLJ3w5xyG4JWmBVIigNBytJhvSSfZZzfTm)
+- [Private Testnet Setup](https://github.com/woofpool/cardano-private-testnet-setup)
