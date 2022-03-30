@@ -11,5 +11,3 @@ main = do
     case e of
         Left err -> print err
         Right () -> printf "wrote stake validator to %s\n" file
-
-

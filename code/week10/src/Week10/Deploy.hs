@@ -1,5 +1,4 @@
 {-# LANGUAGE GADTs             #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
 
 module Week10.Deploy

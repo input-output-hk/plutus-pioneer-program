@@ -49,6 +49,6 @@ mkStakingValidator addr () ctx = case scriptContextPurpose ctx of
 
 stakeValidator :: Address -> StakeValidator
 stakeValidator addr = mkStakeValidatorScript $
-    $$(PlutusTx.compile [|| \addr' -> wrapStakeValidator $ mkStakingValidator addr' ||])
+    $$(PlutusTx.compile [|| wrapStakeValidator . mkStakingValidator ||])
     `PlutusTx.applyCode`
     PlutusTx.liftCode addr
