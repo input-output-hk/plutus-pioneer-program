@@ -86,8 +86,11 @@
  - [Part 6 - Homework](https://youtu.be/iYdyUaq_enA)
 
 ### [Lecture #10](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3EV7FKhlogJgS27dWgwI9B)
- - [Part 1 - Introduction](https://youtu.be/3KyBgD2YiRw)
+ - [Part 1 - Introduction](https://youtu.be/AnID8hn68DA)
  - [Part 2 - The Private Testnet](https://youtu.be/xhEMEH0C2XU)
+ - [Part 3 - Plutus & Staking](https://youtu.be/kFi-7HyBN-s)
+ - [Part 4 - Trying it on the Testnet](https://youtu.be/5cBu4J5RRZ4)
+ - [Part 5 - Conclusion](https://youtu.be/9oWmDXoxtmI)
 
 ## Code Examples
 
