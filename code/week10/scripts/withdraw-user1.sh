@@ -1,9 +1,9 @@
 #!/bin/bash
 
 txin=$1
-amt=$(scripts/query-stake-address-info.sh | jq .[0].rewardAccountBalance)
-raw=withdraw.raw
-signed=withdraw.signed
+amt=$(scripts/query-stake-address-info-user1.sh | jq .[0].rewardAccountBalance)
+raw=tmp/tx.raw
+signed=tmp/tx.signed
 
 echo "txin = $1"
 echo "amt = $amt"
