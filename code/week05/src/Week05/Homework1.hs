@@ -35,18 +35,37 @@ import           Prelude                    (IO, Semigroup (..), Show (..), Stri
 import           Text.Printf                (printf)
 import           Wallet.Emulator.Wallet
 
+-- | Takes PaymentPubKeyHash and deadline to determin if the policy should allow minting or buring of tokens
+-- if the owner of the specified PaymentPubKeyHash has signed the transaction 
+-- and if the specified deadline has not passed.
 {-# INLINABLE mkPolicy #-}
--- This policy should only allow minting (or burning) of tokens if the owner of the specified PaymentPubKeyHash
--- has signed the transaction and if the specified deadline has not passed.
 mkPolicy :: PaymentPubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
-mkPolicy pkh deadline () ctx = True -- FIX ME!
+mkPolicy pkh deadline () ctx = traceIfFalse "Not signed by owner" signedByOwner &&
+                               traceIfFalse "deadline passed" beforeDeadline
+    where 
+        info :: TxInfo 
+        info = scriptContextTxInfo ctx
 
+        signedByOwner :: Bool 
+        signedByOwner = txSignedBy info $ unPaymentPubKeyHash pkh
+
+        beforeDeadline :: Bool
+        beforeDeadline = contains (to deadline) $ txInfoValidRange info
+
+-- | The policy
 policy :: PaymentPubKeyHash -> POSIXTime -> Scripts.MintingPolicy
-policy pkh deadline = undefined -- IMPLEMENT ME!
+policy pkh deadline = mkMintingPolicyScript $
+    $$(PlutusTx.compile [|| \pkh' dl -> Scripts.wrapMintingPolicy $ mkPolicy pkh' dl ||])
+    `PlutusTx.applyCode`
+    PlutusTx.liftCode pkh 
+    `PlutusTx.applyCode`
+    PlutusTx.liftCode deadline
 
+-- | Defines the CurrencySymbol of the tokens being minted or burned
 curSymbol :: PaymentPubKeyHash -> POSIXTime -> CurrencySymbol
-curSymbol pkh deadline = undefined -- IMPLEMENT ME!
+curSymbol pkh deadline = scriptCurrencySymbol $ policy pkh deadline 
 
+-- | ADTs to represent the inputs to create the token
 data MintParams = MintParams
     { mpTokenName :: !TokenName
     , mpDeadline  :: !POSIXTime
@@ -55,6 +74,7 @@ data MintParams = MintParams
 
 type SignedSchema = Endpoint "mint" MintParams
 
+-- | Given the inputs checks if minting is possible
 mint :: MintParams -> Contract w SignedSchema Text ()
 mint mp = do
     pkh <- Contract.ownPaymentPubKeyHash
@@ -70,6 +90,7 @@ mint mp = do
             void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
             Contract.logInfo @String $ printf "forged %s" (show val)
 
+-- | For providing the inputs
 endpoints :: Contract () SignedSchema Text ()
 endpoints = mint' >> endpoints
   where
@@ -79,6 +100,7 @@ mkSchemaDefinitions ''SignedSchema
 
 mkKnownCurrencies []
 
+-- | Testing the policy using EmulatorTrace
 test :: IO ()
 test = runEmulatorTraceIO $ do
     let tn       = "ABC"
