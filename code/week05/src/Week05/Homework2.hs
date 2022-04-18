@@ -29,7 +29,8 @@ import           Text.Printf            (printf)
 import           Wallet.Emulator.Wallet
 
 tName :: BuiltinByteString   
-tName = ""
+tName = "" -- use emptyByteString here then use the TokenName data constructor to create a TokenName
+              -- Then you do not have to wrap and unwrap it when using it.
 
 -- | Given Tx output reference, determin if minting transaction consumes the given UTxO as input
 -- and the TokenName will is the empty ByteString.
@@ -46,7 +47,7 @@ mkPolicy oref () ctx = traceIfFalse "utxo no found" hasTheTxOutRefAsInput &&
 
       checkMintedToken :: Bool
       checkMintedToken = case flattenValue (txInfoMint info) of 
-                          [(_, tn, amt)] -> unTokenName tn == tName && amt == 1
+                          [(_, tn, amt)] -> unTokenName tn == tName && amt == 1 -- no need to unwrap it here
                           _              -> False
 
 policy :: TxOutRef -> Scripts.MintingPolicy
@@ -66,7 +67,7 @@ mint address = do
   case Map.keys utxos of 
     []       -> Contract.logInfo @String "no utxo found"
     oref : _ -> do 
-      let val     = Value.singleton (curSymbol oref) (TokenName tName) 1
+      let val     = Value.singleton (curSymbol oref) (TokenName tName) 1 -- also here wrap it.
           lookups = Constraints.mintingPolicy (policy oref) <> Constraints.unspentOutputs utxos
           tx      = Constraints.mustMintValue val <> Constraints.mustSpendPubKeyOutput oref
       ledgerTx <- submitTxConstraintsWith @Void lookups tx 
