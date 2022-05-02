@@ -86,7 +86,12 @@ unsafeReadTxOutRef s =
         }
 
 writeJSON :: PlutusTx.ToData a => FilePath -> a -> IO ()
-writeJSON file = LBS.writeFile file . encode . scriptDataToJson ScriptDataJsonDetailedSchema . dataToScriptData . PlutusTx.toData
+writeJSON file = 
+  LBS.writeFile file 
+  . encode 
+  . scriptDataToJson ScriptDataJsonDetailedSchema 
+  . dataToScriptData 
+  . PlutusTx.toData
 
 writeUnit :: IO ()
 writeUnit = writeJSON "testnet/unit.json" ()
@@ -106,13 +111,16 @@ getCredentials (Plutus.Address x y) = case x of
       in
         case y of
             Nothing                        -> Just (ppkh, Nothing)
-            Just (Plutus.StakingPtr _ _ _) -> Nothing
+            Just Plutus.StakingPtr{} -> Nothing
             Just (StakingHash h)           -> case h of
                 ScriptCredential _    -> Nothing
                 PubKeyCredential pkh' -> Just (ppkh, Just $ Plutus.StakePubKeyHash pkh')
 
 unsafePaymentPubKeyHash :: Plutus.Address -> Plutus.PaymentPubKeyHash
-unsafePaymentPubKeyHash addr = maybe (error $ "script address " ++ show addr ++ " does not contain a payment key") fst $ getCredentials addr
+unsafePaymentPubKeyHash addr = 
+  maybe (error 
+  $ "script address " ++ show addr ++ " does not contain a payment key") fst 
+  $ getCredentials addr
 
 unsafeStakePubKeyHash :: Plutus.Address -> Plutus.StakePubKeyHash
 unsafeStakePubKeyHash addr = case getCredentials addr of
@@ -124,9 +132,21 @@ cidToString :: ContractInstanceId -> String
 cidToString = show . unContractInstanceId
 
 writeMintingPolicy :: FilePath -> Plutus.MintingPolicy -> IO (Either (FileError ()) ())
-writeMintingPolicy file = writeFileTextEnvelope @(PlutusScript PlutusScriptV1) file Nothing . PlutusScriptSerialised . SBS.toShort . LBS.toStrict . serialise . Plutus.getMintingPolicy
+writeMintingPolicy file = 
+  writeFileTextEnvelope @(PlutusScript PlutusScriptV1) file Nothing 
+    . PlutusScriptSerialised 
+    . SBS.toShort 
+    . LBS.toStrict 
+    . serialise 
+    . Plutus.getMintingPolicy
 
 unsafeTokenNameToHex :: TokenName -> String
-unsafeTokenNameToHex = BS8.unpack . serialiseToRawBytesHex . fromJust . deserialiseFromRawBytes AsAssetName . getByteString . unTokenName
+unsafeTokenNameToHex = 
+  BS8.unpack 
+  . serialiseToRawBytesHex 
+  . fromJust 
+  . deserialiseFromRawBytes AsAssetName 
+  . getByteString 
+  . unTokenName
   where
     getByteString (BuiltinByteString bs) = bs
