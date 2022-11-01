@@ -709,8 +709,8 @@ there is a function *slotToEndPOSIXTime*. If we import this into the REPL, we ca
 
 .. code:: bash
 
-      cabal v2-repl EnghlishAuction.hs
-      Prelude Week01.EnghlishAuction>
+      [nix-shell:/plutus-pioneer-program/code/week01/src/Week01]$ cabal v2-repl EnghlishAuction.hs
+      Prelude Week01.EnghlishAuction >
 
 To do the calculation, we also need to import two other modules *Data.Default* and *Ledger.TimeSlot*.
 Then we can use the default slot configuation and function *slotToEndPOSIXTime* to calculate.
