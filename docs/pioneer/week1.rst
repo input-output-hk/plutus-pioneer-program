@@ -708,18 +708,20 @@ Time is measured in POSIX time (seconds since 1st January 1970), so we need to c
 there is a function *slotToEndPOSIXTime*. If we import this into the REPL, we can get the value we need. 
 
 .. code:: bash
-   cabal v2-repl EnghlishAuction.hs
-   Prelude Week01.EnghlishAuction>
+
+      cabal v2-repl EnghlishAuction.hs
+      Prelude Week01.EnghlishAuction>
 
 To do the calculation, we also need to import two other modules *Data.Default* and *Ledger.TimeSlot*.
 Then we can use the default slot configuation and function *slotToEndPOSIXTime* to calculate.
 
-.. code:: bash
-   Prelude Week01.EnghlishAuction > import Data.Default
-   Prelude Data.Default Week01.EnghlishAuction > import Ledger.TimeSlot
-   Prelude Data.Default Ledger.TimeSlot Week01.EnghlishAuction > slotToEndPOSIXTime def 10
-   POSIXTime {getPOSIXTime = 1596059101999}
-   Prelude Data.Default Ledger.TimeSlot Week01.EnghlishAuction >
+.. code:: haskell
+
+      Prelude Week01.EnghlishAuction > import Data.Default
+      Prelude Data.Default Week01.EnghlishAuction > import Ledger.TimeSlot
+      Prelude Data.Default Ledger.TimeSlot Week01.EnghlishAuction > slotToEndPOSIXTime def 10
+      POSIXTime {getPOSIXTime = 1596059101999}
+      Prelude Data.Default Ledger.TimeSlot Week01.EnghlishAuction >
 
 value - 1596059101999 - reflects that and this will be on July 29th 2020 - the 10th slot of the default slot configuration.
 
