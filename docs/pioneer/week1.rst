@@ -705,14 +705,23 @@ this deadline will not be allowed by the contract.
 Let's say that the deadline is Slot 10. 
 
 Time is measured in POSIX time (seconds since 1st January 1970), so we need to calculate this value. Luckily in the *plutus-ledger* package in module *Ledger.Timeslot*,
-there is a function *slotToPOSIXTime*. If we import this into the REPL, we can get the value we need. The simulation starts at the beginning of the Shelley era, so this
-value - 1596059101 - reflects that and this will be on July 29th 2020 - the 10th slot of the Shelley era.
+there is a function *slotToEndPOSIXTime*. If we import this into the REPL, we can get the value we need. 
 
-.. code:: haskell
+.. code:: bash
+   cabal v2-repl EnghlishAuction.hs
+   Prelude Week01.EnghlishAuction>
 
-   Prelude Week01.EnglishAuction> import Ledger.TimeSlot
-   Prelude Ledger.TimeSlot Week01.EnglishAuction> slotToPOSIXTime 10
-   POSIXTime {getPOSIXTime = 1596059101}
+To do the calculation, we also need to import two other modules *Data.Default* and *Ledger.TimeSlot*.
+Then we can use the default slot configuation and function *slotToEndPOSIXTime* to calculate.
+
+.. code:: bash
+   Prelude Week01.EnghlishAuction > import Data.Default
+   Prelude Data.Default Week01.EnghlishAuction > import Ledger.TimeSlot
+   Prelude Data.Default Ledger.TimeSlot Week01.EnghlishAuction > slotToEndPOSIXTime def 10
+   POSIXTime {getPOSIXTime = 1596059101999}
+   Prelude Data.Default Ledger.TimeSlot Week01.EnghlishAuction >
+
+value - 1596059101999 - reflects that and this will be on July 29th 2020 - the 10th slot of the default slot configuration.
 
 Add this value to the deadline field.
 
