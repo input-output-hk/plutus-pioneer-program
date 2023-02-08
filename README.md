@@ -1,4 +1,4 @@
-# Plutus Pioneer Program
+# Plutus Pioneer Program - Cohort 3
 
 ## Lectures
 
