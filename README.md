@@ -56,6 +56,7 @@ This program involves approximately ten hours a week of your time and efforts du
 
 * Interoperability of Cardano with Sidechains
 
-### Cardano Smart Contracts Developer Certification
+---
 
-After finishing the course, those participants who successfully complete the entire program will receive a certificate as **Cardano Smart Contracts Developer**. Certificates will be represented as non-fungible tokens (NFTs) (on the testnet) and locked by a Plutus contract. The participants can demonstrate their qualifications by constructing an appropriate transaction to unlock their individual token.
+This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
+![Creative Commons License BY 4.0](https://i.creativecommons.org/l/by/4.0/88x31.png)
