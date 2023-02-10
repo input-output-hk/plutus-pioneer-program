@@ -1,5 +1,5 @@
 ARG UBUNTU_VERSION=20.04
-FROM ubuntu:${UBUNTU_VERSION} as firstStage
+FROM ubuntu:${UBUNTU_VERSION} as first_stage
 ENV DEBIAN_FRONTEND=nonintercative
 RUN mkdir -p /app/src
 WORKDIR /app
@@ -68,13 +68,15 @@ RUN wget --secure-protocol=TLSv1_2 \
 RUN ghcup config set downloader Wget \
   &&  ghcup install ghc ${GHC_VERSION} \
   &&  ghcup install cabal ${CABAL_VERSION} \
-  && ghcup set ghc
+  && ghcup set ghc ${GHC_VERSION}
 RUN ghcup install hls ${HLS_VERSION}
 
 # install nix and niv
 RUN curl -L -o install.sh https://nixos.org/nix/install \
   && bash install.sh --daemon
   
-FROM firsStage as secondStage
-RUN source ~/.bashrc
-RUN nix-env -iA nixpkgs.niv
+FROM first_stage as second_stage
+SHELL ["bash", "-lc"]
+RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
+#  && niv add mlabs-haskell/plutus-simple-model -r 64dd3fee4caff9472e0dcc2e14cc587452c80e77
+
