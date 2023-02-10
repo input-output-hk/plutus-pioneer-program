@@ -2,54 +2,60 @@
 
 ## Program Description
 
-The Plutus Pioneer Program (PPP) is a course provided by [the IOG Education Team](https://iohk.io/team/#team=education) to recruit and train software developers in Plutus, the native smart contract language for the Cardano ecosystem.
+The Plutus Pioneer Program (PPP) is a course provided by the IOG Education Team to recruit and train software developers in Plutus, the native smart contract language for the Cardano ecosystem.
 
-People who join this program will become part of a learning community with access to courses that teach them the core principles of how to code in both Haskell and Plutus. In addition, this program is highly interactive, with weekly lessons, exercises, Q&A sessions, and exclusive access to the creators and key experts in the language.
+People who join this program will become part of a learning community with access to courses that teach them the core principles of how to code in Plutus. In addition, this program is highly interactive, with weekly lessons, exercises, Q&A live sessions, and exclusive access to the creators and key experts in Plutus and Cardano.
 
 {% hint style="info" %}
-If you want to learn more about Plutus, you can look at the [Plutus Docs](https://plutus.readthedocs.io/en/latest/).
+If you want to learn more about Plutus, you are encourage to look at the [Plutus Core and Plutus Tx user guide](https://plutus.readthedocs.io/en/latest/).
 {% endhint %}
+
+### Program Objectives
+
+By the end of this course, will be able to:
+
+* Understand the fundamentals of Plutus
+
+* Apply the principles of Plutus in practice
+
+* Understand sample use cases for Plutus
+
+* Develop a sample DApp in Plutus
+
+* Be aware of and adhere to the best practices for Plutus development
 
 ## Prior Experience Required
 
-This program is not for coding beginners. While you do not need to be an expert in formal methods, programming experience and a general aptitude for logical and mathematical thinking are highly desirable. Some prior knowledge of Haskell or functional programming is also recommended. Plutus is heavily based on Haskell and includes advanced features like Template Haskell, type-level programming, and effect systems.
+This program is intended for people with coding experience on any programming language. While you do not need to be an expert in formal methods, programming experience and a general aptitude for logical and mathematical thinking are highly desirable. Some prior knowledge of Haskell or functional programming is also recommended.
 
-Before registering for this course, we recommend you to visit the [Learn Haskell section](prework/learn-haskell.md).
+{% hint style="info" %}
+Plutus is heavily based on Haskell and includes advanced features like Template Haskell, type-level programming, and effect systems. Having previous is experience with Haskell is not mandatory to participate in this program. However, if you want to get started with Haskell before registering for this course, we recommend you to visit the [Learn Haskell section](prework/learn-haskell.md).
+{% endhint %}
 
 ## Course Structure
 
-In this course, you'll learn and gain hands-on experience with the core principles of how to code in both Haskell and Plutus. The course modules will cover the building blocks of these languages. You'll also learn about the [Extended UTXO model](https://docs.cardano.org/learn/eutxo-explainer) while working with Plutus on and off the chain, minting policies, state machines, the Plutus application framework, as well as some case studies and practical exercises.
+This program involves approximately ten hours a week of your time and efforts during ten weeks. It covers the building blocks of Plutus, including:
 
-At a glance, this course covers the building blocks of Haskell and Plutus, including:
+* Setting your Development Environment
 
-* Functions and data types
+* Introduction to ecosystem and Theoretical Foundations
 
-* Type classes
+* Introduction to PlutusTx and Cardano-cli
 
-* Monads
+* Parameterized Validators
 
-* Template Haskell
+* Native tokens, NFTs, and Minting
 
-* Using the Plutus Playground
+* Off-chain code
 
-* Extended UTXO model (EUTXO)
+* Testing Plutus smart contracts
 
-* Working with Plutus (on and off the chain)
+* Working with Marlowe and Plutus
 
-* Minting policies
+* Staking.
 
-* State machines
-
-* The Plutus application framework (PAF)
-
-* The Plutus application backend (PAB)
-
-* Some case studies and practical exercises
+* Interoperability of Cardano with Sidechains
 
 ### Cardano Smart Contracts Developer Certification
 
 After finishing the course, those participants who successfully complete the entire program will receive a certificate as **Cardano Smart Contracts Developer**. Certificates will be represented as non-fungible tokens (NFTs) (on the testnet) and locked by a Plutus contract. The participants can demonstrate their qualifications by constructing an appropriate transaction to unlock their individual token.
-
-## Registration for the Plutus Pioneer program
-
-If you are interested in joining a future cohort of this program, please complete [this registration form](https://input-output.typeform.com/to/au0XDcBP). We'll be in touch when we have fresh course dates to offer.
