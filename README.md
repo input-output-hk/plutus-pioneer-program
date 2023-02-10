@@ -59,4 +59,5 @@ This program involves approximately ten hours a week of your time and efforts du
 ---
 
 This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
+
 ![Creative Commons License BY 4.0](https://i.creativecommons.org/l/by/4.0/88x31.png)
