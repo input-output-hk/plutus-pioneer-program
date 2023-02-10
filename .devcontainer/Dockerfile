@@ -1,5 +1,5 @@
 ARG UBUNTU_VERSION=20.04
-FROM ubuntu:${UBUNTU_VERSION}
+FROM ubuntu:${UBUNTU_VERSION} as firstStage
 ENV DEBIAN_FRONTEND=nonintercative
 RUN mkdir -p /app/src
 WORKDIR /app
@@ -65,12 +65,16 @@ RUN wget --secure-protocol=TLSv1_2 \
   && mkdir -p ${HOME:-/root}/.ghcup/bin \
   && mv $(arch)-linux-ghcup ${HOME:-/root}/.ghcup/bin/ghcup 
 
-# RUN ghcup config set downloader Wget \
-#   &&  ghcup install ghc ${GHC_VERSION} \
-#   &&  ghcup install cabal ${CABAL_VERSION} \
-#   && ghcup set ghc
-# RUN ghcup install hls ${HLS_VERSION}
+RUN ghcup config set downloader Wget \
+  &&  ghcup install ghc ${GHC_VERSION} \
+  &&  ghcup install cabal ${CABAL_VERSION} \
+  && ghcup set ghc
+RUN ghcup install hls ${HLS_VERSION}
 
 # install nix and niv
 RUN curl -L -o install.sh https://nixos.org/nix/install \
   && bash install.sh --daemon
+  
+FROM firsStage as secondStage
+RUN source ~/.bashrc
+RUN nix-env -iA nixpkgs.niv
