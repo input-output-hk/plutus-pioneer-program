@@ -4,7 +4,7 @@
 
 The Plutus Pioneer Program (PPP) is a course the IOG Education Team provides to recruit and train software developers in Plutus, the native smart contract language for the Cardano ecosystem.
 
-People who join this program will become part of a learning community with access to courses that teach them the core principles of how to code in Plutus. In addition, this program is highly interactive, with weekly lessons, exercises, live Q&A sessions, and exclusive access to the creators and key experts in Plutus and Cardano.
+People who join this program will become part of a learning community with access to courses that teach them the core principles of how to code in Plutus. In addition, this program is highly interactive, with weekly lessons, exercises, live Q\&A sessions, and exclusive access to the creators and key experts in Plutus and Cardano.
 
 {% hint style="info" %}
 If you want to learn more about Plutus, we encourage you to look at the [Plutus Core and Plutus Tx user guide](https://plutus.readthedocs.io/en/latest/).
@@ -15,13 +15,9 @@ If you want to learn more about Plutus, we encourage you to look at the [Plutus 
 By the end of this course, participants will be able to:
 
 * Understand the fundamentals of Plutus
-
 * Apply the principles of Plutus in practice
-
 * Understand sample use cases for Plutus
-
 * Develop a sample DApp in Plutus
-
 * Be aware of and adhere to the best practices for Plutus development
 
 ## Prior Experience Required
@@ -37,27 +33,18 @@ Plutus is heavily based on Haskell and includes advanced features like Template 
 This program involves approximately ten hours a week of your time and efforts for ten weeks. It covers the building blocks of Plutus, including:
 
 * Setting your Development Environment
-
 * Introduction to the ecosystem and Theoretical Foundations
-
 * Introduction to PlutusTx and Cardano-cli
-
 * Parameterized Validators
-
 * Native tokens, NFTs, and Minting
-
 * Off-chain code
-
 * Testing Plutus smart contracts
-
 * Working with Marlowe and Plutus
-
 * Staking.
-
 * Interoperability of Cardano with Sidechains
 
----
+***
 
 This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
 
-![Creative Commons License BY 4.0](https://i.creativecommons.org/l/by/4.0/88x31.png)
+<figure><img src="https://i.creativecommons.org/l/by/4.0/88x31.png" alt="Creative Commons License BY 4.0"><figcaption></figcaption></figure>

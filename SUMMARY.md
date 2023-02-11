@@ -12,7 +12,7 @@
 
 ## Lessons
 
-* [Lecture 1](lectures/lecture-01/README.md)
-  * [Lesson 1.1: The EUTxO Model](lectures/lecture-01/lesson-01/README.md)
-  * [Lesson 1.2: Building the Example Code](lectures/lecture-01/lesson-02/README.md)
-  * [Lesson 1.3: Auction Contract in the EUTxO-Model](lectures/lecture-01/lesson-03/README.md)
+* [Lecture 1](lessons/lecture-1/README.md)
+  * [Lesson 1.1: The EUTxO Model](lessons/lecture-1/lesson-1.1-the-eutxo-model.md)
+  * [Lesson 1.2: Building the Example Code](lessons/lecture-1/lesson-1.2-building-the-example-code.md)
+  * [Lesson 1.3: Auction Contract in the EUTxO-Model](lessons/lecture-1/lesson-1.3-auction-contract-in-the-eutxo-model.md)
