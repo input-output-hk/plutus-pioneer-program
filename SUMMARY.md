@@ -7,7 +7,7 @@
 * [Learn Haskell](prework/learn-haskell.md)
 * [Working Environment Set Up](prework/setup/README.md)
   * [Using Demeter](prework/setup/demeter.md)
-  * [Using Ubuntu](prework/setup/docker.md)
+  * [Using Docker](prework/setup/docker.md)
 
 ## Lessons
 
