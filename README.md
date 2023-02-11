@@ -43,7 +43,7 @@ This program involves approximately ten hours a week of your time and efforts fo
 * Staking.
 * Interoperability of Cardano with Sidechains
 
-***
+---
 
 This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
 
