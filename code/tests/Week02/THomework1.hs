@@ -1,5 +1,5 @@
 
-module THomework where
+module Main where
 
 main :: IO ()
 main = putStrLn "TODO: Write tests"
