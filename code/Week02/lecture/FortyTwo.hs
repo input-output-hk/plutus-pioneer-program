@@ -20,6 +20,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as BSS
 import Plutus.V2.Ledger.Api qualified as PlutusV2
 import PlutusTx
+import PlutusTx.Builtins as Builtins
 import PlutusTx.Prelude
 import Cardano.Api
 
@@ -28,10 +29,12 @@ type GiftDatum = BuiltinData
 type GiftRedeemer = BuiltinData
 type ScriptContext = BuiltinData
 
--- This validator always validates true
+-- This validator succeeds only if the redeemer is 42
 {-# INLINABLE mkGiftValidator #-}
 mkGiftValidator :: GiftDatum -> GiftRedeemer -> ScriptContext -> ()
-mkGiftValidator _ _ _ = ()
+mkGiftValidator _ r _
+    | r == Builtins.mkI 42 = ()
+    | otherwise            = error ()
 
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])

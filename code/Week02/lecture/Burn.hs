@@ -24,17 +24,17 @@ import PlutusTx.Prelude
 import Cardano.Api
 
 -- Type aliases to make the validator's signature more readable
-type GiftDatum = BuiltinData
-type GiftRedeemer = BuiltinData
+type BurnDatum = BuiltinData
+type BurnRedeemer = BuiltinData
 type ScriptContext = BuiltinData
 
--- This validator always validates true
-{-# INLINABLE mkGiftValidator #-}
-mkGiftValidator :: GiftDatum -> GiftRedeemer -> ScriptContext -> ()
-mkGiftValidator _ _ _ = ()
+-- This validator always fails
+{-# INLINABLE mkBurnValidator #-}
+mkBurnValidator :: BurnDatum -> BurnRedeemer -> ScriptContext -> ()
+mkBurnValidator _ _ _ = error ()
 
 validator :: PlutusV2.Validator
-validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])
+validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkBurnValidator ||])
 
 serialized :: PlutusScript PlutusScriptV2
 serialized = PlutusScriptSerialised . BSS.toShort . BSL.toStrict . serialise $ validator

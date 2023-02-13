@@ -28,7 +28,7 @@ type GiftDatum = BuiltinData
 type GiftRedeemer = BuiltinData
 type ScriptContext = BuiltinData
 
--- This validator always validates true
+-- This validator always succeeds
 {-# INLINABLE mkGiftValidator #-}
 mkGiftValidator :: GiftDatum -> GiftRedeemer -> ScriptContext -> ()
 mkGiftValidator _ _ _ = ()
