@@ -54,4 +54,4 @@ writePlutusFile =
     Left err -> print $ displayError err
     Right _ -> putStrLn $ "Compiled Plutus script at: " ++ filePath
   where
-    filePath = "gift.plutus"
+    filePath = "assets/gift.plutus"
