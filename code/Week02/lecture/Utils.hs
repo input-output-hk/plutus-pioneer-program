@@ -1,10 +1,12 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RankNTypes #-}
 
-module Utils (writePlutusFile) where
+module Utils (writePlutusFile, wrap) where
 
 import Plutus.V2.Ledger.Api qualified as PlutusV2
+import Plutus.V2.Ledger.Api (UnsafeFromData, unsafeFromBuiltinData) 
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Short as BSS
 import Cardano.Api.Shelley (PlutusScript (..))
@@ -23,3 +25,23 @@ writePlutusFile filePath validator =
   writeFileTextEnvelope filePath Nothing (serializeScript validator) >>= \case
     Left err -> print $ displayError err
     Right _ -> putStrLn $ "Compiled Plutus script at: " ++ filePath
+
+
+wrap ::
+  forall a b c.
+  ( UnsafeFromData a,
+    UnsafeFromData b,
+    UnsafeFromData c
+  ) =>
+  (a -> b -> c -> Bool) ->
+  BuiltinData ->
+  BuiltinData ->
+  BuiltinData ->
+  ()
+wrap f a b c =
+  check
+    ( f
+        (unsafeFromBuiltinData a)
+        (unsafeFromBuiltinData b)
+        (unsafeFromBuiltinData c)
+    )
