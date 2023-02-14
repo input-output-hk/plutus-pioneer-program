@@ -77,6 +77,6 @@ RUN curl -L -o install.sh https://nixos.org/nix/install \
   
 FROM first_stage as second_stage
 SHELL ["bash", "-lc"]
-RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
+#RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
 #  && niv add mlabs-haskell/plutus-simple-model -r 64dd3fee4caff9472e0dcc2e14cc587452c80e77
 
