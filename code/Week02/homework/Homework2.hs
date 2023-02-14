@@ -3,7 +3,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 
-module Homework1 where
+module Homework2 where
 
 import Plutus.V2.Ledger.Api qualified as PlutusV2
 import PlutusTx
@@ -14,13 +14,14 @@ import Prelude (IO)
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
-{-# INLINABLE mkValidator #-}
--- This should validate if and only if the two Booleans in the redeemer are True!
-mkValidator :: () -> (Bool, Bool) -> PlutusV2.ScriptContext -> Bool
-mkValidator _ _ _ = undefined
+data MyRedeemer = MyRedeemer
+    { flag1 :: Bool
+    , flag2 :: Bool
+    }
 
-wrappedVal :: BuiltinData -> BuiltinData -> BuiltinData -> ()
+-- Create a validator that unlocks the funds if MyRedemeer's flags are different
+mkValidator = undefined
+
 wrappedVal = undefined
 
-validator :: PlutusV2.Validator
 validator = undefined
