@@ -13,15 +13,11 @@ import Prelude (IO)
 ---------------------------------------------------------------------------------------------------
 -------------------------------- ON-CHAIN CODE / VALIDATOR ----------------------------------------
 
--- Type aliases to make the validator's signature more meaningful
-type GiftDatum     = BuiltinData
-type GiftRedeemer  = BuiltinData
-type ScriptContext = BuiltinData
-
 -- This validator always succeeds
-{-# INLINABLE mkGiftValidator #-}
-mkGiftValidator :: GiftDatum -> GiftRedeemer -> ScriptContext -> ()
+--                    Datum         Redeemer     ScriptContext
+mkGiftValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkGiftValidator _ _ _ = ()
+{-# INLINABLE mkGiftValidator #-}
 
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])

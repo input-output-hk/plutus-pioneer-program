@@ -15,17 +15,13 @@ import PlutusTx.Builtins as Builtins
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
--- Type aliases to make the validator's signature more meaningful
-type GiftDatum     = BuiltinData
-type GiftRedeemer  = BuiltinData
-type ScriptContext = BuiltinData
-
 -- This validator succeeds only if the redeemer is 42
-{-# INLINABLE mk42Validator #-}
-mk42Validator :: GiftDatum -> GiftRedeemer -> ScriptContext -> ()
+--                  Datum         Redeemer     ScriptContext
+mk42Validator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mk42Validator _ r _
     | r == Builtins.mkI 42 = ()
     | otherwise            = error ()
+{-# INLINABLE mk42Validator #-}
 
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mk42Validator ||])

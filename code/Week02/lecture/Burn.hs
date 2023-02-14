@@ -14,15 +14,11 @@ import Prelude (IO)
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
--- Type aliases to make the validator's signature more meaningful
-type BurnDatum     = BuiltinData
-type BurnRedeemer  = BuiltinData
-type ScriptContext = BuiltinData
-
 -- This validator always fails
-{-# INLINABLE mkBurnValidator #-}
-mkBurnValidator :: BurnDatum -> BurnRedeemer -> ScriptContext -> ()
+--                    Datum         Redeemer     ScriptContext
+mkBurnValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkBurnValidator _ _ _ = error ()
+{-# INLINABLE mkBurnValidator #-}
 
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkBurnValidator ||])
