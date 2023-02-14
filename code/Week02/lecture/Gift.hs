@@ -22,6 +22,10 @@ import Plutus.V2.Ledger.Api qualified as PlutusV2
 import PlutusTx
 import PlutusTx.Prelude
 import Cardano.Api
+import Prelude (IO, putStrLn, print)
+
+---------------------------------------------------------------------------------------------------
+----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
 -- Type aliases to make the validator's signature more readable
 type GiftDatum = BuiltinData
@@ -36,5 +40,18 @@ mkGiftValidator _ _ _ = ()
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator ||])
 
-serialized :: PlutusScript PlutusScriptV2
-serialized = PlutusScriptSerialised . BSS.toShort . BSL.toStrict . serialise $ validator
+---------------------------------------------------------------------------------------------------
+-------------------------------------- HELPER FUNCTIONS -------------------------------------------
+
+-- Serialize script
+serializedScript :: PlutusScript PlutusScriptV2
+serializedScript = PlutusScriptSerialised . BSS.toShort . BSL.toStrict . serialise $ validator
+
+-- Create file with compiled Plutus script
+writePlutusFile :: IO ()
+writePlutusFile =
+  writeFileTextEnvelope filePath Nothing serializedScript >>= \case
+    Left err -> print $ displayError err
+    Right _ -> putStrLn $ "Compiled Plutus script at: " ++ filePath
+  where
+    filePath = "gift.plutus"
