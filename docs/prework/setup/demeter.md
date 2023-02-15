@@ -3,7 +3,7 @@
 [Demeter.run](https://demeter.run/) is a cloud environment that provides all the tools required for building and deploying Cardano applications. Follow the steps below to set up an account and use this development environment.
 
 {% hint style="info" %}
-Demeter.run is one of the several projects of the Cardano ecosystem that provides a development environment for creating dApps. You are free to use this or any other tool available in the ecosystem.
+Demeter.run is a third party service that provides a cloud-based development environment. If you prefer using a local environment, review the [Using Docker guide](docker.md). 
 {% endhint %}
 
 ## Prerequisites
