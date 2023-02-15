@@ -95,3 +95,24 @@ RUN git clone https://github.com/dQuadrant/kuber \
   && cabal install
 
 RUN echo "export PATH=$PATH:/root/.cabal/bin/kuber" >> ~/.bashrc
+
+RUN mkdir -p ${HOME:-/root}/node-config
+RUN mkdir -p /ipc
+
+RUN  wget https://book.world.dev.cardano.org/environments/preview/config.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/db-sync-config.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/submit-api-config.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/topology.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/byron-genesis.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/alonzo-genesis.json \
+  && wget https://book.world.dev.cardano.org/environments/preview/shelley-genesis.json \
+  && mv ./*.json ${HOME:-/root}/node-config/
+
+ARG CARDANO_NODE_SOCKET_PATH=/ipc/node.socket
+
+RUN echo "alias start-node='cardano-node run \
+	     --config ${HOME:-/root}/node-config/config.json \
+	     --topology ${HOME:-/root}/node-config/topology.json \
+	     --database-path ${HOME:-/root}/preview-db \
+	     --socket-path /ipc/node.socket'" >> ~/.bashrc
+
