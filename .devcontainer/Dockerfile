@@ -94,7 +94,7 @@ RUN git clone https://github.com/dQuadrant/kuber \
   && cd server \
   && cabal install
 
-RUN echo "export PATH=$PATH:/root/.cabal/bin/kuber" >> ~/.bashrc
+RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
 
 RUN mkdir -p ${HOME:-/root}/node-config
 RUN mkdir -p /ipc
