@@ -10,9 +10,9 @@ To set up a local environment, we provide a Docker container image that will ins
 
 We provide detailed instructions to set up your working environment in the following guides:
 
-* [Using Demeter](demeter.md). This guide shows how to set up an account to use demeter.run and how to set up the environment required for this course.
+* [Using Demeter](demeter.md): This guide shows how to set up an account to use demeter.run and how to set up the environment required for this course.
 
-* [Using Docker](docker.md). This guide shows you how to use the provided Docker image to set up a local working environment.
+* [Using Docker](docker.md): This guide shows you how to use the provided Docker image to set up a local working environment.
 
 ---
 
