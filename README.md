@@ -2,7 +2,9 @@
 
 The Plutus Pioneer Program (PPP) is a course the IOG Education Team provides to recruit and train software developers in Plutus, the native smart contract language for the Cardano ecosystem.
 
-This repository contains the lectures, code examples, homework, and installation guides for the 4th. Cohort of this program. This documentation is structured to be reviewed in GitBook at the following URL: <https://iog-academy.gitbook.io/plutus-pioneers-program-fourth-cohort/>
+This repository contains the lectures, code examples, homework, and installation guides for the 4th. Cohort of this program.
+
+This documentation looks better in GitBook at the following link: <https://iog-academy.gitbook.io/plutus-pioneers-program-fourth-cohort/>
 
 ## Repository Structure
 
