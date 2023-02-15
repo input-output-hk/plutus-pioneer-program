@@ -1,10 +1,7 @@
 # Welcome to the Plutus Pioneers Program 4th Cohort
 
-## This documentation looks better in Gitbook
-
-https://iog-academy.gitbook.io/plutus-pioneers-program-fourth-cohort/
-
-
+> This documentation looks better in GitBook:
+> <https://iog-academy.gitbook.io/plutus-pioneers-program-fourth-cohort/>
 
 ## Program Description
 
