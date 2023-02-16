@@ -8,8 +8,7 @@ module Homework2 where
 import Plutus.V2.Ledger.Api qualified as PlutusV2
 import PlutusTx
 import PlutusTx.Prelude 
-import Utils (writePlutusFile, wrap)
-import Prelude (IO)
+import Utils (wrap)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
