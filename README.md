@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href="http://txpipe.io"><img src="https://ucarecdn.com/288e5001-d93e-4081-976b-0c6f72cc077e/iohksymbolbig.jpg" alt="TxPipe" width="100"></a>
+  <a href="https://www.youtube.com/@iogacademy"><img src="https://ucarecdn.com/288e5001-d93e-4081-976b-0c6f72cc077e/iohksymbolbig.jpg" alt="IOG Academy on YouTube" width="100"></a>
   <br>
   Welcome to the Plutus Pioneers Program 4th Cohort
   <br>
