@@ -1,4 +1,10 @@
-# Welcome to the Plutus Pioneers Program 4th Cohort
+<h1 align="center">
+  <br>
+  <a href="http://txpipe.io"><img src="https://ucarecdn.com/288e5001-d93e-4081-976b-0c6f72cc077e/iohksymbolbig.jpg" alt="TxPipe" width="100"></a>
+  <br>
+  Welcome to the Plutus Pioneers Program 4th Cohort
+  <br>
+</h1>
 
 The Plutus Pioneer Program (PPP) is a course the IOG Education Team provides to recruit and train software developers in Plutus, the native smart contract language for the Cardano ecosystem.
 
