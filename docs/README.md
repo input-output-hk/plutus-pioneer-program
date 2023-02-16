@@ -1,3 +1,5 @@
+![InputOutput Logo](resources/iohk-logo.png)
+
 # Welcome to the Plutus Pioneers Program 4th Cohort
 
 ## Program Description
