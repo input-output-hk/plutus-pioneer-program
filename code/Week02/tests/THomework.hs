@@ -39,7 +39,7 @@ homework1 cfg = do
     [ good "Case: (True, True)" $ giveGift (True, True)
     , bad "Case: (True, False)" $ giveGift (True, False)
     , bad "Case: (False, True)" $ giveGift (False, True)
-    , bad "Case: (False, False)" $ giveGift (False, False)
+    , good "Case: (False, False)" $ giveGift (False, False)
     ]
   where
     bad msg = good msg . mustFail
@@ -83,10 +83,10 @@ homework2 :: MockConfig -> TestTree
 homework2 cfg = do
   testGroup
     "Testing Homework2"
-    [ bad "Case: (True, True)" $ giveGift' (H2.MyRedeemer True True)
-    , good "Case: (True, False)" $ giveGift' (H2.MyRedeemer True False)
-    , good "Case: (False, True)" $ giveGift' (H2.MyRedeemer False True)
-    , bad "Case: (False, False)" $ giveGift' (H2.MyRedeemer False False)
+    [ bad "Case: MyRedeemer True True" $ giveGift' (H2.MyRedeemer True True)
+    , good "Case: MyRedeemer True False" $ giveGift' (H2.MyRedeemer True False)
+    , good "Case: MyRedeemer False True" $ giveGift' (H2.MyRedeemer False True)
+    , bad "Case: MyRedeemer False False" $ giveGift' (H2.MyRedeemer False False)
     ]
   where
     bad msg = good msg . mustFail
