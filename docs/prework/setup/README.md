@@ -6,7 +6,7 @@ In this program, you'll extensively use Plutus to create Cardano applications. Y
 
 The web development environment allows you to create a Cardano application from your browser, and no further installations are required. This is a suitable option if you have a reliable internet connection.
 
-To set up a local environment, we provide a Docker container image that will install all the required libraries and dependencies. We recommend this option if your internet connection speed is lower than 10 MB.
+To set up a local environment, we provide a Docker container image that will install all the required libraries and dependencies. We recommend this option if your internet connection speed is lower than 10 Mbit/s.
 
 We provide detailed instructions to set up your working environment in the following guides:
 
