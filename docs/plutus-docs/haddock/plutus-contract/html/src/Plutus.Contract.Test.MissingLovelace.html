@@ -1,0 +1,144 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE ViewPatterns #-}</span><span>
+</span><span id="line-2"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contract.Test.MissingLovelace</span><span>
+</span><span id="line-3"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Contract.Test.MissingLovelace.html#calculateDelta"><span class="hs-identifier">calculateDelta</span></a></span><span>
+</span><span id="line-4"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ada</span></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">noAdaValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">P</span></span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- | Returns the calculated delta between initial and final values. Might be false positive.</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- The tests check if a wallet's funds are equal to some expected value at the end.</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Unfortunately, because of the adjustion of transactions, the outputs' costs change</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- and it's hard to track these changes in the tests layer.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- This function tries to check if the difference between final and initial values ('realDelta')</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- is a result of combination of operations between output's costs and the expected delta.</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- There is a risk when expected delta has only ada part and expected delta /= realDelta</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- and realDelta is divisible by some delta from deltas, then we will return realDelta's ada.</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- Which means that the test will pass but without strong confidence in wallets' funds consistency.</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- For example, we expected -n, but there is n among deltas and realDelta is n,</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- it is divisible by n, then the test will pass. So please be careful.</span><span>
+</span><span id="line-24"></span><span class="annot"><a href="Plutus.Contract.Test.MissingLovelace.html#calculateDelta"><span class="hs-identifier hs-type">calculateDelta</span></a></span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-26"></span><span>  </span><span class="hs-comment">-- ^ Expected delta of the test</span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Ada.Ada</span></a></span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-comment">-- ^ Initial value of the wallet before the test</span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Ada.Ada</span></a></span><span>
+</span><span id="line-30"></span><span>  </span><span class="hs-comment">-- ^ Final value of the wallet after the test</span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Ada.Ada</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-comment">-- ^ Missing lovelace costs of outputs from 'AdjustingUnbalancedTx' logs</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-34"></span><span id="calculateDelta"><span class="annot"><span class="annottext">calculateDelta :: Value -&gt; Ada -&gt; Ada -&gt; [Ada] -&gt; Value
+</span><a href="Plutus.Contract.Test.MissingLovelace.html#calculateDelta"><span class="hs-identifier hs-var hs-var">calculateDelta</span></a></span></span><span> </span><span id="local-6989586621680817850"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817850"><span class="hs-identifier hs-var">expectedDelta</span></a></span></span><span> </span><span id="local-6989586621680817849"><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817849"><span class="hs-identifier hs-var">initialValue</span></a></span></span><span> </span><span id="local-6989586621680817848"><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817848"><span class="hs-identifier hs-var">finalValue</span></a></span></span><span> </span><span id="local-6989586621680817847"><span class="annot"><span class="annottext">[Ada]
+</span><a href="#local-6989586621680817847"><span class="hs-identifier hs-var">allWalletsTxOutCosts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-keyword">let</span><span>
+</span><span id="line-36"></span><span>    </span><span id="local-6989586621680817846"><span class="annot"><span class="annottext">expectedAda :: Ada
+</span><a href="#local-6989586621680817846"><span class="hs-identifier hs-var hs-var">expectedAda</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value -&gt; Ada
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.fromValue</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817850"><span class="hs-identifier hs-var">expectedDelta</span></a></span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-comment">-- the list of deltas: combinations (+/-) between outputs' costs,</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-comment">-- the expected delta and the wallet's output costs.</span><span>
+</span><span id="line-40"></span><span>    </span><span id="local-6989586621680817844"><span class="annot"><span class="annottext">deltas :: [Ada]
+</span><a href="#local-6989586621680817844"><span class="hs-identifier hs-var hs-var">deltas</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Ada -&gt; Ada) -&gt; [Ada] -&gt; [Ada]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada
+forall n. (Ord n, AdditiveGroup n) =&gt; n -&gt; n
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">P.abs</span></a></span><span> </span><span class="annot"><span class="annottext">([Ada] -&gt; [Ada]) -&gt; [Ada] -&gt; [Ada]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[[Ada]] -&gt; [Ada]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">concat</span></a></span><span>
+</span><span id="line-41"></span><span>      </span><span class="hs-special">[</span><span> </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada
+forall n. (Ord n, AdditiveGroup n) =&gt; n -&gt; n
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">P.abs</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817841"><span class="hs-identifier hs-var">val</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Ada
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">P.-</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada
+forall n. (Ord n, AdditiveGroup n) =&gt; n -&gt; n
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">P.abs</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817839"><span class="hs-identifier hs-var">wCost</span></a></span><span>
+</span><span id="line-42"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada
+forall n. (Ord n, AdditiveGroup n) =&gt; n -&gt; n
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">P.abs</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817841"><span class="hs-identifier hs-var">val</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Ada
+forall a. AdditiveSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">P.+</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada
+forall n. (Ord n, AdditiveGroup n) =&gt; n -&gt; n
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">P.abs</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817839"><span class="hs-identifier hs-var">wCost</span></a></span><span> </span><span class="hs-special">]</span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680817841"><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817841"><span class="hs-identifier hs-var">val</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817846"><span class="hs-identifier hs-var">expectedAda</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ada
+</span><span class="hs-number">0</span></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[Ada] -&gt; [Ada] -&gt; [Ada]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">[Ada]
+</span><a href="#local-6989586621680817847"><span class="hs-identifier hs-var">allWalletsTxOutCosts</span></a></span><span>
+</span><span id="line-43"></span><span>                                      </span><span class="hs-special">,</span><span> </span><span id="local-6989586621680817839"><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817839"><span class="hs-identifier hs-var">wCost</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Ada]
+</span><a href="#local-6989586621680817847"><span class="hs-identifier hs-var">allWalletsTxOutCosts</span></a></span><span> </span><span class="hs-special">]</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span>    </span><span id="local-6989586621680817837"><span class="annot"><span class="annottext">realDelta :: Ada
+</span><a href="#local-6989586621680817837"><span class="hs-identifier hs-var hs-var">realDelta</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817848"><span class="hs-identifier hs-var">finalValue</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Ada
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">P.-</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817849"><span class="hs-identifier hs-var">initialValue</span></a></span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span>    </span><span id="local-6989586621680817836"><span class="annot"><span class="annottext">missingDelta :: Value
+</span><a href="#local-6989586621680817836"><span class="hs-identifier hs-var hs-var">missingDelta</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-48"></span><span>      </span><span class="hs-comment">-- We check if 'realDelta' is a result of combination of operations between initial delta and outputs' costs</span><span>
+</span><span id="line-49"></span><span>      </span><span class="hs-comment">-- by checking if 'realDelta''s is divisible by any delta without a reminder.</span><span>
+</span><span id="line-50"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">[Bool] -&gt; Bool
+forall (t :: * -&gt; *). Foldable t =&gt; t Bool -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">or</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ada -&gt; Ada
+forall n. (Ord n, AdditiveGroup n) =&gt; n -&gt; n
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">P.abs</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817837"><span class="hs-identifier hs-var">realDelta</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Ada
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">`mod`</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817833"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680817833"><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817833"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Ada]
+</span><a href="#local-6989586621680817844"><span class="hs-identifier hs-var">deltas</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817833"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">/=</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><span class="hs-number">0</span></span><span class="hs-special">]</span><span> </span><span class="hs-keyword">then</span><span>
+</span><span id="line-51"></span><span>        </span><span class="hs-comment">-- if yes, we return a sum of 'realDelta''s ada with non-ada value of the expected delta</span><span>
+</span><span id="line-52"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680817831"><span class="annot"><span class="annottext">missingAda :: Value
+</span><a href="#local-6989586621680817831"><span class="hs-identifier hs-var hs-var">missingAda</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.toValue</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817837"><span class="hs-identifier hs-var">realDelta</span></a></span><span>
+</span><span id="line-53"></span><span>            </span><span id="local-6989586621680817829"><span class="annot"><span class="annottext">missingNonAda :: Value
+</span><a href="#local-6989586621680817829"><span class="hs-identifier hs-var hs-var">missingNonAda</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">noAdaValue</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817850"><span class="hs-identifier hs-var">expectedDelta</span></a></span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817831"><span class="hs-identifier hs-var">missingAda</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Value -&gt; Value
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817829"><span class="hs-identifier hs-var">missingNonAda</span></a></span><span>
+</span><span id="line-55"></span><span>      </span><span class="hs-comment">-- otherwise we just return the expected delta</span><span>
+</span><span id="line-56"></span><span>      </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817850"><span class="hs-identifier hs-var">expectedDelta</span></a></span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-keyword">in</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-comment">-- if ada in the expected delta is the same as the real delta, then we don't need to check anything</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-comment">-- and can just return it</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817846"><span class="hs-identifier hs-var">expectedAda</span></a></span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Ada -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">Ada
+</span><a href="#local-6989586621680817837"><span class="hs-identifier hs-var">realDelta</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817850"><span class="hs-identifier hs-var">expectedDelta</span></a></span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">-- otherwise we return the missing delta that is needed to pass the test</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680817836"><span class="hs-identifier hs-var">missingDelta</span></a></span><span>
+</span><span id="line-63"></span></pre></body></html>

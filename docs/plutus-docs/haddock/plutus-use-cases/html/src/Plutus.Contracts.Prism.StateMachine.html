@@ -1,0 +1,506 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric      #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns     #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude  #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- | State machine that manages credential tokens</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Prism.StateMachine</span><span class="hs-special">(</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier">IDState</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier">IDAction</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier">UserCredential</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#typedValidator"><span class="hs-identifier">typedValidator</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#machineClient"><span class="hs-identifier">machineClient</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#mkMachineClient"><span class="hs-identifier">mkMachineClient</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/c8zmk5p1xjyk8kh1g2scsirszd4kyahy-hashable-lib-hashable-1.3.5.0-haddock-doc/share/doc/hashable/html/src"><span class="hs-identifier">Data.Hashable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/c8zmk5p1xjyk8kh1g2scsirszd4kyahy-hashable-lib-hashable-1.3.5.0-haddock-doc/share/doc/hashable/html/src"><span class="hs-identifier">Hashable</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Address</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">PaymentPubKeyHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints.TxConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">TxConstraints</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TokenName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract.StateMachine</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">State</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">StateMachine</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">StateMachineClient</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract.StateMachine</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">StateMachine</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html"><span class="hs-identifier">Plutus.Contracts.Prism.Credential</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier">Credential</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#CredentialAuthority"><span class="hs-identifier">CredentialAuthority</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html"><span class="hs-identifier">Plutus.Contracts.Prism.Credential</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Credential</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span id="local-6989586621680981007"><span id="local-6989586621680981008"></span></span><span class="hs-keyword">data</span><span> </span><span id="IDState"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-var">IDState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-36"></span><span>    </span><span id="Active"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#Active"><span class="hs-identifier hs-var">Active</span></a></span></span><span> </span><span class="hs-comment">-- ^ The credential is active and can be used in transactions</span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="Revoked"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#Revoked"><span class="hs-identifier hs-var">Revoked</span></a></span></span><span> </span><span class="hs-comment">-- ^ The credential has been revoked and can't be used anymore.</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. IDState -&gt; Rep IDState x)
+-&gt; (forall x. Rep IDState x -&gt; IDState) -&gt; Generic IDState
+forall x. Rep IDState x -&gt; IDState
+forall x. IDState -&gt; Rep IDState x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep IDState x -&gt; IDState
+$cfrom :: forall x. IDState -&gt; Rep IDState x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980998"><span id="local-6989586621680981000"><span class="annot"><span class="annottext">IDState -&gt; IDState -&gt; Bool
+(IDState -&gt; IDState -&gt; Bool)
+-&gt; (IDState -&gt; IDState -&gt; Bool) -&gt; Eq IDState
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: IDState -&gt; IDState -&gt; Bool
+$c/= :: IDState -&gt; IDState -&gt; Bool
+== :: IDState -&gt; IDState -&gt; Bool
+$c== :: IDState -&gt; IDState -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980991"><span id="local-6989586621680980993"><span id="local-6989586621680980995"><span class="annot"><span class="annottext">Int -&gt; IDState -&gt; ShowS
+[IDState] -&gt; ShowS
+IDState -&gt; String
+(Int -&gt; IDState -&gt; ShowS)
+-&gt; (IDState -&gt; String) -&gt; ([IDState] -&gt; ShowS) -&gt; Show IDState
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [IDState] -&gt; ShowS
+$cshowList :: [IDState] -&gt; ShowS
+show :: IDState -&gt; String
+$cshow :: IDState -&gt; String
+showsPrec :: Int -&gt; IDState -&gt; ShowS
+$cshowsPrec :: Int -&gt; IDState -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680980982"><span id="local-6989586621680980984"><span id="local-6989586621680980986"><span id="local-6989586621680980988"><span class="annot"><span class="annottext">[IDState] -&gt; Encoding
+[IDState] -&gt; Value
+IDState -&gt; Encoding
+IDState -&gt; Value
+(IDState -&gt; Value)
+-&gt; (IDState -&gt; Encoding)
+-&gt; ([IDState] -&gt; Value)
+-&gt; ([IDState] -&gt; Encoding)
+-&gt; ToJSON IDState
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [IDState] -&gt; Encoding
+$ctoEncodingList :: [IDState] -&gt; Encoding
+toJSONList :: [IDState] -&gt; Value
+$ctoJSONList :: [IDState] -&gt; Value
+toEncoding :: IDState -&gt; Encoding
+$ctoEncoding :: IDState -&gt; Encoding
+toJSON :: IDState -&gt; Value
+$ctoJSON :: IDState -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980977"><span id="local-6989586621680980979"><span class="annot"><span class="annottext">Value -&gt; Parser [IDState]
+Value -&gt; Parser IDState
+(Value -&gt; Parser IDState)
+-&gt; (Value -&gt; Parser [IDState]) -&gt; FromJSON IDState
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [IDState]
+$cparseJSONList :: Value -&gt; Parser [IDState]
+parseJSON :: Value -&gt; Parser IDState
+$cparseJSON :: Value -&gt; Parser IDState
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span id="local-6989586621680980974"><span id="local-6989586621680980975"></span></span><span class="hs-keyword">data</span><span> </span><span id="IDAction"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-var">IDAction</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-42"></span><span>    </span><span id="PresentCredential"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#PresentCredential"><span class="hs-identifier hs-var">PresentCredential</span></a></span></span><span> </span><span class="hs-comment">-- ^ Present the credential in a transaction</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="RevokeCredential"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#RevokeCredential"><span class="hs-identifier hs-var">RevokeCredential</span></a></span></span><span> </span><span class="hs-comment">-- ^ Revoke the credential</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. IDAction -&gt; Rep IDAction x)
+-&gt; (forall x. Rep IDAction x -&gt; IDAction) -&gt; Generic IDAction
+forall x. Rep IDAction x -&gt; IDAction
+forall x. IDAction -&gt; Rep IDAction x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep IDAction x -&gt; IDAction
+$cfrom :: forall x. IDAction -&gt; Rep IDAction x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980966"><span id="local-6989586621680980968"><span class="annot"><span class="annottext">IDAction -&gt; IDAction -&gt; Bool
+(IDAction -&gt; IDAction -&gt; Bool)
+-&gt; (IDAction -&gt; IDAction -&gt; Bool) -&gt; Eq IDAction
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: IDAction -&gt; IDAction -&gt; Bool
+$c/= :: IDAction -&gt; IDAction -&gt; Bool
+== :: IDAction -&gt; IDAction -&gt; Bool
+$c== :: IDAction -&gt; IDAction -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980960"><span id="local-6989586621680980962"><span id="local-6989586621680980964"><span class="annot"><span class="annottext">Int -&gt; IDAction -&gt; ShowS
+[IDAction] -&gt; ShowS
+IDAction -&gt; String
+(Int -&gt; IDAction -&gt; ShowS)
+-&gt; (IDAction -&gt; String) -&gt; ([IDAction] -&gt; ShowS) -&gt; Show IDAction
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [IDAction] -&gt; ShowS
+$cshowList :: [IDAction] -&gt; ShowS
+show :: IDAction -&gt; String
+$cshow :: IDAction -&gt; String
+showsPrec :: Int -&gt; IDAction -&gt; ShowS
+$cshowsPrec :: Int -&gt; IDAction -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680980952"><span id="local-6989586621680980954"><span id="local-6989586621680980956"><span id="local-6989586621680980958"><span class="annot"><span class="annottext">[IDAction] -&gt; Encoding
+[IDAction] -&gt; Value
+IDAction -&gt; Encoding
+IDAction -&gt; Value
+(IDAction -&gt; Value)
+-&gt; (IDAction -&gt; Encoding)
+-&gt; ([IDAction] -&gt; Value)
+-&gt; ([IDAction] -&gt; Encoding)
+-&gt; ToJSON IDAction
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [IDAction] -&gt; Encoding
+$ctoEncodingList :: [IDAction] -&gt; Encoding
+toJSONList :: [IDAction] -&gt; Value
+$ctoJSONList :: [IDAction] -&gt; Value
+toEncoding :: IDAction -&gt; Encoding
+$ctoEncoding :: IDAction -&gt; Encoding
+toJSON :: IDAction -&gt; Value
+$ctoJSON :: IDAction -&gt; Value
+</span><a href="#local-6989586621680980952"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980948"><span id="local-6989586621680980950"><span class="annot"><span class="annottext">Value -&gt; Parser [IDAction]
+Value -&gt; Parser IDAction
+(Value -&gt; Parser IDAction)
+-&gt; (Value -&gt; Parser [IDAction]) -&gt; FromJSON IDAction
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [IDAction]
+$cparseJSONList :: Value -&gt; Parser [IDAction]
+parseJSON :: Value -&gt; Parser IDAction
+$cparseJSON :: Value -&gt; Parser IDAction
+</span><a href="#local-6989586621680980948"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- | A 'Credential' issued to a user (public key address)</span><span>
+</span><span id="line-48"></span><span id="local-6989586621680980946"><span id="local-6989586621680980947"></span></span><span class="hs-keyword">data</span><span> </span><span id="UserCredential"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-var">UserCredential</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-49"></span><span>    </span><span id="UserCredential"><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-var">UserCredential</span></a></span></span><span>
+</span><span id="line-50"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="ucAddress"><span class="annot"><span class="annottext">UserCredential -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#ucAddress"><span class="hs-identifier hs-var hs-var">ucAddress</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-51"></span><span>        </span><span class="hs-comment">-- ^ Address of the credential holder</span><span>
+</span><span id="line-52"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="ucCredential"><span class="annot"><span class="annottext">UserCredential -&gt; Credential
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#ucCredential"><span class="hs-identifier hs-var hs-var">ucCredential</span></a></span></span><span> </span><span class="hs-glyph">::</span><span>  </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier hs-type">Credential</span></a></span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-comment">-- ^ The credential</span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="ucToken"><span class="annot"><span class="annottext">UserCredential -&gt; Value
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#ucToken"><span class="hs-identifier hs-var hs-var">ucToken</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-55"></span><span>        </span><span class="hs-comment">-- ^ The 'Value' containing a token of the credential</span><span>
+</span><span id="line-56"></span><span>        </span><span class="hs-comment">-- (this needs to be included here because 'Credential.token'</span><span>
+</span><span id="line-57"></span><span>        </span><span class="hs-comment">-- is not available in on-chain code)</span><span>
+</span><span id="line-58"></span><span>        </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680980938"><span id="local-6989586621680980940"><span class="annot"><span class="annottext">UserCredential -&gt; UserCredential -&gt; Bool
+(UserCredential -&gt; UserCredential -&gt; Bool)
+-&gt; (UserCredential -&gt; UserCredential -&gt; Bool) -&gt; Eq UserCredential
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UserCredential -&gt; UserCredential -&gt; Bool
+$c/= :: UserCredential -&gt; UserCredential -&gt; Bool
+== :: UserCredential -&gt; UserCredential -&gt; Bool
+$c== :: UserCredential -&gt; UserCredential -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980932"><span id="local-6989586621680980934"><span id="local-6989586621680980936"><span class="annot"><span class="annottext">Int -&gt; UserCredential -&gt; ShowS
+[UserCredential] -&gt; ShowS
+UserCredential -&gt; String
+(Int -&gt; UserCredential -&gt; ShowS)
+-&gt; (UserCredential -&gt; String)
+-&gt; ([UserCredential] -&gt; ShowS)
+-&gt; Show UserCredential
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UserCredential] -&gt; ShowS
+$cshowList :: [UserCredential] -&gt; ShowS
+show :: UserCredential -&gt; String
+$cshow :: UserCredential -&gt; String
+showsPrec :: Int -&gt; UserCredential -&gt; ShowS
+$cshowsPrec :: Int -&gt; UserCredential -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. UserCredential -&gt; Rep UserCredential x)
+-&gt; (forall x. Rep UserCredential x -&gt; UserCredential)
+-&gt; Generic UserCredential
+forall x. Rep UserCredential x -&gt; UserCredential
+forall x. UserCredential -&gt; Rep UserCredential x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep UserCredential x -&gt; UserCredential
+$cfrom :: forall x. UserCredential -&gt; Rep UserCredential x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>          </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680980922"><span id="local-6989586621680980924"><span id="local-6989586621680980926"><span id="local-6989586621680980928"><span class="annot"><span class="annottext">[UserCredential] -&gt; Encoding
+[UserCredential] -&gt; Value
+UserCredential -&gt; Encoding
+UserCredential -&gt; Value
+(UserCredential -&gt; Value)
+-&gt; (UserCredential -&gt; Encoding)
+-&gt; ([UserCredential] -&gt; Value)
+-&gt; ([UserCredential] -&gt; Encoding)
+-&gt; ToJSON UserCredential
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [UserCredential] -&gt; Encoding
+$ctoEncodingList :: [UserCredential] -&gt; Encoding
+toJSONList :: [UserCredential] -&gt; Value
+$ctoJSONList :: [UserCredential] -&gt; Value
+toEncoding :: UserCredential -&gt; Encoding
+$ctoEncoding :: UserCredential -&gt; Encoding
+toJSON :: UserCredential -&gt; Value
+$ctoJSON :: UserCredential -&gt; Value
+</span><a href="#local-6989586621680980922"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980918"><span id="local-6989586621680980920"><span class="annot"><span class="annottext">Value -&gt; Parser [UserCredential]
+Value -&gt; Parser UserCredential
+(Value -&gt; Parser UserCredential)
+-&gt; (Value -&gt; Parser [UserCredential]) -&gt; FromJSON UserCredential
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [UserCredential]
+$cparseJSONList :: Value -&gt; Parser [UserCredential]
+parseJSON :: Value -&gt; Parser UserCredential
+$cparseJSON :: Value -&gt; Parser UserCredential
+</span><a href="#local-6989586621680980918"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980914"><span id="local-6989586621680980916"><span class="annot"><span class="annottext">Int -&gt; UserCredential -&gt; Int
+UserCredential -&gt; Int
+(Int -&gt; UserCredential -&gt; Int)
+-&gt; (UserCredential -&gt; Int) -&gt; Hashable UserCredential
+forall a. (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+hash :: UserCredential -&gt; Int
+$chash :: UserCredential -&gt; Int
+hashWithSalt :: Int -&gt; UserCredential -&gt; Int
+$chashWithSalt :: Int -&gt; UserCredential -&gt; Int
+</span><a href="../file:///nix/store/c8zmk5p1xjyk8kh1g2scsirszd4kyahy-hashable-lib-hashable-1.3.5.0-haddock-doc/share/doc/hashable/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#transition"><span class="hs-pragma hs-type">transition</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#transition"><span class="hs-identifier hs-type">transition</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-type">UserCredential</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">TxConstraints</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Void</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Void</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span id="transition"><span class="annot"><span class="annottext">transition :: UserCredential
+-&gt; State IDState
+-&gt; IDAction
+-&gt; Maybe (TxConstraints Void Void, State IDState)
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#transition"><span class="hs-identifier hs-var hs-var">transition</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-type">UserCredential</span></a></span><span class="hs-special">{</span><span id="local-6989586621680980911"><span class="annot"><span class="annottext">PaymentPubKeyHash
+ucAddress :: PaymentPubKeyHash
+ucAddress :: UserCredential -&gt; PaymentPubKeyHash
+</span><a href="#local-6989586621680980911"><span class="hs-identifier hs-var hs-var">ucAddress</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980910"><span class="annot"><span class="annottext">Credential
+ucCredential :: Credential
+ucCredential :: UserCredential -&gt; Credential
+</span><a href="#local-6989586621680980910"><span class="hs-identifier hs-var hs-var">ucCredential</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680980909"><span class="annot"><span class="annottext">Value
+ucToken :: Value
+ucToken :: UserCredential -&gt; Value
+</span><a href="#local-6989586621680980909"><span class="hs-identifier hs-var hs-var">ucToken</span></a></span></span><span class="hs-special">}</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">State</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">stateData :: forall s. State s -&gt; s
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">stateData</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680980906"><span class="annot"><span class="annottext">IDState
+</span><a href="#local-6989586621680980906"><span class="hs-identifier hs-var">state</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">stateValue :: forall s. State s -&gt; Value
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">stateValue</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680980904"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680980904"><span class="hs-identifier hs-var">currentValue</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621680980903"><span class="annot"><span class="annottext">IDAction
+</span><a href="#local-6989586621680980903"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IDState
+</span><a href="#local-6989586621680980906"><span class="hs-identifier hs-var">state</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">IDAction
+</span><a href="#local-6989586621680980903"><span class="hs-identifier hs-var">input</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-65"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IDState
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#Active"><span class="hs-identifier hs-var">Active</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#PresentCredential"><span class="hs-identifier hs-var">PresentCredential</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-66"></span><span>            </span><span class="annot"><span class="annottext">(TxConstraints Void Void, State IDState)
+-&gt; Maybe (TxConstraints Void Void, State IDState)
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span>
+</span><span id="line-67"></span><span>                </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; TxConstraints Void Void
+forall i o. PaymentPubKeyHash -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustBeSignedBy</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680980911"><span class="hs-identifier hs-var">ucAddress</span></a></span><span>
+</span><span id="line-68"></span><span>                </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">State :: forall s. s -&gt; Value -&gt; State s
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">State</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">stateData :: IDState
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">stateData</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">IDState
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#Active"><span class="hs-identifier hs-var">Active</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">stateValue :: Value
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">stateValue</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680980904"><span class="hs-identifier hs-var">currentValue</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-69"></span><span>                </span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IDState
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#Active"><span class="hs-identifier hs-var">Active</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#RevokeCredential"><span class="hs-identifier hs-var">RevokeCredential</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-71"></span><span>            </span><span class="annot"><span class="annottext">(TxConstraints Void Void, State IDState)
+-&gt; Maybe (TxConstraints Void Void, State IDState)
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span>
+</span><span id="line-72"></span><span>                </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; TxConstraints Void Void
+forall i o. PaymentPubKeyHash -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustBeSignedBy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CredentialAuthority -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Prism.Credential.html#unCredentialAuthority"><span class="hs-identifier hs-var hs-var">unCredentialAuthority</span></a></span><span> </span><span class="annot"><span class="annottext">(CredentialAuthority -&gt; PaymentPubKeyHash)
+-&gt; CredentialAuthority -&gt; PaymentPubKeyHash
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Credential -&gt; CredentialAuthority
+</span><a href="Plutus.Contracts.Prism.Credential.html#credAuthority"><span class="hs-identifier hs-var hs-var">credAuthority</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680980910"><span class="hs-identifier hs-var">ucCredential</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints Void Void
+-&gt; TxConstraints Void Void -&gt; TxConstraints Void Void
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; TxConstraints Void Void
+forall i o. Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustMintValue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Value -&gt; Value
+forall a. Group a =&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">inv</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680980909"><span class="hs-identifier hs-var">ucToken</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- Destroy the token</span><span>
+</span><span id="line-74"></span><span>                </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">State :: forall s. s -&gt; Value -&gt; State s
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">State</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">stateData :: IDState
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">stateData</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">IDState
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#Revoked"><span class="hs-identifier hs-var">Revoked</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">stateValue :: Value
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">stateValue</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">Value
+forall a. Monoid a =&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">mempty</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-75"></span><span>                </span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>        </span><span class="annot"><span class="annottext">(IDState, IDAction)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (TxConstraints Void Void, State IDState)
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#credentialStateMachine"><span class="hs-pragma hs-type">credentialStateMachine</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-79"></span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#credentialStateMachine"><span class="hs-identifier hs-type">credentialStateMachine</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-type">UserCredential</span></a></span><span>
+</span><span id="line-81"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachine</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span>
+</span><span id="line-82"></span><span id="credentialStateMachine"><span class="annot"><span class="annottext">credentialStateMachine :: UserCredential -&gt; StateMachine IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#credentialStateMachine"><span class="hs-identifier hs-var hs-var">credentialStateMachine</span></a></span></span><span> </span><span id="local-6989586621680980893"><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980893"><span class="hs-identifier hs-var">cd</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe ThreadToken
+-&gt; (State IDState
+    -&gt; IDAction -&gt; Maybe (TxConstraints Void Void, State IDState))
+-&gt; (IDState -&gt; Bool)
+-&gt; StateMachine IDState IDAction
+forall s i.
+Maybe ThreadToken
+-&gt; (State s -&gt; i -&gt; Maybe (TxConstraints Void Void, State s))
+-&gt; (s -&gt; Bool)
+-&gt; StateMachine s i
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">StateMachine.mkStateMachine</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe ThreadToken
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UserCredential
+-&gt; State IDState
+-&gt; IDAction
+-&gt; Maybe (TxConstraints Void Void, State IDState)
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#transition"><span class="hs-identifier hs-var">transition</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980893"><span class="hs-identifier hs-var">cd</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">IDState -&gt; Bool
+</span><a href="#local-6989586621680980891"><span class="hs-identifier hs-var">isFinal</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-83"></span><span>  </span><span id="local-6989586621680980891"><span class="annot"><span class="annottext">isFinal :: IDState -&gt; Bool
+</span><a href="#local-6989586621680980891"><span class="hs-identifier hs-var hs-var">isFinal</span></a></span></span><span> </span><span class="annot"><span class="annottext">IDState
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#Revoked"><span class="hs-identifier hs-var">Revoked</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-84"></span><span>  </span><span class="annot"><a href="#local-6989586621680980891"><span class="hs-identifier hs-var">isFinal</span></a></span><span> </span><span class="annot"><span class="annottext">IDState
+</span><span class="hs-identifier">_</span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#typedValidator"><span class="hs-identifier hs-type">typedValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-87"></span><span>  </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-type">UserCredential</span></a></span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.TypedValidator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachine</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span id="typedValidator"><span class="annot"><span class="annottext">typedValidator :: UserCredential -&gt; TypedValidator (StateMachine IDState IDAction)
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#typedValidator"><span class="hs-identifier hs-var hs-var">typedValidator</span></a></span></span><span> </span><span id="local-6989586621680980890"><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980890"><span class="hs-identifier hs-var">credentialData</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680980889"><span class="annot"><span class="annottext">val :: CompiledCodeIn
+  DefaultUni
+  DefaultFun
+  (IDState -&gt; IDAction -&gt; ScriptContext -&gt; Bool)
+</span><a href="#local-6989586621680980889"><span class="hs-identifier hs-var hs-var">val</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">validator</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CompiledCode
+  (UserCredential -&gt; IDState -&gt; IDAction -&gt; ScriptContext -&gt; Bool)
+-&gt; CompiledCodeIn DefaultUni DefaultFun UserCredential
+-&gt; CompiledCodeIn
+     DefaultUni
+     DefaultFun
+     (IDState -&gt; IDAction -&gt; ScriptContext -&gt; Bool)
+forall (uni :: * -&gt; *) fun a b.
+(Closed uni, Everywhere uni Flat, Flat fun,
+ Everywhere uni PrettyConst, GShow uni, Pretty fun) =&gt;
+CompiledCodeIn uni fun (a -&gt; b)
+-&gt; CompiledCodeIn uni fun a -&gt; CompiledCodeIn uni fun b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">`PlutusTx.applyCode`</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+-&gt; CompiledCodeIn DefaultUni DefaultFun UserCredential
+forall (uni :: * -&gt; *) a fun.
+(Lift uni a, Throwable uni fun, Typecheckable uni fun) =&gt;
+a -&gt; CompiledCodeIn uni fun a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">PlutusTx.liftCode</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980890"><span class="hs-identifier hs-var">credentialData</span></a></span><span>
+</span><span id="line-91"></span><span>        </span><span id="local-6989586621680980888"><span class="annot"><span class="annottext">validator :: UserCredential -&gt; ValidatorType (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680980888"><span class="hs-identifier hs-var hs-var">validator</span></a></span></span><span> </span><span id="local-6989586621680980882"><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980882"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StateMachine IDState IDAction
+-&gt; ValidatorType (StateMachine IDState IDAction)
+forall s i.
+ToData s =&gt;
+StateMachine s i -&gt; ValidatorType (StateMachine s i)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">StateMachine.mkValidator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UserCredential -&gt; StateMachine IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#credentialStateMachine"><span class="hs-identifier hs-var">credentialStateMachine</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980882"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>        </span><span id="local-6989586621680980880"><span class="annot"><span class="annottext">wrap :: (IDState -&gt; IDAction -&gt; ScriptContext -&gt; Bool) -&gt; UntypedValidator
+</span><a href="#local-6989586621680980880"><span class="hs-identifier hs-var hs-var">wrap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(UnsafeFromData IDState, UnsafeFromData IDAction) =&gt;
+(IDState -&gt; IDAction -&gt; ScriptContext -&gt; Bool) -&gt; UntypedValidator
+forall sc d r.
+(IsScriptContext sc, UnsafeFromData d, UnsafeFromData r) =&gt;
+(d -&gt; r -&gt; sc -&gt; Bool) -&gt; UntypedValidator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkUntypedValidator</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.ScriptContextV1</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">CompiledCode (ValidatorType (StateMachine IDState IDAction))
+-&gt; CompiledCode
+     (ValidatorType (StateMachine IDState IDAction) -&gt; UntypedValidator)
+-&gt; TypedValidator (StateMachine IDState IDAction)
+forall a.
+CompiledCode (ValidatorType a)
+-&gt; CompiledCode (ValidatorType a -&gt; UntypedValidator)
+-&gt; TypedValidator a
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkTypedValidator</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachine</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CompiledCode (ValidatorType (StateMachine IDState IDAction))
+CompiledCodeIn
+  DefaultUni
+  DefaultFun
+  (IDState -&gt; IDAction -&gt; ScriptContext -&gt; Bool)
+</span><a href="#local-6989586621680980889"><span class="hs-identifier hs-var">val</span></a></span><span> </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">wrap</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#machineClient"><span class="hs-identifier hs-type">machineClient</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-96"></span><span>    </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.TypedValidator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachine</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-type">UserCredential</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachineClient</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span>
+</span><span id="line-99"></span><span id="machineClient"><span class="annot"><span class="annottext">machineClient :: TypedValidator (StateMachine IDState IDAction)
+-&gt; UserCredential -&gt; StateMachineClient IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#machineClient"><span class="hs-identifier hs-var hs-var">machineClient</span></a></span></span><span> </span><span id="local-6989586621680980876"><span class="annot"><span class="annottext">TypedValidator (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680980876"><span class="hs-identifier hs-var">inst</span></a></span></span><span> </span><span id="local-6989586621680980875"><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980875"><span class="hs-identifier hs-var">credentialData</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680980874"><span class="annot"><span class="annottext">machine :: StateMachine IDState IDAction
+</span><a href="#local-6989586621680980874"><span class="hs-identifier hs-var hs-var">machine</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UserCredential -&gt; StateMachine IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#credentialStateMachine"><span class="hs-identifier hs-var">credentialStateMachine</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980875"><span class="hs-identifier hs-var">credentialData</span></a></span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">StateMachineInstance IDState IDAction
+-&gt; StateMachineClient IDState IDAction
+forall state input.
+StateMachineInstance state input -&gt; StateMachineClient state input
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">StateMachine.mkStateMachineClient</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">StateMachine IDState IDAction
+-&gt; TypedValidator (StateMachine IDState IDAction)
+-&gt; StateMachineInstance IDState IDAction
+forall s i.
+StateMachine s i
+-&gt; TypedValidator (StateMachine s i) -&gt; StateMachineInstance s i
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">StateMachine.StateMachineInstance</span></a></span><span> </span><span class="annot"><span class="annottext">StateMachine IDState IDAction
+</span><a href="#local-6989586621680980874"><span class="hs-identifier hs-var">machine</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680980876"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#mkMachineClient"><span class="hs-identifier hs-type">mkMachineClient</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#CredentialAuthority"><span class="hs-identifier hs-type">CredentialAuthority</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachineClient</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span>
+</span><span id="line-104"></span><span id="mkMachineClient"><span class="annot"><span class="annottext">mkMachineClient :: CredentialAuthority
+-&gt; PaymentPubKeyHash
+-&gt; TokenName
+-&gt; StateMachineClient IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#mkMachineClient"><span class="hs-identifier hs-var hs-var">mkMachineClient</span></a></span></span><span> </span><span id="local-6989586621680980871"><span class="annot"><span class="annottext">CredentialAuthority
+</span><a href="#local-6989586621680980871"><span class="hs-identifier hs-var">authority</span></a></span></span><span> </span><span id="local-6989586621680980870"><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680980870"><span class="hs-identifier hs-var">credentialOwner</span></a></span></span><span> </span><span id="local-6989586621680980869"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680980869"><span class="hs-identifier hs-var">tokenName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680980868"><span class="annot"><span class="annottext">credential :: Credential
+</span><a href="#local-6989586621680980868"><span class="hs-identifier hs-var hs-var">credential</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Credential :: CredentialAuthority -&gt; TokenName -&gt; Credential
+</span><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier hs-type">Credential</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">credAuthority :: CredentialAuthority
+</span><a href="Plutus.Contracts.Prism.Credential.html#credAuthority"><span class="hs-identifier hs-var">credAuthority</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">CredentialAuthority
+</span><a href="#local-6989586621680980871"><span class="hs-identifier hs-var">authority</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">credName :: TokenName
+</span><a href="Plutus.Contracts.Prism.Credential.html#credName"><span class="hs-identifier hs-var">credName</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680980869"><span class="hs-identifier hs-var">tokenName</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-106"></span><span>        </span><span id="local-6989586621680980865"><span class="annot"><span class="annottext">userCredential :: UserCredential
+</span><a href="#local-6989586621680980865"><span class="hs-identifier hs-var hs-var">userCredential</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-107"></span><span>            </span><span class="annot"><span class="annottext">UserCredential :: PaymentPubKeyHash -&gt; Credential -&gt; Value -&gt; UserCredential
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-type">UserCredential</span></a></span><span>
+</span><span id="line-108"></span><span>                </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">ucAddress :: PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#ucAddress"><span class="hs-identifier hs-var">ucAddress</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680980870"><span class="hs-identifier hs-var">credentialOwner</span></a></span><span>
+</span><span id="line-109"></span><span>                </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ucCredential :: Credential
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#ucCredential"><span class="hs-identifier hs-var">ucCredential</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680980868"><span class="hs-identifier hs-var">credential</span></a></span><span>
+</span><span id="line-110"></span><span>                </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ucToken :: Value
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#ucToken"><span class="hs-identifier hs-var">ucToken</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Credential -&gt; Value
+</span><a href="Plutus.Contracts.Prism.Credential.html#token"><span class="hs-identifier hs-var">Credential.token</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680980868"><span class="hs-identifier hs-var">credential</span></a></span><span>
+</span><span id="line-111"></span><span>                </span><span class="hs-special">}</span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">TypedValidator (StateMachine IDState IDAction)
+-&gt; UserCredential -&gt; StateMachineClient IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#machineClient"><span class="hs-identifier hs-var">machineClient</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UserCredential -&gt; TypedValidator (StateMachine IDState IDAction)
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980865"><span class="hs-identifier hs-var">userCredential</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680980865"><span class="hs-identifier hs-var">userCredential</span></a></span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span id="local-6989586621680980860"><span id="local-6989586621680980862"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">UserCredential</span></span></span><span>
+</span><span id="line-115"></span><span id="local-6989586621680980852"><span id="local-6989586621680980854"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">IDState</span></span></span><span>
+</span><span id="line-116"></span><span id="local-6989586621680980848"><span id="local-6989586621680980850"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">IDAction</span></span></span><span>
+</span><span id="line-117"></span><span id="local-6989586621680980842"><span id="local-6989586621680980844"><span id="local-6989586621680980846"><span class="hs-identifier">PlutusTx.unstableMakeIsData</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">IDState</span></span></span></span><span>
+</span><span id="line-118"></span><span id="local-6989586621680980830"><span id="local-6989586621680980832"><span id="local-6989586621680980834"><span class="hs-identifier">PlutusTx.unstableMakeIsData</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">IDAction</span></span></span></span><span>
+</span><span id="line-119"></span></pre></body></html>

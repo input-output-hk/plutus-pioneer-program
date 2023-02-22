@@ -1,0 +1,951 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE AllowAmbiguousTypes        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DataKinds                  #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass             #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric              #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies         #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts           #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances          #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses      #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns             #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude          #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE PartialTypeSignatures      #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards            #-}</span><span>
+</span><span id="line-14"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables        #-}</span><span>
+</span><span id="line-15"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell            #-}</span><span>
+</span><span id="line-16"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications           #-}</span><span>
+</span><span id="line-17"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies               #-}</span><span>
+</span><span id="line-18"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators              #-}</span><span>
+</span><span id="line-19"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns               #-}</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- | A guessing game. A simplified version of 'Plutus.Contract.GameStateMachine'</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- not using 'Plutus.Contract.StateMachine' and using `yieldUnbalancedTx' for</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- balancing, signing and submitting transactions.</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- Currently, remote wallets (anything other than WBE) can only handles</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- `yieldUnbalancedTx` requests, and not `balanceTx`, `signTx` and `submitTx`</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- requests.</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Game</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#contract"><span class="hs-identifier">contract</span></a></span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier">GameParam</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameSchema"><span class="hs-identifier">GameSchema</span></a></span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#LockArgs"><span class="hs-identifier">LockArgs</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GuessArgs"><span class="hs-identifier">GuessArgs</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Scripts</span></span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#gameInstance"><span class="hs-identifier">gameInstance</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#mkValidator"><span class="hs-identifier">mkValidator</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Address</span></span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#gameAddress"><span class="hs-identifier">gameAddress</span></a></span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#covIdx"><span class="hs-identifier">covIdx</span></a></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Params</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">testnet</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">_2</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(^?)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier">Data.ByteString.Char8</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Map</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">catMaybes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">CardanoAddress</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">POSIXTime</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">PaymentPubKeyHash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">ScriptContext</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TxOutRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ada</span></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-53"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Tx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">DecoratedTxOut</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">datumInDatumFromQuery</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">decoratedTxOutDatum</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">Playground.Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">ToSchema</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">AsContractError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Contract</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Endpoint</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Promise</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">adjustUnbalancedTx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">endpoint</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">fundsAtAddressGeq</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-57"></span><span>                        </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">logInfo</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">mkTxConstraints</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">selectList</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">type</span><span> </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator">(.\/)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">yieldUnbalancedTx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Plutus.Script.Utils.Typed</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">ScriptContextV1</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Plutus.Script.Utils.V1.Address</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">mkValidatorCardanoAddress</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Scripts</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Datum</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Datum</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Validator</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Code</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">getCovIdx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Coverage</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">CoverageIndex</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">pure</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-operator">(&lt;$&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="hs-comment">-- | Datatype for creating a parameterized validator.</span><span>
+</span><span id="line-68"></span><span id="local-6989586621680974044"><span id="local-6989586621680974045"></span></span><span class="hs-keyword">data</span><span> </span><span id="GameParam"><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-var">GameParam</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="GameParam"><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-var">GameParam</span></a></span></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="gameParamPayeePkh"><span class="annot"><span class="annottext">GameParam -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Game.html#gameParamPayeePkh"><span class="hs-identifier hs-var hs-var">gameParamPayeePkh</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-comment">-- ^ Payment public key hash of the wallet locking some funds</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="gameParamStartTime"><span class="annot"><span class="annottext">GameParam -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Game.html#gameParamStartTime"><span class="hs-identifier hs-var hs-var">gameParamStartTime</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">POSIXTime</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-comment">-- ^ Starting time of the game</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680974035"><span id="local-6989586621680974037"><span id="local-6989586621680974039"><span class="annot"><span class="annottext">Int -&gt; GameParam -&gt; ShowS
+[GameParam] -&gt; ShowS
+GameParam -&gt; String
+(Int -&gt; GameParam -&gt; ShowS)
+-&gt; (GameParam -&gt; String)
+-&gt; ([GameParam] -&gt; ShowS)
+-&gt; Show GameParam
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GameParam] -&gt; ShowS
+$cshowList :: [GameParam] -&gt; ShowS
+show :: GameParam -&gt; String
+$cshow :: GameParam -&gt; String
+showsPrec :: Int -&gt; GameParam -&gt; ShowS
+$cshowsPrec :: Int -&gt; GameParam -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. GameParam -&gt; Rep GameParam x)
+-&gt; (forall x. Rep GameParam x -&gt; GameParam) -&gt; Generic GameParam
+forall x. Rep GameParam x -&gt; GameParam
+forall x. GameParam -&gt; Rep GameParam x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep GameParam x -&gt; GameParam
+$cfrom :: forall x. GameParam -&gt; Rep GameParam x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680974023"><span id="local-6989586621680974025"><span id="local-6989586621680974027"><span id="local-6989586621680974029"><span class="annot"><span class="annottext">[GameParam] -&gt; Encoding
+[GameParam] -&gt; Value
+GameParam -&gt; Encoding
+GameParam -&gt; Value
+(GameParam -&gt; Value)
+-&gt; (GameParam -&gt; Encoding)
+-&gt; ([GameParam] -&gt; Value)
+-&gt; ([GameParam] -&gt; Encoding)
+-&gt; ToJSON GameParam
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [GameParam] -&gt; Encoding
+$ctoEncodingList :: [GameParam] -&gt; Encoding
+toJSONList :: [GameParam] -&gt; Value
+$ctoJSONList :: [GameParam] -&gt; Value
+toEncoding :: GameParam -&gt; Encoding
+$ctoEncoding :: GameParam -&gt; Encoding
+toJSON :: GameParam -&gt; Value
+$ctoJSON :: GameParam -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680974018"><span id="local-6989586621680974020"><span class="annot"><span class="annottext">Value -&gt; Parser [GameParam]
+Value -&gt; Parser GameParam
+(Value -&gt; Parser GameParam)
+-&gt; (Value -&gt; Parser [GameParam]) -&gt; FromJSON GameParam
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [GameParam]
+$cparseJSONList :: Value -&gt; Parser [GameParam]
+parseJSON :: Value -&gt; Parser GameParam
+$cparseJSON :: Value -&gt; Parser GameParam
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680974015"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema GameParam
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="../../../../playground-common/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span id="local-6989586621680974010"><span id="local-6989586621680974012"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">GameParam</span></span></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-keyword">newtype</span><span> </span><span id="HashedString"><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-var">HashedString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="HashedString"><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-var">HashedString</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">BuiltinByteString</span></a></span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680974003"><span class="annot"><span class="annottext">HashedString -&gt; BuiltinData
+(HashedString -&gt; BuiltinData) -&gt; ToData HashedString
+forall a. (a -&gt; BuiltinData) -&gt; ToData a
+toBuiltinData :: HashedString -&gt; BuiltinData
+$ctoBuiltinData :: HashedString -&gt; BuiltinData
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.ToData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680974000"><span class="annot"><span class="annottext">BuiltinData -&gt; Maybe HashedString
+(BuiltinData -&gt; Maybe HashedString) -&gt; FromData HashedString
+forall a. (BuiltinData -&gt; Maybe a) -&gt; FromData a
+fromBuiltinData :: BuiltinData -&gt; Maybe HashedString
+$cfromBuiltinData :: BuiltinData -&gt; Maybe HashedString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.FromData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973997"><span class="annot"><span class="annottext">BuiltinData -&gt; HashedString
+(BuiltinData -&gt; HashedString) -&gt; UnsafeFromData HashedString
+forall a. (BuiltinData -&gt; a) -&gt; UnsafeFromData a
+unsafeFromBuiltinData :: BuiltinData -&gt; HashedString
+$cunsafeFromBuiltinData :: BuiltinData -&gt; HashedString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.UnsafeFromData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span id="local-6989586621680973992"><span id="local-6989586621680973994"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">HashedString</span></span></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-keyword">newtype</span><span> </span><span id="ClearString"><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-var">ClearString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ClearString"><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-var">ClearString</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">BuiltinByteString</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680973989"><span class="annot"><span class="annottext">ClearString -&gt; BuiltinData
+(ClearString -&gt; BuiltinData) -&gt; ToData ClearString
+forall a. (a -&gt; BuiltinData) -&gt; ToData a
+toBuiltinData :: ClearString -&gt; BuiltinData
+$ctoBuiltinData :: ClearString -&gt; BuiltinData
+</span><a href="#local-6989586621680973989"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.ToData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973987"><span class="annot"><span class="annottext">BuiltinData -&gt; Maybe ClearString
+(BuiltinData -&gt; Maybe ClearString) -&gt; FromData ClearString
+forall a. (BuiltinData -&gt; Maybe a) -&gt; FromData a
+fromBuiltinData :: BuiltinData -&gt; Maybe ClearString
+$cfromBuiltinData :: BuiltinData -&gt; Maybe ClearString
+</span><a href="#local-6989586621680973987"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.FromData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973985"><span class="annot"><span class="annottext">BuiltinData -&gt; ClearString
+(BuiltinData -&gt; ClearString) -&gt; UnsafeFromData ClearString
+forall a. (BuiltinData -&gt; a) -&gt; UnsafeFromData a
+unsafeFromBuiltinData :: BuiltinData -&gt; ClearString
+$cunsafeFromBuiltinData :: BuiltinData -&gt; ClearString
+</span><a href="#local-6989586621680973985"><span class="hs-identifier hs-var hs-var hs-var hs-var">PlutusTx.UnsafeFromData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span id="local-6989586621680973981"><span id="local-6989586621680973983"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">ClearString</span></span></span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span class="hs-keyword">type</span><span> </span><span id="GameSchema"><span class="annot"><a href="Plutus.Contracts.Game.html#GameSchema"><span class="hs-identifier hs-var">GameSchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-89"></span><span>        </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;lock&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#LockArgs"><span class="hs-identifier hs-type">LockArgs</span></a></span><span>
+</span><span id="line-90"></span><span>        </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator hs-type">.\/</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;guess&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GuessArgs"><span class="hs-identifier hs-type">GuessArgs</span></a></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-keyword">data</span><span> </span><span id="Game"><span class="annot"><a href="Plutus.Contracts.Game.html#Game"><span class="hs-identifier hs-var">Game</span></a></span></span><span>
+</span><span id="line-93"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.ValidatorTypes</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#Game"><span class="hs-identifier hs-type">Game</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="RedeemerType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">RedeemerType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#Game"><span class="hs-identifier hs-type">Game</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-type">ClearString</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="DatumType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">DatumType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#Game"><span class="hs-identifier hs-type">Game</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="hs-comment">-- | The address of the game (the hash of its validator script)</span><span>
+</span><span id="line-98"></span><span class="annot"><a href="Plutus.Contracts.Game.html#gameAddress"><span class="hs-identifier hs-type">gameAddress</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">CardanoAddress</span></a></span><span>
+</span><span id="line-99"></span><span id="gameAddress"><span class="annot"><span class="annottext">gameAddress :: GameParam -&gt; CardanoAddress
+</span><a href="Plutus.Contracts.Game.html#gameAddress"><span class="hs-identifier hs-var hs-var">gameAddress</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NetworkId -&gt; Validator -&gt; CardanoAddress
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">mkValidatorCardanoAddress</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">testnet</span></a></span><span> </span><span class="annot"><span class="annottext">(Validator -&gt; CardanoAddress)
+-&gt; (GameParam -&gt; Validator) -&gt; GameParam -&gt; CardanoAddress
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam -&gt; Validator
+</span><a href="Plutus.Contracts.Game.html#gameValidator"><span class="hs-identifier hs-var">gameValidator</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="hs-comment">-- | The validator script of the game.</span><span>
+</span><span id="line-102"></span><span class="annot"><a href="Plutus.Contracts.Game.html#gameValidator"><span class="hs-identifier hs-type">gameValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Validator</span></a></span><span>
+</span><span id="line-103"></span><span id="gameValidator"><span class="annot"><span class="annottext">gameValidator :: GameParam -&gt; Validator
+</span><a href="Plutus.Contracts.Game.html#gameValidator"><span class="hs-identifier hs-var hs-var">gameValidator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator Game -&gt; Validator
+forall a. TypedValidator a -&gt; Validator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.validatorScript</span></a></span><span> </span><span class="annot"><span class="annottext">(TypedValidator Game -&gt; Validator)
+-&gt; (GameParam -&gt; TypedValidator Game) -&gt; GameParam -&gt; Validator
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam -&gt; TypedValidator Game
+</span><a href="Plutus.Contracts.Game.html#gameInstance"><span class="hs-identifier hs-var">gameInstance</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="annot"><a href="Plutus.Contracts.Game.html#gameInstance"><span class="hs-identifier hs-type">gameInstance</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.TypedValidator</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#Game"><span class="hs-identifier hs-type">Game</span></a></span><span>
+</span><span id="line-106"></span><span id="gameInstance"><span class="annot"><span class="annottext">gameInstance :: GameParam -&gt; TypedValidator Game
+</span><a href="Plutus.Contracts.Game.html#gameInstance"><span class="hs-identifier hs-var hs-var">gameInstance</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompiledCode (GameParam -&gt; ValidatorType Game)
+-&gt; CompiledCode (ValidatorType Game -&gt; UntypedValidator)
+-&gt; GameParam
+-&gt; TypedValidator Game
+forall a param.
+Lift DefaultUni param =&gt;
+CompiledCode (param -&gt; ValidatorType a)
+-&gt; CompiledCode (ValidatorType a -&gt; UntypedValidator)
+-&gt; param
+-&gt; TypedValidator a
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkTypedValidatorParam</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Game.html#Game"><span class="hs-identifier hs-type">Game</span></a></span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">mkValidator</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">wrap</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-109"></span><span>        </span><span id="local-6989586621680973972"><span class="annot"><span class="annottext">wrap :: (HashedString -&gt; ClearString -&gt; ScriptContext -&gt; Bool)
+-&gt; UntypedValidator
+</span><a href="#local-6989586621680973972"><span class="hs-identifier hs-var hs-var">wrap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(UnsafeFromData HashedString, UnsafeFromData ClearString) =&gt;
+(HashedString -&gt; ClearString -&gt; ScriptContext -&gt; Bool)
+-&gt; UntypedValidator
+forall sc d r.
+(IsScriptContext sc, UnsafeFromData d, UnsafeFromData r) =&gt;
+(d -&gt; r -&gt; sc -&gt; Bool) -&gt; UntypedValidator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkUntypedValidator</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">ScriptContextV1</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-type">ClearString</span></a></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span class="hs-comment">-- | The validation function (Datum -&gt; Redeemer -&gt; ScriptContext -&gt; Bool)</span><span>
+</span><span id="line-112"></span><span class="hs-comment">--</span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- The 'GameParam' parameter is not used in the validation. It is meant to</span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- parameterize the script address depending based on the value of 'GaramParam'.</span><span>
+</span><span id="line-115"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#mkValidator"><span class="hs-pragma hs-type">mkValidator</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-116"></span><span class="annot"><a href="Plutus.Contracts.Game.html#mkValidator"><span class="hs-identifier hs-type">mkValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-type">ClearString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptContext</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-117"></span><span id="mkValidator"><span class="annot"><span class="annottext">mkValidator :: GameParam -&gt; HashedString -&gt; ClearString -&gt; ScriptContext -&gt; Bool
+</span><a href="Plutus.Contracts.Game.html#mkValidator"><span class="hs-identifier hs-var hs-var">mkValidator</span></a></span></span><span> </span><span class="annot"><span class="annottext">GameParam
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680973970"><span class="annot"><span class="annottext">HashedString
+</span><a href="#local-6989586621680973970"><span class="hs-identifier hs-var">hs</span></a></span></span><span> </span><span id="local-6989586621680973969"><span class="annot"><span class="annottext">ClearString
+</span><a href="#local-6989586621680973969"><span class="hs-identifier hs-var">cs</span></a></span></span><span> </span><span class="annot"><span class="annottext">ScriptContext
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">HashedString -&gt; ClearString -&gt; Bool
+</span><a href="Plutus.Contracts.Game.html#isGoodGuess"><span class="hs-identifier hs-var">isGoodGuess</span></a></span><span> </span><span class="annot"><span class="annottext">HashedString
+</span><a href="#local-6989586621680973970"><span class="hs-identifier hs-var">hs</span></a></span><span> </span><span class="annot"><span class="annottext">ClearString
+</span><a href="#local-6989586621680973969"><span class="hs-identifier hs-var">cs</span></a></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#isGoodGuess"><span class="hs-pragma hs-type">isGoodGuess</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-120"></span><span class="annot"><a href="Plutus.Contracts.Game.html#isGoodGuess"><span class="hs-identifier hs-type">isGoodGuess</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-type">ClearString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-121"></span><span id="isGoodGuess"><span class="annot"><span class="annottext">isGoodGuess :: HashedString -&gt; ClearString -&gt; Bool
+</span><a href="Plutus.Contracts.Game.html#isGoodGuess"><span class="hs-identifier hs-var hs-var">isGoodGuess</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span> </span><span id="local-6989586621680973967"><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680973967"><span class="hs-identifier hs-var">actual</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-type">ClearString</span></a></span><span> </span><span id="local-6989586621680973966"><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680973966"><span class="hs-identifier hs-var">guess'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680973967"><span class="hs-identifier hs-var">actual</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680973966"><span class="hs-identifier hs-var">guess'</span></a></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- TODO: Ideas welcome for how to make this interface suck less.</span><span>
+</span><span id="line-124"></span><span class="hs-comment">-- Doing it this way actually generates coverage locations that we don't care about(!)</span><span>
+</span><span id="line-125"></span><span class="annot"><a href="Plutus.Contracts.Game.html#covIdx"><span class="hs-identifier hs-type">covIdx</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">CoverageIndex</span></a></span><span>
+</span><span id="line-126"></span><span id="covIdx"><span class="annot"><span class="annottext">covIdx :: GameParam -&gt; CoverageIndex
+</span><a href="Plutus.Contracts.Game.html#covIdx"><span class="hs-identifier hs-var hs-var">covIdx</span></a></span></span><span> </span><span id="local-6989586621680973963"><span class="annot"><span class="annottext">GameParam
+</span><a href="#local-6989586621680973963"><span class="hs-identifier hs-var">gameParam</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-127"></span><span>    </span><span class="annot"><span class="annottext">CompiledCodeIn
+  DefaultUni
+  DefaultFun
+  (HashedString -&gt; ClearString -&gt; ScriptContext -&gt; Bool)
+-&gt; CoverageIndex
+forall (uni :: * -&gt; *) fun a.
+CompiledCodeIn uni fun a -&gt; CoverageIndex
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">getCovIdx</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">mkValidator</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CompiledCode
+  (GameParam -&gt; HashedString -&gt; ClearString -&gt; ScriptContext -&gt; Bool)
+-&gt; CompiledCodeIn DefaultUni DefaultFun GameParam
+-&gt; CompiledCodeIn
+     DefaultUni
+     DefaultFun
+     (HashedString -&gt; ClearString -&gt; ScriptContext -&gt; Bool)
+forall (uni :: * -&gt; *) fun a b.
+(Closed uni, Everywhere uni Flat, Flat fun,
+ Everywhere uni PrettyConst, GShow uni, Pretty fun) =&gt;
+CompiledCodeIn uni fun (a -&gt; b)
+-&gt; CompiledCodeIn uni fun a -&gt; CompiledCodeIn uni fun b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">`PlutusTx.applyCode`</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam -&gt; CompiledCodeIn DefaultUni DefaultFun GameParam
+forall (uni :: * -&gt; *) a fun.
+(Lift uni a, Throwable uni fun, Typecheckable uni fun) =&gt;
+a -&gt; CompiledCodeIn uni fun a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">PlutusTx.liftCode</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam
+</span><a href="#local-6989586621680973963"><span class="hs-identifier hs-var">gameParam</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- create a data script for the guessing game by hashing the string</span><span>
+</span><span id="line-130"></span><span class="hs-comment">-- and lifting the hash to its on-chain representation</span><span>
+</span><span id="line-131"></span><span class="annot"><a href="Plutus.Contracts.Game.html#hashString"><span class="hs-identifier hs-type">hashString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span>
+</span><span id="line-132"></span><span id="hashString"><span class="annot"><span class="annottext">hashString :: String -&gt; HashedString
+</span><a href="Plutus.Contracts.Game.html#hashString"><span class="hs-identifier hs-var hs-var">hashString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; HashedString
+</span><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-var">HashedString</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; HashedString)
+-&gt; (String -&gt; BuiltinByteString) -&gt; String -&gt; HashedString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; BuiltinByteString)
+-&gt; (String -&gt; BuiltinByteString) -&gt; String -&gt; BuiltinByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; BuiltinByteString
+forall a arep. ToBuiltin a arep =&gt; a -&gt; arep
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">toBuiltin</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; BuiltinByteString)
+-&gt; (String -&gt; ByteString) -&gt; String -&gt; BuiltinByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-var">C.pack</span></a></span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span class="hs-comment">-- create a redeemer script for the guessing game by lifting the</span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- string to its on-chain representation</span><span>
+</span><span id="line-136"></span><span class="annot"><a href="Plutus.Contracts.Game.html#clearString"><span class="hs-identifier hs-type">clearString</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-type">ClearString</span></a></span><span>
+</span><span id="line-137"></span><span id="clearString"><span class="annot"><span class="annottext">clearString :: String -&gt; ClearString
+</span><a href="Plutus.Contracts.Game.html#clearString"><span class="hs-identifier hs-var hs-var">clearString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; ClearString
+</span><a href="Plutus.Contracts.Game.html#ClearString"><span class="hs-identifier hs-var">ClearString</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; ClearString)
+-&gt; (String -&gt; BuiltinByteString) -&gt; String -&gt; ClearString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; BuiltinByteString
+forall a arep. ToBuiltin a arep =&gt; a -&gt; arep
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">toBuiltin</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; BuiltinByteString)
+-&gt; (String -&gt; ByteString) -&gt; String -&gt; BuiltinByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ByteString
+</span><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-var">C.pack</span></a></span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- | Arguments for the @&quot;lock&quot;@ endpoint</span><span>
+</span><span id="line-140"></span><span id="local-6989586621680973955"><span id="local-6989586621680973956"></span></span><span class="hs-keyword">data</span><span> </span><span id="LockArgs"><span class="annot"><a href="Plutus.Contracts.Game.html#LockArgs"><span class="hs-identifier hs-var">LockArgs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-141"></span><span>    </span><span id="LockArgs"><span class="annot"><a href="Plutus.Contracts.Game.html#LockArgs"><span class="hs-identifier hs-var">LockArgs</span></a></span></span><span>
+</span><span id="line-142"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="lockArgsGameParam"><span class="annot"><span class="annottext">LockArgs -&gt; GameParam
+</span><a href="Plutus.Contracts.Game.html#lockArgsGameParam"><span class="hs-identifier hs-var hs-var">lockArgsGameParam</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span>
+</span><span id="line-143"></span><span>        </span><span class="hs-comment">-- ^ The parameters for parameterizing the validator.</span><span>
+</span><span id="line-144"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="lockArgsSecret"><span class="annot"><span class="annottext">LockArgs -&gt; String
+</span><a href="Plutus.Contracts.Game.html#lockArgsSecret"><span class="hs-identifier hs-var hs-var">lockArgsSecret</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span> </span><span class="hs-comment">-- SecretArgument Haskell.String</span><span>
+</span><span id="line-145"></span><span>        </span><span class="hs-comment">-- ^ The secret</span><span>
+</span><span id="line-146"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="lockArgsValue"><span class="annot"><span class="annottext">LockArgs -&gt; Value
+</span><a href="Plutus.Contracts.Game.html#lockArgsValue"><span class="hs-identifier hs-var hs-var">lockArgsValue</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-147"></span><span>        </span><span class="hs-comment">-- ^ Value that is locked by the contract initially</span><span>
+</span><span id="line-148"></span><span>        </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680973945"><span id="local-6989586621680973947"><span id="local-6989586621680973949"><span class="annot"><span class="annottext">Int -&gt; LockArgs -&gt; ShowS
+[LockArgs] -&gt; ShowS
+LockArgs -&gt; String
+(Int -&gt; LockArgs -&gt; ShowS)
+-&gt; (LockArgs -&gt; String) -&gt; ([LockArgs] -&gt; ShowS) -&gt; Show LockArgs
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [LockArgs] -&gt; ShowS
+$cshowList :: [LockArgs] -&gt; ShowS
+show :: LockArgs -&gt; String
+$cshow :: LockArgs -&gt; String
+showsPrec :: Int -&gt; LockArgs -&gt; ShowS
+$cshowsPrec :: Int -&gt; LockArgs -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. LockArgs -&gt; Rep LockArgs x)
+-&gt; (forall x. Rep LockArgs x -&gt; LockArgs) -&gt; Generic LockArgs
+forall x. Rep LockArgs x -&gt; LockArgs
+forall x. LockArgs -&gt; Rep LockArgs x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep LockArgs x -&gt; LockArgs
+$cfrom :: forall x. LockArgs -&gt; Rep LockArgs x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-149"></span><span>          </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680973935"><span id="local-6989586621680973937"><span id="local-6989586621680973939"><span id="local-6989586621680973941"><span class="annot"><span class="annottext">[LockArgs] -&gt; Encoding
+[LockArgs] -&gt; Value
+LockArgs -&gt; Encoding
+LockArgs -&gt; Value
+(LockArgs -&gt; Value)
+-&gt; (LockArgs -&gt; Encoding)
+-&gt; ([LockArgs] -&gt; Value)
+-&gt; ([LockArgs] -&gt; Encoding)
+-&gt; ToJSON LockArgs
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [LockArgs] -&gt; Encoding
+$ctoEncodingList :: [LockArgs] -&gt; Encoding
+toJSONList :: [LockArgs] -&gt; Value
+$ctoJSONList :: [LockArgs] -&gt; Value
+toEncoding :: LockArgs -&gt; Encoding
+$ctoEncoding :: LockArgs -&gt; Encoding
+toJSON :: LockArgs -&gt; Value
+$ctoJSON :: LockArgs -&gt; Value
+</span><a href="#local-6989586621680973935"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973931"><span id="local-6989586621680973933"><span class="annot"><span class="annottext">Value -&gt; Parser [LockArgs]
+Value -&gt; Parser LockArgs
+(Value -&gt; Parser LockArgs)
+-&gt; (Value -&gt; Parser [LockArgs]) -&gt; FromJSON LockArgs
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [LockArgs]
+$cparseJSONList :: Value -&gt; Parser [LockArgs]
+parseJSON :: Value -&gt; Parser LockArgs
+$cparseJSON :: Value -&gt; Parser LockArgs
+</span><a href="#local-6989586621680973931"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973929"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema LockArgs
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="#local-6989586621680973929"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- | Arguments for the @&quot;guess&quot;@ endpoint</span><span>
+</span><span id="line-152"></span><span id="local-6989586621680973927"><span id="local-6989586621680973928"></span></span><span class="hs-keyword">data</span><span> </span><span id="GuessArgs"><span class="annot"><a href="Plutus.Contracts.Game.html#GuessArgs"><span class="hs-identifier hs-var">GuessArgs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-153"></span><span>    </span><span id="GuessArgs"><span class="annot"><a href="Plutus.Contracts.Game.html#GuessArgs"><span class="hs-identifier hs-var">GuessArgs</span></a></span></span><span>
+</span><span id="line-154"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="guessArgsGameParam"><span class="annot"><span class="annottext">GuessArgs -&gt; GameParam
+</span><a href="Plutus.Contracts.Game.html#guessArgsGameParam"><span class="hs-identifier hs-var hs-var">guessArgsGameParam</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameParam"><span class="hs-identifier hs-type">GameParam</span></a></span><span>
+</span><span id="line-155"></span><span>        </span><span class="hs-comment">-- ^ The parameters for parameterizing the validator.</span><span>
+</span><span id="line-156"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="guessArgsSecret"><span class="annot"><span class="annottext">GuessArgs -&gt; String
+</span><a href="Plutus.Contracts.Game.html#guessArgsSecret"><span class="hs-identifier hs-var hs-var">guessArgsSecret</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span>
+</span><span id="line-157"></span><span>        </span><span class="hs-comment">-- ^ The guess</span><span>
+</span><span id="line-158"></span><span>        </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680973918"><span id="local-6989586621680973920"><span id="local-6989586621680973922"><span class="annot"><span class="annottext">Int -&gt; GuessArgs -&gt; ShowS
+[GuessArgs] -&gt; ShowS
+GuessArgs -&gt; String
+(Int -&gt; GuessArgs -&gt; ShowS)
+-&gt; (GuessArgs -&gt; String)
+-&gt; ([GuessArgs] -&gt; ShowS)
+-&gt; Show GuessArgs
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GuessArgs] -&gt; ShowS
+$cshowList :: [GuessArgs] -&gt; ShowS
+show :: GuessArgs -&gt; String
+$cshow :: GuessArgs -&gt; String
+showsPrec :: Int -&gt; GuessArgs -&gt; ShowS
+$cshowsPrec :: Int -&gt; GuessArgs -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. GuessArgs -&gt; Rep GuessArgs x)
+-&gt; (forall x. Rep GuessArgs x -&gt; GuessArgs) -&gt; Generic GuessArgs
+forall x. Rep GuessArgs x -&gt; GuessArgs
+forall x. GuessArgs -&gt; Rep GuessArgs x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep GuessArgs x -&gt; GuessArgs
+$cfrom :: forall x. GuessArgs -&gt; Rep GuessArgs x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>          </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680973908"><span id="local-6989586621680973910"><span id="local-6989586621680973912"><span id="local-6989586621680973914"><span class="annot"><span class="annottext">[GuessArgs] -&gt; Encoding
+[GuessArgs] -&gt; Value
+GuessArgs -&gt; Encoding
+GuessArgs -&gt; Value
+(GuessArgs -&gt; Value)
+-&gt; (GuessArgs -&gt; Encoding)
+-&gt; ([GuessArgs] -&gt; Value)
+-&gt; ([GuessArgs] -&gt; Encoding)
+-&gt; ToJSON GuessArgs
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [GuessArgs] -&gt; Encoding
+$ctoEncodingList :: [GuessArgs] -&gt; Encoding
+toJSONList :: [GuessArgs] -&gt; Value
+$ctoJSONList :: [GuessArgs] -&gt; Value
+toEncoding :: GuessArgs -&gt; Encoding
+$ctoEncoding :: GuessArgs -&gt; Encoding
+toJSON :: GuessArgs -&gt; Value
+$ctoJSON :: GuessArgs -&gt; Value
+</span><a href="#local-6989586621680973908"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973904"><span id="local-6989586621680973906"><span class="annot"><span class="annottext">Value -&gt; Parser [GuessArgs]
+Value -&gt; Parser GuessArgs
+(Value -&gt; Parser GuessArgs)
+-&gt; (Value -&gt; Parser [GuessArgs]) -&gt; FromJSON GuessArgs
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [GuessArgs]
+$cparseJSONList :: Value -&gt; Parser [GuessArgs]
+parseJSON :: Value -&gt; Parser GuessArgs
+$cparseJSON :: Value -&gt; Parser GuessArgs
+</span><a href="#local-6989586621680973904"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973902"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema GuessArgs
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="#local-6989586621680973902"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span class="hs-comment">-- | The &quot;lock&quot; contract endpoint. See note [Contract endpoints]</span><span>
+</span><span id="line-162"></span><span id="local-6989586621680974075"><span class="annot"><a href="Plutus.Contracts.Game.html#lock"><span class="hs-identifier hs-type">lock</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680974075"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameSchema"><span class="hs-identifier hs-type">GameSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680974075"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-163"></span><span id="lock"><span class="annot"><span class="annottext">lock :: Promise () GameSchema e ()
+</span><a href="Plutus.Contracts.Game.html#lock"><span class="hs-identifier hs-var hs-var">lock</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;lock&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;lock&quot;</span></span><span> </span><span class="annot"><span class="annottext">((LockArgs
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+             &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+       e
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+            &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+      e
+      ())
+-&gt; (LockArgs
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+               &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+         e
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><a href="Plutus.Contracts.Game.html#LockArgs"><span class="hs-identifier hs-type">LockArgs</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span id="local-6989586621680973899"><span class="annot"><span class="annottext">GameParam
+lockArgsGameParam :: GameParam
+lockArgsGameParam :: LockArgs -&gt; GameParam
+</span><a href="#local-6989586621680973899"><span class="hs-identifier hs-var hs-var">lockArgsGameParam</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973898"><span class="annot"><span class="annottext">String
+lockArgsSecret :: String
+lockArgsSecret :: LockArgs -&gt; String
+</span><a href="#local-6989586621680973898"><span class="hs-identifier hs-var hs-var">lockArgsSecret</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973897"><span class="annot"><span class="annottext">Value
+lockArgsValue :: Value
+lockArgsValue :: LockArgs -&gt; Value
+</span><a href="#local-6989586621680973897"><span class="hs-identifier hs-var hs-var">lockArgsValue</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-164"></span><span>    </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+forall w (s :: Row *) e.
+ToJSON String =&gt;
+String -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span> </span><span class="annot"><span class="annottext">(String
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+            &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+      e
+      ())
+-&gt; String
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Pay &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Haskell.show</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680973897"><span class="hs-identifier hs-var">lockArgsValue</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot; to the script&quot;</span></span><span>
+</span><span id="line-165"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680973894"><span class="annot"><span class="annottext">lookups :: ScriptLookups Game
+</span><a href="#local-6989586621680973894"><span class="hs-identifier hs-var hs-var">lookups</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator Game -&gt; ScriptLookups Game
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GameParam -&gt; TypedValidator Game
+</span><a href="Plutus.Contracts.Game.html#gameInstance"><span class="hs-identifier hs-var">gameInstance</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam
+</span><a href="#local-6989586621680973899"><span class="hs-identifier hs-var">lockArgsGameParam</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>        </span><span id="local-6989586621680973892"><span class="annot"><span class="annottext">tx :: TxConstraints ClearString HashedString
+</span><a href="#local-6989586621680973892"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">HashedString -&gt; Value -&gt; TxConstraints ClearString HashedString
+forall o i. o -&gt; Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustPayToTheScriptWithDatumInTx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; HashedString
+</span><a href="Plutus.Contracts.Game.html#hashString"><span class="hs-identifier hs-var">hashString</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621680973898"><span class="hs-identifier hs-var">lockArgsSecret</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680973897"><span class="hs-identifier hs-var">lockArgsValue</span></a></span><span>
+</span><span id="line-167"></span><span>    </span><span class="annot"><span class="annottext">ScriptLookups Game
+-&gt; TxConstraints (RedeemerType Game) (DatumType Game)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups Game
+</span><a href="#local-6989586621680973894"><span class="hs-identifier hs-var">lookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints (RedeemerType Game) (DatumType Game)
+TxConstraints ClearString HashedString
+</span><a href="#local-6989586621680973892"><span class="hs-identifier hs-var">tx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+        &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+  e
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+               &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+         e
+         UnbalancedTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+        &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+  e
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+               &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+         e
+         ())
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">yieldUnbalancedTx</span></a></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span class="hs-comment">-- | The &quot;guess&quot; contract endpoint. See note [Contract endpoints]</span><span>
+</span><span id="line-170"></span><span id="local-6989586621680973890"><span class="annot"><a href="Plutus.Contracts.Game.html#guess"><span class="hs-identifier hs-type">guess</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680973890"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameSchema"><span class="hs-identifier hs-type">GameSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680973890"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-171"></span><span id="guess"><span class="annot"><span class="annottext">guess :: Promise () GameSchema e ()
+</span><a href="Plutus.Contracts.Game.html#guess"><span class="hs-identifier hs-var hs-var">guess</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;guess&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;guess&quot;</span></span><span> </span><span class="annot"><span class="annottext">((GuessArgs
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+             &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+       e
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+            &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+      e
+      ())
+-&gt; (GuessArgs
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+               &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+         e
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><a href="Plutus.Contracts.Game.html#GuessArgs"><span class="hs-identifier hs-type">GuessArgs</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span id="local-6989586621680973888"><span class="annot"><span class="annottext">GameParam
+guessArgsGameParam :: GameParam
+guessArgsGameParam :: GuessArgs -&gt; GameParam
+</span><a href="#local-6989586621680973888"><span class="hs-identifier hs-var hs-var">guessArgsGameParam</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680973887"><span class="annot"><span class="annottext">String
+guessArgsSecret :: String
+guessArgsSecret :: GuessArgs -&gt; String
+</span><a href="#local-6989586621680973887"><span class="hs-identifier hs-var hs-var">guessArgsSecret</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-172"></span><span>    </span><span class="hs-comment">-- Wait for script to have a UTxO of a least 1 lovelace</span><span>
+</span><span id="line-173"></span><span>    </span><span class="annot"><span class="annottext">String
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Waiting for script to have a UTxO of at least 1 lovelace&quot;</span></span><span>
+</span><span id="line-174"></span><span>    </span><span id="local-6989586621680973886"><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680973886"><span class="hs-identifier hs-var">utxos</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+-&gt; Value
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     (Map TxOutRef DecoratedTxOut)
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+CardanoAddress
+-&gt; Value -&gt; Contract w s e (Map TxOutRef DecoratedTxOut)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">fundsAtAddressGeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GameParam -&gt; CardanoAddress
+</span><a href="Plutus.Contracts.Game.html#gameAddress"><span class="hs-identifier hs-var">gameAddress</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam
+</span><a href="#local-6989586621680973888"><span class="hs-identifier hs-var">guessArgsGameParam</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.lovelaceValueOf</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680973884"><span class="annot"><span class="annottext">lookups :: ScriptLookups Game
+</span><a href="#local-6989586621680973884"><span class="hs-identifier hs-var hs-var">lookups</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator Game -&gt; ScriptLookups Game
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">GameParam -&gt; TypedValidator Game
+</span><a href="Plutus.Contracts.Game.html#gameInstance"><span class="hs-identifier hs-var">gameInstance</span></a></span><span> </span><span class="annot"><span class="annottext">GameParam
+</span><a href="#local-6989586621680973888"><span class="hs-identifier hs-var">guessArgsGameParam</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-177"></span><span>               </span><span class="annot"><span class="annottext">ScriptLookups Game -&gt; ScriptLookups Game -&gt; ScriptLookups Game
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">Haskell.&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut -&gt; ScriptLookups Game
+forall a. Map TxOutRef DecoratedTxOut -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680973886"><span class="hs-identifier hs-var">utxos</span></a></span><span>
+</span><span id="line-178"></span><span>        </span><span id="local-6989586621680973882"><span class="annot"><span class="annottext">redeemer :: ClearString
+</span><a href="#local-6989586621680973882"><span class="hs-identifier hs-var hs-var">redeemer</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; ClearString
+</span><a href="Plutus.Contracts.Game.html#clearString"><span class="hs-identifier hs-var">clearString</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621680973887"><span class="hs-identifier hs-var">guessArgsSecret</span></a></span><span>
+</span><span id="line-179"></span><span>        </span><span id="local-6989586621680973881"><span class="annot"><span class="annottext">tx :: TxConstraints ClearString HashedString
+</span><a href="#local-6989586621680973881"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+-&gt; ClearString -&gt; TxConstraints ClearString HashedString
+forall i o. Map TxOutRef DecoratedTxOut -&gt; i -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.collectFromTheScript</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680973886"><span class="hs-identifier hs-var">utxos</span></a></span><span> </span><span class="annot"><span class="annottext">ClearString
+</span><a href="#local-6989586621680973882"><span class="hs-identifier hs-var">redeemer</span></a></span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span>    </span><span id="local-6989586621680973879"><span class="annot"><span class="annottext">UnbalancedTx
+</span><a href="#local-6989586621680973879"><span class="hs-identifier hs-var">unbalancedTx</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ScriptLookups Game
+-&gt; TxConstraints (RedeemerType Game) (DatumType Game)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups Game
+</span><a href="#local-6989586621680973884"><span class="hs-identifier hs-var">lookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints (RedeemerType Game) (DatumType Game)
+TxConstraints ClearString HashedString
+</span><a href="#local-6989586621680973881"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-182"></span><span>    </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">yieldUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+</span><a href="#local-6989586621680973879"><span class="hs-identifier hs-var">unbalancedTx</span></a></span><span>
+</span><span id="line-183"></span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- | Find the secret word in the Datum of the UTxOs</span><span>
+</span><span id="line-185"></span><span class="annot"><a href="Plutus.Contracts.Game.html#findSecretWordValue"><span class="hs-identifier hs-type">findSecretWordValue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">DecoratedTxOut</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span>
+</span><span id="line-186"></span><span id="findSecretWordValue"><span class="annot"><span class="annottext">findSecretWordValue :: Map TxOutRef DecoratedTxOut -&gt; Maybe HashedString
+</span><a href="Plutus.Contracts.Game.html#findSecretWordValue"><span class="hs-identifier hs-var hs-var">findSecretWordValue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-187"></span><span>  </span><span class="annot"><span class="annottext">[HashedString] -&gt; Maybe HashedString
+forall a. [a] -&gt; Maybe a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">listToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">([HashedString] -&gt; Maybe HashedString)
+-&gt; (Map TxOutRef DecoratedTxOut -&gt; [HashedString])
+-&gt; Map TxOutRef DecoratedTxOut
+-&gt; Maybe HashedString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[Maybe HashedString] -&gt; [HashedString]
+forall a. [Maybe a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">catMaybes</span></a></span><span> </span><span class="annot"><span class="annottext">([Maybe HashedString] -&gt; [HashedString])
+-&gt; (Map TxOutRef DecoratedTxOut -&gt; [Maybe HashedString])
+-&gt; Map TxOutRef DecoratedTxOut
+-&gt; [HashedString]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef (Maybe HashedString) -&gt; [Maybe HashedString]
+forall k a. Map k a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.elems</span></a></span><span> </span><span class="annot"><span class="annottext">(Map TxOutRef (Maybe HashedString) -&gt; [Maybe HashedString])
+-&gt; (Map TxOutRef DecoratedTxOut
+    -&gt; Map TxOutRef (Maybe HashedString))
+-&gt; Map TxOutRef DecoratedTxOut
+-&gt; [Maybe HashedString]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(DecoratedTxOut -&gt; Maybe HashedString)
+-&gt; Map TxOutRef DecoratedTxOut -&gt; Map TxOutRef (Maybe HashedString)
+forall a b k. (a -&gt; b) -&gt; Map k a -&gt; Map k b
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.map</span></a></span><span> </span><span class="annot"><span class="annottext">DecoratedTxOut -&gt; Maybe HashedString
+</span><a href="Plutus.Contracts.Game.html#secretWordValue"><span class="hs-identifier hs-var">secretWordValue</span></a></span><span>
+</span><span id="line-188"></span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- | Extract the secret word in the Datum of a given transaction output is possible</span><span>
+</span><span id="line-190"></span><span class="annot"><a href="Plutus.Contracts.Game.html#secretWordValue"><span class="hs-identifier hs-type">secretWordValue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">DecoratedTxOut</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#HashedString"><span class="hs-identifier hs-type">HashedString</span></a></span><span>
+</span><span id="line-191"></span><span id="secretWordValue"><span class="annot"><span class="annottext">secretWordValue :: DecoratedTxOut -&gt; Maybe HashedString
+</span><a href="Plutus.Contracts.Game.html#secretWordValue"><span class="hs-identifier hs-var hs-var">secretWordValue</span></a></span></span><span> </span><span id="local-6989586621680973873"><span class="annot"><span class="annottext">DecoratedTxOut
+</span><a href="#local-6989586621680973873"><span class="hs-identifier hs-var">o</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-192"></span><span>  </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Datum</span></a></span><span> </span><span id="local-6989586621680973872"><span class="annot"><span class="annottext">BuiltinData
+</span><a href="#local-6989586621680973872"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">DecoratedTxOut
+</span><a href="#local-6989586621680973873"><span class="hs-identifier hs-var">o</span></a></span><span> </span><span class="annot"><span class="annottext">DecoratedTxOut
+-&gt; Getting (First Datum) DecoratedTxOut Datum -&gt; Maybe Datum
+forall s a. s -&gt; Getting (First a) s a -&gt; Maybe a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^?</span></a></span><span> </span><span class="annot"><span class="annottext">((DatumHash, DatumFromQuery)
+ -&gt; Const (First Datum) (DatumHash, DatumFromQuery))
+-&gt; DecoratedTxOut -&gt; Const (First Datum) DecoratedTxOut
+Traversal' DecoratedTxOut (DatumHash, DatumFromQuery)
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">decoratedTxOutDatum</span></a></span><span> </span><span class="annot"><span class="annottext">(((DatumHash, DatumFromQuery)
+  -&gt; Const (First Datum) (DatumHash, DatumFromQuery))
+ -&gt; DecoratedTxOut -&gt; Const (First Datum) DecoratedTxOut)
+-&gt; ((Datum -&gt; Const (First Datum) Datum)
+    -&gt; (DatumHash, DatumFromQuery)
+    -&gt; Const (First Datum) (DatumHash, DatumFromQuery))
+-&gt; Getting (First Datum) DecoratedTxOut Datum
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(DatumFromQuery -&gt; Const (First Datum) DatumFromQuery)
+-&gt; (DatumHash, DatumFromQuery)
+-&gt; Const (First Datum) (DatumHash, DatumFromQuery)
+forall s t a b. Field2 s t a b =&gt; Lens s t a b
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">_2</span></a></span><span> </span><span class="annot"><span class="annottext">((DatumFromQuery -&gt; Const (First Datum) DatumFromQuery)
+ -&gt; (DatumHash, DatumFromQuery)
+ -&gt; Const (First Datum) (DatumHash, DatumFromQuery))
+-&gt; ((Datum -&gt; Const (First Datum) Datum)
+    -&gt; DatumFromQuery -&gt; Const (First Datum) DatumFromQuery)
+-&gt; (Datum -&gt; Const (First Datum) Datum)
+-&gt; (DatumHash, DatumFromQuery)
+-&gt; Const (First Datum) (DatumHash, DatumFromQuery)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(Datum -&gt; Const (First Datum) Datum)
+-&gt; DatumFromQuery -&gt; Const (First Datum) DatumFromQuery
+Traversal' DatumFromQuery Datum
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">datumInDatumFromQuery</span></a></span><span>
+</span><span id="line-193"></span><span>  </span><span class="annot"><span class="annottext">BuiltinData -&gt; Maybe HashedString
+forall a. FromData a =&gt; BuiltinData -&gt; Maybe a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">PlutusTx.fromBuiltinData</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinData
+</span><a href="#local-6989586621680973872"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-194"></span><span>
+</span><span id="line-195"></span><span id="local-6989586621680974072"><span class="annot"><a href="Plutus.Contracts.Game.html#contract"><span class="hs-identifier hs-type">contract</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680974072"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Game.html#GameSchema"><span class="hs-identifier hs-type">GameSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680974072"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-196"></span><span id="contract"><span class="annot"><span class="annottext">contract :: Contract () GameSchema e ()
+</span><a href="Plutus.Contracts.Game.html#contract"><span class="hs-identifier hs-var hs-var">contract</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-197"></span><span>    </span><span class="annot"><span class="annottext">String
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Haskell.String</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Waiting for lock or guess endpoint...&quot;</span></span><span>
+</span><span id="line-198"></span><span>    </span><span class="annot"><span class="annottext">[Promise
+   ()
+   ('R
+      '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+         &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+   e
+   ()]
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall w (s :: Row *) e a. [Promise w s e a] -&gt; Contract w s e a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">selectList</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Promise
+  ()
+  ('R
+     '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+        &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+  e
+  ()
+forall e. AsContractError e =&gt; Promise () GameSchema e ()
+</span><a href="Plutus.Contracts.Game.html#lock"><span class="hs-identifier hs-var">lock</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Promise
+  ()
+  ('R
+     '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+        &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+  e
+  ()
+forall e. AsContractError e =&gt; Promise () GameSchema e ()
+</span><a href="Plutus.Contracts.Game.html#guess"><span class="hs-identifier hs-var">guess</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+        &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+  e
+  ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+           &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+     e
+     ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; m b -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;guess&quot; ':-&gt; (EndpointValue GuessArgs, ActiveEndpoint),
+        &quot;lock&quot; ':-&gt; (EndpointValue LockArgs, ActiveEndpoint)])
+  e
+  ()
+forall e. AsContractError e =&gt; Contract () GameSchema e ()
+</span><a href="Plutus.Contracts.Game.html#contract"><span class="hs-identifier hs-var">contract</span></a></span><span>
+</span><span id="line-199"></span></pre></body></html>

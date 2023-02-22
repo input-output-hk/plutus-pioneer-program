@@ -1,0 +1,560 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns   #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards  #-}</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Wallet.Rollup</span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Wallet.Rollup.html#doAnnotateBlockchain"><span class="hs-identifier">doAnnotateBlockchain</span></a></span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Rollup.html#initialRollup"><span class="hs-identifier">initialRollup</span></a></span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Rollup.html#annotateBlockchain"><span class="hs-identifier">annotateBlockchain</span></a></span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#Rollup"><span class="hs-identifier">Rollup</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Chain event fold</span></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Rollup.html#initialState"><span class="hs-identifier">initialState</span></a></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Rollup.html#handleChainEvent"><span class="hs-identifier">handleChainEvent</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Rollup.html#getAnnotatedTransactions"><span class="hs-identifier">getAnnotatedTransactions</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Chain</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">ChainEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">assign</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">ifoldr</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">over</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">set</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">use</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">view</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&amp;)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(^.)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens.Combinators</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">itraverse</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier">Control.Monad.State</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">StateT</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">evalStateT</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">runState</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">groupBy</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Map</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Block</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Blockchain</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">OnChainTx</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">TxIn</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">TxIn</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">TxOut</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">ValidationPhase</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">consumableInputs</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>               </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">onChainTxIsValid</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">outputsProduced</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">txInRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">txOutRefId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">txOutRefIdx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">txOutValue</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">unOnChain</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Tx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Tx</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html"><span class="hs-identifier">Wallet.Rollup.Types</span></a></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-comment">------------------------------------------------------------</span><span>
+</span><span id="line-31"></span><span class="annot"><a href="Wallet.Rollup.html#txInputKey"><span class="hs-identifier hs-type">txInputKey</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">TxIn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#TxKey"><span class="hs-identifier hs-type">TxKey</span></a></span><span>
+</span><span id="line-32"></span><span id="txInputKey"><span class="annot"><span class="annottext">txInputKey :: TxIn -&gt; TxKey
+</span><a href="Wallet.Rollup.html#txInputKey"><span class="hs-identifier hs-var hs-var">txInputKey</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">TxIn</span></a></span><span> </span><span class="hs-special">{</span><span id="local-6989586621680821251"><span class="annot"><span class="annottext">TxOutRef
+txInRef :: TxOutRef
+txInRef :: TxIn -&gt; TxOutRef
+</span><a href="#local-6989586621680821251"><span class="hs-identifier hs-var hs-var">txInRef</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-33"></span><span>    </span><span class="annot"><span class="annottext">TxKey :: TxId -&gt; Integer -&gt; TxKey
+</span><a href="Wallet.Rollup.Types.html#TxKey"><span class="hs-identifier hs-type">TxKey</span></a></span><span>
+</span><span id="line-34"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_txKeyTxId :: TxId
+</span><a href="Wallet.Rollup.Types.html#_txKeyTxId"><span class="hs-identifier hs-var">_txKeyTxId</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; TxId
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">txOutRefId</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680821251"><span class="hs-identifier hs-var">txInRef</span></a></span><span>
+</span><span id="line-35"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_txKeyTxOutRefIdx :: Integer
+</span><a href="Wallet.Rollup.Types.html#_txKeyTxOutRefIdx"><span class="hs-identifier hs-var">_txKeyTxOutRefIdx</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; Integer
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">txOutRefIdx</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680821251"><span class="hs-identifier hs-var">txInRef</span></a></span><span>
+</span><span id="line-36"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span id="local-6989586621680821322"><span class="annot"><a href="Wallet.Rollup.html#annotateTransaction"><span class="hs-identifier hs-type">annotateTransaction</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-39"></span><span>       </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821322"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#SequenceId"><span class="hs-identifier hs-type">SequenceId</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">OnChainTx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-type">StateT</span></a></span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#Rollup"><span class="hs-identifier hs-type">Rollup</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821322"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#AnnotatedTx"><span class="hs-identifier hs-type">AnnotatedTx</span></a></span></span><span>
+</span><span id="line-40"></span><span id="annotateTransaction"><span class="annot"><span class="annottext">annotateTransaction :: SequenceId -&gt; OnChainTx -&gt; StateT Rollup m AnnotatedTx
+</span><a href="Wallet.Rollup.html#annotateTransaction"><span class="hs-identifier hs-var hs-var">annotateTransaction</span></a></span></span><span> </span><span id="local-6989586621680821246"><span class="annot"><span class="annottext">SequenceId
+</span><a href="#local-6989586621680821246"><span class="hs-identifier hs-var">sequenceId</span></a></span></span><span> </span><span id="local-6989586621680821245"><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821245"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-41"></span><span>    </span><span id="local-6989586621680821244"><span class="annot"><span class="annottext">Map TxKey TxOut
+</span><a href="#local-6989586621680821244"><span class="hs-identifier hs-var">cPreviousOutputs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Getting (Map TxKey TxOut) Rollup (Map TxKey TxOut)
+-&gt; StateT Rollup m (Map TxKey TxOut)
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">use</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (Map TxKey TxOut) Rollup (Map TxKey TxOut)
+Lens' Rollup (Map TxKey TxOut)
+</span><a href="Wallet.Rollup.Types.html#previousOutputs"><span class="hs-identifier hs-var">previousOutputs</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span id="local-6989586621680821242"><span class="annot"><span class="annottext">Map BeneficialOwner Value
+</span><a href="#local-6989586621680821242"><span class="hs-identifier hs-var">cRollingBalances</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Getting
+  (Map BeneficialOwner Value) Rollup (Map BeneficialOwner Value)
+-&gt; StateT Rollup m (Map BeneficialOwner Value)
+forall s (m :: * -&gt; *) a. MonadState s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">use</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (Map BeneficialOwner Value) Rollup (Map BeneficialOwner Value)
+Lens' Rollup (Map BeneficialOwner Value)
+</span><a href="Wallet.Rollup.Types.html#rollingBalances"><span class="hs-identifier hs-var">rollingBalances</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span id="local-6989586621680821240"><span class="annot"><span class="annottext">[DereferencedInput]
+</span><a href="#local-6989586621680821240"><span class="hs-identifier hs-var">dereferencedInputs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-44"></span><span>        </span><span class="annot"><span class="annottext">(TxIn -&gt; StateT Rollup m DereferencedInput)
+-&gt; [TxIn] -&gt; StateT Rollup m [DereferencedInput]
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">traverse</span></a></span><span>
+</span><span id="line-45"></span><span>            </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680821238"><span class="annot"><span class="annottext">TxIn
+</span><a href="#local-6989586621680821238"><span class="hs-identifier hs-var">txIn</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-46"></span><span>                 </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680821237"><span class="annot"><span class="annottext">key :: TxKey
+</span><a href="#local-6989586621680821237"><span class="hs-identifier hs-var hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxIn -&gt; TxKey
+</span><a href="Wallet.Rollup.html#txInputKey"><span class="hs-identifier hs-var">txInputKey</span></a></span><span> </span><span class="annot"><span class="annottext">TxIn
+</span><a href="#local-6989586621680821238"><span class="hs-identifier hs-var">txIn</span></a></span><span>
+</span><span id="line-47"></span><span>                  </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">TxKey -&gt; Map TxKey TxOut -&gt; Maybe TxOut
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.lookup</span></a></span><span> </span><span class="annot"><span class="annottext">TxKey
+</span><a href="#local-6989586621680821237"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxKey TxOut
+</span><a href="#local-6989586621680821244"><span class="hs-identifier hs-var">cPreviousOutputs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-48"></span><span>                         </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621680821235"><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680821235"><span class="hs-identifier hs-var">txOut</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">DereferencedInput -&gt; StateT Rollup m DereferencedInput
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(DereferencedInput -&gt; StateT Rollup m DereferencedInput)
+-&gt; DereferencedInput -&gt; StateT Rollup m DereferencedInput
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TxIn -&gt; TxOut -&gt; DereferencedInput
+</span><a href="Wallet.Rollup.Types.html#DereferencedInput"><span class="hs-identifier hs-var">DereferencedInput</span></a></span><span> </span><span class="annot"><span class="annottext">TxIn
+</span><a href="#local-6989586621680821238"><span class="hs-identifier hs-var">txIn</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680821235"><span class="hs-identifier hs-var">txOut</span></a></span><span>
+</span><span id="line-49"></span><span>                         </span><span class="annot"><span class="annottext">Maybe TxOut
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">DereferencedInput -&gt; StateT Rollup m DereferencedInput
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(DereferencedInput -&gt; StateT Rollup m DereferencedInput)
+-&gt; DereferencedInput -&gt; StateT Rollup m DereferencedInput
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TxKey -&gt; DereferencedInput
+</span><a href="Wallet.Rollup.Types.html#InputNotFound"><span class="hs-identifier hs-var">InputNotFound</span></a></span><span> </span><span class="annot"><span class="annottext">TxKey
+</span><a href="#local-6989586621680821237"><span class="hs-identifier hs-var">key</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OnChainTx -&gt; [TxIn]
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">consumableInputs</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821245"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680821232"><span class="annot"><span class="annottext">txId :: TxId
+</span><a href="#local-6989586621680821232"><span class="hs-identifier hs-var hs-var">txId</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Tx.getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">(CardanoTx -&gt; TxId) -&gt; CardanoTx -&gt; TxId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx -&gt; CardanoTx
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">unOnChain</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821245"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-52"></span><span>        </span><span id="local-6989586621680821230"><span class="annot"><span class="annottext">txOuts :: [TxOut]
+</span><a href="#local-6989586621680821230"><span class="hs-identifier hs-var hs-var">txOuts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map TxOutRef TxOut -&gt; [TxOut]
+forall k a. Map k a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.elems</span></a></span><span> </span><span class="annot"><span class="annottext">(Map TxOutRef TxOut -&gt; [TxOut]) -&gt; Map TxOutRef TxOut -&gt; [TxOut]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx -&gt; Map TxOutRef TxOut
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">outputsProduced</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821245"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-53"></span><span>        </span><span id="local-6989586621680821228"><span class="annot"><span class="annottext">newOutputs :: Map TxKey TxOut
+</span><a href="#local-6989586621680821228"><span class="hs-identifier hs-var hs-var">newOutputs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-54"></span><span>            </span><span class="annot"><span class="annottext">(Int -&gt; TxOut -&gt; Map TxKey TxOut -&gt; Map TxKey TxOut)
+-&gt; Map TxKey TxOut -&gt; [TxOut] -&gt; Map TxKey TxOut
+forall i (f :: * -&gt; *) a b.
+FoldableWithIndex i f =&gt;
+(i -&gt; a -&gt; b -&gt; b) -&gt; b -&gt; f a -&gt; b
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">ifoldr</span></a></span><span>
+</span><span id="line-55"></span><span>                </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680821227"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680821227"><span class="hs-identifier hs-var">outputIndex</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-56"></span><span>                     </span><span class="annot"><span class="annottext">TxKey -&gt; TxOut -&gt; Map TxKey TxOut -&gt; Map TxKey TxOut
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.insert</span></a></span><span>
+</span><span id="line-57"></span><span>                         </span><span class="annot"><span class="annottext">TxKey :: TxId -&gt; Integer -&gt; TxKey
+</span><a href="Wallet.Rollup.Types.html#TxKey"><span class="hs-identifier hs-type">TxKey</span></a></span><span>
+</span><span id="line-58"></span><span>                             </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_txKeyTxId :: TxId
+</span><a href="Wallet.Rollup.Types.html#_txKeyTxId"><span class="hs-identifier hs-var">_txKeyTxId</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680821232"><span class="hs-identifier hs-var">txId</span></a></span><span>
+</span><span id="line-59"></span><span>                             </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_txKeyTxOutRefIdx :: Integer
+</span><a href="Wallet.Rollup.Types.html#_txKeyTxOutRefIdx"><span class="hs-identifier hs-var">_txKeyTxOutRefIdx</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680821227"><span class="hs-identifier hs-var">outputIndex</span></a></span><span>
+</span><span id="line-60"></span><span>                             </span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>                </span><span class="annot"><span class="annottext">Map TxKey TxOut
+</span><a href="#local-6989586621680821244"><span class="hs-identifier hs-var">cPreviousOutputs</span></a></span><span>
+</span><span id="line-62"></span><span>                </span><span class="annot"><span class="annottext">[TxOut]
+</span><a href="#local-6989586621680821230"><span class="hs-identifier hs-var">txOuts</span></a></span><span>
+</span><span id="line-63"></span><span>        </span><span id="local-6989586621680821225"><span class="annot"><span class="annottext">newBalances :: Map BeneficialOwner Value
+</span><a href="#local-6989586621680821225"><span class="hs-identifier hs-var hs-var">newBalances</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-64"></span><span>            </span><span class="annot"><span class="annottext">(TxOut -&gt; Map BeneficialOwner Value -&gt; Map BeneficialOwner Value)
+-&gt; Map BeneficialOwner Value
+-&gt; [TxOut]
+-&gt; Map BeneficialOwner Value
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldr</span></a></span><span>
+</span><span id="line-65"></span><span>                </span><span class="annot"><span class="annottext">TxOut -&gt; Map BeneficialOwner Value -&gt; Map BeneficialOwner Value
+</span><a href="#local-6989586621680821223"><span class="hs-identifier hs-var">sumAccounts</span></a></span><span>
+</span><span id="line-66"></span><span>                </span><span class="annot"><span class="annottext">Map BeneficialOwner Value
+</span><a href="#local-6989586621680821242"><span class="hs-identifier hs-var">cRollingBalances</span></a></span><span>
+</span><span id="line-67"></span><span>                </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">ASetter TxOut TxOut (TxOutValue BabbageEra) (TxOutValue BabbageEra)
+-&gt; (TxOutValue BabbageEra -&gt; TxOutValue BabbageEra)
+-&gt; TxOut
+-&gt; TxOut
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter TxOut TxOut (TxOutValue BabbageEra) (TxOutValue BabbageEra)
+Lens' TxOut (TxOutValue BabbageEra)
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Tx.outValue'</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutValue BabbageEra -&gt; TxOutValue BabbageEra
+forall era. TxOutValue era -&gt; TxOutValue era
+</span><a href="#local-6989586621680821221"><span class="hs-identifier hs-var">negateValue</span></a></span><span> </span><span class="annot"><span class="annottext">(TxOut -&gt; TxOut)
+-&gt; (DereferencedInput -&gt; TxOut) -&gt; DereferencedInput -&gt; TxOut
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">DereferencedInput -&gt; TxOut
+</span><a href="Wallet.Rollup.Types.html#refersTo"><span class="hs-identifier hs-var hs-var">refersTo</span></a></span><span> </span><span class="annot"><span class="annottext">(DereferencedInput -&gt; TxOut) -&gt; [DereferencedInput] -&gt; [TxOut]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(DereferencedInput -&gt; Bool)
+-&gt; [DereferencedInput] -&gt; [DereferencedInput]
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">filter</span></a></span><span> </span><span class="annot"><span class="annottext">DereferencedInput -&gt; Bool
+</span><a href="Wallet.Rollup.Types.html#isFound"><span class="hs-identifier hs-var">isFound</span></a></span><span> </span><span class="annot"><span class="annottext">[DereferencedInput]
+</span><a href="#local-6989586621680821240"><span class="hs-identifier hs-var">dereferencedInputs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TxOut] -&gt; [TxOut] -&gt; [TxOut]
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span>
+</span><span id="line-68"></span><span>                 </span><span class="annot"><span class="annottext">[TxOut]
+</span><a href="#local-6989586621680821230"><span class="hs-identifier hs-var">txOuts</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>          </span><span class="hs-keyword">where</span><span>
+</span><span id="line-70"></span><span>            </span><span id="local-6989586621680821353"><span class="annot"><a href="#local-6989586621680821221"><span class="hs-identifier hs-type">negateValue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxOutValue</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821353"><span class="hs-identifier hs-type">era</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxOutValue</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821353"><span class="hs-identifier hs-type">era</span></a></span></span><span>
+</span><span id="line-71"></span><span>            </span><span id="local-6989586621680821221"><span class="annot"><span class="annottext">negateValue :: TxOutValue era -&gt; TxOutValue era
+</span><a href="#local-6989586621680821221"><span class="hs-identifier hs-var hs-var">negateValue</span></a></span></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxOutAdaOnly</span></a></span><span> </span><span id="local-6989586621680821215"><span class="annot"><span class="annottext">OnlyAdaSupportedInEra era
+</span><a href="#local-6989586621680821215"><span class="hs-identifier hs-var">wit</span></a></span></span><span> </span><span id="local-6989586621680821214"><span class="annot"><span class="annottext">Lovelace
+</span><a href="#local-6989586621680821214"><span class="hs-identifier hs-var">l</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OnlyAdaSupportedInEra era -&gt; Lovelace -&gt; TxOutValue era
+forall era. OnlyAdaSupportedInEra era -&gt; Lovelace -&gt; TxOutValue era
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">C.TxOutAdaOnly</span></a></span><span> </span><span class="annot"><span class="annottext">OnlyAdaSupportedInEra era
+</span><a href="#local-6989586621680821215"><span class="hs-identifier hs-var">wit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Lovelace -&gt; Lovelace
+forall a. Num a =&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">negate</span></a></span><span> </span><span class="annot"><span class="annottext">Lovelace
+</span><a href="#local-6989586621680821214"><span class="hs-identifier hs-var">l</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>            </span><span class="annot"><a href="#local-6989586621680821221"><span class="hs-identifier hs-var">negateValue</span></a></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxOutValue</span></a></span><span> </span><span id="local-6989586621680821212"><span class="annot"><span class="annottext">MultiAssetSupportedInEra era
+</span><a href="#local-6989586621680821212"><span class="hs-identifier hs-var">wit</span></a></span></span><span> </span><span id="local-6989586621680821211"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680821211"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MultiAssetSupportedInEra era -&gt; Value -&gt; TxOutValue era
+forall era. MultiAssetSupportedInEra era -&gt; Value -&gt; TxOutValue era
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">C.TxOutValue</span></a></span><span> </span><span class="annot"><span class="annottext">MultiAssetSupportedInEra era
+</span><a href="#local-6989586621680821212"><span class="hs-identifier hs-var">wit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Value -&gt; Value
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">C.negateValue</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680821211"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>        </span><span class="annot"><a href="#local-6989586621680821223"><span class="hs-identifier hs-type">sumAccounts</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-74"></span><span>               </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">TxOut</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#BeneficialOwner"><span class="hs-identifier hs-type">BeneficialOwner</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#BeneficialOwner"><span class="hs-identifier hs-type">BeneficialOwner</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-75"></span><span>        </span><span id="local-6989586621680821223"><span class="annot"><span class="annottext">sumAccounts :: TxOut -&gt; Map BeneficialOwner Value -&gt; Map BeneficialOwner Value
+</span><a href="#local-6989586621680821223"><span class="hs-identifier hs-var hs-var">sumAccounts</span></a></span></span><span> </span><span id="local-6989586621680821209"><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680821209"><span class="hs-identifier hs-var">txOut</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-76"></span><span>            </span><span class="annot"><span class="annottext">(Maybe Value -&gt; Maybe Value)
+-&gt; BeneficialOwner
+-&gt; Map BeneficialOwner Value
+-&gt; Map BeneficialOwner Value
+forall k a.
+Ord k =&gt;
+(Maybe a -&gt; Maybe a) -&gt; k -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.alter</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Value -&gt; Maybe Value
+</span><a href="#local-6989586621680821207"><span class="hs-identifier hs-var">sumBalances</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxOut -&gt; BeneficialOwner
+</span><a href="Wallet.Rollup.Types.html#toBeneficialOwner"><span class="hs-identifier hs-var">toBeneficialOwner</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680821209"><span class="hs-identifier hs-var">txOut</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>          </span><span class="hs-keyword">where</span><span>
+</span><span id="line-78"></span><span>            </span><span class="annot"><a href="#local-6989586621680821207"><span class="hs-identifier hs-type">sumBalances</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-79"></span><span>            </span><span id="local-6989586621680821207"><span class="annot"><span class="annottext">sumBalances :: Maybe Value -&gt; Maybe Value
+</span><a href="#local-6989586621680821207"><span class="hs-identifier hs-var hs-var">sumBalances</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe Value
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value -&gt; Maybe Value
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxOut -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">txOutValue</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680821209"><span class="hs-identifier hs-var">txOut</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>            </span><span class="annot"><a href="#local-6989586621680821207"><span class="hs-identifier hs-var">sumBalances</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621680821205"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680821205"><span class="hs-identifier hs-var">oldValue</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value -&gt; Maybe Value
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680821205"><span class="hs-identifier hs-var">oldValue</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Value -&gt; Value
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">txOutValue</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680821209"><span class="hs-identifier hs-var">txOut</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>    </span><span class="annot"><span class="annottext">ASetter Rollup Rollup (Map TxKey TxOut) (Map TxKey TxOut)
+-&gt; Map TxKey TxOut -&gt; StateT Rollup m ()
+forall s (m :: * -&gt; *) a b.
+MonadState s m =&gt;
+ASetter s s a b -&gt; b -&gt; m ()
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">assign</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter Rollup Rollup (Map TxKey TxOut) (Map TxKey TxOut)
+Lens' Rollup (Map TxKey TxOut)
+</span><a href="Wallet.Rollup.Types.html#previousOutputs"><span class="hs-identifier hs-var">previousOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxKey TxOut
+</span><a href="#local-6989586621680821228"><span class="hs-identifier hs-var">newOutputs</span></a></span><span>
+</span><span id="line-82"></span><span>    </span><span class="annot"><span class="annottext">ASetter
+  Rollup
+  Rollup
+  (Map BeneficialOwner Value)
+  (Map BeneficialOwner Value)
+-&gt; Map BeneficialOwner Value -&gt; StateT Rollup m ()
+forall s (m :: * -&gt; *) a b.
+MonadState s m =&gt;
+ASetter s s a b -&gt; b -&gt; m ()
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">assign</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  Rollup
+  Rollup
+  (Map BeneficialOwner Value)
+  (Map BeneficialOwner Value)
+Lens' Rollup (Map BeneficialOwner Value)
+</span><a href="Wallet.Rollup.Types.html#rollingBalances"><span class="hs-identifier hs-var">rollingBalances</span></a></span><span> </span><span class="annot"><span class="annottext">Map BeneficialOwner Value
+</span><a href="#local-6989586621680821225"><span class="hs-identifier hs-var">newBalances</span></a></span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="annottext">AnnotatedTx -&gt; StateT Rollup m AnnotatedTx
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(AnnotatedTx -&gt; StateT Rollup m AnnotatedTx)
+-&gt; AnnotatedTx -&gt; StateT Rollup m AnnotatedTx
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-84"></span><span>        </span><span class="annot"><span class="annottext">AnnotatedTx :: SequenceId
+-&gt; TxId
+-&gt; CardanoTx
+-&gt; [DereferencedInput]
+-&gt; Map BeneficialOwner Value
+-&gt; Bool
+-&gt; AnnotatedTx
+</span><a href="Wallet.Rollup.Types.html#AnnotatedTx"><span class="hs-identifier hs-type">AnnotatedTx</span></a></span><span>
+</span><span id="line-85"></span><span>            </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">SequenceId
+sequenceId :: SequenceId
+sequenceId :: SequenceId
+</span><a href="Wallet.Rollup.Types.html#sequenceId"><span class="hs-identifier hs-var hs-var">sequenceId</span></a></span><span>
+</span><span id="line-86"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TxId
+txId :: TxId
+txId :: TxId
+</span><a href="Wallet.Rollup.Types.html#txId"><span class="hs-identifier hs-var hs-var">txId</span></a></span><span>
+</span><span id="line-87"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">tx :: CardanoTx
+</span><a href="Wallet.Rollup.Types.html#tx"><span class="hs-identifier hs-var">tx</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OnChainTx -&gt; CardanoTx
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">unOnChain</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821245"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-88"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">[DereferencedInput]
+dereferencedInputs :: [DereferencedInput]
+dereferencedInputs :: [DereferencedInput]
+</span><a href="Wallet.Rollup.Types.html#dereferencedInputs"><span class="hs-identifier hs-var hs-var">dereferencedInputs</span></a></span><span>
+</span><span id="line-89"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">balances :: Map BeneficialOwner Value
+</span><a href="Wallet.Rollup.Types.html#balances"><span class="hs-identifier hs-var">balances</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map BeneficialOwner Value
+</span><a href="#local-6989586621680821225"><span class="hs-identifier hs-var">newBalances</span></a></span><span>
+</span><span id="line-90"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">valid :: Bool
+</span><a href="Wallet.Rollup.Types.html#valid"><span class="hs-identifier hs-var">valid</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OnChainTx -&gt; Bool
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">onChainTxIsValid</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821245"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-91"></span><span>            </span><span class="hs-special">}</span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span id="local-6989586621680821315"><span class="annot"><a href="Wallet.Rollup.html#annotateChainSlot"><span class="hs-identifier hs-type">annotateChainSlot</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821315"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-type">StateT</span></a></span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#Rollup"><span class="hs-identifier hs-type">Rollup</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821315"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Rollup.Types.html#AnnotatedTx"><span class="hs-identifier hs-type">AnnotatedTx</span></a></span><span class="hs-special">]</span></span><span>
+</span><span id="line-94"></span><span id="annotateChainSlot"><span class="annot"><span class="annottext">annotateChainSlot :: Int -&gt; Block -&gt; StateT Rollup m [AnnotatedTx]
+</span><a href="Wallet.Rollup.html#annotateChainSlot"><span class="hs-identifier hs-var hs-var">annotateChainSlot</span></a></span></span><span> </span><span id="local-6989586621680821196"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680821196"><span class="hs-identifier hs-var">slotIndex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-95"></span><span>    </span><span class="annot"><span class="annottext">(Int -&gt; OnChainTx -&gt; StateT Rollup m AnnotatedTx)
+-&gt; Block -&gt; StateT Rollup m [AnnotatedTx]
+forall i (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(TraversableWithIndex i t, Applicative f) =&gt;
+(i -&gt; a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">itraverse</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680821195"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680821195"><span class="hs-identifier hs-var">txIndex</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SequenceId -&gt; OnChainTx -&gt; StateT Rollup m AnnotatedTx
+forall (m :: * -&gt; *).
+Monad m =&gt;
+SequenceId -&gt; OnChainTx -&gt; StateT Rollup m AnnotatedTx
+</span><a href="Wallet.Rollup.html#annotateTransaction"><span class="hs-identifier hs-var">annotateTransaction</span></a></span><span> </span><span class="annot"><span class="annottext">SequenceId :: Int -&gt; Int -&gt; SequenceId
+</span><a href="Wallet.Rollup.Types.html#SequenceId"><span class="hs-identifier hs-type">SequenceId</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">Int
+txIndex :: Int
+slotIndex :: Int
+txIndex :: Int
+slotIndex :: Int
+</span><a href="Wallet.Rollup.Types.html#txIndex"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span id="local-6989586621680821307"><span class="annot"><a href="Wallet.Rollup.html#annotateBlockchain"><span class="hs-identifier hs-type">annotateBlockchain</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821307"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Blockchain</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-type">StateT</span></a></span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#Rollup"><span class="hs-identifier hs-type">Rollup</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821307"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Rollup.Types.html#AnnotatedTx"><span class="hs-identifier hs-type">AnnotatedTx</span></a></span><span class="hs-special">]</span><span class="hs-special">]</span></span><span>
+</span><span id="line-98"></span><span id="annotateBlockchain"><span class="annot"><span class="annottext">annotateBlockchain :: Blockchain -&gt; StateT Rollup m [[AnnotatedTx]]
+</span><a href="Wallet.Rollup.html#annotateBlockchain"><span class="hs-identifier hs-var hs-var">annotateBlockchain</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">([[AnnotatedTx]] -&gt; [[AnnotatedTx]])
+-&gt; StateT Rollup m [[AnnotatedTx]]
+-&gt; StateT Rollup m [[AnnotatedTx]]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">[[AnnotatedTx]] -&gt; [[AnnotatedTx]]
+forall a. [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">reverse</span></a></span><span> </span><span class="annot"><span class="annottext">(StateT Rollup m [[AnnotatedTx]]
+ -&gt; StateT Rollup m [[AnnotatedTx]])
+-&gt; (Blockchain -&gt; StateT Rollup m [[AnnotatedTx]])
+-&gt; Blockchain
+-&gt; StateT Rollup m [[AnnotatedTx]]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Block -&gt; StateT Rollup m [AnnotatedTx])
+-&gt; Blockchain -&gt; StateT Rollup m [[AnnotatedTx]]
+forall i (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(TraversableWithIndex i t, Applicative f) =&gt;
+(i -&gt; a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">itraverse</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Block -&gt; StateT Rollup m [AnnotatedTx]
+forall (m :: * -&gt; *).
+Monad m =&gt;
+Int -&gt; Block -&gt; StateT Rollup m [AnnotatedTx]
+</span><a href="Wallet.Rollup.html#annotateChainSlot"><span class="hs-identifier hs-var">annotateChainSlot</span></a></span><span> </span><span class="annot"><span class="annottext">(Blockchain -&gt; StateT Rollup m [[AnnotatedTx]])
+-&gt; (Blockchain -&gt; Blockchain)
+-&gt; Blockchain
+-&gt; StateT Rollup m [[AnnotatedTx]]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain -&gt; Blockchain
+forall a. [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">reverse</span></a></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="annot"><a href="Wallet.Rollup.html#initialRollup"><span class="hs-identifier hs-type">initialRollup</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#Rollup"><span class="hs-identifier hs-type">Rollup</span></a></span><span>
+</span><span id="line-101"></span><span id="initialRollup"><span class="annot"><span class="annottext">initialRollup :: Rollup
+</span><a href="Wallet.Rollup.html#initialRollup"><span class="hs-identifier hs-var hs-var">initialRollup</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-102"></span><span>    </span><span class="annot"><span class="annottext">Rollup :: Map TxKey TxOut -&gt; Map BeneficialOwner Value -&gt; Rollup
+</span><a href="Wallet.Rollup.Types.html#Rollup"><span class="hs-identifier hs-type">Rollup</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">_previousOutputs :: Map TxKey TxOut
+</span><a href="Wallet.Rollup.Types.html#_previousOutputs"><span class="hs-identifier hs-var">_previousOutputs</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map TxKey TxOut
+forall k a. Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.empty</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_rollingBalances :: Map BeneficialOwner Value
+</span><a href="Wallet.Rollup.Types.html#_rollingBalances"><span class="hs-identifier hs-var">_rollingBalances</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map BeneficialOwner Value
+forall k a. Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.empty</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span class="annot"><a href="Wallet.Rollup.html#initialState"><span class="hs-identifier hs-type">initialState</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span>
+</span><span id="line-105"></span><span id="initialState"><span class="annot"><span class="annottext">initialState :: RollupState
+</span><a href="Wallet.Rollup.html#initialState"><span class="hs-identifier hs-var hs-var">initialState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-106"></span><span>    </span><span class="annot"><span class="annottext">RollupState :: SequenceId -&gt; Rollup -&gt; [AnnotatedTx] -&gt; RollupState
+</span><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_rollup :: Rollup
+</span><a href="Wallet.Rollup.Types.html#_rollup"><span class="hs-identifier hs-var">_rollup</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Rollup
+</span><a href="Wallet.Rollup.html#initialRollup"><span class="hs-identifier hs-var">initialRollup</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_annotatedTransactions :: [AnnotatedTx]
+</span><a href="Wallet.Rollup.Types.html#_annotatedTransactions"><span class="hs-identifier hs-var">_annotatedTransactions</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_currentSequenceId :: SequenceId
+</span><a href="Wallet.Rollup.Types.html#_currentSequenceId"><span class="hs-identifier hs-var">_currentSequenceId</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; SequenceId
+</span><a href="Wallet.Rollup.Types.html#SequenceId"><span class="hs-identifier hs-var">SequenceId</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span id="local-6989586621680821182"><span class="annot"><a href="Wallet.Rollup.html#doAnnotateBlockchain"><span class="hs-identifier hs-type">doAnnotateBlockchain</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821182"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Blockchain</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680821182"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Rollup.Types.html#AnnotatedTx"><span class="hs-identifier hs-type">AnnotatedTx</span></a></span><span class="hs-special">]</span><span class="hs-special">]</span></span><span>
+</span><span id="line-109"></span><span id="doAnnotateBlockchain"><span class="annot"><span class="annottext">doAnnotateBlockchain :: Blockchain -&gt; m [[AnnotatedTx]]
+</span><a href="Wallet.Rollup.html#doAnnotateBlockchain"><span class="hs-identifier hs-var hs-var">doAnnotateBlockchain</span></a></span></span><span> </span><span id="local-6989586621680821181"><span class="annot"><span class="annottext">Blockchain
+</span><a href="#local-6989586621680821181"><span class="hs-identifier hs-var">blockchain</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-110"></span><span>    </span><span class="annot"><span class="annottext">StateT Rollup m [[AnnotatedTx]] -&gt; Rollup -&gt; m [[AnnotatedTx]]
+forall (m :: * -&gt; *) s a. Monad m =&gt; StateT s m a -&gt; s -&gt; m a
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">evalStateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Blockchain -&gt; StateT Rollup m [[AnnotatedTx]]
+forall (m :: * -&gt; *).
+Monad m =&gt;
+Blockchain -&gt; StateT Rollup m [[AnnotatedTx]]
+</span><a href="Wallet.Rollup.html#annotateBlockchain"><span class="hs-identifier hs-var">annotateBlockchain</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain
+</span><a href="#local-6989586621680821181"><span class="hs-identifier hs-var">blockchain</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Rollup
+</span><a href="Wallet.Rollup.html#initialRollup"><span class="hs-identifier hs-var">initialRollup</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="annot"><a href="Wallet.Rollup.html#getAnnotatedTransactions"><span class="hs-identifier hs-type">getAnnotatedTransactions</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Rollup.Types.html#AnnotatedTx"><span class="hs-identifier hs-type">AnnotatedTx</span></a></span><span class="hs-special">]</span><span class="hs-special">]</span><span>
+</span><span id="line-113"></span><span id="getAnnotatedTransactions"><span class="annot"><span class="annottext">getAnnotatedTransactions :: RollupState -&gt; [[AnnotatedTx]]
+</span><a href="Wallet.Rollup.html#getAnnotatedTransactions"><span class="hs-identifier hs-var hs-var">getAnnotatedTransactions</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(AnnotatedTx -&gt; AnnotatedTx -&gt; Bool)
+-&gt; [AnnotatedTx] -&gt; [[AnnotatedTx]]
+forall a. (a -&gt; a -&gt; Bool) -&gt; [a] -&gt; [[a]]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">groupBy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(AnnotatedTx -&gt; Int) -&gt; AnnotatedTx -&gt; AnnotatedTx -&gt; Bool
+forall a b. Eq a =&gt; (b -&gt; a) -&gt; b -&gt; b -&gt; Bool
+</span><a href="Wallet.Rollup.html#equating"><span class="hs-identifier hs-var">equating</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SequenceId -&gt; Int
+</span><a href="Wallet.Rollup.Types.html#slotIndex"><span class="hs-identifier hs-var hs-var">slotIndex</span></a></span><span> </span><span class="annot"><span class="annottext">(SequenceId -&gt; Int)
+-&gt; (AnnotatedTx -&gt; SequenceId) -&gt; AnnotatedTx -&gt; Int
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">AnnotatedTx -&gt; SequenceId
+</span><a href="Wallet.Rollup.Types.html#sequenceId"><span class="hs-identifier hs-var hs-var">sequenceId</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([AnnotatedTx] -&gt; [[AnnotatedTx]])
+-&gt; (RollupState -&gt; [AnnotatedTx]) -&gt; RollupState -&gt; [[AnnotatedTx]]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[AnnotatedTx] -&gt; [AnnotatedTx]
+forall a. [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">reverse</span></a></span><span> </span><span class="annot"><span class="annottext">([AnnotatedTx] -&gt; [AnnotatedTx])
+-&gt; (RollupState -&gt; [AnnotatedTx]) -&gt; RollupState -&gt; [AnnotatedTx]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting [AnnotatedTx] RollupState [AnnotatedTx]
+-&gt; RollupState -&gt; [AnnotatedTx]
+forall s (m :: * -&gt; *) a. MonadReader s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">view</span></a></span><span> </span><span class="annot"><span class="annottext">Getting [AnnotatedTx] RollupState [AnnotatedTx]
+Lens' RollupState [AnnotatedTx]
+</span><a href="Wallet.Rollup.Types.html#annotatedTransactions"><span class="hs-identifier hs-var">annotatedTransactions</span></a></span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span class="annot"><a href="Wallet.Rollup.html#handleChainEvent"><span class="hs-identifier hs-type">handleChainEvent</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">ChainEvent</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span>
+</span><span id="line-116"></span><span id="handleChainEvent"><span class="annot"><span class="annottext">handleChainEvent :: RollupState -&gt; ChainEvent -&gt; RollupState
+</span><a href="Wallet.Rollup.html#handleChainEvent"><span class="hs-identifier hs-var hs-var">handleChainEvent</span></a></span></span><span> </span><span id="local-6989586621680821178"><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821178"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-117"></span><span>    </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">SlotAdd</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><span class="hs-identifier">_</span></span><span>                           </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821178"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">RollupState -&gt; (RollupState -&gt; RollupState) -&gt; RollupState
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState SequenceId SequenceId
+-&gt; (SequenceId -&gt; SequenceId) -&gt; RollupState -&gt; RollupState
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState SequenceId SequenceId
+Lens' RollupState SequenceId
+</span><a href="Wallet.Rollup.Types.html#currentSequenceId"><span class="hs-identifier hs-var">currentSequenceId</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ASetter SequenceId SequenceId Int Int
+-&gt; Int -&gt; SequenceId -&gt; SequenceId
+forall s t a b. ASetter s t a b -&gt; b -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">set</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter SequenceId SequenceId Int Int
+Lens' SequenceId Int
+</span><a href="Wallet.Rollup.Types.html#txIndexL"><span class="hs-identifier hs-var">txIndexL</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">(SequenceId -&gt; SequenceId)
+-&gt; (SequenceId -&gt; SequenceId) -&gt; SequenceId -&gt; SequenceId
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter SequenceId SequenceId Int Int
+-&gt; (Int -&gt; Int) -&gt; SequenceId -&gt; SequenceId
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter SequenceId SequenceId Int Int
+Lens' SequenceId Int
+</span><a href="Wallet.Rollup.Types.html#slotIndexL"><span class="hs-identifier hs-var">slotIndexL</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Enum a =&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">succ</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-118"></span><span>    </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">TxnValidate</span></a></span><span> </span><span class="annot"><span class="annottext">TxId
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680821171"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680821171"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><span class="hs-identifier">_</span></span><span>                  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RollupState -&gt; OnChainTx -&gt; RollupState
+</span><a href="Wallet.Rollup.html#addTx"><span class="hs-identifier hs-var">addTx</span></a></span><span> </span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821178"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CardanoTx -&gt; OnChainTx
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Valid</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680821171"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-119"></span><span>    </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">TxnValidationFail</span></a></span><span> </span><span class="annot"><span class="annottext">ValidationPhase
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Phase2</span></a></span><span> </span><span class="annot"><span class="annottext">TxId
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680821166"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680821166"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="annot"><span class="annottext">ValidationError
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Value
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">[Text]
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RollupState -&gt; OnChainTx -&gt; RollupState
+</span><a href="Wallet.Rollup.html#addTx"><span class="hs-identifier hs-var">addTx</span></a></span><span> </span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821178"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CardanoTx -&gt; OnChainTx
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Invalid</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680821166"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-120"></span><span>    </span><span class="annot"><span class="annottext">ChainEvent
+</span><span class="hs-identifier">_</span></span><span>                                   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821178"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span class="annot"><a href="Wallet.Rollup.html#addTx"><span class="hs-identifier hs-type">addTx</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">OnChainTx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Rollup.Types.html#RollupState"><span class="hs-identifier hs-type">RollupState</span></a></span><span>
+</span><span id="line-123"></span><span id="addTx"><span class="annot"><span class="annottext">addTx :: RollupState -&gt; OnChainTx -&gt; RollupState
+</span><a href="Wallet.Rollup.html#addTx"><span class="hs-identifier hs-var hs-var">addTx</span></a></span></span><span> </span><span id="local-6989586621680821164"><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821164"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680821163"><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821163"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680821162"><span class="annot"><span class="annottext">AnnotatedTx
+</span><a href="#local-6989586621680821162"><span class="hs-identifier hs-var">tx'</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680821161"><span class="annot"><span class="annottext">Rollup
+</span><a href="#local-6989586621680821161"><span class="hs-identifier hs-var">newState</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">State Rollup AnnotatedTx -&gt; Rollup -&gt; (AnnotatedTx, Rollup)
+forall s a. State s a -&gt; s -&gt; (a, s)
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">runState</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SequenceId -&gt; OnChainTx -&gt; State Rollup AnnotatedTx
+forall (m :: * -&gt; *).
+Monad m =&gt;
+SequenceId -&gt; OnChainTx -&gt; StateT Rollup m AnnotatedTx
+</span><a href="Wallet.Rollup.html#annotateTransaction"><span class="hs-identifier hs-var">annotateTransaction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821164"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">RollupState
+-&gt; Getting SequenceId RollupState SequenceId -&gt; SequenceId
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting SequenceId RollupState SequenceId
+Lens' RollupState SequenceId
+</span><a href="Wallet.Rollup.Types.html#currentSequenceId"><span class="hs-identifier hs-var">currentSequenceId</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680821163"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821164"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">RollupState -&gt; Getting Rollup RollupState Rollup -&gt; Rollup
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting Rollup RollupState Rollup
+Lens' RollupState Rollup
+</span><a href="Wallet.Rollup.Types.html#rollup"><span class="hs-identifier hs-var">rollup</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">RollupState
+</span><a href="#local-6989586621680821164"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">RollupState -&gt; (RollupState -&gt; RollupState) -&gt; RollupState
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState SequenceId SequenceId
+-&gt; (SequenceId -&gt; SequenceId) -&gt; RollupState -&gt; RollupState
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState SequenceId SequenceId
+Lens' RollupState SequenceId
+</span><a href="Wallet.Rollup.Types.html#currentSequenceId"><span class="hs-identifier hs-var">currentSequenceId</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ASetter SequenceId SequenceId Int Int
+-&gt; (Int -&gt; Int) -&gt; SequenceId -&gt; SequenceId
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter SequenceId SequenceId Int Int
+Lens' SequenceId Int
+</span><a href="Wallet.Rollup.Types.html#txIndexL"><span class="hs-identifier hs-var">txIndexL</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int
+forall a. Enum a =&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">succ</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>         </span><span class="annot"><span class="annottext">RollupState -&gt; (RollupState -&gt; RollupState) -&gt; RollupState
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState [AnnotatedTx] [AnnotatedTx]
+-&gt; ([AnnotatedTx] -&gt; [AnnotatedTx]) -&gt; RollupState -&gt; RollupState
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState [AnnotatedTx] [AnnotatedTx]
+Lens' RollupState [AnnotatedTx]
+</span><a href="Wallet.Rollup.Types.html#annotatedTransactions"><span class="hs-identifier hs-var">annotatedTransactions</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">AnnotatedTx
+</span><a href="#local-6989586621680821162"><span class="hs-identifier hs-var">tx'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>         </span><span class="annot"><span class="annottext">RollupState -&gt; (RollupState -&gt; RollupState) -&gt; RollupState
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState Rollup Rollup
+-&gt; Rollup -&gt; RollupState -&gt; RollupState
+forall s t a b. ASetter s t a b -&gt; b -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">set</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter RollupState RollupState Rollup Rollup
+Lens' RollupState Rollup
+</span><a href="Wallet.Rollup.Types.html#rollup"><span class="hs-identifier hs-var">rollup</span></a></span><span> </span><span class="annot"><span class="annottext">Rollup
+</span><a href="#local-6989586621680821161"><span class="hs-identifier hs-var">newState</span></a></span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- https://hackage.haskell.org/package/Cabal-3.2.1.0/docs/src/Distribution.Utils.Generic.html#equating</span><span>
+</span><span id="line-130"></span><span id="local-6989586621680821304"><span id="local-6989586621680821305"><span class="annot"><a href="Wallet.Rollup.html#equating"><span class="hs-identifier hs-type">equating</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Eq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821305"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680821304"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680821305"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680821304"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680821304"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span></span></span><span>
+</span><span id="line-131"></span><span id="equating"><span class="annot"><span class="annottext">equating :: (b -&gt; a) -&gt; b -&gt; b -&gt; Bool
+</span><a href="Wallet.Rollup.html#equating"><span class="hs-identifier hs-var hs-var">equating</span></a></span></span><span> </span><span id="local-6989586621680821159"><span class="annot"><span class="annottext">b -&gt; a
+</span><a href="#local-6989586621680821159"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621680821158"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680821158"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621680821157"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680821157"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">b -&gt; a
+</span><a href="#local-6989586621680821159"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680821158"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; a
+</span><a href="#local-6989586621680821159"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680821157"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-132"></span></pre></body></html>
