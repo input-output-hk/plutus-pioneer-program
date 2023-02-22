@@ -1,0 +1,435 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- | The user-facing API of the renamer.</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia          #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances    #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications     #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusCore.Rename</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier">Rename</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Dupable"><span class="hs-identifier">Dupable</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#liftDupable"><span class="hs-identifier">liftDupable</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusPrelude.html"><span class="hs-identifier">PlutusPrelude</span></a></span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Core.html"><span class="hs-identifier">PlutusCore.Core</span></a></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Mark.html"><span class="hs-identifier">PlutusCore.Mark</span></a></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Name.html"><span class="hs-identifier">PlutusCore.Name</span></a></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Quote.html"><span class="hs-identifier">PlutusCore.Quote</span></a></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Rename.Internal.html"><span class="hs-identifier">PlutusCore.Rename.Internal</span></a></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Functor.Identity</span></a></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">{- Note [Marking]
+We use functions from the @markNonFresh*@ family in order to ensure that bound variables never get
+renamed to free ones. This means types/terms/etc are processed twice: once by a @markNonFresh*@
+function and once for the actual renaming. We may consider later to do some kind of meta-circular
+programming trick in order to perform renaming in a single pass.
+-}</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- | The class of things that can be renamed.</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- I.e. things that are capable of satisfying the global uniqueness condition.</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">class</span><span> </span><span id="Rename"><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-var">Rename</span></a></span></span><span> </span><span id="local-6989586621680951547"><span class="annot"><a href="#local-6989586621680951547"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-comment">-- | Rename 'Unique's so that they're globally unique.</span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-comment">-- In case there are any free variables, they must be left untouched and bound variables</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-comment">-- must not get renamed to free ones.</span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-comment">-- Must always assign new names to bound variables,</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-comment">-- so that @rename@ can be used for alpha-renaming as well.</span><span>
+</span><span id="line-39"></span><span>    </span><span id="local-6989586621680951554"><span id="rename"><span class="annot"><a href="PlutusCore.Rename.html#rename"><span class="hs-identifier hs-type">rename</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Quote.html#MonadQuote"><span class="hs-identifier hs-type">MonadQuote</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951554"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680951547"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680951554"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951547"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span id="local-6989586621680951355"><span id="local-6989586621680951356"><span id="local-6989586621680951357"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Core.Type.html#HasUniques"><span class="hs-identifier hs-type">HasUniques</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Type"><span class="hs-identifier hs-type">Type</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951357"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951356"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951355"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-type">Rename</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Type"><span class="hs-identifier hs-type">Type</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951357"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951356"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951355"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-comment">-- See Note [Marking].</span><span>
+</span><span id="line-43"></span><span>    </span><span id="local-6989586621680951352"><span class="annot"><span class="annottext">rename :: Type tyname uni ann -&gt; m (Type tyname uni ann)
+</span><a href="#local-6989586621680951352"><span class="hs-identifier hs-var hs-var hs-var hs-var">rename</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Type tyname uni ann -&gt; m ())
+-&gt; Type tyname uni ann -&gt; m (Type tyname uni ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; f b) -&gt; a -&gt; f a
+</span><a href="PlutusPrelude.html#through"><span class="hs-identifier hs-var">through</span></a></span><span> </span><span class="annot"><span class="annottext">Type tyname uni ann -&gt; m ()
+forall tyname (uni :: * -&gt; *) ann (m :: * -&gt; *).
+(HasUniques (Type tyname uni ann), MonadQuote m) =&gt;
+Type tyname uni ann -&gt; m ()
+</span><a href="PlutusCore.Mark.html#markNonFreshType"><span class="hs-identifier hs-var">markNonFreshType</span></a></span><span> </span><span class="annot"><span class="annottext">(Type tyname uni ann -&gt; m (Type tyname uni ann))
+-&gt; (Type tyname uni ann -&gt; m (Type tyname uni ann))
+-&gt; Type tyname uni ann
+-&gt; m (Type tyname uni ann)
+forall (m :: * -&gt; *) a b c.
+Monad m =&gt;
+(a -&gt; m b) -&gt; (b -&gt; m c) -&gt; a -&gt; m c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;=&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall ren (m :: * -&gt; *) a. Monoid ren =&gt; RenameT ren m a -&gt; m a
+forall (m :: * -&gt; *) a.
+Monoid TypeRenaming =&gt;
+RenameT TypeRenaming m a -&gt; m a
+</span><a href="PlutusCore.Rename.Monad.html#runRenameT"><span class="hs-identifier hs-var">runRenameT</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="PlutusCore.Rename.Monad.html#TypeRenaming"><span class="hs-identifier hs-type">TypeRenaming</span></a></span><span> </span><span class="annot"><span class="annottext">(RenameT TypeRenaming m (Type tyname uni ann)
+ -&gt; m (Type tyname uni ann))
+-&gt; (Type tyname uni ann
+    -&gt; RenameT TypeRenaming m (Type tyname uni ann))
+-&gt; Type tyname uni ann
+-&gt; m (Type tyname uni ann)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Type tyname uni ann -&gt; RenameT TypeRenaming m (Type tyname uni ann)
+forall ren tyname (uni :: * -&gt; *) ann (m :: * -&gt; *).
+(HasRenaming ren TypeUnique, HasUniques (Type tyname uni ann),
+ MonadQuote m, MonadReader ren m) =&gt;
+Type tyname uni ann -&gt; m (Type tyname uni ann)
+</span><a href="PlutusCore.Rename.Internal.html#renameTypeM"><span class="hs-identifier hs-var">renameTypeM</span></a></span></span></span></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span id="local-6989586621680951341"><span id="local-6989586621680951342"><span id="local-6989586621680951343"><span id="local-6989586621680951344"><span id="local-6989586621680951345"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Core.Type.html#HasUniques"><span class="hs-identifier hs-type">HasUniques</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951345"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951344"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951343"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951342"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951341"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-type">Rename</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951345"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951344"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951343"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951342"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951341"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-comment">-- See Note [Marking].</span><span>
+</span><span id="line-47"></span><span>    </span><span id="local-6989586621680951339"><span class="annot"><span class="annottext">rename :: Term tyname name uni fun ann -&gt; m (Term tyname name uni fun ann)
+</span><a href="#local-6989586621680951339"><span class="hs-identifier hs-var hs-var hs-var hs-var">rename</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Term tyname name uni fun ann -&gt; m ())
+-&gt; Term tyname name uni fun ann -&gt; m (Term tyname name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; f b) -&gt; a -&gt; f a
+</span><a href="PlutusPrelude.html#through"><span class="hs-identifier hs-var">through</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann -&gt; m ()
+forall tyname name (uni :: * -&gt; *) fun ann (m :: * -&gt; *).
+(HasUniques (Term tyname name uni fun ann), MonadQuote m) =&gt;
+Term tyname name uni fun ann -&gt; m ()
+</span><a href="PlutusCore.Mark.html#markNonFreshTerm"><span class="hs-identifier hs-var">markNonFreshTerm</span></a></span><span> </span><span class="annot"><span class="annottext">(Term tyname name uni fun ann -&gt; m (Term tyname name uni fun ann))
+-&gt; (Term tyname name uni fun ann
+    -&gt; m (Term tyname name uni fun ann))
+-&gt; Term tyname name uni fun ann
+-&gt; m (Term tyname name uni fun ann)
+forall (m :: * -&gt; *) a b c.
+Monad m =&gt;
+(a -&gt; m b) -&gt; (b -&gt; m c) -&gt; a -&gt; m c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;=&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">RenameT ScopedRenaming m (Term tyname name uni fun ann)
+-&gt; m (Term tyname name uni fun ann)
+forall ren (m :: * -&gt; *) a. Monoid ren =&gt; RenameT ren m a -&gt; m a
+</span><a href="PlutusCore.Rename.Monad.html#runRenameT"><span class="hs-identifier hs-var">runRenameT</span></a></span><span> </span><span class="annot"><span class="annottext">(RenameT ScopedRenaming m (Term tyname name uni fun ann)
+ -&gt; m (Term tyname name uni fun ann))
+-&gt; (Term tyname name uni fun ann
+    -&gt; RenameT ScopedRenaming m (Term tyname name uni fun ann))
+-&gt; Term tyname name uni fun ann
+-&gt; m (Term tyname name uni fun ann)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+-&gt; RenameT ScopedRenaming m (Term tyname name uni fun ann)
+forall tyname name (uni :: * -&gt; *) fun ann (m :: * -&gt; *).
+(HasUniques (Term tyname name uni fun ann), MonadQuote m,
+ MonadReader ScopedRenaming m) =&gt;
+Term tyname name uni fun ann -&gt; m (Term tyname name uni fun ann)
+</span><a href="PlutusCore.Rename.Internal.html#renameTermM"><span class="hs-identifier hs-var">renameTermM</span></a></span></span></span></span></span></span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span id="local-6989586621680951332"><span id="local-6989586621680951333"><span id="local-6989586621680951334"><span id="local-6989586621680951335"><span id="local-6989586621680951336"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Core.Type.html#HasUniques"><span class="hs-identifier hs-type">HasUniques</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-type">Program</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951336"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951335"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951334"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951333"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951332"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-type">Rename</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-type">Program</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951336"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951335"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951334"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951333"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951332"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-comment">-- See Note [Marking].</span><span>
+</span><span id="line-51"></span><span>    </span><span id="local-6989586621680951330"><span class="annot"><span class="annottext">rename :: Program tyname name uni fun ann
+-&gt; m (Program tyname name uni fun ann)
+</span><a href="#local-6989586621680951330"><span class="hs-identifier hs-var hs-var hs-var hs-var">rename</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Program tyname name uni fun ann -&gt; m ())
+-&gt; Program tyname name uni fun ann
+-&gt; m (Program tyname name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; f b) -&gt; a -&gt; f a
+</span><a href="PlutusPrelude.html#through"><span class="hs-identifier hs-var">through</span></a></span><span> </span><span class="annot"><span class="annottext">Program tyname name uni fun ann -&gt; m ()
+forall tyname name (m :: * -&gt; *) (uni :: * -&gt; *) fun ann.
+(HasUnique tyname TypeUnique, HasUnique name TermUnique,
+ MonadQuote m) =&gt;
+Program tyname name uni fun ann -&gt; m ()
+</span><a href="PlutusCore.Mark.html#markNonFreshProgram"><span class="hs-identifier hs-var">markNonFreshProgram</span></a></span><span> </span><span class="annot"><span class="annottext">(Program tyname name uni fun ann
+ -&gt; m (Program tyname name uni fun ann))
+-&gt; (Program tyname name uni fun ann
+    -&gt; m (Program tyname name uni fun ann))
+-&gt; Program tyname name uni fun ann
+-&gt; m (Program tyname name uni fun ann)
+forall (m :: * -&gt; *) a b c.
+Monad m =&gt;
+(a -&gt; m b) -&gt; (b -&gt; m c) -&gt; a -&gt; m c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;=&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">RenameT ScopedRenaming m (Program tyname name uni fun ann)
+-&gt; m (Program tyname name uni fun ann)
+forall ren (m :: * -&gt; *) a. Monoid ren =&gt; RenameT ren m a -&gt; m a
+</span><a href="PlutusCore.Rename.Monad.html#runRenameT"><span class="hs-identifier hs-var">runRenameT</span></a></span><span> </span><span class="annot"><span class="annottext">(RenameT ScopedRenaming m (Program tyname name uni fun ann)
+ -&gt; m (Program tyname name uni fun ann))
+-&gt; (Program tyname name uni fun ann
+    -&gt; RenameT ScopedRenaming m (Program tyname name uni fun ann))
+-&gt; Program tyname name uni fun ann
+-&gt; m (Program tyname name uni fun ann)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Program tyname name uni fun ann
+-&gt; RenameT ScopedRenaming m (Program tyname name uni fun ann)
+forall tyname name (uni :: * -&gt; *) fun ann (m :: * -&gt; *).
+(HasUniques (Program tyname name uni fun ann), MonadQuote m,
+ MonadReader ScopedRenaming m) =&gt;
+Program tyname name uni fun ann
+-&gt; m (Program tyname name uni fun ann)
+</span><a href="PlutusCore.Rename.Internal.html#renameProgramM"><span class="hs-identifier hs-var">renameProgramM</span></a></span></span></span></span></span></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span id="local-6989586621680951327"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-type">Rename</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951327"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-type">Rename</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Normalized"><span class="hs-identifier hs-type">Normalized</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951327"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-54"></span><span>    </span><span id="local-6989586621680951325"><span class="annot"><span class="annottext">rename :: Normalized a -&gt; m (Normalized a)
+</span><a href="#local-6989586621680951325"><span class="hs-identifier hs-var hs-var hs-var hs-var">rename</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; m a) -&gt; Normalized a -&gt; m (Normalized a)
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; m a
+forall a (m :: * -&gt; *). (Rename a, MonadQuote m) =&gt; a -&gt; m a
+</span><a href="PlutusCore.Rename.html#rename"><span class="hs-identifier hs-var">rename</span></a></span></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- | @Dupable a@ is isomorphic to @a@, but the only way to extract the @a@ is via 'liftDupable'</span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- which renames the stored value along the way. This type is used whenever</span><span>
+</span><span id="line-58"></span><span class="hs-comment">--</span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- 1. preserving global uniqueness is required</span><span>
+</span><span id="line-60"></span><span class="hs-comment">-- 2. some value may be used multiple times</span><span>
+</span><span id="line-61"></span><span class="hs-comment">--</span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- so we annotate such a value with 'Dupable' and call 'liftDupable' at each usage, which ensures</span><span>
+</span><span id="line-63"></span><span class="hs-comment">-- global conditions is preserved.</span><span>
+</span><span id="line-64"></span><span class="hs-keyword">newtype</span><span> </span><span id="Dupable"><span class="annot"><a href="PlutusCore.Rename.html#Dupable"><span class="hs-identifier hs-var">Dupable</span></a></span></span><span> </span><span id="local-6989586621680951360"><span class="annot"><a href="#local-6989586621680951360"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Dupable"><span class="annot"><a href="PlutusCore.Rename.html#Dupable"><span class="hs-identifier hs-var">Dupable</span></a></span></span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="unDupable"><span class="annot"><span class="annottext">Dupable a -&gt; a
+</span><a href="PlutusCore.Rename.html#unDupable"><span class="hs-identifier hs-var hs-var">unDupable</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680951360"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680951316"><span id="local-6989586621680951318"><span id="local-6989586621680951320"><span class="annot"><span class="annottext">Int -&gt; Dupable a -&gt; ShowS
+[Dupable a] -&gt; ShowS
+Dupable a -&gt; String
+(Int -&gt; Dupable a -&gt; ShowS)
+-&gt; (Dupable a -&gt; String)
+-&gt; ([Dupable a] -&gt; ShowS)
+-&gt; Show (Dupable a)
+forall a. Show a =&gt; Int -&gt; Dupable a -&gt; ShowS
+forall a. Show a =&gt; [Dupable a] -&gt; ShowS
+forall a. Show a =&gt; Dupable a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Dupable a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [Dupable a] -&gt; ShowS
+show :: Dupable a -&gt; String
+$cshow :: forall a. Show a =&gt; Dupable a -&gt; String
+showsPrec :: Int -&gt; Dupable a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; Dupable a -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680951311"><span id="local-6989586621680951313"><span class="annot"><span class="annottext">Dupable a -&gt; Dupable a -&gt; Bool
+(Dupable a -&gt; Dupable a -&gt; Bool)
+-&gt; (Dupable a -&gt; Dupable a -&gt; Bool) -&gt; Eq (Dupable a)
+forall a. Eq a =&gt; Dupable a -&gt; Dupable a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Dupable a -&gt; Dupable a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; Dupable a -&gt; Dupable a -&gt; Bool
+== :: Dupable a -&gt; Dupable a -&gt; Bool
+$c== :: forall a. Eq a =&gt; Dupable a -&gt; Dupable a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680951306"><span id="local-6989586621680951308"><span class="annot"><span class="annottext">a -&gt; Dupable b -&gt; Dupable a
+(a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+(forall a b. (a -&gt; b) -&gt; Dupable a -&gt; Dupable b)
+-&gt; (forall a b. a -&gt; Dupable b -&gt; Dupable a) -&gt; Functor Dupable
+forall a b. a -&gt; Dupable b -&gt; Dupable a
+forall a b. (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; Dupable b -&gt; Dupable a
+$c&lt;$ :: forall a b. a -&gt; Dupable b -&gt; Dupable a
+fmap :: (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+$cfmap :: forall a b. (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680951271"><span id="local-6989586621680951273"><span id="local-6989586621680951275"><span id="local-6989586621680951277"><span id="local-6989586621680951279"><span id="local-6989586621680951281"><span id="local-6989586621680951283"><span id="local-6989586621680951285"><span id="local-6989586621680951287"><span id="local-6989586621680951289"><span id="local-6989586621680951291"><span id="local-6989586621680951293"><span id="local-6989586621680951295"><span id="local-6989586621680951297"><span id="local-6989586621680951299"><span id="local-6989586621680951301"><span id="local-6989586621680951303"><span class="annot"><span class="annottext">Dupable a -&gt; Bool
+(a -&gt; m) -&gt; Dupable a -&gt; m
+(a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+(forall m. Monoid m =&gt; Dupable m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Dupable a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Dupable a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a)
+-&gt; (forall a. Dupable a -&gt; [a])
+-&gt; (forall a. Dupable a -&gt; Bool)
+-&gt; (forall a. Dupable a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; Dupable a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; Dupable a -&gt; a)
+-&gt; (forall a. Ord a =&gt; Dupable a -&gt; a)
+-&gt; (forall a. Num a =&gt; Dupable a -&gt; a)
+-&gt; (forall a. Num a =&gt; Dupable a -&gt; a)
+-&gt; Foldable Dupable
+forall a. Eq a =&gt; a -&gt; Dupable a -&gt; Bool
+forall a. Num a =&gt; Dupable a -&gt; a
+forall a. Ord a =&gt; Dupable a -&gt; a
+forall m. Monoid m =&gt; Dupable m -&gt; m
+forall a. Dupable a -&gt; Bool
+forall a. Dupable a -&gt; Int
+forall a. Dupable a -&gt; [a]
+forall a. (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Dupable a -&gt; m
+forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+forall (t :: * -&gt; *).
+(forall m. Monoid m =&gt; t m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. t a -&gt; [a])
+-&gt; (forall a. t a -&gt; Bool)
+-&gt; (forall a. t a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; t a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; Foldable t
+product :: Dupable a -&gt; a
+$cproduct :: forall a. Num a =&gt; Dupable a -&gt; a
+sum :: Dupable a -&gt; a
+$csum :: forall a. Num a =&gt; Dupable a -&gt; a
+minimum :: Dupable a -&gt; a
+$cminimum :: forall a. Ord a =&gt; Dupable a -&gt; a
+maximum :: Dupable a -&gt; a
+$cmaximum :: forall a. Ord a =&gt; Dupable a -&gt; a
+elem :: a -&gt; Dupable a -&gt; Bool
+$celem :: forall a. Eq a =&gt; a -&gt; Dupable a -&gt; Bool
+length :: Dupable a -&gt; Int
+$clength :: forall a. Dupable a -&gt; Int
+null :: Dupable a -&gt; Bool
+$cnull :: forall a. Dupable a -&gt; Bool
+toList :: Dupable a -&gt; [a]
+$ctoList :: forall a. Dupable a -&gt; [a]
+foldl1 :: (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a
+$cfoldl1 :: forall a. (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a
+foldr1 :: (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a
+$cfoldr1 :: forall a. (a -&gt; a -&gt; a) -&gt; Dupable a -&gt; a
+foldl' :: (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+$cfoldl' :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+$cfoldl :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+foldr' :: (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+$cfoldr' :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+$cfoldr :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Dupable a -&gt; b
+foldMap' :: (a -&gt; m) -&gt; Dupable a -&gt; m
+$cfoldMap' :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Dupable a -&gt; m
+foldMap :: (a -&gt; m) -&gt; Dupable a -&gt; m
+$cfoldMap :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Dupable a -&gt; m
+fold :: Dupable m -&gt; m
+$cfold :: forall m. Monoid m =&gt; Dupable m -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Foldable</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680951260"><span id="local-6989586621680951262"><span id="local-6989586621680951264"><span id="local-6989586621680951266"><span class="annot"><span class="annottext">Functor Dupable
+Foldable Dupable
+Functor Dupable
+-&gt; Foldable Dupable
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; Dupable a -&gt; f (Dupable b))
+-&gt; (forall (f :: * -&gt; *) a.
+    Applicative f =&gt;
+    Dupable (f a) -&gt; f (Dupable a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; Dupable a -&gt; m (Dupable b))
+-&gt; (forall (m :: * -&gt; *) a.
+    Monad m =&gt;
+    Dupable (m a) -&gt; m (Dupable a))
+-&gt; Traversable Dupable
+(a -&gt; f b) -&gt; Dupable a -&gt; f (Dupable b)
+forall (t :: * -&gt; *).
+Functor t
+-&gt; Foldable t
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; t a -&gt; f (t b))
+-&gt; (forall (f :: * -&gt; *) a. Applicative f =&gt; t (f a) -&gt; f (t a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; t a -&gt; m (t b))
+-&gt; (forall (m :: * -&gt; *) a. Monad m =&gt; t (m a) -&gt; m (t a))
+-&gt; Traversable t
+forall (m :: * -&gt; *) a. Monad m =&gt; Dupable (m a) -&gt; m (Dupable a)
+forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+Dupable (f a) -&gt; f (Dupable a)
+forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; Dupable a -&gt; m (Dupable b)
+forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; Dupable a -&gt; f (Dupable b)
+sequence :: Dupable (m a) -&gt; m (Dupable a)
+$csequence :: forall (m :: * -&gt; *) a. Monad m =&gt; Dupable (m a) -&gt; m (Dupable a)
+mapM :: (a -&gt; m b) -&gt; Dupable a -&gt; m (Dupable b)
+$cmapM :: forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; Dupable a -&gt; m (Dupable b)
+sequenceA :: Dupable (f a) -&gt; f (Dupable a)
+$csequenceA :: forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+Dupable (f a) -&gt; f (Dupable a)
+traverse :: (a -&gt; f b) -&gt; Dupable a -&gt; f (Dupable b)
+$ctraverse :: forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; Dupable a -&gt; f (Dupable b)
+$cp2Traversable :: Foldable Dupable
+$cp1Traversable :: Functor Dupable
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Traversable</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680951248"><span id="local-6989586621680951250"><span id="local-6989586621680951252"><span id="local-6989586621680951254"><span id="local-6989586621680951256"><span class="annot"><span class="annottext">Functor Dupable
+a -&gt; Dupable a
+Functor Dupable
+-&gt; (forall a. a -&gt; Dupable a)
+-&gt; (forall a b. Dupable (a -&gt; b) -&gt; Dupable a -&gt; Dupable b)
+-&gt; (forall a b c.
+    (a -&gt; b -&gt; c) -&gt; Dupable a -&gt; Dupable b -&gt; Dupable c)
+-&gt; (forall a b. Dupable a -&gt; Dupable b -&gt; Dupable b)
+-&gt; (forall a b. Dupable a -&gt; Dupable b -&gt; Dupable a)
+-&gt; Applicative Dupable
+Dupable a -&gt; Dupable b -&gt; Dupable b
+Dupable a -&gt; Dupable b -&gt; Dupable a
+Dupable (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+(a -&gt; b -&gt; c) -&gt; Dupable a -&gt; Dupable b -&gt; Dupable c
+forall a. a -&gt; Dupable a
+forall a b. Dupable a -&gt; Dupable b -&gt; Dupable a
+forall a b. Dupable a -&gt; Dupable b -&gt; Dupable b
+forall a b. Dupable (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+forall a b c. (a -&gt; b -&gt; c) -&gt; Dupable a -&gt; Dupable b -&gt; Dupable c
+forall (f :: * -&gt; *).
+Functor f
+-&gt; (forall a. a -&gt; f a)
+-&gt; (forall a b. f (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b c. (a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c)
+-&gt; (forall a b. f a -&gt; f b -&gt; f b)
+-&gt; (forall a b. f a -&gt; f b -&gt; f a)
+-&gt; Applicative f
+&lt;* :: Dupable a -&gt; Dupable b -&gt; Dupable a
+$c&lt;* :: forall a b. Dupable a -&gt; Dupable b -&gt; Dupable a
+*&gt; :: Dupable a -&gt; Dupable b -&gt; Dupable b
+$c*&gt; :: forall a b. Dupable a -&gt; Dupable b -&gt; Dupable b
+liftA2 :: (a -&gt; b -&gt; c) -&gt; Dupable a -&gt; Dupable b -&gt; Dupable c
+$cliftA2 :: forall a b c. (a -&gt; b -&gt; c) -&gt; Dupable a -&gt; Dupable b -&gt; Dupable c
+&lt;*&gt; :: Dupable (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+$c&lt;*&gt; :: forall a b. Dupable (a -&gt; b) -&gt; Dupable a -&gt; Dupable b
+pure :: a -&gt; Dupable a
+$cpure :: forall a. a -&gt; Dupable a
+$cp1Applicative :: Functor Dupable
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Applicative</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680951240"><span id="local-6989586621680951242"><span id="local-6989586621680951244"><span class="annot"><span class="annottext">Applicative Dupable
+a -&gt; Dupable a
+Applicative Dupable
+-&gt; (forall a b. Dupable a -&gt; (a -&gt; Dupable b) -&gt; Dupable b)
+-&gt; (forall a b. Dupable a -&gt; Dupable b -&gt; Dupable b)
+-&gt; (forall a. a -&gt; Dupable a)
+-&gt; Monad Dupable
+Dupable a -&gt; (a -&gt; Dupable b) -&gt; Dupable b
+Dupable a -&gt; Dupable b -&gt; Dupable b
+forall a. a -&gt; Dupable a
+forall a b. Dupable a -&gt; Dupable b -&gt; Dupable b
+forall a b. Dupable a -&gt; (a -&gt; Dupable b) -&gt; Dupable b
+forall (m :: * -&gt; *).
+Applicative m
+-&gt; (forall a b. m a -&gt; (a -&gt; m b) -&gt; m b)
+-&gt; (forall a b. m a -&gt; m b -&gt; m b)
+-&gt; (forall a. a -&gt; m a)
+-&gt; Monad m
+return :: a -&gt; Dupable a
+$creturn :: forall a. a -&gt; Dupable a
+&gt;&gt; :: Dupable a -&gt; Dupable b -&gt; Dupable b
+$c&gt;&gt; :: forall a b. Dupable a -&gt; Dupable b -&gt; Dupable b
+&gt;&gt;= :: Dupable a -&gt; (a -&gt; Dupable b) -&gt; Dupable b
+$c&gt;&gt;= :: forall a b. Dupable a -&gt; (a -&gt; Dupable b) -&gt; Dupable b
+$cp1Monad :: Applicative Dupable
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Monad</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Identity</span></a></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- | Extract the value stored in a @Dupable a@ and rename it.</span><span>
+</span><span id="line-70"></span><span id="local-6989586621680951236"><span id="local-6989586621680951237"><span class="annot"><a href="PlutusCore.Rename.html#liftDupable"><span class="hs-identifier hs-type">liftDupable</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Quote.html#MonadQuote"><span class="hs-identifier hs-type">MonadQuote</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951237"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Rename"><span class="hs-identifier hs-type">Rename</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951236"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Rename.html#Dupable"><span class="hs-identifier hs-type">Dupable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951236"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680951237"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680951236"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-71"></span><span id="liftDupable"><span class="annot"><span class="annottext">liftDupable :: Dupable a -&gt; m a
+</span><a href="PlutusCore.Rename.html#liftDupable"><span class="hs-identifier hs-var hs-var">liftDupable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Quote a -&gt; m a
+forall (m :: * -&gt; *) a. MonadQuote m =&gt; Quote a -&gt; m a
+</span><a href="PlutusCore.Quote.html#liftQuote"><span class="hs-identifier hs-var">liftQuote</span></a></span><span> </span><span class="annot"><span class="annottext">(Quote a -&gt; m a) -&gt; (Dupable a -&gt; Quote a) -&gt; Dupable a -&gt; m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Quote a
+forall a (m :: * -&gt; *). (Rename a, MonadQuote m) =&gt; a -&gt; m a
+</span><a href="PlutusCore.Rename.html#rename"><span class="hs-identifier hs-var">rename</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Quote a) -&gt; (Dupable a -&gt; a) -&gt; Dupable a -&gt; Quote a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Dupable a -&gt; a
+forall a. Dupable a -&gt; a
+</span><a href="PlutusCore.Rename.html#unDupable"><span class="hs-identifier hs-var hs-var">unDupable</span></a></span><span>
+</span><span id="line-72"></span></pre></body></html>

@@ -1,0 +1,1548 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- | Crowdfunding contract implemented using the [[Plutus]] interface.</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- This is the fully parallel version that collects all contributions</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- in a single transaction. This is, of course, limited by the maximum</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- number of inputs a transaction can have.</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE AllowAmbiguousTypes #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE DataKinds           #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass      #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric       #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies  #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts    #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns      #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude   #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-14"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards     #-}</span><span>
+</span><span id="line-15"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-16"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell     #-}</span><span>
+</span><span id="line-17"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications    #-}</span><span>
+</span><span id="line-18"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies        #-}</span><span>
+</span><span id="line-19"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators       #-}</span><span>
+</span><span id="line-20"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns        #-}</span><span>
+</span><span id="line-21"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}</span><span>
+</span><span id="line-22"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-omit-interface-pragmas #-}</span><span>
+</span><span id="line-23"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-specialise #-}</span><span>
+</span><span id="line-24"></span><span class="hs-pragma">{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:debug-context #-}</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Crowdfunding</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-27"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Campaign parameters</span></span><span>
+</span><span id="line-28"></span><span>      </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier">Campaign</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CrowdfundingSchema"><span class="hs-identifier">CrowdfundingSchema</span></a></span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#crowdfunding"><span class="hs-identifier">crowdfunding</span></a></span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#theCampaign"><span class="hs-identifier">theCampaign</span></a></span><span>
+</span><span id="line-32"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Functionality for campaign contributors</span></span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#contribute"><span class="hs-identifier">contribute</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Contribution"><span class="hs-identifier">Contribution</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Functionality for campaign owners</span></span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#scheduleCollection"><span class="hs-identifier">scheduleCollection</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#campaignAddress"><span class="hs-identifier">campaignAddress</span></a></span><span>
+</span><span id="line-38"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Validator script</span></span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#contributionScript"><span class="hs-identifier">contributionScript</span></a></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#mkValidator"><span class="hs-identifier">mkValidator</span></a></span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#mkCampaign"><span class="hs-identifier">mkCampaign</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CampaignAction"><span class="hs-identifier">CampaignAction</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#collectionRange"><span class="hs-identifier">collectionRange</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#refundRange"><span class="hs-identifier">refundRange</span></a></span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Traces</span></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#startCampaign"><span class="hs-identifier">startCampaign</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#makeContribution"><span class="hs-identifier">makeContribution</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#successfulCampaign"><span class="hs-identifier">successfulCampaign</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Params</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Params</span></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.TimeSlot</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">TimeSlot</span></span><span>
+</span><span id="line-53"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Applicative</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Applicative</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">unPaymentPubKeyHash</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">getCardanoTxId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ada</span></span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-63"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints.ValidityInterval</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">ValidityInterval</span></span><span>
+</span><span id="line-64"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Ledger.Interval</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Interval</span></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">validatorHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span>
+</span><span id="line-67"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Plutus.Script.Utils.V1.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PV1</span></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Trace.Effects.EmulatorControl</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">getSlotConfig</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Trace.Emulator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">ContractHandle</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">EmulatorTrace</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Trace.Emulator</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Trace</span></span><span>
+</span><span id="line-71"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Api</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PV1</span></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Contexts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PV1</span></span><span>
+</span><span id="line-73"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-74"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">Applicative</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">return</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-operator">(&lt;$&gt;)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&gt;&gt;)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&gt;&gt;=)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&lt;$&gt;)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&gt;&gt;=)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span>
+</span><span id="line-77"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">Schema</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">ToArgument</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">ToSchema</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Wallet.Emulator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Wallet</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">knownWallet</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Wallet.Emulator</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Emulator</span></span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- | A crowdfunding campaign.</span><span>
+</span><span id="line-82"></span><span id="local-6989586621680972240"><span id="local-6989586621680972241"></span></span><span class="hs-keyword">data</span><span> </span><span id="Campaign"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-var">Campaign</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Campaign"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-var">Campaign</span></a></span></span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="campaignDeadline"><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignDeadline"><span class="hs-identifier hs-var hs-var">campaignDeadline</span></a></span></span><span>           </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-comment">-- ^ The date by which the campaign funds can be contributed.</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="campaignCollectionDeadline"><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignCollectionDeadline"><span class="hs-identifier hs-var hs-var">campaignCollectionDeadline</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">-- ^ The date by which the campaign owner has to collect the funds</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="campaignOwner"><span class="annot"><span class="annottext">Campaign -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignOwner"><span class="hs-identifier hs-var hs-var">campaignOwner</span></a></span></span><span>              </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-comment">-- ^ Public key of the campaign owner. This key is entitled to retrieve the</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-comment">--   funds if the campaign is successful.</span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. Campaign -&gt; Rep Campaign x)
+-&gt; (forall x. Rep Campaign x -&gt; Campaign) -&gt; Generic Campaign
+forall x. Rep Campaign x -&gt; Campaign
+forall x. Campaign -&gt; Rep Campaign x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Campaign x -&gt; Campaign
+$cfrom :: forall x. Campaign -&gt; Rep Campaign x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972225"><span id="local-6989586621680972227"><span id="local-6989586621680972229"><span id="local-6989586621680972231"><span class="annot"><span class="annottext">[Campaign] -&gt; Encoding
+[Campaign] -&gt; Value
+Campaign -&gt; Encoding
+Campaign -&gt; Value
+(Campaign -&gt; Value)
+-&gt; (Campaign -&gt; Encoding)
+-&gt; ([Campaign] -&gt; Value)
+-&gt; ([Campaign] -&gt; Encoding)
+-&gt; ToJSON Campaign
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [Campaign] -&gt; Encoding
+$ctoEncodingList :: [Campaign] -&gt; Encoding
+toJSONList :: [Campaign] -&gt; Value
+$ctoJSONList :: [Campaign] -&gt; Value
+toEncoding :: Campaign -&gt; Encoding
+$ctoEncoding :: Campaign -&gt; Encoding
+toJSON :: Campaign -&gt; Value
+$ctoJSON :: Campaign -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972220"><span id="local-6989586621680972222"><span class="annot"><span class="annottext">Value -&gt; Parser [Campaign]
+Value -&gt; Parser Campaign
+(Value -&gt; Parser Campaign)
+-&gt; (Value -&gt; Parser [Campaign]) -&gt; FromJSON Campaign
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [Campaign]
+$cparseJSONList :: Value -&gt; Parser [Campaign]
+parseJSON :: Value -&gt; Parser Campaign
+$cparseJSON :: Value -&gt; Parser Campaign
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972217"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema Campaign
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="../../../../playground-common/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972210"><span id="local-6989586621680972212"><span id="local-6989586621680972214"><span class="annot"><span class="annottext">Int -&gt; Campaign -&gt; ShowS
+[Campaign] -&gt; ShowS
+Campaign -&gt; String
+(Int -&gt; Campaign -&gt; ShowS)
+-&gt; (Campaign -&gt; String) -&gt; ([Campaign] -&gt; ShowS) -&gt; Show Campaign
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Campaign] -&gt; ShowS
+$cshowList :: [Campaign] -&gt; ShowS
+show :: Campaign -&gt; String
+$cshow :: Campaign -&gt; String
+showsPrec :: Int -&gt; Campaign -&gt; ShowS
+$cshowsPrec :: Int -&gt; Campaign -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span id="local-6989586621680972205"><span id="local-6989586621680972207"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Campaign</span></span></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- | Action that can be taken by the participants in this contract. A value of</span><span>
+</span><span id="line-95"></span><span class="hs-comment">--   `CampaignAction` is provided as the redeemer. The validator script then</span><span>
+</span><span id="line-96"></span><span class="hs-comment">--   checks if the conditions for performing this action are met.</span><span>
+</span><span id="line-97"></span><span class="hs-comment">--</span><span>
+</span><span id="line-98"></span><span class="hs-keyword">data</span><span> </span><span id="CampaignAction"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CampaignAction"><span class="hs-identifier hs-var">CampaignAction</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Collect"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Collect"><span class="hs-identifier hs-var">Collect</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="Refund"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Refund"><span class="hs-identifier hs-var">Refund</span></a></span></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span id="local-6989586621680972193"><span id="local-6989586621680972195"><span id="local-6989586621680972197"><span class="hs-identifier">PlutusTx.unstableMakeIsData</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">CampaignAction</span></span></span></span><span>
+</span><span id="line-101"></span><span id="local-6989586621680972183"><span id="local-6989586621680972185"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">CampaignAction</span></span></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="hs-keyword">type</span><span> </span><span id="CrowdfundingSchema"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CrowdfundingSchema"><span class="hs-identifier hs-var">CrowdfundingSchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-104"></span><span>    </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;schedule collection&quot;</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>    </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator hs-type">.\/</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;contribute&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Contribution"><span class="hs-identifier hs-type">Contribution</span></a></span><span>
+</span><span id="line-106"></span><span>
+</span><span id="line-107"></span><span id="local-6989586621680972179"><span id="local-6989586621680972180"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="Contribution"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Contribution"><span class="hs-identifier hs-var">Contribution</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Contribution"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Contribution"><span class="hs-identifier hs-var">Contribution</span></a></span></span><span>
+</span><span id="line-108"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="contribValue"><span class="annot"><span class="annottext">Contribution -&gt; Value
+</span><a href="Plutus.Contracts.Crowdfunding.html#contribValue"><span class="hs-identifier hs-var hs-var">contribValue</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.Value</span></a></span><span>
+</span><span id="line-109"></span><span>        </span><span class="hs-comment">-- ^ how much to contribute</span><span>
+</span><span id="line-110"></span><span>        </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972173"><span id="local-6989586621680972175"><span class="annot"><span class="annottext">Contribution -&gt; Contribution -&gt; Bool
+(Contribution -&gt; Contribution -&gt; Bool)
+-&gt; (Contribution -&gt; Contribution -&gt; Bool) -&gt; Eq Contribution
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Contribution -&gt; Contribution -&gt; Bool
+$c/= :: Contribution -&gt; Contribution -&gt; Bool
+== :: Contribution -&gt; Contribution -&gt; Bool
+$c== :: Contribution -&gt; Contribution -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972166"><span id="local-6989586621680972168"><span id="local-6989586621680972170"><span class="annot"><span class="annottext">Int -&gt; Contribution -&gt; ShowS
+[Contribution] -&gt; ShowS
+Contribution -&gt; String
+(Int -&gt; Contribution -&gt; ShowS)
+-&gt; (Contribution -&gt; String)
+-&gt; ([Contribution] -&gt; ShowS)
+-&gt; Show Contribution
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Contribution] -&gt; ShowS
+$cshowList :: [Contribution] -&gt; ShowS
+show :: Contribution -&gt; String
+$cshow :: Contribution -&gt; String
+showsPrec :: Int -&gt; Contribution -&gt; ShowS
+$cshowsPrec :: Int -&gt; Contribution -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. Contribution -&gt; Rep Contribution x)
+-&gt; (forall x. Rep Contribution x -&gt; Contribution)
+-&gt; Generic Contribution
+forall x. Rep Contribution x -&gt; Contribution
+forall x. Contribution -&gt; Rep Contribution x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Contribution x -&gt; Contribution
+$cfrom :: forall x. Contribution -&gt; Rep Contribution x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>          </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972156"><span id="local-6989586621680972158"><span id="local-6989586621680972160"><span id="local-6989586621680972162"><span class="annot"><span class="annottext">[Contribution] -&gt; Encoding
+[Contribution] -&gt; Value
+Contribution -&gt; Encoding
+Contribution -&gt; Value
+(Contribution -&gt; Value)
+-&gt; (Contribution -&gt; Encoding)
+-&gt; ([Contribution] -&gt; Value)
+-&gt; ([Contribution] -&gt; Encoding)
+-&gt; ToJSON Contribution
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [Contribution] -&gt; Encoding
+$ctoEncodingList :: [Contribution] -&gt; Encoding
+toJSONList :: [Contribution] -&gt; Value
+$ctoJSONList :: [Contribution] -&gt; Value
+toEncoding :: Contribution -&gt; Encoding
+$ctoEncoding :: Contribution -&gt; Encoding
+toJSON :: Contribution -&gt; Value
+$ctoJSON :: Contribution -&gt; Value
+</span><a href="#local-6989586621680972156"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972152"><span id="local-6989586621680972154"><span class="annot"><span class="annottext">Value -&gt; Parser [Contribution]
+Value -&gt; Parser Contribution
+(Value -&gt; Parser Contribution)
+-&gt; (Value -&gt; Parser [Contribution]) -&gt; FromJSON Contribution
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [Contribution]
+$cparseJSONList :: Value -&gt; Parser [Contribution]
+parseJSON :: Value -&gt; Parser Contribution
+$cparseJSON :: Value -&gt; Parser Contribution
+</span><a href="#local-6989586621680972152"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972150"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema Contribution
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="#local-6989586621680972150"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972147"><span class="annot"><span class="annottext">ToSchema Contribution
+ToSchema Contribution
+-&gt; (Contribution -&gt; Fix FormArgumentF) -&gt; ToArgument Contribution
+Contribution -&gt; Fix FormArgumentF
+forall a. ToSchema a -&gt; (a -&gt; Fix FormArgumentF) -&gt; ToArgument a
+toArgument :: Contribution -&gt; Fix FormArgumentF
+$ctoArgument :: Contribution -&gt; Fix FormArgumentF
+$cp1ToArgument :: ToSchema Contribution
+</span><a href="../../../../playground-common/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">ToArgument</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- | Construct a 'Campaign' value from the campaign parameters,</span><span>
+</span><span id="line-114"></span><span class="hs-comment">--   using the wallet's public key.</span><span>
+</span><span id="line-115"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#mkCampaign"><span class="hs-identifier hs-type">mkCampaign</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Wallet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span>
+</span><span id="line-116"></span><span id="mkCampaign"><span class="annot"><span class="annottext">mkCampaign :: POSIXTime -&gt; POSIXTime -&gt; Wallet -&gt; Campaign
+</span><a href="Plutus.Contracts.Crowdfunding.html#mkCampaign"><span class="hs-identifier hs-var hs-var">mkCampaign</span></a></span></span><span> </span><span id="local-6989586621680972145"><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972145"><span class="hs-identifier hs-var">ddl</span></a></span></span><span> </span><span id="local-6989586621680972144"><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972144"><span class="hs-identifier hs-var">collectionDdl</span></a></span></span><span> </span><span id="local-6989586621680972143"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680972143"><span class="hs-identifier hs-var">ownerWallet</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-117"></span><span>    </span><span class="annot"><span class="annottext">Campaign :: POSIXTime -&gt; POSIXTime -&gt; PaymentPubKeyHash -&gt; Campaign
+</span><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span>
+</span><span id="line-118"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">campaignDeadline :: POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignDeadline"><span class="hs-identifier hs-var">campaignDeadline</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972145"><span class="hs-identifier hs-var">ddl</span></a></span><span>
+</span><span id="line-119"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">campaignCollectionDeadline :: POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignCollectionDeadline"><span class="hs-identifier hs-var">campaignCollectionDeadline</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972144"><span class="hs-identifier hs-var">collectionDdl</span></a></span><span>
+</span><span id="line-120"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">campaignOwner :: PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignOwner"><span class="hs-identifier hs-var">campaignOwner</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Wallet -&gt; PaymentPubKeyHash
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Emulator.mockWalletPaymentPubKeyHash</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680972143"><span class="hs-identifier hs-var">ownerWallet</span></a></span><span>
+</span><span id="line-121"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- | The 'ValidityInterval POSIXTime' during which the funds can be collected</span><span>
+</span><span id="line-124"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#collectionRange"><span class="hs-pragma hs-type">collectionRange</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-125"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#collectionRange"><span class="hs-identifier hs-type">collectionRange</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">ValidityInterval.ValidityInterval</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span>
+</span><span id="line-126"></span><span id="collectionRange"><span class="annot"><span class="annottext">collectionRange :: Campaign -&gt; ValidityInterval POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#collectionRange"><span class="hs-identifier hs-var hs-var">collectionRange</span></a></span></span><span> </span><span id="local-6989586621680972141"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972141"><span class="hs-identifier hs-var">cmp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; POSIXTime -&gt; ValidityInterval POSIXTime
+forall a. a -&gt; a -&gt; ValidityInterval a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">ValidityInterval.interval</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignDeadline"><span class="hs-identifier hs-var hs-var">campaignDeadline</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972141"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignCollectionDeadline"><span class="hs-identifier hs-var hs-var">campaignCollectionDeadline</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972141"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span class="hs-comment">-- | The 'ValidityInterval POSIXTime' during which a refund may be claimed</span><span>
+</span><span id="line-129"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#refundRange"><span class="hs-pragma hs-type">refundRange</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-130"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#refundRange"><span class="hs-identifier hs-type">refundRange</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">ValidityInterval.ValidityInterval</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span>
+</span><span id="line-131"></span><span id="refundRange"><span class="annot"><span class="annottext">refundRange :: Campaign -&gt; ValidityInterval POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#refundRange"><span class="hs-identifier hs-var hs-var">refundRange</span></a></span></span><span> </span><span id="local-6989586621680972139"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972139"><span class="hs-identifier hs-var">cmp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; ValidityInterval POSIXTime
+forall a. a -&gt; ValidityInterval a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">ValidityInterval.from</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignCollectionDeadline"><span class="hs-identifier hs-var hs-var">campaignCollectionDeadline</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972139"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-keyword">data</span><span> </span><span id="Crowdfunding"><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Crowdfunding"><span class="hs-identifier hs-var">Crowdfunding</span></a></span></span><span>
+</span><span id="line-134"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.ValidatorTypes</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Crowdfunding"><span class="hs-identifier hs-type">Crowdfunding</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="RedeemerType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">RedeemerType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Crowdfunding"><span class="hs-identifier hs-type">Crowdfunding</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CampaignAction"><span class="hs-identifier hs-type">CampaignAction</span></a></span><span>
+</span><span id="line-136"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="DatumType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">DatumType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Crowdfunding"><span class="hs-identifier hs-type">Crowdfunding</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#typedValidator"><span class="hs-identifier hs-type">typedValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.TypedValidator</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Crowdfunding"><span class="hs-identifier hs-type">Crowdfunding</span></a></span><span>
+</span><span id="line-139"></span><span id="typedValidator"><span class="annot"><span class="annottext">typedValidator :: Campaign -&gt; TypedValidator Crowdfunding
+</span><a href="Plutus.Contracts.Crowdfunding.html#typedValidator"><span class="hs-identifier hs-var hs-var">typedValidator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompiledCode (Campaign -&gt; ValidatorType Crowdfunding)
+-&gt; CompiledCode (ValidatorType Crowdfunding -&gt; UntypedValidator)
+-&gt; Campaign
+-&gt; TypedValidator Crowdfunding
+forall a param.
+Lift DefaultUni param =&gt;
+CompiledCode (param -&gt; ValidatorType a)
+-&gt; CompiledCode (ValidatorType a -&gt; UntypedValidator)
+-&gt; param
+-&gt; TypedValidator a
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkTypedValidatorParam</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Crowdfunding"><span class="hs-identifier hs-type">Crowdfunding</span></a></span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">mkValidator</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">wrap</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-142"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-143"></span><span>        </span><span id="local-6989586621680972131"><span class="annot"><span class="annottext">wrap :: (PaymentPubKeyHash -&gt; CampaignAction -&gt; ScriptContext -&gt; Bool)
+-&gt; UntypedValidator
+</span><a href="#local-6989586621680972131"><span class="hs-identifier hs-var hs-var">wrap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(PaymentPubKeyHash -&gt; CampaignAction -&gt; ScriptContext -&gt; Bool)
+-&gt; UntypedValidator
+forall sc d r.
+(IsScriptContext sc, UnsafeFromData d, UnsafeFromData r) =&gt;
+(d -&gt; r -&gt; sc -&gt; Bool) -&gt; UntypedValidator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkUntypedValidator</span></a></span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#validRefund"><span class="hs-pragma hs-type">validRefund</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-146"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#validRefund"><span class="hs-identifier hs-type">validRefund</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.TxInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-147"></span><span id="validRefund"><span class="annot"><span class="annottext">validRefund :: Campaign -&gt; PaymentPubKeyHash -&gt; TxInfo -&gt; Bool
+</span><a href="Plutus.Contracts.Crowdfunding.html#validRefund"><span class="hs-identifier hs-var hs-var">validRefund</span></a></span></span><span> </span><span id="local-6989586621680972128"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972128"><span class="hs-identifier hs-var">campaign</span></a></span></span><span> </span><span id="local-6989586621680972127"><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972127"><span class="hs-identifier hs-var">contributor</span></a></span></span><span> </span><span id="local-6989586621680972126"><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972126"><span class="hs-identifier hs-var">txinfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-148"></span><span>    </span><span class="hs-comment">-- Check that the transaction falls in the refund range of the campaign</span><span>
+</span><span id="line-149"></span><span>    </span><span class="annot"><span class="annottext">ValidityInterval POSIXTime -&gt; Interval POSIXTime
+forall a. ValidityInterval a -&gt; Interval a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">ValidityInterval.toPlutusInterval</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; ValidityInterval POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#refundRange"><span class="hs-identifier hs-var">refundRange</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972128"><span class="hs-identifier hs-var">campaign</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Interval POSIXTime -&gt; Interval POSIXTime -&gt; Bool
+forall a. Ord a =&gt; Interval a -&gt; Interval a -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-operator hs-var">`Interval.contains`</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; Interval POSIXTime
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">PV1.txInfoValidRange</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972126"><span class="hs-identifier hs-var">txinfo</span></a></span><span>
+</span><span id="line-150"></span><span>    </span><span class="hs-comment">-- Check that the transaction is signed by the contributor</span><span>
+</span><span id="line-151"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972126"><span class="hs-identifier hs-var">txinfo</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; PubKeyHash -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-operator hs-var">`PV1.txSignedBy`</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; PubKeyHash
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var hs-var">unPaymentPubKeyHash</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972127"><span class="hs-identifier hs-var">contributor</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#validCollection"><span class="hs-pragma hs-type">validCollection</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-154"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#validCollection"><span class="hs-identifier hs-type">validCollection</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.TxInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-155"></span><span id="validCollection"><span class="annot"><span class="annottext">validCollection :: Campaign -&gt; TxInfo -&gt; Bool
+</span><a href="Plutus.Contracts.Crowdfunding.html#validCollection"><span class="hs-identifier hs-var hs-var">validCollection</span></a></span></span><span> </span><span id="local-6989586621680972119"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972119"><span class="hs-identifier hs-var">campaign</span></a></span></span><span> </span><span id="local-6989586621680972118"><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972118"><span class="hs-identifier hs-var">txinfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-comment">-- Check that the transaction falls in the collection range of the campaign</span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ValidityInterval POSIXTime -&gt; Interval POSIXTime
+forall a. ValidityInterval a -&gt; Interval a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">ValidityInterval.toPlutusInterval</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; ValidityInterval POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#collectionRange"><span class="hs-identifier hs-var">collectionRange</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972119"><span class="hs-identifier hs-var">campaign</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Interval POSIXTime -&gt; Interval POSIXTime -&gt; Bool
+forall a. Ord a =&gt; Interval a -&gt; Interval a -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-operator hs-var">`Interval.contains`</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; Interval POSIXTime
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">PV1.txInfoValidRange</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972118"><span class="hs-identifier hs-var">txinfo</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-comment">-- Check that the transaction is signed by the campaign owner</span><span>
+</span><span id="line-159"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972118"><span class="hs-identifier hs-var">txinfo</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; PubKeyHash -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-operator hs-var">`PV1.txSignedBy`</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; PubKeyHash
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var hs-var">unPaymentPubKeyHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignOwner"><span class="hs-identifier hs-var hs-var">campaignOwner</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972119"><span class="hs-identifier hs-var">campaign</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#mkValidator"><span class="hs-pragma hs-type">mkValidator</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-162"></span><span class="hs-comment">-- | The validator script is of type 'CrowdfundingValidator', and is</span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- additionally parameterized by a 'Campaign' definition. This argument is</span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- provided by the Plutus client, using 'PlutusTx.applyCode'.</span><span>
+</span><span id="line-165"></span><span class="hs-comment">-- As a result, the 'Campaign' definition is part of the script address,</span><span>
+</span><span id="line-166"></span><span class="hs-comment">-- and different campaigns have different addresses. The Campaign{..} syntax</span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- means that all fields of the 'Campaign' value are in scope</span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- (for example 'campaignDeadline' in l. 70).</span><span>
+</span><span id="line-169"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#mkValidator"><span class="hs-identifier hs-type">mkValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CampaignAction"><span class="hs-identifier hs-type">CampaignAction</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.ScriptContext</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-170"></span><span id="mkValidator"><span class="annot"><span class="annottext">mkValidator :: Campaign
+-&gt; PaymentPubKeyHash -&gt; CampaignAction -&gt; ScriptContext -&gt; Bool
+</span><a href="Plutus.Contracts.Crowdfunding.html#mkValidator"><span class="hs-identifier hs-var hs-var">mkValidator</span></a></span></span><span> </span><span id="local-6989586621680972117"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972117"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621680972116"><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972116"><span class="hs-identifier hs-var">con</span></a></span></span><span> </span><span id="local-6989586621680972115"><span class="annot"><span class="annottext">CampaignAction
+</span><a href="#local-6989586621680972115"><span class="hs-identifier hs-var">act</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.ScriptContext</span></a></span><span class="hs-special">{</span><span id="local-6989586621680972113"><span class="annot"><span class="annottext">TxInfo
+scriptContextTxInfo :: ScriptContext -&gt; TxInfo
+scriptContextTxInfo :: TxInfo
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">PV1.scriptContextTxInfo</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CampaignAction
+</span><a href="#local-6989586621680972115"><span class="hs-identifier hs-var">act</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-171"></span><span>    </span><span class="hs-comment">-- the &quot;refund&quot; branch</span><span>
+</span><span id="line-172"></span><span>    </span><span class="annot"><span class="annottext">CampaignAction
+</span><a href="Plutus.Contracts.Crowdfunding.html#Refund"><span class="hs-identifier hs-var">Refund</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; PaymentPubKeyHash -&gt; TxInfo -&gt; Bool
+</span><a href="Plutus.Contracts.Crowdfunding.html#validRefund"><span class="hs-identifier hs-var">validRefund</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972117"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972116"><span class="hs-identifier hs-var">con</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972113"><span class="hs-identifier hs-var">scriptContextTxInfo</span></a></span><span>
+</span><span id="line-173"></span><span>    </span><span class="hs-comment">-- the &quot;collection&quot; branch</span><span>
+</span><span id="line-174"></span><span>    </span><span class="annot"><span class="annottext">CampaignAction
+</span><a href="Plutus.Contracts.Crowdfunding.html#Collect"><span class="hs-identifier hs-var">Collect</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; TxInfo -&gt; Bool
+</span><a href="Plutus.Contracts.Crowdfunding.html#validCollection"><span class="hs-identifier hs-var">validCollection</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972117"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972113"><span class="hs-identifier hs-var">scriptContextTxInfo</span></a></span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span class="hs-comment">-- | The validator script that determines whether the campaign owner can</span><span>
+</span><span id="line-177"></span><span class="hs-comment">--   retrieve the funds or the contributors can claim a refund.</span><span>
+</span><span id="line-178"></span><span class="hs-comment">--</span><span>
+</span><span id="line-179"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#contributionScript"><span class="hs-identifier hs-type">contributionScript</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.Validator</span></a></span><span>
+</span><span id="line-180"></span><span id="contributionScript"><span class="annot"><span class="annottext">contributionScript :: Campaign -&gt; Validator
+</span><a href="Plutus.Contracts.Crowdfunding.html#contributionScript"><span class="hs-identifier hs-var hs-var">contributionScript</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator Crowdfunding -&gt; Validator
+forall a. TypedValidator a -&gt; Validator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.validatorScript</span></a></span><span> </span><span class="annot"><span class="annottext">(TypedValidator Crowdfunding -&gt; Validator)
+-&gt; (Campaign -&gt; TypedValidator Crowdfunding)
+-&gt; Campaign
+-&gt; Validator
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; TypedValidator Crowdfunding
+</span><a href="Plutus.Contracts.Crowdfunding.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span>
+</span><span id="line-181"></span><span>
+</span><span id="line-182"></span><span class="hs-comment">-- | The address of a [[Campaign]]</span><span>
+</span><span id="line-183"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#campaignAddress"><span class="hs-identifier hs-type">campaignAddress</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.ValidatorHash</span></a></span><span>
+</span><span id="line-184"></span><span id="campaignAddress"><span class="annot"><span class="annottext">campaignAddress :: Campaign -&gt; ValidatorHash
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignAddress"><span class="hs-identifier hs-var hs-var">campaignAddress</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Validator -&gt; ValidatorHash
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">PV1.validatorHash</span></a></span><span> </span><span class="annot"><span class="annottext">(Validator -&gt; ValidatorHash)
+-&gt; (Campaign -&gt; Validator) -&gt; Campaign -&gt; ValidatorHash
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; Validator
+</span><a href="Plutus.Contracts.Crowdfunding.html#contributionScript"><span class="hs-identifier hs-var">contributionScript</span></a></span><span>
+</span><span id="line-185"></span><span>
+</span><span id="line-186"></span><span class="hs-comment">-- | The crowdfunding contract for the 'Campaign'.</span><span>
+</span><span id="line-187"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#crowdfunding"><span class="hs-identifier hs-type">crowdfunding</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CrowdfundingSchema"><span class="hs-identifier hs-type">CrowdfundingSchema</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-188"></span><span id="crowdfunding"><span class="annot"><span class="annottext">crowdfunding :: Campaign -&gt; Contract () CrowdfundingSchema ContractError ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#crowdfunding"><span class="hs-identifier hs-var hs-var">crowdfunding</span></a></span></span><span> </span><span id="local-6989586621680972108"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972108"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Promise
+   ()
+   ('R
+      '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+         &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+   ContractError
+   ()]
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall w (s :: Row *) e a. [Promise w s e a] -&gt; Contract w s e a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">selectList</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Campaign -&gt; Promise () CrowdfundingSchema ContractError ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#contribute"><span class="hs-identifier hs-var">contribute</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972108"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; Promise () CrowdfundingSchema ContractError ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#scheduleCollection"><span class="hs-identifier hs-var">scheduleCollection</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972108"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-189"></span><span>
+</span><span id="line-190"></span><span class="hs-comment">-- | A sample campaign</span><span>
+</span><span id="line-191"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#theCampaign"><span class="hs-identifier hs-type">theCampaign</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.POSIXTime</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span>
+</span><span id="line-192"></span><span id="theCampaign"><span class="annot"><span class="annottext">theCampaign :: POSIXTime -&gt; Campaign
+</span><a href="Plutus.Contracts.Crowdfunding.html#theCampaign"><span class="hs-identifier hs-var hs-var">theCampaign</span></a></span></span><span> </span><span id="local-6989586621680972106"><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972106"><span class="hs-identifier hs-var">startTime</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Campaign :: POSIXTime -&gt; POSIXTime -&gt; PaymentPubKeyHash -&gt; Campaign
+</span><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span>
+</span><span id="line-193"></span><span>    </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">campaignDeadline :: POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignDeadline"><span class="hs-identifier hs-var">campaignDeadline</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972106"><span class="hs-identifier hs-var">startTime</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; POSIXTime -&gt; POSIXTime
+forall a. AdditiveSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><span class="hs-number">20000</span></span><span>
+</span><span id="line-194"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">campaignCollectionDeadline :: POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignCollectionDeadline"><span class="hs-identifier hs-var">campaignCollectionDeadline</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972106"><span class="hs-identifier hs-var">startTime</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; POSIXTime -&gt; POSIXTime
+forall a. AdditiveSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><span class="hs-number">30000</span></span><span>
+</span><span id="line-195"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">campaignOwner :: PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignOwner"><span class="hs-identifier hs-var">campaignOwner</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Wallet -&gt; PaymentPubKeyHash
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Emulator.mockWalletPaymentPubKeyHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Wallet
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">knownWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-196"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-197"></span><span>
+</span><span id="line-198"></span><span class="hs-comment">-- | The &quot;contribute&quot; branch of the contract for a specific 'Campaign'. Exposes</span><span>
+</span><span id="line-199"></span><span class="hs-comment">--   an endpoint that allows the user to enter their public key and the</span><span>
+</span><span id="line-200"></span><span class="hs-comment">--   contribution. Then waits until the campaign is over, and collects the</span><span>
+</span><span id="line-201"></span><span class="hs-comment">--   refund if the funding was not collected.</span><span>
+</span><span id="line-202"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#contribute"><span class="hs-identifier hs-type">contribute</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CrowdfundingSchema"><span class="hs-identifier hs-type">CrowdfundingSchema</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-203"></span><span id="contribute"><span class="annot"><span class="annottext">contribute :: Campaign -&gt; Promise () CrowdfundingSchema ContractError ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#contribute"><span class="hs-identifier hs-var hs-var">contribute</span></a></span></span><span> </span><span id="local-6989586621680972104"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972104"><span class="hs-identifier hs-var">cmp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;contribute&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;contribute&quot;</span></span><span> </span><span class="annot"><span class="annottext">((Contribution
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+             &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+       ContractError
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; (Contribution
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Contribution"><span class="hs-identifier hs-type">Contribution</span></a></span><span class="hs-special">{</span><span id="local-6989586621680972101"><span class="annot"><span class="annottext">Value
+contribValue :: Value
+contribValue :: Contribution -&gt; Value
+</span><a href="#local-6989586621680972101"><span class="hs-identifier hs-var hs-var">contribValue</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-204"></span><span>    </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+forall w (s :: Row *) e. ToJSON Text =&gt; Text -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="annot"><span class="annottext">(Text
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; Text
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Contributing &quot;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; Text
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Value -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Haskell.show</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680972101"><span class="hs-identifier hs-var">contribValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-205"></span><span>    </span><span id="local-6989586621680972097"><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972097"><span class="hs-identifier hs-var">contributor</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  PaymentPubKeyHash
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+Contract w s e PaymentPubKeyHash
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">ownFirstPaymentPubKeyHash</span></a></span><span>
+</span><span id="line-206"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972095"><span class="annot"><span class="annottext">inst :: TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972095"><span class="hs-identifier hs-var hs-var">inst</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; TypedValidator Crowdfunding
+</span><a href="Plutus.Contracts.Crowdfunding.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972104"><span class="hs-identifier hs-var">cmp</span></a></span><span>
+</span><span id="line-207"></span><span>        </span><span id="local-6989586621680972094"><span class="annot"><span class="annottext">validityTimeRange :: ValidityInterval POSIXTime
+</span><a href="#local-6989586621680972094"><span class="hs-identifier hs-var hs-var">validityTimeRange</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; ValidityInterval POSIXTime
+forall a. a -&gt; ValidityInterval a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">ValidityInterval.lessThan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignDeadline"><span class="hs-identifier hs-var hs-var">campaignDeadline</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972104"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-208"></span><span>        </span><span id="local-6989586621680972092"><span class="annot"><span class="annottext">tx :: TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972092"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+-&gt; Value -&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall o i. o -&gt; Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustPayToTheScriptWithDatumInTx</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972097"><span class="hs-identifier hs-var">contributor</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680972101"><span class="hs-identifier hs-var">contribValue</span></a></span><span>
+</span><span id="line-209"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ValidityInterval POSIXTime
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o. ValidityInterval POSIXTime -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustValidateInTimeRange</span></a></span><span> </span><span class="annot"><span class="annottext">ValidityInterval POSIXTime
+</span><a href="#local-6989586621680972094"><span class="hs-identifier hs-var">validityTimeRange</span></a></span><span>
+</span><span id="line-210"></span><span>    </span><span id="local-6989586621680972089"><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972089"><span class="hs-identifier hs-var">txid</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(CardanoTx -&gt; TxId)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     TxId
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract
+   ()
+   ('R
+      '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+         &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+   ContractError
+   CardanoTx
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      TxId)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     TxId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups Crowdfunding
+-&gt; TxConstraints
+     (RedeemerType Crowdfunding) (DatumType Crowdfunding)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypedValidator Crowdfunding -&gt; ScriptLookups Crowdfunding
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972095"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TxConstraints (RedeemerType Crowdfunding) (DatumType Crowdfunding)
+TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972092"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-211"></span><span>        </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         UnbalancedTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         CardanoTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span>
+</span><span id="line-212"></span><span>
+</span><span id="line-213"></span><span>    </span><span id="local-6989586621680972083"><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972083"><span class="hs-identifier hs-var">utxo</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+-&gt; POSIXTime
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     (Map TxOutRef DecoratedTxOut)
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+CardanoAddress
+-&gt; POSIXTime -&gt; Contract w s e (Map TxOutRef DecoratedTxOut)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">watchAddressUntilTime</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NetworkId -&gt; TypedValidator Crowdfunding -&gt; CardanoAddress
+forall a. NetworkId -&gt; TypedValidator a -&gt; CardanoAddress
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.validatorCardanoAddress</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">Params.testnet</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972095"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(POSIXTime
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      (Map TxOutRef DecoratedTxOut))
+-&gt; POSIXTime
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     (Map TxOutRef DecoratedTxOut)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignCollectionDeadline"><span class="hs-identifier hs-var hs-var">campaignCollectionDeadline</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972104"><span class="hs-identifier hs-var">cmp</span></a></span><span>
+</span><span id="line-214"></span><span>
+</span><span id="line-215"></span><span>    </span><span class="hs-comment">-- 'utxo' is the set of unspent outputs at the campaign address at the</span><span>
+</span><span id="line-216"></span><span>    </span><span class="hs-comment">-- collection deadline. If 'utxo' still contains our own contribution</span><span>
+</span><span id="line-217"></span><span>    </span><span class="hs-comment">-- then we can claim a refund.</span><span>
+</span><span id="line-218"></span><span>
+</span><span id="line-219"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972079"><span class="annot"><span class="annottext">flt :: TxOutRef -&gt; DecoratedTxOut -&gt; Bool
+</span><a href="#local-6989586621680972079"><span class="hs-identifier hs-var hs-var">flt</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Ledger.TxOutRef</span></a></span><span class="hs-special">{</span><span id="local-6989586621680972077"><span class="annot"><span class="annottext">TxId
+txOutRefId :: TxOutRef -&gt; TxId
+txOutRefId :: TxId
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">txOutRefId</span></a></span></span><span class="hs-special">}</span><span> </span><span class="annot"><span class="annottext">DecoratedTxOut
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972089"><span class="hs-identifier hs-var">txid</span></a></span><span> </span><span class="annot"><span class="annottext">TxId -&gt; TxId -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">Haskell.==</span></a></span><span> </span><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972077"><span class="hs-identifier hs-var">txOutRefId</span></a></span><span>
+</span><span id="line-220"></span><span>        </span><span id="local-6989586621680972075"><span class="annot"><span class="annottext">tx' :: TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972075"><span class="hs-identifier hs-var hs-var">tx'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(TxOutRef -&gt; DecoratedTxOut -&gt; Bool)
+-&gt; Map TxOutRef DecoratedTxOut
+-&gt; CampaignAction
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o.
+(TxOutRef -&gt; DecoratedTxOut -&gt; Bool)
+-&gt; Map TxOutRef DecoratedTxOut -&gt; i -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.collectFromTheScriptFilter</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; DecoratedTxOut -&gt; Bool
+</span><a href="#local-6989586621680972079"><span class="hs-identifier hs-var">flt</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972083"><span class="hs-identifier hs-var">utxo</span></a></span><span> </span><span class="annot"><span class="annottext">CampaignAction
+</span><a href="Plutus.Contracts.Crowdfunding.html#Refund"><span class="hs-identifier hs-var">Refund</span></a></span><span>
+</span><span id="line-221"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ValidityInterval POSIXTime
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o. ValidityInterval POSIXTime -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustValidateInTimeRange</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; ValidityInterval POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#refundRange"><span class="hs-identifier hs-var">refundRange</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972104"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-222"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o. PaymentPubKeyHash -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustBeSignedBy</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680972097"><span class="hs-identifier hs-var">contributor</span></a></span><span>
+</span><span id="line-223"></span><span>    </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash -&gt; Bool
+forall i o. TxConstraints i o -&gt; Bool
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.modifiesUtxoSet</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972075"><span class="hs-identifier hs-var">tx'</span></a></span><span>
+</span><span id="line-224"></span><span>    </span><span class="hs-keyword">then</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-225"></span><span>        </span><span class="annot"><span class="annottext">Text
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Claiming refund&quot;</span></span><span>
+</span><span id="line-226"></span><span>        </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract
+   ()
+   ('R
+      '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+         &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+   ContractError
+   CardanoTx
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups Crowdfunding
+-&gt; TxConstraints
+     (RedeemerType Crowdfunding) (DatumType Crowdfunding)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypedValidator Crowdfunding -&gt; ScriptLookups Crowdfunding
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972095"><span class="hs-identifier hs-var">inst</span></a></span><span>
+</span><span id="line-227"></span><span>                             </span><span class="annot"><span class="annottext">ScriptLookups Crowdfunding
+-&gt; ScriptLookups Crowdfunding -&gt; ScriptLookups Crowdfunding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut -&gt; ScriptLookups Crowdfunding
+forall a. Map TxOutRef DecoratedTxOut -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972083"><span class="hs-identifier hs-var">utxo</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TxConstraints (RedeemerType Crowdfunding) (DatumType Crowdfunding)
+TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972075"><span class="hs-identifier hs-var">tx'</span></a></span><span>
+</span><span id="line-228"></span><span>            </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         UnbalancedTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         CardanoTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span>
+</span><span id="line-229"></span><span>    </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-230"></span><span>
+</span><span id="line-231"></span><span class="hs-comment">-- | The campaign owner's branch of the contract for a given 'Campaign'. It</span><span>
+</span><span id="line-232"></span><span class="hs-comment">--   watches the campaign address for contributions and collects them if</span><span>
+</span><span id="line-233"></span><span class="hs-comment">--   the funding goal was reached in time.</span><span>
+</span><span id="line-234"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#scheduleCollection"><span class="hs-identifier hs-type">scheduleCollection</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#Campaign"><span class="hs-identifier hs-type">Campaign</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CrowdfundingSchema"><span class="hs-identifier hs-type">CrowdfundingSchema</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-235"></span><span id="scheduleCollection"><span class="annot"><span class="annottext">scheduleCollection :: Campaign -&gt; Promise () CrowdfundingSchema ContractError ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#scheduleCollection"><span class="hs-identifier hs-var hs-var">scheduleCollection</span></a></span></span><span> </span><span id="local-6989586621680972070"><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972070"><span class="hs-identifier hs-var">cmp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;schedule collection&quot; a s, AsContractError e,
+ FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;schedule collection&quot;</span></span><span> </span><span class="annot"><span class="annottext">((()
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+             &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+       ContractError
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; (()
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-236"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972069"><span class="annot"><span class="annottext">inst :: TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972069"><span class="hs-identifier hs-var hs-var">inst</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; TypedValidator Crowdfunding
+</span><a href="Plutus.Contracts.Crowdfunding.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972070"><span class="hs-identifier hs-var">cmp</span></a></span><span>
+</span><span id="line-237"></span><span>
+</span><span id="line-238"></span><span>    </span><span class="hs-comment">-- Expose an endpoint that lets the user fire the starting gun on the</span><span>
+</span><span id="line-239"></span><span>    </span><span class="hs-comment">-- campaign. (This endpoint isn't technically necessary, we could just</span><span>
+</span><span id="line-240"></span><span>    </span><span class="hs-comment">-- run the 'trg' action right away)</span><span>
+</span><span id="line-241"></span><span>    </span><span class="annot"><span class="annottext">Text
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Campaign started. Waiting for campaign deadline to collect funds.&quot;</span></span><span>
+</span><span id="line-242"></span><span>
+</span><span id="line-243"></span><span>    </span><span class="annot"><span class="annottext">POSIXTime
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">POSIXTime
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     POSIXTime
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+POSIXTime -&gt; Contract w s e POSIXTime
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">awaitTime</span></a></span><span> </span><span class="annot"><span class="annottext">(POSIXTime
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      POSIXTime)
+-&gt; POSIXTime
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     POSIXTime
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign -&gt; POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignDeadline"><span class="hs-identifier hs-var hs-var">campaignDeadline</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972070"><span class="hs-identifier hs-var">cmp</span></a></span><span>
+</span><span id="line-244"></span><span>    </span><span id="local-6989586621680972067"><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972067"><span class="hs-identifier hs-var">unspentOutputs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     (Map TxOutRef DecoratedTxOut)
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+CardanoAddress -&gt; Contract w s e (Map TxOutRef DecoratedTxOut)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">utxosAt</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NetworkId -&gt; TypedValidator Crowdfunding -&gt; CardanoAddress
+forall a. NetworkId -&gt; TypedValidator a -&gt; CardanoAddress
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.validatorCardanoAddress</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">Params.testnet</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972069"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-245"></span><span>
+</span><span id="line-246"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972065"><span class="annot"><span class="annottext">tx :: TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972065"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+-&gt; CampaignAction -&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o. Map TxOutRef DecoratedTxOut -&gt; i -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.collectFromTheScript</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972067"><span class="hs-identifier hs-var">unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">CampaignAction
+</span><a href="Plutus.Contracts.Crowdfunding.html#Collect"><span class="hs-identifier hs-var">Collect</span></a></span><span>
+</span><span id="line-247"></span><span>            </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o. PaymentPubKeyHash -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustBeSignedBy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Crowdfunding.html#campaignOwner"><span class="hs-identifier hs-var hs-var">campaignOwner</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972070"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-248"></span><span>            </span><span class="annot"><span class="annottext">TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ValidityInterval POSIXTime
+-&gt; TxConstraints CampaignAction PaymentPubKeyHash
+forall i o. ValidityInterval POSIXTime -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustValidateInTimeRange</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; ValidityInterval POSIXTime
+</span><a href="Plutus.Contracts.Crowdfunding.html#collectionRange"><span class="hs-identifier hs-var">collectionRange</span></a></span><span> </span><span class="annot"><span class="annottext">Campaign
+</span><a href="#local-6989586621680972070"><span class="hs-identifier hs-var">cmp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-249"></span><span>
+</span><span id="line-250"></span><span>    </span><span class="annot"><span class="annottext">Text
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a w (s :: Row *) e. ToJSON a =&gt; a -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Collecting funds&quot;</span></span><span>
+</span><span id="line-251"></span><span>    </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract
+   ()
+   ('R
+      '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+         &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+   ContractError
+   CardanoTx
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups Crowdfunding
+-&gt; TxConstraints
+     (RedeemerType Crowdfunding) (DatumType Crowdfunding)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypedValidator Crowdfunding -&gt; ScriptLookups Crowdfunding
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator Crowdfunding
+</span><a href="#local-6989586621680972069"><span class="hs-identifier hs-var">inst</span></a></span><span>
+</span><span id="line-252"></span><span>                         </span><span class="annot"><span class="annottext">ScriptLookups Crowdfunding
+-&gt; ScriptLookups Crowdfunding -&gt; ScriptLookups Crowdfunding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut -&gt; ScriptLookups Crowdfunding
+forall a. Map TxOutRef DecoratedTxOut -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972067"><span class="hs-identifier hs-var">unspentOutputs</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TxConstraints (RedeemerType Crowdfunding) (DatumType Crowdfunding)
+TxConstraints CampaignAction PaymentPubKeyHash
+</span><a href="#local-6989586621680972065"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-253"></span><span>        </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         UnbalancedTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+               &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+         ContractError
+         CardanoTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span>
+</span><span id="line-254"></span><span>
+</span><span id="line-255"></span><span class="hs-comment">-- | Call the &quot;schedule collection&quot; endpoint and instruct the campaign owner's</span><span>
+</span><span id="line-256"></span><span class="hs-comment">--   wallet (wallet 1) to start watching the campaign address.</span><span>
+</span><span id="line-257"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#startCampaign"><span class="hs-identifier hs-type">startCampaign</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">EmulatorTrace</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractHandle</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#CrowdfundingSchema"><span class="hs-identifier hs-type">CrowdfundingSchema</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-258"></span><span id="startCampaign"><span class="annot"><span class="annottext">startCampaign :: EmulatorTrace (ContractHandle () CrowdfundingSchema ContractError)
+</span><a href="Plutus.Contracts.Crowdfunding.html#startCampaign"><span class="hs-identifier hs-var hs-var">startCampaign</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-259"></span><span>    </span><span id="local-6989586621680972063"><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972063"><span class="hs-identifier hs-var">startTime</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">SlotConfig -&gt; POSIXTime
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var hs-var">TimeSlot.scSlotZeroTime</span></a></span><span> </span><span class="annot"><span class="annottext">(SlotConfig -&gt; POSIXTime)
+-&gt; Eff EmulatorEffects SlotConfig -&gt; Eff EmulatorEffects POSIXTime
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Eff EmulatorEffects SlotConfig
+forall (effs :: [* -&gt; *]).
+Member EmulatorControl effs =&gt;
+Eff effs SlotConfig
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getSlotConfig</span></a></span><span>
+</span><span id="line-260"></span><span>    </span><span id="local-6989586621680972061"><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+</span><a href="#local-6989586621680972061"><span class="hs-identifier hs-var">hdl</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Wallet
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+-&gt; Eff
+     EmulatorEffects
+     (ContractHandle
+        ()
+        ('R
+           '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+              &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+        ContractError)
+forall (contract :: * -&gt; Row * -&gt; * -&gt; * -&gt; *) w (s :: Row *) e
+       (effs :: [* -&gt; *]).
+(IsContract contract, ContractConstraints s, Show e, ToJSON e,
+ FromJSON e, ToJSON w, FromJSON w, Member StartContract effs,
+ Monoid w) =&gt;
+Wallet -&gt; contract w s e () -&gt; Eff effs (ContractHandle w s e)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Trace.activateContractWallet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Wallet
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">knownWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; Contract () CrowdfundingSchema ContractError ()
+Campaign
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#crowdfunding"><span class="hs-identifier hs-var">crowdfunding</span></a></span><span> </span><span class="annot"><span class="annottext">(Campaign
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; Campaign
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; Campaign
+</span><a href="Plutus.Contracts.Crowdfunding.html#theCampaign"><span class="hs-identifier hs-var">theCampaign</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972063"><span class="hs-identifier hs-var">startTime</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-261"></span><span>    </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+-&gt; () -&gt; Eff EmulatorEffects ()
+forall (l :: Symbol) ep w (s :: Row *) e (effs :: [* -&gt; *]).
+(ToJSON ep, ContractConstraints s, HasEndpoint l ep s,
+ Member RunContract effs) =&gt;
+ContractHandle w s e -&gt; ep -&gt; Eff effs ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Trace.callEndpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;schedule collection&quot;</span></span><span> </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+</span><a href="#local-6989586621680972061"><span class="hs-identifier hs-var">hdl</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-262"></span><span>    </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+-&gt; Eff
+     EmulatorEffects
+     (ContractHandle
+        ()
+        ('R
+           '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+              &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+        ContractError)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+</span><a href="#local-6989586621680972061"><span class="hs-identifier hs-var">hdl</span></a></span><span>
+</span><span id="line-263"></span><span>
+</span><span id="line-264"></span><span class="hs-comment">-- | Call the &quot;contribute&quot; endpoint, contributing the amount from the wallet</span><span>
+</span><span id="line-265"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#makeContribution"><span class="hs-identifier hs-type">makeContribution</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Wallet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PV1.Value</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">EmulatorTrace</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-266"></span><span id="makeContribution"><span class="annot"><span class="annottext">makeContribution :: Wallet -&gt; Value -&gt; Eff EmulatorEffects ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#makeContribution"><span class="hs-identifier hs-var hs-var">makeContribution</span></a></span></span><span> </span><span id="local-6989586621680972058"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680972058"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span id="local-6989586621680972057"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680972057"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-267"></span><span>    </span><span id="local-6989586621680972056"><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972056"><span class="hs-identifier hs-var">startTime</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">SlotConfig -&gt; POSIXTime
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var hs-var">TimeSlot.scSlotZeroTime</span></a></span><span> </span><span class="annot"><span class="annottext">(SlotConfig -&gt; POSIXTime)
+-&gt; Eff EmulatorEffects SlotConfig -&gt; Eff EmulatorEffects POSIXTime
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Eff EmulatorEffects SlotConfig
+forall (effs :: [* -&gt; *]).
+Member EmulatorControl effs =&gt;
+Eff effs SlotConfig
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getSlotConfig</span></a></span><span>
+</span><span id="line-268"></span><span>    </span><span id="local-6989586621680972055"><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+</span><a href="#local-6989586621680972055"><span class="hs-identifier hs-var">hdl</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Wallet
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+-&gt; Eff
+     EmulatorEffects
+     (ContractHandle
+        ()
+        ('R
+           '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+              &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+        ContractError)
+forall (contract :: * -&gt; Row * -&gt; * -&gt; * -&gt; *) w (s :: Row *) e
+       (effs :: [* -&gt; *]).
+(IsContract contract, ContractConstraints s, Show e, ToJSON e,
+ FromJSON e, ToJSON w, FromJSON w, Member StartContract effs,
+ Monoid w) =&gt;
+Wallet -&gt; contract w s e () -&gt; Eff effs (ContractHandle w s e)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Trace.activateContractWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680972058"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Campaign -&gt; Contract () CrowdfundingSchema ContractError ()
+Campaign
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#crowdfunding"><span class="hs-identifier hs-var">crowdfunding</span></a></span><span> </span><span class="annot"><span class="annottext">(Campaign
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+            &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+      ContractError
+      ())
+-&gt; Campaign
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime -&gt; Campaign
+</span><a href="Plutus.Contracts.Crowdfunding.html#theCampaign"><span class="hs-identifier hs-var">theCampaign</span></a></span><span> </span><span class="annot"><span class="annottext">POSIXTime
+</span><a href="#local-6989586621680972056"><span class="hs-identifier hs-var">startTime</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-269"></span><span>    </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+-&gt; Contribution -&gt; Eff EmulatorEffects ()
+forall (l :: Symbol) ep w (s :: Row *) e (effs :: [* -&gt; *]).
+(ToJSON ep, ContractConstraints s, HasEndpoint l ep s,
+ Member RunContract effs) =&gt;
+ContractHandle w s e -&gt; ep -&gt; Eff effs ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Trace.callEndpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;contribute&quot;</span></span><span> </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+</span><a href="#local-6989586621680972055"><span class="hs-identifier hs-var">hdl</span></a></span><span> </span><span class="annot"><span class="annottext">Contribution :: Value -&gt; Contribution
+</span><a href="Plutus.Contracts.Crowdfunding.html#Contribution"><span class="hs-identifier hs-type">Contribution</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">contribValue :: Value
+</span><a href="Plutus.Contracts.Crowdfunding.html#contribValue"><span class="hs-identifier hs-var">contribValue</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680972057"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-270"></span><span>
+</span><span id="line-271"></span><span class="hs-comment">-- | Run a successful campaign with contributions from wallets 2, 3 and 4.</span><span>
+</span><span id="line-272"></span><span class="annot"><a href="Plutus.Contracts.Crowdfunding.html#successfulCampaign"><span class="hs-identifier hs-type">successfulCampaign</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">EmulatorTrace</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-273"></span><span id="successfulCampaign"><span class="annot"><span class="annottext">successfulCampaign :: Eff EmulatorEffects ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#successfulCampaign"><span class="hs-identifier hs-var hs-var">successfulCampaign</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-274"></span><span>    </span><span class="annot"><span class="annottext">ContractHandle
+  ()
+  ('R
+     '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+        &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+  ContractError
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">EmulatorTrace (ContractHandle () CrowdfundingSchema ContractError)
+Eff
+  EmulatorEffects
+  (ContractHandle
+     ()
+     ('R
+        '[ &quot;contribute&quot; ':-&gt; (EndpointValue Contribution, ActiveEndpoint),
+           &quot;schedule collection&quot; ':-&gt; (EndpointValue (), ActiveEndpoint)])
+     ContractError)
+</span><a href="Plutus.Contracts.Crowdfunding.html#startCampaign"><span class="hs-identifier hs-var">startCampaign</span></a></span><span>
+</span><span id="line-275"></span><span>    </span><span class="annot"><span class="annottext">Wallet -&gt; Value -&gt; Eff EmulatorEffects ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#makeContribution"><span class="hs-identifier hs-var">makeContribution</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Wallet
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">knownWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Micro -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.adaValueOf</span></a></span><span> </span><span class="annot"><span class="annottext">Micro
+</span><span class="hs-number">10</span></span><span class="hs-special">)</span><span>
+</span><span id="line-276"></span><span>    </span><span class="annot"><span class="annottext">Wallet -&gt; Value -&gt; Eff EmulatorEffects ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#makeContribution"><span class="hs-identifier hs-var">makeContribution</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Wallet
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">knownWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">3</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Micro -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.adaValueOf</span></a></span><span> </span><span class="annot"><span class="annottext">Micro
+</span><span class="hs-number">10</span></span><span class="hs-special">)</span><span>
+</span><span id="line-277"></span><span>    </span><span class="annot"><span class="annottext">Wallet -&gt; Value -&gt; Eff EmulatorEffects ()
+</span><a href="Plutus.Contracts.Crowdfunding.html#makeContribution"><span class="hs-identifier hs-var">makeContribution</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Wallet
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">knownWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">4</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Micro -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.adaValueOf</span></a></span><span> </span><span class="annot"><span class="annottext">Micro
+</span><span class="hs-number">2.5</span></span><span class="hs-special">)</span><span>
+</span><span id="line-278"></span><span>    </span><span class="annot"><span class="annottext">Eff EmulatorEffects Slot -&gt; Eff EmulatorEffects ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff EmulatorEffects Slot -&gt; Eff EmulatorEffects ())
+-&gt; Eff EmulatorEffects Slot -&gt; Eff EmulatorEffects ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Slot -&gt; Eff EmulatorEffects Slot
+forall (effs :: [* -&gt; *]).
+Member Waiting effs =&gt;
+Slot -&gt; Eff effs Slot
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">Trace.waitUntilSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><span class="hs-number">21</span></span><span>
+</span><span id="line-279"></span></pre></body></html>

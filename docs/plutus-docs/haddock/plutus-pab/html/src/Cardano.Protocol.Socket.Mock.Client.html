@@ -1,0 +1,710 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds         #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts  #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE GADTs             #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns    #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies      #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-comment">{-|
+   This mock client has been used to test the PAB while we had no real node available.
+   Since now we do, this will be phased out and eventually removed in favor of the
+   `Cardano.Protocol.Socket.Client` module which connects to a real cardano node.
+-}</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Protocol.Socket.Mock.Client</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier">Data.ByteString.Lazy</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LBS</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">Data.Time.Units</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">Second</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">TimeUnit</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">toMicroseconds</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Void</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Concurrent</span></a></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">Control.Monad.Catch</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">catchAll</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/nhl1qjsgl4zpvgrmpa6xzrl7bwwbxld1-contra-tracer-lib-contra-tracer-0.1.0.0-haddock-doc/share/doc/contra-tracer/html/src"><span class="hs-identifier">Control.Tracer</span></a></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">Ouroboros.Network.Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">Point</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">Ouroboros.Network.Protocol.ChainSync.Client</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">ChainSync</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">Ouroboros.Network.Protocol.LocalTxSubmission.Client</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">TxSubmission</span></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.TimeSlot</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">SlotConfig</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">currentSlot</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier">Ouroboros.Network.IOManager</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier">Ouroboros.Network.Mux</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">Ouroboros.Network.NodeToClient</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">NodeToClientProtocols</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">connectTo</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier">versionedNodeToClientProtocols</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier">Ouroboros.Network.Snocket</span></a></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier">Ouroboros.Network.Socket</span></a></span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Cardano.Protocol.Socket.Client</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">ChainSyncHandle</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Cardano.Protocol.Socket.Type</span></a></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Block</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Slot</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">newtype</span><span> </span><span id="TxSendHandle"><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-var">TxSendHandle</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="TxSendHandle"><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-var">TxSendHandle</span></a></span></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="tshQueue"><span class="annot"><span class="annottext">TxSendHandle -&gt; TQueue (Tx BabbageEra)
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#tshQueue"><span class="hs-identifier hs-var hs-var">tshQueue</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TQueue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- | Queue a transaction to be sent to the server.</span><span>
+</span><span id="line-45"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#queueTx"><span class="hs-identifier hs-type">queueTx</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-46"></span><span>    </span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-type">TxSendHandle</span></a></span><span>
+</span><span id="line-47"></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span>
+</span><span id="line-48"></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span id="queueTx"><span class="annot"><span class="annottext">queueTx :: TxSendHandle -&gt; Tx BabbageEra -&gt; IO ()
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#queueTx"><span class="hs-identifier hs-var hs-var">queueTx</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-type">TxSendHandle</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span id="local-6989586621680381962"><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+tshQueue :: TQueue (Tx BabbageEra)
+tshQueue :: TxSendHandle -&gt; TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381962"><span class="hs-identifier hs-var hs-var">tshQueue</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span id="local-6989586621680381961"><span class="annot"><span class="annottext">Tx BabbageEra
+</span><a href="#local-6989586621680381961"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra) -&gt; Tx BabbageEra -&gt; STM ()
+forall a. TQueue a -&gt; a -&gt; STM ()
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">writeTQueue</span></a></span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381962"><span class="hs-identifier hs-var">tshQueue</span></a></span><span> </span><span class="annot"><span class="annottext">Tx BabbageEra
+</span><a href="#local-6989586621680381961"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#getCurrentSlot"><span class="hs-identifier hs-type">getCurrentSlot</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainSyncHandle</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span>
+</span><span id="line-53"></span><span id="getCurrentSlot"><span class="annot"><span class="annottext">getCurrentSlot :: ChainSyncHandle Block -&gt; IO Slot
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#getCurrentSlot"><span class="hs-identifier hs-var hs-var">getCurrentSlot</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ChainSyncHandle Block -&gt; IO Slot
+forall event. ChainSyncHandle event -&gt; IO Slot
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var hs-var">cshCurrentSlot</span></a></span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | Run the chain sync protocol to get access to the current slot number.</span><span>
+</span><span id="line-56"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#runChainSync%27"><span class="hs-identifier hs-type">runChainSync'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-57"></span><span>              </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">SlotConfig</span></a></span><span>
+</span><span id="line-58"></span><span>              </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainSyncHandle</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span id="runChainSync%27"><span class="annot"><span class="annottext">runChainSync' :: FilePath -&gt; SlotConfig -&gt; IO (ChainSyncHandle Block)
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#runChainSync%27"><span class="hs-identifier hs-var hs-var">runChainSync'</span></a></span></span><span> </span><span id="local-6989586621680381955"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680381955"><span class="hs-identifier hs-var">socketPath</span></a></span></span><span> </span><span id="local-6989586621680381954"><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381954"><span class="hs-identifier hs-var">slotConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><span class="annottext">FilePath
+-&gt; SlotConfig
+-&gt; (Block -&gt; Slot -&gt; IO ())
+-&gt; IO (ChainSyncHandle Block)
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#runChainSync"><span class="hs-identifier hs-var">runChainSync</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680381955"><span class="hs-identifier hs-var">socketPath</span></a></span><span> </span><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381954"><span class="hs-identifier hs-var">slotConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">Block
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#runChainSync"><span class="hs-identifier hs-type">runChainSync</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-63"></span><span>             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">SlotConfig</span></a></span><span>
+</span><span id="line-64"></span><span>             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainSyncHandle</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span id="runChainSync"><span class="annot"><span class="annottext">runChainSync :: FilePath
+-&gt; SlotConfig
+-&gt; (Block -&gt; Slot -&gt; IO ())
+-&gt; IO (ChainSyncHandle Block)
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#runChainSync"><span class="hs-identifier hs-var hs-var">runChainSync</span></a></span></span><span> </span><span id="local-6989586621680381952"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680381952"><span class="hs-identifier hs-var">socketPath</span></a></span></span><span> </span><span id="local-6989586621680381951"><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381951"><span class="hs-identifier hs-var">slotConfig</span></a></span></span><span> </span><span id="local-6989586621680381950"><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381950"><span class="hs-identifier hs-var">onNewBlock</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680381949"><span class="annot"><span class="annottext">handle :: ChainSyncHandle Block
+</span><a href="#local-6989586621680381949"><span class="hs-identifier hs-var hs-var">handle</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ChainSyncHandle :: forall event.
+IO Slot -&gt; (event -&gt; Slot -&gt; IO ()) -&gt; ChainSyncHandle event
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainSyncHandle</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">cshCurrentSlot :: IO Slot
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">cshCurrentSlot</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SlotConfig -&gt; IO Slot
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">currentSlot</span></a></span><span> </span><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381951"><span class="hs-identifier hs-var">slotConfig</span></a></span><span>
+</span><span id="line-68"></span><span>                                 </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">cshHandler :: Block -&gt; Slot -&gt; IO ()
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">cshHandler</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381950"><span class="hs-identifier hs-var">onNewBlock</span></a></span><span>
+</span><span id="line-69"></span><span>                                 </span><span class="hs-special">}</span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><span class="annottext">ThreadId
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO ThreadId
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forkIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ThreadId) -&gt; IO () -&gt; IO ThreadId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(IOManager -&gt; IO ()) -&gt; IO ()
+WithIOManager
+</span><a href="../file:///nix/store/3h7idad3jkr1m7rx7xh537d2rhbxrzim-Win32-network-lib-Win32-network-0.1.1.0-haddock-doc/share/doc/Win32-network/html/src"><span class="hs-identifier hs-var">withIOManager</span></a></span><span> </span><span class="annot"><span class="annottext">((IOManager -&gt; IO ()) -&gt; IO ()) -&gt; (IOManager -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Second -&gt; ChainSyncHandle Block -&gt; IOManager -&gt; IO ()
+forall a.
+TimeUnit a =&gt;
+a -&gt; ChainSyncHandle Block -&gt; IOManager -&gt; IO ()
+</span><a href="#local-6989586621680381944"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Second
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">Second</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ChainSyncHandle Block
+</span><a href="#local-6989586621680381949"><span class="hs-identifier hs-var">handle</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><span class="annottext">ChainSyncHandle Block -&gt; IO (ChainSyncHandle Block)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncHandle Block
+</span><a href="#local-6989586621680381949"><span class="hs-identifier hs-var">handle</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-74"></span><span>      </span><span id="local-6989586621680382096"><span class="annot"><a href="#local-6989586621680381944"><span class="hs-identifier hs-type">loop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">TimeUnit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680382096"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680382096"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainSyncHandle</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/3h7idad3jkr1m7rx7xh537d2rhbxrzim-Win32-network-lib-Win32-network-0.1.1.0-haddock-doc/share/doc/Win32-network/html/src"><span class="hs-identifier hs-type">IOManager</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-75"></span><span>      </span><span id="local-6989586621680381944"><span class="annot"><span class="annottext">loop :: a -&gt; ChainSyncHandle Block -&gt; IOManager -&gt; IO ()
+</span><a href="#local-6989586621680381944"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621680381943"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680381943"><span class="hs-identifier hs-var">timeout</span></a></span></span><span> </span><span id="local-6989586621680381942"><span class="annot"><span class="annottext">ch :: ChainSyncHandle Block
+</span><a href="#local-6989586621680381942"><span class="hs-identifier hs-var">ch</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainSyncHandle</span></a></span><span class="hs-special">{</span><span> </span><span id="local-6989586621680381941"><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+cshHandler :: Block -&gt; Slot -&gt; IO ()
+cshHandler :: forall event. ChainSyncHandle event -&gt; event -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381941"><span class="hs-identifier hs-var hs-var">cshHandler</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span id="local-6989586621680381940"><span class="annot"><span class="annottext">IOManager
+</span><a href="#local-6989586621680381940"><span class="hs-identifier hs-var">iocp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-76"></span><span>        </span><span class="annot"><span class="annottext">IO () -&gt; (SomeException -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; (SomeException -&gt; m a) -&gt; m a
+</span><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier hs-var">catchAll</span></a></span><span>
+</span><span id="line-77"></span><span>          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LocalSnocket
+-&gt; NetworkConnectTracers LocalAddress NodeToClientVersion
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication
+        'InitiatorMode LocalAddress ByteString IO () Void)
+-&gt; FilePath
+-&gt; IO ()
+forall a b.
+LocalSnocket
+-&gt; NetworkConnectTracers LocalAddress NodeToClientVersion
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication
+        'InitiatorMode LocalAddress ByteString IO a b)
+-&gt; FilePath
+-&gt; IO ()
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">connectTo</span></a></span><span>
+</span><span id="line-78"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IOManager -&gt; LocalSnocket
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">localSnocket</span></a></span><span> </span><span class="annot"><span class="annottext">IOManager
+</span><a href="#local-6989586621680381940"><span class="hs-identifier hs-var">iocp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>            </span><span class="annot"><span class="annottext">NetworkConnectTracers LocalAddress NodeToClientVersion
+forall addr vNumber. NetworkConnectTracers addr vNumber
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">nullNetworkConnectTracers</span></a></span><span>
+</span><span id="line-80"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NodeToClientVersion
+-&gt; NodeToClientVersionData
+-&gt; (ConnectionId LocalAddress
+    -&gt; STM IO ControlMessage
+    -&gt; NodeToClientProtocols 'InitiatorMode ByteString IO () Void)
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication
+        'InitiatorMode LocalAddress ByteString IO () Void)
+forall (m :: * -&gt; *) (appType :: MuxMode) bytes a b.
+NodeToClientVersion
+-&gt; NodeToClientVersionData
+-&gt; (ConnectionId LocalAddress
+    -&gt; STM m ControlMessage
+    -&gt; NodeToClientProtocols appType bytes m a b)
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication appType LocalAddress bytes m a b)
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">versionedNodeToClientProtocols</span></a></span><span>
+</span><span id="line-81"></span><span>              </span><span class="annot"><span class="annottext">NodeToClientVersion
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">nodeToClientVersion</span></a></span><span>
+</span><span id="line-82"></span><span>              </span><span class="annot"><span class="annottext">NodeToClientVersionData
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">nodeToClientVersionData</span></a></span><span>
+</span><span id="line-83"></span><span>              </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">ConnectionId LocalAddress
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">STM IO ControlMessage
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Block -&gt; Slot -&gt; IO ())
+-&gt; NodeToClientProtocols 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381935"><span class="hs-identifier hs-var">nodeToClientProtocols</span></a></span><span> </span><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381941"><span class="hs-identifier hs-var">cshHandler</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>            </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680381952"><span class="hs-identifier hs-var">socketPath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>          </span><span class="hs-comment">{- If we receive any error or disconnect, try to reconnect.
+             This happens a lot on startup, until the server starts. -}</span><span>
+</span><span id="line-87"></span><span>          </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">SomeException
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-88"></span><span>               </span><span class="annot"><span class="annottext">Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">threadDelay</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Int) -&gt; Integer -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Integer
+forall a. TimeUnit a =&gt; a -&gt; Integer
+</span><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-var">toMicroseconds</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680381943"><span class="hs-identifier hs-var">timeout</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span>               </span><span class="annot"><span class="annottext">a -&gt; ChainSyncHandle Block -&gt; IOManager -&gt; IO ()
+forall a.
+TimeUnit a =&gt;
+a -&gt; ChainSyncHandle Block -&gt; IOManager -&gt; IO ()
+</span><a href="#local-6989586621680381944"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680381943"><span class="hs-identifier hs-var">timeout</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncHandle Block
+</span><a href="#local-6989586621680381942"><span class="hs-identifier hs-var">ch</span></a></span><span> </span><span class="annot"><span class="annottext">IOManager
+</span><a href="#local-6989586621680381940"><span class="hs-identifier hs-var">iocp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span>      </span><span class="annot"><a href="#local-6989586621680381935"><span class="hs-identifier hs-type">nodeToClientProtocols</span></a></span><span>
+</span><span id="line-92"></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">NodeToClientProtocols</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="../file:///nix/store/kbrd49nyfr5ssaif435cdk5c5apffi69-network-mux-lib-network-mux-0.1.0.1-haddock-doc/share/doc/network-mux/html/src"><span class="hs-identifier hs-type">InitiatorMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-type">LBS.ByteString</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Void</span></a></span><span>
+</span><span id="line-94"></span><span>      </span><span id="local-6989586621680381935"><span class="annot"><span class="annottext">nodeToClientProtocols :: (Block -&gt; Slot -&gt; IO ())
+-&gt; NodeToClientProtocols 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381935"><span class="hs-identifier hs-var hs-var">nodeToClientProtocols</span></a></span></span><span> </span><span id="local-6989586621680381933"><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381933"><span class="hs-identifier hs-var">blockHandler</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-95"></span><span>        </span><span class="annot"><span class="annottext">NodeToClientProtocols :: forall (appType :: MuxMode) bytes (m :: * -&gt; *) a b.
+RunMiniProtocol appType bytes m a b
+-&gt; RunMiniProtocol appType bytes m a b
+-&gt; RunMiniProtocol appType bytes m a b
+-&gt; RunMiniProtocol appType bytes m a b
+-&gt; NodeToClientProtocols appType bytes m a b
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">NodeToClientProtocols</span></a></span><span>
+</span><span id="line-96"></span><span>          </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">localChainSyncProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localChainSyncProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Block -&gt; Slot -&gt; IO ())
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381930"><span class="hs-identifier hs-var">chainSync</span></a></span><span> </span><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381933"><span class="hs-identifier hs-var">blockHandler</span></a></span><span>
+</span><span id="line-97"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">localTxSubmissionProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localTxSubmissionProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall (m :: * -&gt; *) a.
+MonadTimer m =&gt;
+RunMiniProtocol 'InitiatorMode ByteString m a Void
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">doNothingInitiatorProtocol</span></a></span><span>
+</span><span id="line-98"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">localStateQueryProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localStateQueryProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall (m :: * -&gt; *) a.
+MonadTimer m =&gt;
+RunMiniProtocol 'InitiatorMode ByteString m a Void
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">doNothingInitiatorProtocol</span></a></span><span>
+</span><span id="line-99"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">localTxMonitorProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localTxMonitorProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall (m :: * -&gt; *) a.
+MonadTimer m =&gt;
+RunMiniProtocol 'InitiatorMode ByteString m a Void
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">doNothingInitiatorProtocol</span></a></span><span>
+</span><span id="line-100"></span><span>          </span><span class="hs-special">}</span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span>      </span><span class="annot"><a href="#local-6989586621680381930"><span class="hs-identifier hs-type">chainSync</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-type">RunMiniProtocol</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="../file:///nix/store/kbrd49nyfr5ssaif435cdk5c5apffi69-network-mux-lib-network-mux-0.1.0.1-haddock-doc/share/doc/network-mux/html/src"><span class="hs-identifier hs-type">InitiatorMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-type">LBS.ByteString</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Void</span></a></span><span>
+</span><span id="line-104"></span><span>      </span><span id="local-6989586621680381930"><span class="annot"><span class="annottext">chainSync :: (Block -&gt; Slot -&gt; IO ())
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381930"><span class="hs-identifier hs-var hs-var">chainSync</span></a></span></span><span> </span><span id="local-6989586621680381925"><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381925"><span class="hs-identifier hs-var">onNewBlock'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-105"></span><span>          </span><span class="annot"><span class="annottext">MuxPeer ByteString IO ()
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall bytes (m :: * -&gt; *) a.
+MuxPeer bytes m a -&gt; RunMiniProtocol 'InitiatorMode bytes m a Void
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">InitiatorProtocolOnly</span></a></span><span> </span><span class="annot"><span class="annottext">(MuxPeer ByteString IO ()
+ -&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void)
+-&gt; MuxPeer ByteString IO ()
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-106"></span><span>          </span><span class="annot"><span class="annottext">Tracer IO (TraceSendRecv (ChainSync Block (Point Block) Block))
+-&gt; Codec
+     (ChainSync Block (Point Block) Block)
+     DeserialiseFailure
+     IO
+     ByteString
+-&gt; Peer
+     (ChainSync Block (Point Block) Block) 'AsClient 'StIdle IO ()
+-&gt; MuxPeer ByteString IO ()
+forall (pr :: PeerRole) ps (st :: ps) failure bytes (m :: * -&gt; *)
+       a.
+(Show failure, forall (st' :: ps). Show (ClientHasAgency st'),
+ forall (st' :: ps). Show (ServerHasAgency st'), ShowProxy ps) =&gt;
+Tracer m (TraceSendRecv ps)
+-&gt; Codec ps failure m bytes
+-&gt; Peer ps pr st m a
+-&gt; MuxPeer bytes m a
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">MuxPeer</span></a></span><span>
+</span><span id="line-107"></span><span>            </span><span class="annot"><span class="annottext">Tracer IO (TraceSendRecv (ChainSync Block (Point Block) Block))
+forall (m :: * -&gt; *) a. Applicative m =&gt; Tracer m a
+</span><a href="../file:///nix/store/nhl1qjsgl4zpvgrmpa6xzrl7bwwbxld1-contra-tracer-lib-contra-tracer-0.1.0.0-haddock-doc/share/doc/contra-tracer/html/src"><span class="hs-identifier hs-var">nullTracer</span></a></span><span>
+</span><span id="line-108"></span><span>            </span><span class="annot"><span class="annottext">Codec
+  (ChainSync Block (Point Block) Block)
+  DeserialiseFailure
+  IO
+  ByteString
+forall block.
+(Serialise block, Serialise (HeaderHash block)) =&gt;
+Codec
+  (ChainSync block (Point block) Block)
+  DeserialiseFailure
+  IO
+  ByteString
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">chainSyncCodec</span></a></span><span>
+</span><span id="line-109"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ChainSyncClient Block (Point Block) Block IO ()
+-&gt; Peer
+     (ChainSync Block (Point Block) Block) 'AsClient 'StIdle IO ()
+forall header point tip (m :: * -&gt; *) a.
+Monad m =&gt;
+ChainSyncClient header point tip m a
+-&gt; Peer (ChainSync header point tip) 'AsClient 'StIdle m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">ChainSync.chainSyncClientPeer</span></a></span><span>
+</span><span id="line-110"></span><span>               </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SlotConfig
+-&gt; (Block -&gt; Slot -&gt; IO ())
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#chainSyncClient"><span class="hs-identifier hs-var">chainSyncClient</span></a></span><span> </span><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381951"><span class="hs-identifier hs-var">slotConfig</span></a></span><span> </span><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381925"><span class="hs-identifier hs-var">onNewBlock'</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- | The client updates the application state when the protocol state changes.</span><span>
+</span><span id="line-113"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#chainSyncClient"><span class="hs-identifier hs-type">chainSyncClient</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">SlotConfig</span></a></span><span>
+</span><span id="line-114"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">ChainSync.ChainSyncClient</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span id="chainSyncClient"><span class="annot"><span class="annottext">chainSyncClient :: SlotConfig
+-&gt; (Block -&gt; Slot -&gt; IO ())
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#chainSyncClient"><span class="hs-identifier hs-var hs-var">chainSyncClient</span></a></span></span><span> </span><span id="local-6989586621680381917"><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381917"><span class="hs-identifier hs-var">slotConfig</span></a></span></span><span> </span><span id="local-6989586621680381916"><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381916"><span class="hs-identifier hs-var">onNewBlock</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-117"></span><span>    </span><span class="annot"><span class="annottext">IO (ClientStIdle Block (Point Block) Block IO ())
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+forall header point tip (m :: * -&gt; *) a.
+m (ClientStIdle header point tip m a)
+-&gt; ChainSyncClient header point tip m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">ChainSync.ChainSyncClient</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (ClientStIdle Block (Point Block) Block IO ())
+ -&gt; ChainSyncClient Block (Point Block) Block IO ())
+-&gt; IO (ClientStIdle Block (Point Block) Block IO ())
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ClientStIdle Block (Point Block) Block IO ()
+-&gt; IO (ClientStIdle Block (Point Block) Block IO ())
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">ClientStIdle Block (Point Block) Block IO ()
+</span><a href="#local-6989586621680381914"><span class="hs-identifier hs-var">requestNext</span></a></span><span>
+</span><span id="line-118"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-119"></span><span>      </span><span class="annot"><a href="#local-6989586621680381914"><span class="hs-identifier hs-type">requestNext</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">ChainSync.ClientStIdle</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-120"></span><span>      </span><span id="local-6989586621680381914"><span class="annot"><span class="annottext">requestNext :: ClientStIdle Block (Point Block) Block IO ()
+</span><a href="#local-6989586621680381914"><span class="hs-identifier hs-var hs-var">requestNext</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-121"></span><span>        </span><span class="annot"><span class="annottext">ClientStNext Block (Point Block) Block IO ()
+-&gt; IO (ClientStNext Block (Point Block) Block IO ())
+-&gt; ClientStIdle Block (Point Block) Block IO ()
+forall header point tip (m :: * -&gt; *) a.
+ClientStNext header point tip m a
+-&gt; m (ClientStNext header point tip m a)
+-&gt; ClientStIdle header point tip m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">ChainSync.SendMsgRequestNext</span></a></span><span>
+</span><span id="line-122"></span><span>          </span><span class="annot"><span class="annottext">ClientStNext Block (Point Block) Block IO ()
+</span><a href="#local-6989586621680381912"><span class="hs-identifier hs-var">handleNext</span></a></span><span>
+</span><span id="line-123"></span><span>          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ClientStNext Block (Point Block) Block IO ()
+-&gt; IO (ClientStNext Block (Point Block) Block IO ())
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">ClientStNext Block (Point Block) Block IO ()
+</span><a href="#local-6989586621680381912"><span class="hs-identifier hs-var">handleNext</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span>      </span><span class="annot"><a href="#local-6989586621680381912"><span class="hs-identifier hs-type">handleNext</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">ChainSync.ClientStNext</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>      </span><span id="local-6989586621680381912"><span class="annot"><span class="annottext">handleNext :: ClientStNext Block (Point Block) Block IO ()
+</span><a href="#local-6989586621680381912"><span class="hs-identifier hs-var hs-var">handleNext</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-127"></span><span>        </span><span class="annot"><span class="annottext">ClientStNext :: forall header point tip (m :: * -&gt; *) a.
+(header -&gt; tip -&gt; ChainSyncClient header point tip m a)
+-&gt; (point -&gt; tip -&gt; ChainSyncClient header point tip m a)
+-&gt; ClientStNext header point tip m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">ChainSync.ClientStNext</span></a></span><span>
+</span><span id="line-128"></span><span>        </span><span class="hs-special">{</span><span>
+</span><span id="line-129"></span><span>          </span><span class="annot"><span class="annottext">recvMsgRollForward :: Block -&gt; Block -&gt; ChainSyncClient Block (Point Block) Block IO ()
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">ChainSync.recvMsgRollForward</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680381909"><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680381909"><span class="hs-identifier hs-var">block</span></a></span></span><span> </span><span class="annot"><span class="annottext">Block
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-130"></span><span>            </span><span class="annot"><span class="annottext">IO (ClientStIdle Block (Point Block) Block IO ())
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+forall header point tip (m :: * -&gt; *) a.
+m (ClientStIdle header point tip m a)
+-&gt; ChainSyncClient header point tip m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">ChainSync.ChainSyncClient</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (ClientStIdle Block (Point Block) Block IO ())
+ -&gt; ChainSyncClient Block (Point Block) Block IO ())
+-&gt; IO (ClientStIdle Block (Point Block) Block IO ())
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-131"></span><span>              </span><span id="local-6989586621680381908"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680381908"><span class="hs-identifier hs-var">slot</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">SlotConfig -&gt; IO Slot
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">currentSlot</span></a></span><span> </span><span class="annot"><span class="annottext">SlotConfig
+</span><a href="#local-6989586621680381917"><span class="hs-identifier hs-var">slotConfig</span></a></span><span>
+</span><span id="line-132"></span><span>              </span><span class="annot"><span class="annottext">Block -&gt; Slot -&gt; IO ()
+</span><a href="#local-6989586621680381916"><span class="hs-identifier hs-var">onNewBlock</span></a></span><span> </span><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680381909"><span class="hs-identifier hs-var">block</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680381908"><span class="hs-identifier hs-var">slot</span></a></span><span>
+</span><span id="line-133"></span><span>              </span><span class="annot"><span class="annottext">ClientStIdle Block (Point Block) Block IO ()
+-&gt; IO (ClientStIdle Block (Point Block) Block IO ())
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">ClientStIdle Block (Point Block) Block IO ()
+</span><a href="#local-6989586621680381914"><span class="hs-identifier hs-var">requestNext</span></a></span><span>
+</span><span id="line-134"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">recvMsgRollBackward :: Point Block
+-&gt; Block -&gt; ChainSyncClient Block (Point Block) Block IO ()
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">ChainSync.recvMsgRollBackward</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath
+-&gt; Point Block
+-&gt; Block
+-&gt; ChainSyncClient Block (Point Block) Block IO ()
+forall a. HasCallStack =&gt; FilePath -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;Not supported.&quot;</span></span><span>
+</span><span id="line-135"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#runTxSender"><span class="hs-identifier hs-type">runTxSender</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-138"></span><span>            </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-type">TxSendHandle</span></a></span><span>
+</span><span id="line-139"></span><span id="runTxSender"><span class="annot"><span class="annottext">runTxSender :: FilePath -&gt; IO TxSendHandle
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#runTxSender"><span class="hs-identifier hs-var hs-var">runTxSender</span></a></span></span><span> </span><span id="local-6989586621680381904"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680381904"><span class="hs-identifier hs-var">socketPath</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621680381903"><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381903"><span class="hs-identifier hs-var">inputQueue</span></a></span></span><span>  </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (TQueue (Tx BabbageEra))
+forall a. IO (TQueue a)
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">newTQueueIO</span></a></span><span>
+</span><span id="line-141"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680381901"><span class="annot"><span class="annottext">handle :: TxSendHandle
+</span><a href="#local-6989586621680381901"><span class="hs-identifier hs-var hs-var">handle</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxSendHandle :: TQueue (Tx BabbageEra) -&gt; TxSendHandle
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-type">TxSendHandle</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">tshQueue :: TQueue (Tx BabbageEra)
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#tshQueue"><span class="hs-identifier hs-var">tshQueue</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381903"><span class="hs-identifier hs-var">inputQueue</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span>    </span><span class="annot"><span class="annottext">ThreadId
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO ThreadId
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forkIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ThreadId) -&gt; IO () -&gt; IO ThreadId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(IOManager -&gt; IO ()) -&gt; IO ()
+WithIOManager
+</span><a href="../file:///nix/store/3h7idad3jkr1m7rx7xh537d2rhbxrzim-Win32-network-lib-Win32-network-0.1.1.0-haddock-doc/share/doc/Win32-network/html/src"><span class="hs-identifier hs-var">withIOManager</span></a></span><span> </span><span class="annot"><span class="annottext">((IOManager -&gt; IO ()) -&gt; IO ()) -&gt; (IOManager -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Second -&gt; TxSendHandle -&gt; IOManager -&gt; IO ()
+forall a. TimeUnit a =&gt; a -&gt; TxSendHandle -&gt; IOManager -&gt; IO ()
+</span><a href="#local-6989586621680381900"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Second
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">Second</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TxSendHandle
+</span><a href="#local-6989586621680381901"><span class="hs-identifier hs-var">handle</span></a></span><span>
+</span><span id="line-144"></span><span>    </span><span class="annot"><span class="annottext">TxSendHandle -&gt; IO TxSendHandle
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">TxSendHandle
+</span><a href="#local-6989586621680381901"><span class="hs-identifier hs-var">handle</span></a></span><span>
+</span><span id="line-145"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-146"></span><span>      </span><span id="local-6989586621680381992"><span class="annot"><a href="#local-6989586621680381900"><span class="hs-identifier hs-type">loop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">TimeUnit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381992"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680381992"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-type">TxSendHandle</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/3h7idad3jkr1m7rx7xh537d2rhbxrzim-Win32-network-lib-Win32-network-0.1.1.0-haddock-doc/share/doc/Win32-network/html/src"><span class="hs-identifier hs-type">IOManager</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-147"></span><span>      </span><span id="local-6989586621680381900"><span class="annot"><span class="annottext">loop :: a -&gt; TxSendHandle -&gt; IOManager -&gt; IO ()
+</span><a href="#local-6989586621680381900"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621680381899"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680381899"><span class="hs-identifier hs-var">timeout</span></a></span></span><span> </span><span id="local-6989586621680381898"><span class="annot"><span class="annottext">ch :: TxSendHandle
+</span><a href="#local-6989586621680381898"><span class="hs-identifier hs-var">ch</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#TxSendHandle"><span class="hs-identifier hs-type">TxSendHandle</span></a></span><span class="hs-special">{</span><span> </span><span id="local-6989586621680381897"><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+tshQueue :: TQueue (Tx BabbageEra)
+tshQueue :: TxSendHandle -&gt; TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381897"><span class="hs-identifier hs-var hs-var">tshQueue</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span id="local-6989586621680381896"><span class="annot"><span class="annottext">IOManager
+</span><a href="#local-6989586621680381896"><span class="hs-identifier hs-var">iocp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-148"></span><span>        </span><span class="annot"><span class="annottext">IO () -&gt; (SomeException -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a.
+MonadCatch m =&gt;
+m a -&gt; (SomeException -&gt; m a) -&gt; m a
+</span><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier hs-var">catchAll</span></a></span><span>
+</span><span id="line-149"></span><span>          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LocalSnocket
+-&gt; NetworkConnectTracers LocalAddress NodeToClientVersion
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication
+        'InitiatorMode LocalAddress ByteString IO () Void)
+-&gt; FilePath
+-&gt; IO ()
+forall a b.
+LocalSnocket
+-&gt; NetworkConnectTracers LocalAddress NodeToClientVersion
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication
+        'InitiatorMode LocalAddress ByteString IO a b)
+-&gt; FilePath
+-&gt; IO ()
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">connectTo</span></a></span><span>
+</span><span id="line-150"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IOManager -&gt; LocalSnocket
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">localSnocket</span></a></span><span> </span><span class="annot"><span class="annottext">IOManager
+</span><a href="#local-6989586621680381896"><span class="hs-identifier hs-var">iocp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span>            </span><span class="annot"><span class="annottext">NetworkConnectTracers LocalAddress NodeToClientVersion
+forall addr vNumber. NetworkConnectTracers addr vNumber
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">nullNetworkConnectTracers</span></a></span><span>
+</span><span id="line-152"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NodeToClientVersion
+-&gt; NodeToClientVersionData
+-&gt; (ConnectionId LocalAddress
+    -&gt; STM IO ControlMessage
+    -&gt; NodeToClientProtocols 'InitiatorMode ByteString IO () Void)
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication
+        'InitiatorMode LocalAddress ByteString IO () Void)
+forall (m :: * -&gt; *) (appType :: MuxMode) bytes a b.
+NodeToClientVersion
+-&gt; NodeToClientVersionData
+-&gt; (ConnectionId LocalAddress
+    -&gt; STM m ControlMessage
+    -&gt; NodeToClientProtocols appType bytes m a b)
+-&gt; Versions
+     NodeToClientVersion
+     NodeToClientVersionData
+     (OuroborosApplication appType LocalAddress bytes m a b)
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">versionedNodeToClientProtocols</span></a></span><span>
+</span><span id="line-153"></span><span>              </span><span class="annot"><span class="annottext">NodeToClientVersion
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">nodeToClientVersion</span></a></span><span>
+</span><span id="line-154"></span><span>              </span><span class="annot"><span class="annottext">NodeToClientVersionData
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">nodeToClientVersionData</span></a></span><span>
+</span><span id="line-155"></span><span>              </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">ConnectionId LocalAddress
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">STM IO ControlMessage
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+-&gt; NodeToClientProtocols 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381895"><span class="hs-identifier hs-var">nodeToClientProtocols</span></a></span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381897"><span class="hs-identifier hs-var">tshQueue</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-156"></span><span>            </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680381904"><span class="hs-identifier hs-var">socketPath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-157"></span><span>          </span><span class="hs-comment">{- If we receive any error or disconnect, try to reconnect.
+             This happens a lot on startup, until the server starts. -}</span><span>
+</span><span id="line-159"></span><span>          </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">SomeException
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-160"></span><span>               </span><span class="annot"><span class="annottext">Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">threadDelay</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Int) -&gt; Integer -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Integer
+forall a. TimeUnit a =&gt; a -&gt; Integer
+</span><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-var">toMicroseconds</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680381899"><span class="hs-identifier hs-var">timeout</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-161"></span><span>               </span><span class="annot"><span class="annottext">a -&gt; TxSendHandle -&gt; IOManager -&gt; IO ()
+forall a. TimeUnit a =&gt; a -&gt; TxSendHandle -&gt; IOManager -&gt; IO ()
+</span><a href="#local-6989586621680381900"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680381899"><span class="hs-identifier hs-var">timeout</span></a></span><span> </span><span class="annot"><span class="annottext">TxSendHandle
+</span><a href="#local-6989586621680381898"><span class="hs-identifier hs-var">ch</span></a></span><span> </span><span class="annot"><span class="annottext">IOManager
+</span><a href="#local-6989586621680381896"><span class="hs-identifier hs-var">iocp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span>      </span><span class="annot"><a href="#local-6989586621680381895"><span class="hs-identifier hs-type">nodeToClientProtocols</span></a></span><span>
+</span><span id="line-164"></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TQueue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-165"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">NodeToClientProtocols</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="../file:///nix/store/kbrd49nyfr5ssaif435cdk5c5apffi69-network-mux-lib-network-mux-0.1.0.1-haddock-doc/share/doc/network-mux/html/src"><span class="hs-identifier hs-type">InitiatorMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-type">LBS.ByteString</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Void</span></a></span><span>
+</span><span id="line-166"></span><span>      </span><span id="local-6989586621680381895"><span class="annot"><span class="annottext">nodeToClientProtocols :: TQueue (Tx BabbageEra)
+-&gt; NodeToClientProtocols 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381895"><span class="hs-identifier hs-var hs-var">nodeToClientProtocols</span></a></span></span><span> </span><span id="local-6989586621680381894"><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381894"><span class="hs-identifier hs-var">sendQueue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-167"></span><span>        </span><span class="annot"><span class="annottext">NodeToClientProtocols :: forall (appType :: MuxMode) bytes (m :: * -&gt; *) a b.
+RunMiniProtocol appType bytes m a b
+-&gt; RunMiniProtocol appType bytes m a b
+-&gt; RunMiniProtocol appType bytes m a b
+-&gt; RunMiniProtocol appType bytes m a b
+-&gt; NodeToClientProtocols appType bytes m a b
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">NodeToClientProtocols</span></a></span><span>
+</span><span id="line-168"></span><span>          </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">localChainSyncProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localChainSyncProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall (m :: * -&gt; *) a.
+MonadTimer m =&gt;
+RunMiniProtocol 'InitiatorMode ByteString m a Void
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">doNothingInitiatorProtocol</span></a></span><span>
+</span><span id="line-169"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">localTxSubmissionProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localTxSubmissionProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381893"><span class="hs-identifier hs-var">txSubmission</span></a></span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381894"><span class="hs-identifier hs-var">sendQueue</span></a></span><span>
+</span><span id="line-170"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">localStateQueryProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localStateQueryProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall (m :: * -&gt; *) a.
+MonadTimer m =&gt;
+RunMiniProtocol 'InitiatorMode ByteString m a Void
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">doNothingInitiatorProtocol</span></a></span><span>
+</span><span id="line-171"></span><span>          </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">localTxMonitorProtocol :: RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">localTxMonitorProtocol</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall (m :: * -&gt; *) a.
+MonadTimer m =&gt;
+RunMiniProtocol 'InitiatorMode ByteString m a Void
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">doNothingInitiatorProtocol</span></a></span><span>
+</span><span id="line-172"></span><span>          </span><span class="hs-special">}</span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span>      </span><span class="annot"><a href="#local-6989586621680381893"><span class="hs-identifier hs-type">txSubmission</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TQueue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-175"></span><span>                   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-type">RunMiniProtocol</span></a></span><span> </span><span class="hs-special">'</span><span class="annot"><a href="../file:///nix/store/kbrd49nyfr5ssaif435cdk5c5apffi69-network-mux-lib-network-mux-0.1.0.1-haddock-doc/share/doc/network-mux/html/src"><span class="hs-identifier hs-type">InitiatorMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-type">LBS.ByteString</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Void</span></a></span><span>
+</span><span id="line-176"></span><span>      </span><span id="local-6989586621680381893"><span class="annot"><span class="annottext">txSubmission :: TQueue (Tx BabbageEra)
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+</span><a href="#local-6989586621680381893"><span class="hs-identifier hs-var hs-var">txSubmission</span></a></span></span><span> </span><span id="local-6989586621680381892"><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381892"><span class="hs-identifier hs-var">inputQueue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-177"></span><span>          </span><span class="annot"><span class="annottext">MuxPeer ByteString IO ()
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall bytes (m :: * -&gt; *) a.
+MuxPeer bytes m a -&gt; RunMiniProtocol 'InitiatorMode bytes m a Void
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">InitiatorProtocolOnly</span></a></span><span> </span><span class="annot"><span class="annottext">(MuxPeer ByteString IO ()
+ -&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void)
+-&gt; MuxPeer ByteString IO ()
+-&gt; RunMiniProtocol 'InitiatorMode ByteString IO () Void
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-178"></span><span>          </span><span class="annot"><span class="annottext">Tracer
+  IO (TraceSendRecv (LocalTxSubmission (Tx BabbageEra) FilePath))
+-&gt; Codec
+     (LocalTxSubmission (Tx BabbageEra) FilePath)
+     DeserialiseFailure
+     IO
+     ByteString
+-&gt; Peer
+     (LocalTxSubmission (Tx BabbageEra) FilePath)
+     'AsClient
+     'StIdle
+     IO
+     ()
+-&gt; MuxPeer ByteString IO ()
+forall (pr :: PeerRole) ps (st :: ps) failure bytes (m :: * -&gt; *)
+       a.
+(Show failure, forall (st' :: ps). Show (ClientHasAgency st'),
+ forall (st' :: ps). Show (ServerHasAgency st'), ShowProxy ps) =&gt;
+Tracer m (TraceSendRecv ps)
+-&gt; Codec ps failure m bytes
+-&gt; Peer ps pr st m a
+-&gt; MuxPeer bytes m a
+</span><a href="../file:///nix/store/bp3m4ac33j7n0825ryxn7zd3w7nyh7f4-ouroboros-network-framework-lib-ouroboros-network-framework-0.1.0.1-haddock-doc/share/doc/ouroboros-network-framework/html/src"><span class="hs-identifier hs-var">MuxPeer</span></a></span><span>
+</span><span id="line-179"></span><span>            </span><span class="annot"><span class="annottext">Tracer
+  IO (TraceSendRecv (LocalTxSubmission (Tx BabbageEra) FilePath))
+forall (m :: * -&gt; *) a. Applicative m =&gt; Tracer m a
+</span><a href="../file:///nix/store/nhl1qjsgl4zpvgrmpa6xzrl7bwwbxld1-contra-tracer-lib-contra-tracer-0.1.0.0-haddock-doc/share/doc/contra-tracer/html/src"><span class="hs-identifier hs-var">nullTracer</span></a></span><span>
+</span><span id="line-180"></span><span>            </span><span class="annot"><span class="annottext">Codec
+  (LocalTxSubmission (Tx BabbageEra) FilePath)
+  DeserialiseFailure
+  IO
+  ByteString
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">txSubmissionCodec</span></a></span><span>
+</span><span id="line-181"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LocalTxSubmissionClient (Tx BabbageEra) FilePath IO ()
+-&gt; Peer
+     (LocalTxSubmission (Tx BabbageEra) FilePath)
+     'AsClient
+     'StIdle
+     IO
+     ()
+forall tx reject (m :: * -&gt; *) a.
+Monad m =&gt;
+LocalTxSubmissionClient tx reject m a
+-&gt; Peer (LocalTxSubmission tx reject) 'AsClient 'StIdle m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">TxSubmission.localTxSubmissionClientPeer</span></a></span><span>
+</span><span id="line-182"></span><span>               </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+-&gt; LocalTxSubmissionClient (Tx BabbageEra) FilePath IO ()
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#txSubmissionClient"><span class="hs-identifier hs-var">txSubmissionClient</span></a></span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381892"><span class="hs-identifier hs-var">inputQueue</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-183"></span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- | The client updates the application state when the protocol state changes.</span><span>
+</span><span id="line-185"></span><span class="annot"><a href="Cardano.Protocol.Socket.Mock.Client.html#txSubmissionClient"><span class="hs-identifier hs-type">txSubmissionClient</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TQueue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-186"></span><span>                   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">TxSubmission.LocalTxSubmissionClient</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span id="txSubmissionClient"><span class="annot"><span class="annottext">txSubmissionClient :: TQueue (Tx BabbageEra)
+-&gt; LocalTxSubmissionClient (Tx BabbageEra) FilePath IO ()
+</span><a href="Cardano.Protocol.Socket.Mock.Client.html#txSubmissionClient"><span class="hs-identifier hs-var hs-var">txSubmissionClient</span></a></span></span><span> </span><span id="local-6989586621680381887"><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381887"><span class="hs-identifier hs-var">txQueue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-188"></span><span>    </span><span class="annot"><span class="annottext">IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+-&gt; LocalTxSubmissionClient (Tx BabbageEra) FilePath IO ()
+forall tx reject (m :: * -&gt; *) a.
+m (LocalTxClientStIdle tx reject m a)
+-&gt; LocalTxSubmissionClient tx reject m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">TxSubmission.LocalTxSubmissionClient</span></a></span><span> </span><span class="annot"><span class="annottext">IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+</span><a href="#local-6989586621680381885"><span class="hs-identifier hs-var">pushTxs</span></a></span><span>
+</span><span id="line-189"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-190"></span><span>      </span><span class="annot"><a href="#local-6989586621680381885"><span class="hs-identifier hs-type">pushTxs</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-type">TxSubmission.LocalTxClientStIdle</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.Tx</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.BabbageEra</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-191"></span><span>      </span><span id="local-6989586621680381885"><span class="annot"><span class="annottext">pushTxs :: IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+</span><a href="#local-6989586621680381885"><span class="hs-identifier hs-var hs-var">pushTxs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-192"></span><span>        </span><span id="local-6989586621680381884"><span class="annot"><span class="annottext">Tx BabbageEra
+</span><a href="#local-6989586621680381884"><span class="hs-identifier hs-var">header</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (Tx BabbageEra) -&gt; IO (Tx BabbageEra)
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (Tx BabbageEra) -&gt; IO (Tx BabbageEra))
+-&gt; STM (Tx BabbageEra) -&gt; IO (Tx BabbageEra)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra) -&gt; STM (Tx BabbageEra)
+forall a. TQueue a -&gt; STM a
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">readTQueue</span></a></span><span> </span><span class="annot"><span class="annottext">TQueue (Tx BabbageEra)
+</span><a href="#local-6989586621680381887"><span class="hs-identifier hs-var">txQueue</span></a></span><span>
+</span><span id="line-193"></span><span>        </span><span class="annot"><span class="annottext">LocalTxClientStIdle (Tx BabbageEra) FilePath IO ()
+-&gt; IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">(LocalTxClientStIdle (Tx BabbageEra) FilePath IO ()
+ -&gt; IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ()))
+-&gt; LocalTxClientStIdle (Tx BabbageEra) FilePath IO ()
+-&gt; IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Tx BabbageEra
+-&gt; (SubmitResult FilePath
+    -&gt; IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ()))
+-&gt; LocalTxClientStIdle (Tx BabbageEra) FilePath IO ()
+forall tx reject (m :: * -&gt; *) a.
+tx
+-&gt; (SubmitResult reject -&gt; m (LocalTxClientStIdle tx reject m a))
+-&gt; LocalTxClientStIdle tx reject m a
+</span><a href="../file:///nix/store/81aj6sl5d9757dvrbnsb927sgr0bibpp-ouroboros-network-lib-ouroboros-network-0.1.0.1-haddock-doc/share/doc/ouroboros-network/html/src"><span class="hs-identifier hs-var">TxSubmission.SendMsgSubmitTx</span></a></span><span>
+</span><span id="line-194"></span><span>                   </span><span class="annot"><span class="annottext">Tx BabbageEra
+</span><a href="#local-6989586621680381884"><span class="hs-identifier hs-var">header</span></a></span><span>
+</span><span id="line-195"></span><span>                   </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+-&gt; SubmitResult FilePath
+-&gt; IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+forall a b. a -&gt; b -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">IO (LocalTxClientStIdle (Tx BabbageEra) FilePath IO ())
+</span><a href="#local-6989586621680381885"><span class="hs-identifier hs-var">pushTxs</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- ignore rejects for now</span><span>
+</span><span id="line-196"></span></pre></body></html>

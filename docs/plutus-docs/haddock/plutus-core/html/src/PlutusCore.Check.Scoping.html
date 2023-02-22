@@ -1,0 +1,1163 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="%24con2tag_86bYFPW1kBT1AP9Juw6OGb"><span id="%24con2tag_Eu8iZwoIHZ3diksUCZXSj"></span></span><span class="hs-pragma">{-# LANGUAGE ConstraintKinds       #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes            #-}</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusCore.Check.Scoping</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Name.html"><span class="hs-identifier">PlutusCore.Name</span></a></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Quote.html"><span class="hs-identifier">PlutusCore.Quote</span></a></span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier">Control.Monad.Except</span></a></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Coerce</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List.NonEmpty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">NonEmpty</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List.NonEmpty</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">NonEmpty</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map.Strict</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Set</span></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-comment">{- Note [Example of a scoping check]
+Consider the following type:
+
+    \(x_42 :: *) -&gt; x_42
+
+This Note describes how we can use this type to check that a renamer handles scoping correctly.
+Any other type could be used as well (and in property tests we generate random ones), but the type
+above is the simplest example, so we're going to use it.
+
+First, we traverse the type and freshen every single name in it, which gives us
+
+    \(x_0 :: *) -&gt; x_1
+
+After this procedure all names in the new type are distinct, not just globally unique -- completely
+distinct: all variables are free variables with different uniques and all bindings are distinct and
+never referenced.
+
+Now for each binder we insert one in-scope variable and one out-of-scope one by referencing them
+in an added constructor (we could use 'TyFun', but we use 'TyApp', 'cause it has an analogue at the
+term level -- 'Apply' and we can also reference a type variable in a 'Term' via a similar
+constructor -- 'TyInst'). That gives us
+
+    (\(x_0 :: *) -&gt; x_1 x_0) x_0
+
+(currently we just decorate the binder with those constructors. In future we could employ a fancier
+strategy and go under to the leaves of the term being processed etc).
+
+The next step is to annotate each name with what is supposed to happen to it once the renaming is
+performed.
+
+1. the @x_0@ binding is supposed to be renamed and hence will disappear
+2. the @x_1@ variable is free, so it's supposed to stay free
+3. the inner @x_0@ variable is in scope and so is supposed to be renamed
+4. the outer @x_0@ is out of scope and so is free and is supposed to stay
+
+In the actual implementation everything that we did above happens in a single definition.
+
+After this initial scoping setup is performed, we run the provided renamer (which is not supposed
+to touch any annotations) and collect all the available information: which names disappeared,
+which didn't, which appeared etc, simultaneously checking that the names that were supposed to
+disappear indeed disappeared and the names that were supposed to stay indeed stayed.
+
+Once all this scoping information is collected, we run 'checkScopeInfo' to check that the
+information is coherent. See its docs for the details on what exactly the checked invariants are.
+
+The advantage of this approach is that we can pinpoint exactly where what is visible and, just
+as importantly, what is not.
+-}</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">data</span><span> </span><span id="ScopedName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-var">ScopedName</span></a></span></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="TypeName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#TypeName"><span class="hs-identifier hs-var">TypeName</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TyName"><span class="hs-identifier hs-type">TyName</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="TermName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#TermName"><span class="hs-identifier hs-var">TermName</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Name"><span class="hs-identifier hs-type">Name</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680940081"><span id="local-6989586621680940083"><span id="local-6989586621680940085"><span class="annot"><span class="annottext">Int -&gt; ScopedName -&gt; ShowS
+[ScopedName] -&gt; ShowS
+ScopedName -&gt; String
+(Int -&gt; ScopedName -&gt; ShowS)
+-&gt; (ScopedName -&gt; String)
+-&gt; ([ScopedName] -&gt; ShowS)
+-&gt; Show ScopedName
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ScopedName] -&gt; ShowS
+$cshowList :: [ScopedName] -&gt; ShowS
+show :: ScopedName -&gt; String
+$cshow :: ScopedName -&gt; String
+showsPrec :: Int -&gt; ScopedName -&gt; ShowS
+$cshowsPrec :: Int -&gt; ScopedName -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680940076"><span id="local-6989586621680940078"><span class="annot"><span class="annottext">ScopedName -&gt; ScopedName -&gt; Bool
+(ScopedName -&gt; ScopedName -&gt; Bool)
+-&gt; (ScopedName -&gt; ScopedName -&gt; Bool) -&gt; Eq ScopedName
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ScopedName -&gt; ScopedName -&gt; Bool
+$c/= :: ScopedName -&gt; ScopedName -&gt; Bool
+== :: ScopedName -&gt; ScopedName -&gt; Bool
+$c== :: ScopedName -&gt; ScopedName -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680940060"><span id="local-6989586621680940062"><span id="local-6989586621680940064"><span id="local-6989586621680940066"><span id="local-6989586621680940068"><span id="local-6989586621680940070"><span id="local-6989586621680940072"><span class="annot"><span class="annottext">Eq ScopedName
+Eq ScopedName
+-&gt; (ScopedName -&gt; ScopedName -&gt; Ordering)
+-&gt; (ScopedName -&gt; ScopedName -&gt; Bool)
+-&gt; (ScopedName -&gt; ScopedName -&gt; Bool)
+-&gt; (ScopedName -&gt; ScopedName -&gt; Bool)
+-&gt; (ScopedName -&gt; ScopedName -&gt; Bool)
+-&gt; (ScopedName -&gt; ScopedName -&gt; ScopedName)
+-&gt; (ScopedName -&gt; ScopedName -&gt; ScopedName)
+-&gt; Ord ScopedName
+ScopedName -&gt; ScopedName -&gt; Bool
+ScopedName -&gt; ScopedName -&gt; Ordering
+ScopedName -&gt; ScopedName -&gt; ScopedName
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ScopedName -&gt; ScopedName -&gt; ScopedName
+$cmin :: ScopedName -&gt; ScopedName -&gt; ScopedName
+max :: ScopedName -&gt; ScopedName -&gt; ScopedName
+$cmax :: ScopedName -&gt; ScopedName -&gt; ScopedName
+&gt;= :: ScopedName -&gt; ScopedName -&gt; Bool
+$c&gt;= :: ScopedName -&gt; ScopedName -&gt; Bool
+&gt; :: ScopedName -&gt; ScopedName -&gt; Bool
+$c&gt; :: ScopedName -&gt; ScopedName -&gt; Bool
+&lt;= :: ScopedName -&gt; ScopedName -&gt; Bool
+$c&lt;= :: ScopedName -&gt; ScopedName -&gt; Bool
+&lt; :: ScopedName -&gt; ScopedName -&gt; Bool
+$c&lt; :: ScopedName -&gt; ScopedName -&gt; Bool
+compare :: ScopedName -&gt; ScopedName -&gt; Ordering
+$ccompare :: ScopedName -&gt; ScopedName -&gt; Ordering
+$cp1Ord :: Eq ScopedName
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#isSameScope"><span class="hs-identifier hs-type">isSameScope</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-74"></span><span id="isSameScope"><span class="annot"><span class="annottext">isSameScope :: ScopedName -&gt; ScopedName -&gt; Bool
+</span><a href="PlutusCore.Check.Scoping.html#isSameScope"><span class="hs-identifier hs-var hs-var">isSameScope</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TypeName"><span class="hs-identifier hs-type">TypeName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TypeName"><span class="hs-identifier hs-type">TypeName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-75"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#isSameScope"><span class="hs-identifier hs-var">isSameScope</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TermName"><span class="hs-identifier hs-type">TermName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TermName"><span class="hs-identifier hs-type">TermName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-76"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#isSameScope"><span class="hs-identifier hs-var">isSameScope</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TypeName"><span class="hs-identifier hs-type">TypeName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TermName"><span class="hs-identifier hs-type">TermName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-77"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#isSameScope"><span class="hs-identifier hs-var">isSameScope</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TermName"><span class="hs-identifier hs-type">TermName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#TypeName"><span class="hs-identifier hs-type">TypeName</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | Staying names.</span><span>
+</span><span id="line-80"></span><span class="hs-keyword">data</span><span> </span><span id="Stays"><span class="annot"><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-var">Stays</span></a></span></span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="StaysOutOfScopeVariable"><span class="annot"><a href="PlutusCore.Check.Scoping.html#StaysOutOfScopeVariable"><span class="hs-identifier hs-var">StaysOutOfScopeVariable</span></a></span></span><span>  </span><span class="hs-comment">-- ^ An out-of-scope variable does not get renamed and hence stays.</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="StaysFreeVariable"><span class="annot"><a href="PlutusCore.Check.Scoping.html#StaysFreeVariable"><span class="hs-identifier hs-var">StaysFreeVariable</span></a></span></span><span>        </span><span class="hs-comment">-- ^ A free variable does not get renamed and hence stays.</span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680940050"><span id="local-6989586621680940052"><span id="local-6989586621680940054"><span class="annot"><span class="annottext">Int -&gt; Stays -&gt; ShowS
+[Stays] -&gt; ShowS
+Stays -&gt; String
+(Int -&gt; Stays -&gt; ShowS)
+-&gt; (Stays -&gt; String) -&gt; ([Stays] -&gt; ShowS) -&gt; Show Stays
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Stays] -&gt; ShowS
+$cshowList :: [Stays] -&gt; ShowS
+show :: Stays -&gt; String
+$cshow :: Stays -&gt; String
+showsPrec :: Int -&gt; Stays -&gt; ShowS
+$cshowsPrec :: Int -&gt; Stays -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- | Changing names.</span><span>
+</span><span id="line-86"></span><span class="hs-keyword">data</span><span> </span><span id="Disappears"><span class="annot"><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-var">Disappears</span></a></span></span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="DisappearsBinding"><span class="annot"><a href="PlutusCore.Check.Scoping.html#DisappearsBinding"><span class="hs-identifier hs-var">DisappearsBinding</span></a></span></span><span>   </span><span class="hs-comment">-- ^ A binding gets renamed and hence the name that it binds disappears.</span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="DisappearsVariable"><span class="annot"><a href="PlutusCore.Check.Scoping.html#DisappearsVariable"><span class="hs-identifier hs-var">DisappearsVariable</span></a></span></span><span>  </span><span class="hs-comment">-- ^ A bound variable gets renamed and hence its name disappears.</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680940042"><span id="local-6989586621680940044"><span id="local-6989586621680940046"><span class="annot"><span class="annottext">Int -&gt; Disappears -&gt; ShowS
+[Disappears] -&gt; ShowS
+Disappears -&gt; String
+(Int -&gt; Disappears -&gt; ShowS)
+-&gt; (Disappears -&gt; String)
+-&gt; ([Disappears] -&gt; ShowS)
+-&gt; Show Disappears
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Disappears] -&gt; ShowS
+$cshowList :: [Disappears] -&gt; ShowS
+show :: Disappears -&gt; String
+$cshow :: Disappears -&gt; String
+showsPrec :: Int -&gt; Disappears -&gt; ShowS
+$cshowsPrec :: Int -&gt; Disappears -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="hs-comment">-- | A name either stays or disappears.</span><span>
+</span><span id="line-92"></span><span class="hs-keyword">data</span><span> </span><span id="NameAction"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-var">NameAction</span></a></span></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="Stays"><span class="annot"><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-var">Stays</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-type">Stays</span></a></span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="Disappears"><span class="annot"><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-var">Disappears</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-type">Disappears</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680940034"><span id="local-6989586621680940036"><span id="local-6989586621680940038"><span class="annot"><span class="annottext">Int -&gt; NameAction -&gt; ShowS
+[NameAction] -&gt; ShowS
+NameAction -&gt; String
+(Int -&gt; NameAction -&gt; ShowS)
+-&gt; (NameAction -&gt; String)
+-&gt; ([NameAction] -&gt; ShowS)
+-&gt; Show NameAction
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [NameAction] -&gt; ShowS
+$cshowList :: [NameAction] -&gt; ShowS
+show :: NameAction -&gt; String
+$cshow :: NameAction -&gt; String
+showsPrec :: Int -&gt; NameAction -&gt; ShowS
+$cshowsPrec :: Int -&gt; NameAction -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="hs-keyword">data</span><span> </span><span id="NameAnn"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-var">NameAnn</span></a></span></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="NameAction"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-var">NameAction</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-type">NameAction</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="NotAName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NotAName"><span class="hs-identifier hs-var">NotAName</span></a></span></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680940026"><span id="local-6989586621680940028"><span id="local-6989586621680940030"><span class="annot"><span class="annottext">Int -&gt; NameAnn -&gt; ShowS
+[NameAnn] -&gt; ShowS
+NameAnn -&gt; String
+(Int -&gt; NameAnn -&gt; ShowS)
+-&gt; (NameAnn -&gt; String) -&gt; ([NameAnn] -&gt; ShowS) -&gt; Show NameAnn
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [NameAnn] -&gt; ShowS
+$cshowList :: [NameAnn] -&gt; ShowS
+show :: NameAnn -&gt; String
+$cshow :: NameAnn -&gt; String
+showsPrec :: Int -&gt; NameAnn -&gt; ShowS
+$cshowsPrec :: Int -&gt; NameAnn -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-keyword">class</span><span> </span><span id="ToScopedName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-var">ToScopedName</span></a></span></span><span> </span><span id="local-6989586621680940179"><span class="annot"><a href="#local-6989586621680940179"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-103"></span><span>    </span><span id="toScopedName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#toScopedName"><span class="hs-identifier hs-type">toScopedName</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680940179"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TyName"><span class="hs-identifier hs-type">TyName</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621680940022"><span class="annot"><span class="annottext">toScopedName :: TyName -&gt; ScopedName
+</span><a href="#local-6989586621680940022"><span class="hs-identifier hs-var hs-var hs-var hs-var">toScopedName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TyName -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#TypeName"><span class="hs-identifier hs-var">TypeName</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Name"><span class="hs-identifier hs-type">Name</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621680940020"><span class="annot"><span class="annottext">toScopedName :: Name -&gt; ScopedName
+</span><a href="#local-6989586621680940020"><span class="hs-identifier hs-var hs-var hs-var hs-var">toScopedName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Name -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#TermName"><span class="hs-identifier hs-var">TermName</span></a></span><span>
+</span><span id="line-110"></span><span>
+</span><span id="line-111"></span><span class="hs-comment">-- Naming: @introduce*@ for bindings and @register*@ for variables.</span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="hs-comment">-- | Annotation for a binding saying \&quot;supposed to disappear\&quot;.</span><span>
+</span><span id="line-114"></span><span id="local-6989586621680940019"><span class="annot"><a href="PlutusCore.Check.Scoping.html#introduceBound"><span class="hs-identifier hs-type">introduceBound</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940019"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940019"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span></span><span>
+</span><span id="line-115"></span><span id="introduceBound"><span class="annot"><span class="annottext">introduceBound :: name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#introduceBound"><span class="hs-identifier hs-var hs-var">introduceBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NameAction -&gt; ScopedName -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-var">NameAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Disappears -&gt; NameAction
+</span><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-var">Disappears</span></a></span><span> </span><span class="annot"><span class="annottext">Disappears
+</span><a href="PlutusCore.Check.Scoping.html#DisappearsBinding"><span class="hs-identifier hs-var">DisappearsBinding</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ScopedName -&gt; NameAnn) -&gt; (name -&gt; ScopedName) -&gt; name -&gt; NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; ScopedName
+forall name. ToScopedName name =&gt; name -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#toScopedName"><span class="hs-identifier hs-var">toScopedName</span></a></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- | Annotation for a bound variable saying \&quot;supposed to disappear\&quot;.</span><span>
+</span><span id="line-118"></span><span id="local-6989586621680940016"><span class="annot"><a href="PlutusCore.Check.Scoping.html#registerBound"><span class="hs-identifier hs-type">registerBound</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940016"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940016"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span></span><span>
+</span><span id="line-119"></span><span id="registerBound"><span class="annot"><span class="annottext">registerBound :: name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#registerBound"><span class="hs-identifier hs-var hs-var">registerBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NameAction -&gt; ScopedName -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-var">NameAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Disappears -&gt; NameAction
+</span><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-var">Disappears</span></a></span><span> </span><span class="annot"><span class="annottext">Disappears
+</span><a href="PlutusCore.Check.Scoping.html#DisappearsVariable"><span class="hs-identifier hs-var">DisappearsVariable</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ScopedName -&gt; NameAnn) -&gt; (name -&gt; ScopedName) -&gt; name -&gt; NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; ScopedName
+forall name. ToScopedName name =&gt; name -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#toScopedName"><span class="hs-identifier hs-var">toScopedName</span></a></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- | Annotation for an out-of-scope variable saying \&quot;supposed to stay out of scope\&quot;.</span><span>
+</span><span id="line-122"></span><span id="local-6989586621680940014"><span class="annot"><a href="PlutusCore.Check.Scoping.html#registerOutOfScope"><span class="hs-identifier hs-type">registerOutOfScope</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940014"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940014"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span></span><span>
+</span><span id="line-123"></span><span id="registerOutOfScope"><span class="annot"><span class="annottext">registerOutOfScope :: name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#registerOutOfScope"><span class="hs-identifier hs-var hs-var">registerOutOfScope</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NameAction -&gt; ScopedName -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-var">NameAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Stays -&gt; NameAction
+</span><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-var">Stays</span></a></span><span> </span><span class="annot"><span class="annottext">Stays
+</span><a href="PlutusCore.Check.Scoping.html#StaysOutOfScopeVariable"><span class="hs-identifier hs-var">StaysOutOfScopeVariable</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ScopedName -&gt; NameAnn) -&gt; (name -&gt; ScopedName) -&gt; name -&gt; NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; ScopedName
+forall name. ToScopedName name =&gt; name -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#toScopedName"><span class="hs-identifier hs-var">toScopedName</span></a></span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | Annotation for a free variable saying \&quot;supposed to stay free\&quot;.</span><span>
+</span><span id="line-126"></span><span id="local-6989586621680940012"><span class="annot"><a href="PlutusCore.Check.Scoping.html#registerFree"><span class="hs-identifier hs-type">registerFree</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940012"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940012"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span></span><span>
+</span><span id="line-127"></span><span id="registerFree"><span class="annot"><span class="annottext">registerFree :: name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#registerFree"><span class="hs-identifier hs-var hs-var">registerFree</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NameAction -&gt; ScopedName -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-var">NameAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Stays -&gt; NameAction
+</span><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-var">Stays</span></a></span><span> </span><span class="annot"><span class="annottext">Stays
+</span><a href="PlutusCore.Check.Scoping.html#StaysFreeVariable"><span class="hs-identifier hs-var">StaysFreeVariable</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ScopedName -&gt; NameAnn) -&gt; (name -&gt; ScopedName) -&gt; name -&gt; NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; ScopedName
+forall name. ToScopedName name =&gt; name -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#toScopedName"><span class="hs-identifier hs-var">toScopedName</span></a></span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-keyword">class</span><span> </span><span id="Reference"><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-var">Reference</span></a></span></span><span> </span><span id="local-6989586621680940167"><span class="annot"><a href="#local-6989586621680940167"><span class="hs-identifier hs-type">n</span></a></span></span><span> </span><span id="local-6989586621680940166"><span class="annot"><a href="#local-6989586621680940166"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-comment">-- | Take a registering function, apply it to the provided name, create a type\/term variable</span><span>
+</span><span id="line-131"></span><span>    </span><span class="hs-comment">-- out of the resulting annotation and the original name and reference that variable in the</span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-comment">-- provided type\/term by prepending a constructor to it mentioning the variable.</span><span>
+</span><span id="line-133"></span><span>    </span><span id="referenceVia"><span class="annot"><a href="PlutusCore.Check.Scoping.html#referenceVia"><span class="hs-identifier hs-type">referenceVia</span></a></span></span><span>
+</span><span id="line-134"></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680940168"><span class="annot"><a href="#local-6989586621680940168"><span class="hs-identifier hs-type">name</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940168"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940168"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-135"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940167"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-136"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940166"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span>
+</span><span id="line-137"></span><span>        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940166"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- | Reference the provided variable in the provided type\/term as an in-scope one.</span><span>
+</span><span id="line-140"></span><span id="local-6989586621680940008"><span id="local-6989586621680940009"><span class="annot"><a href="PlutusCore.Check.Scoping.html#referenceBound"><span class="hs-identifier hs-type">referenceBound</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940009"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940008"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940009"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940008"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940008"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span></span></span><span>
+</span><span id="line-141"></span><span id="referenceBound"><span class="annot"><span class="annottext">referenceBound :: n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceBound"><span class="hs-identifier hs-var hs-var">referenceBound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+forall n (t :: * -&gt; *).
+Reference n t =&gt;
+(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceVia"><span class="hs-identifier hs-var">referenceVia</span></a></span><span> </span><span class="annot"><span class="annottext">forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#registerBound"><span class="hs-identifier hs-var">registerBound</span></a></span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span class="hs-comment">-- | Reference the provided variable in the provided type\/term as an out-of-scope one.</span><span>
+</span><span id="line-144"></span><span id="local-6989586621680940105"><span id="local-6989586621680940106"><span class="annot"><a href="PlutusCore.Check.Scoping.html#referenceOutOfScope"><span class="hs-identifier hs-type">referenceOutOfScope</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940106"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940105"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940106"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940105"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680940105"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span></span></span><span>
+</span><span id="line-145"></span><span id="referenceOutOfScope"><span class="annot"><span class="annottext">referenceOutOfScope :: n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceOutOfScope"><span class="hs-identifier hs-var hs-var">referenceOutOfScope</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+forall n (t :: * -&gt; *).
+Reference n t =&gt;
+(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceVia"><span class="hs-identifier hs-var">referenceVia</span></a></span><span> </span><span class="annot"><span class="annottext">forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#registerOutOfScope"><span class="hs-identifier hs-var">registerOutOfScope</span></a></span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span class="hs-comment">-- #####################################################</span><span>
+</span><span id="line-148"></span><span class="hs-comment">-- ## Information about scopes and relevant functions ##</span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- #####################################################</span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- | Each kind of old and new names.</span><span>
+</span><span id="line-152"></span><span class="hs-keyword">data</span><span> </span><span id="ScopeEntry"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeEntry"><span class="hs-identifier hs-var">ScopeEntry</span></a></span></span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="DisappearedBindings"><span class="annot"><a href="PlutusCore.Check.Scoping.html#DisappearedBindings"><span class="hs-identifier hs-var">DisappearedBindings</span></a></span></span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="DisappearedVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#DisappearedVariables"><span class="hs-identifier hs-var">DisappearedVariables</span></a></span></span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="AppearedBindings"><span class="annot"><a href="PlutusCore.Check.Scoping.html#AppearedBindings"><span class="hs-identifier hs-var">AppearedBindings</span></a></span></span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="AppearedVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#AppearedVariables"><span class="hs-identifier hs-var">AppearedVariables</span></a></span></span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="StayedOutOfScopeVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#StayedOutOfScopeVariables"><span class="hs-identifier hs-var">StayedOutOfScopeVariables</span></a></span></span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="StayedFreeVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#StayedFreeVariables"><span class="hs-identifier hs-var">StayedFreeVariables</span></a></span></span><span>
+</span><span id="line-159"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680939994"><span id="local-6989586621680939996"><span id="local-6989586621680939998"><span class="annot"><span class="annottext">Int -&gt; ScopeEntry -&gt; ShowS
+[ScopeEntry] -&gt; ShowS
+ScopeEntry -&gt; String
+(Int -&gt; ScopeEntry -&gt; ShowS)
+-&gt; (ScopeEntry -&gt; String)
+-&gt; ([ScopeEntry] -&gt; ShowS)
+-&gt; Show ScopeEntry
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ScopeEntry] -&gt; ShowS
+$cshowList :: [ScopeEntry] -&gt; ShowS
+show :: ScopeEntry -&gt; String
+$cshow :: ScopeEntry -&gt; String
+showsPrec :: Int -&gt; ScopeEntry -&gt; ShowS
+$cshowsPrec :: Int -&gt; ScopeEntry -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680939990"><span id="local-6989586621680939992"><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeEntry -&gt; Bool
+(ScopeEntry -&gt; ScopeEntry -&gt; Bool)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; Bool) -&gt; Eq ScopeEntry
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+$c/= :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+== :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+$c== :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680939975"><span id="local-6989586621680939977"><span id="local-6989586621680939979"><span id="local-6989586621680939981"><span id="local-6989586621680939983"><span id="local-6989586621680939985"><span id="local-6989586621680939987"><span class="annot"><span class="annottext">Eq ScopeEntry
+Eq ScopeEntry
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; Ordering)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; Bool)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; Bool)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; Bool)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; Bool)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry)
+-&gt; (ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry)
+-&gt; Ord ScopeEntry
+ScopeEntry -&gt; ScopeEntry -&gt; Bool
+ScopeEntry -&gt; ScopeEntry -&gt; Ordering
+ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry
+$cmin :: ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry
+max :: ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry
+$cmax :: ScopeEntry -&gt; ScopeEntry -&gt; ScopeEntry
+&gt;= :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+$c&gt;= :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+&gt; :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+$c&gt; :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+&lt;= :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+$c&lt;= :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+&lt; :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+$c&lt; :: ScopeEntry -&gt; ScopeEntry -&gt; Bool
+compare :: ScopeEntry -&gt; ScopeEntry -&gt; Ordering
+$ccompare :: ScopeEntry -&gt; ScopeEntry -&gt; Ordering
+$cp1Ord :: Eq ScopeEntry
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span class="hs-comment">-- | A 'ScopeInfo' is a set of 'ScopedName's for each of the 'ScopeEntry'.</span><span>
+</span><span id="line-162"></span><span class="hs-comment">-- If a 'ScopeEntry' is not present in the map, the corresponding set of 'ScopeName's is considered</span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- to be empty.</span><span>
+</span><span id="line-164"></span><span class="hs-keyword">newtype</span><span> </span><span id="ScopeInfo"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-var">ScopeInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ScopeInfo"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-var">ScopeInfo</span></a></span></span><span>
+</span><span id="line-165"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="unScopeInfo"><span class="annot"><span class="annottext">ScopeInfo -&gt; Map ScopeEntry (Set ScopedName)
+</span><a href="PlutusCore.Check.Scoping.html#unScopeInfo"><span class="hs-identifier hs-var hs-var">unScopeInfo</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeEntry"><span class="hs-identifier hs-type">ScopeEntry</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>    </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680939967"><span id="local-6989586621680939969"><span id="local-6989586621680939971"><span class="annot"><span class="annottext">Int -&gt; ScopeInfo -&gt; ShowS
+[ScopeInfo] -&gt; ShowS
+ScopeInfo -&gt; String
+(Int -&gt; ScopeInfo -&gt; ShowS)
+-&gt; (ScopeInfo -&gt; String)
+-&gt; ([ScopeInfo] -&gt; ShowS)
+-&gt; Show ScopeInfo
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ScopeInfo] -&gt; ShowS
+$cshowList :: [ScopeInfo] -&gt; ShowS
+show :: ScopeInfo -&gt; String
+$cshow :: ScopeInfo -&gt; String
+showsPrec :: Int -&gt; ScopeInfo -&gt; ShowS
+$cshowsPrec :: Int -&gt; ScopeInfo -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- | Extract the set stored in the provided 'ScopeInfo' at the provided 'ScopeEntry'.</span><span>
+</span><span id="line-169"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-type">to</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeEntry"><span class="hs-identifier hs-type">ScopeEntry</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-170"></span><span id="to"><span class="annot"><span class="annottext">to :: ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var hs-var">to</span></a></span></span><span> </span><span id="local-6989586621680939965"><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939965"><span class="hs-identifier hs-var">entry</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Maybe (Set ScopedName) -&gt; Set ScopedName
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+forall a. Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.empty</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe (Set ScopedName) -&gt; Set ScopedName)
+-&gt; (ScopeInfo -&gt; Maybe (Set ScopedName))
+-&gt; ScopeInfo
+-&gt; Set ScopedName
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+-&gt; Map ScopeEntry (Set ScopedName) -&gt; Maybe (Set ScopedName)
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.lookup</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939965"><span class="hs-identifier hs-var">entry</span></a></span><span> </span><span class="annot"><span class="annottext">(Map ScopeEntry (Set ScopedName) -&gt; Maybe (Set ScopedName))
+-&gt; (ScopeInfo -&gt; Map ScopeEntry (Set ScopedName))
+-&gt; ScopeInfo
+-&gt; Maybe (Set ScopedName)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo -&gt; Map ScopeEntry (Set ScopedName)
+</span><a href="PlutusCore.Check.Scoping.html#unScopeInfo"><span class="hs-identifier hs-var hs-var">unScopeInfo</span></a></span><span>
+</span><span id="line-171"></span><span>
+</span><span id="line-172"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#emptyScopeInfo"><span class="hs-identifier hs-type">emptyScopeInfo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-173"></span><span id="emptyScopeInfo"><span class="annot"><span class="annottext">emptyScopeInfo :: ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#emptyScopeInfo"><span class="hs-identifier hs-var hs-var">emptyScopeInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map ScopeEntry (Set ScopedName) -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-var">ScopeInfo</span></a></span><span> </span><span class="annot"><span class="annottext">Map ScopeEntry (Set ScopedName)
+forall k a. Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.empty</span></a></span><span>
+</span><span id="line-174"></span><span>
+</span><span id="line-175"></span><span class="hs-comment">-- | Check if a set is empty and report an error with the set embedded in it otherwise.</span><span>
+</span><span id="line-176"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-type">checkEmpty</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-177"></span><span id="checkEmpty"><span class="annot"><span class="annottext">checkEmpty :: (Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var hs-var">checkEmpty</span></a></span></span><span> </span><span id="local-6989586621680939958"><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="#local-6989586621680939958"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span id="local-6989586621680939957"><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939957"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Either ScopeError () -&gt; Either ScopeError ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">unless</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Set ScopedName -&gt; Bool
+forall a. Set a -&gt; Bool
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.null</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939957"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Either ScopeError () -&gt; Either ScopeError ())
+-&gt; (ScopeError -&gt; Either ScopeError ())
+-&gt; ScopeError
+-&gt; Either ScopeError ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeError -&gt; Either ScopeError ()
+forall a b. a -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeError -&gt; Either ScopeError ())
+-&gt; ScopeError -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="#local-6989586621680939958"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939957"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-178"></span><span>
+</span><span id="line-179"></span><span class="hs-comment">-- | Merge two 'ScopeInfo's checking that they do not intersect along the way.</span><span>
+</span><span id="line-180"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#mergeScopeInfo"><span class="hs-identifier hs-type">mergeScopeInfo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-181"></span><span id="mergeScopeInfo"><span class="annot"><span class="annottext">mergeScopeInfo :: ScopeInfo -&gt; ScopeInfo -&gt; Either ScopeError ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#mergeScopeInfo"><span class="hs-identifier hs-var hs-var">mergeScopeInfo</span></a></span></span><span> </span><span id="local-6989586621680939953"><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939953"><span class="hs-identifier hs-var">si1</span></a></span></span><span> </span><span id="local-6989586621680939952"><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939952"><span class="hs-identifier hs-var">si2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-182"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680939951"><span class="annot"><span class="annottext">disappearedBindings1 :: Set ScopedName
+</span><a href="#local-6989586621680939951"><span class="hs-identifier hs-var hs-var">disappearedBindings1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#DisappearedBindings"><span class="hs-identifier hs-var">DisappearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939953"><span class="hs-identifier hs-var">si1</span></a></span><span>
+</span><span id="line-183"></span><span>        </span><span id="local-6989586621680939950"><span class="annot"><span class="annottext">disappearedBindings2 :: Set ScopedName
+</span><a href="#local-6989586621680939950"><span class="hs-identifier hs-var hs-var">disappearedBindings2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#DisappearedBindings"><span class="hs-identifier hs-var">DisappearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939952"><span class="hs-identifier hs-var">si2</span></a></span><span>
+</span><span id="line-184"></span><span>        </span><span id="local-6989586621680939949"><span class="annot"><span class="annottext">appearedBindings1 :: Set ScopedName
+</span><a href="#local-6989586621680939949"><span class="hs-identifier hs-var hs-var">appearedBindings1</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#AppearedBindings"><span class="hs-identifier hs-var">AppearedBindings</span></a></span><span>    </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939953"><span class="hs-identifier hs-var">si1</span></a></span><span>
+</span><span id="line-185"></span><span>        </span><span id="local-6989586621680939948"><span class="annot"><span class="annottext">appearedBindings2 :: Set ScopedName
+</span><a href="#local-6989586621680939948"><span class="hs-identifier hs-var hs-var">appearedBindings2</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#AppearedBindings"><span class="hs-identifier hs-var">AppearedBindings</span></a></span><span>    </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939952"><span class="hs-identifier hs-var">si2</span></a></span><span>
+</span><span id="line-186"></span><span>        </span><span id="local-6989586621680939947"><span class="annot"><span class="annottext">duplicateDisappearedBindings :: Set ScopedName
+</span><a href="#local-6989586621680939947"><span class="hs-identifier hs-var hs-var">duplicateDisappearedBindings</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939951"><span class="hs-identifier hs-var">disappearedBindings1</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939950"><span class="hs-identifier hs-var">disappearedBindings2</span></a></span><span>
+</span><span id="line-187"></span><span>        </span><span id="local-6989586621680939945"><span class="annot"><span class="annottext">duplicateAppearedBindings :: Set ScopedName
+</span><a href="#local-6989586621680939945"><span class="hs-identifier hs-var hs-var">duplicateAppearedBindings</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939949"><span class="hs-identifier hs-var">appearedBindings1</span></a></span><span>    </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939948"><span class="hs-identifier hs-var">appearedBindings2</span></a></span><span>
+</span><span id="line-188"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#DuplicateBindersInTheInput"><span class="hs-identifier hs-var">DuplicateBindersInTheInput</span></a></span><span>  </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939947"><span class="hs-identifier hs-var">duplicateDisappearedBindings</span></a></span><span>
+</span><span id="line-189"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#DuplicateBindersInTheOutput"><span class="hs-identifier hs-var">DuplicateBindersInTheOutput</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939945"><span class="hs-identifier hs-var">duplicateAppearedBindings</span></a></span><span>
+</span><span id="line-190"></span><span>    </span><span class="annot"><span class="annottext">ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. b -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeInfo -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Map ScopeEntry (Set ScopedName)
+ -&gt; Map ScopeEntry (Set ScopedName)
+ -&gt; Map ScopeEntry (Set ScopedName))
+-&gt; ScopeInfo -&gt; ScopeInfo -&gt; ScopeInfo
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">coerce</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName)
+-&gt; Map ScopeEntry (Set ScopedName)
+-&gt; Map ScopeEntry (Set ScopedName)
+-&gt; Map ScopeEntry (Set ScopedName)
+forall k a. Ord k =&gt; (a -&gt; a -&gt; a) -&gt; Map k a -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.unionWith</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.union</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939953"><span class="hs-identifier hs-var">si1</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939952"><span class="hs-identifier hs-var">si2</span></a></span><span>
+</span><span id="line-191"></span><span>
+</span><span id="line-192"></span><span class="hs-comment">-- @newtype@-ing it for the sake of providing very convenient 'Semigroup' and 'Monoid' instances.</span><span>
+</span><span id="line-193"></span><span class="hs-keyword">newtype</span><span> </span><span id="ScopeErrorOrInfo"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-var">ScopeErrorOrInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ScopeErrorOrInfo"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-var">ScopeErrorOrInfo</span></a></span></span><span>
+</span><span id="line-194"></span><span>    </span><span class="hs-comment">-- We might want to use @Validation@ or something instead of 'Either'.</span><span>
+</span><span id="line-195"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="unScopeErrorOrInfo"><span class="annot"><span class="annottext">ScopeErrorOrInfo -&gt; Either ScopeError ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#unScopeErrorOrInfo"><span class="hs-identifier hs-var hs-var">unScopeErrorOrInfo</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-196"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-197"></span><span>
+</span><span id="line-198"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680939934"><span id="local-6989586621680939936"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-type">ScopeErrorOrInfo</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-199"></span><span>    </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-type">ScopeErrorOrInfo</span></a></span><span> </span><span id="local-6989586621680939932"><span class="annot"><span class="annottext">Either ScopeError ScopeInfo
+</span><a href="#local-6989586621680939932"><span class="hs-identifier hs-var">errOrInfo1</span></a></span></span><span> </span><span id="local-6989586621680939931"><span class="annot"><span class="annottext">&lt;&gt; :: ScopeErrorOrInfo -&gt; ScopeErrorOrInfo -&gt; ScopeErrorOrInfo
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-type">ScopeErrorOrInfo</span></a></span><span> </span><span id="local-6989586621680939930"><span class="annot"><span class="annottext">Either ScopeError ScopeInfo
+</span><a href="#local-6989586621680939930"><span class="hs-identifier hs-var">errOrInfo2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-200"></span><span>        </span><span class="annot"><span class="annottext">Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo
+</span><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-var">ScopeErrorOrInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo)
+-&gt; (Either ScopeError (Either ScopeError ScopeInfo)
+    -&gt; Either ScopeError ScopeInfo)
+-&gt; Either ScopeError (Either ScopeError ScopeInfo)
+-&gt; ScopeErrorOrInfo
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Either ScopeError (Either ScopeError ScopeInfo)
+-&gt; Either ScopeError ScopeInfo
+forall (m :: * -&gt; *) a. Monad m =&gt; m (m a) -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">join</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ScopeError (Either ScopeError ScopeInfo)
+ -&gt; ScopeErrorOrInfo)
+-&gt; Either ScopeError (Either ScopeError ScopeInfo)
+-&gt; ScopeErrorOrInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo -&gt; ScopeInfo -&gt; Either ScopeError ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#mergeScopeInfo"><span class="hs-identifier hs-var">mergeScopeInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeInfo -&gt; ScopeInfo -&gt; Either ScopeError ScopeInfo)
+-&gt; Either ScopeError ScopeInfo
+-&gt; Either ScopeError (ScopeInfo -&gt; Either ScopeError ScopeInfo)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Either ScopeError ScopeInfo
+</span><a href="#local-6989586621680939932"><span class="hs-identifier hs-var">errOrInfo1</span></a></span><span> </span><span class="annot"><span class="annottext">Either ScopeError (ScopeInfo -&gt; Either ScopeError ScopeInfo)
+-&gt; Either ScopeError ScopeInfo
+-&gt; Either ScopeError (Either ScopeError ScopeInfo)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Either ScopeError ScopeInfo
+</span><a href="#local-6989586621680939930"><span class="hs-identifier hs-var">errOrInfo2</span></a></span><span>
+</span><span id="line-201"></span><span>
+</span><span id="line-202"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680939923"><span id="local-6989586621680939925"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-type">ScopeErrorOrInfo</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-203"></span><span>    </span><span id="local-6989586621680939921"><span class="annot"><span class="annottext">mempty :: ScopeErrorOrInfo
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo
+</span><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-var">ScopeErrorOrInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo)
+-&gt; Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. b -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#emptyScopeInfo"><span class="hs-identifier hs-var">emptyScopeInfo</span></a></span><span>
+</span><span id="line-204"></span><span>
+</span><span id="line-205"></span><span class="hs-comment">-- ########################################################################</span><span>
+</span><span id="line-206"></span><span class="hs-comment">-- ## Main class for collecting scope information and relevant functions ##</span><span>
+</span><span id="line-207"></span><span class="hs-comment">-- ########################################################################</span><span>
+</span><span id="line-208"></span><span>
+</span><span id="line-209"></span><span class="hs-keyword">class</span><span> </span><span id="EstablishScoping"><span class="annot"><a href="PlutusCore.Check.Scoping.html#EstablishScoping"><span class="hs-identifier hs-var">EstablishScoping</span></a></span></span><span> </span><span id="local-6989586621680940109"><span class="annot"><a href="#local-6989586621680940109"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-210"></span><span>    </span><span class="hs-comment">{-| Traverse a 't' freshening every name (both at the binding and the use sites)
+    and annotating the freshened names with either 'DisappearsBinding' or 'StaysFreeVariable'
+    depending on whether the name occurs at the binding or the use site.
+
+    In addition to that every binder should be decorated with one out-of-scope variable (annotated
+    with 'StaysOutOfScopeVariable') and one in-scope one (annotated with 'DisappearsVariable').
+
+    Note that no original name occurring in 't' should survive this procedure (and hence we don't
+    care if any of the freshened names clashes with an original one as all original ones are
+    supposed to be gone).
+
+    How to provide an implementation:
+
+    1. handle bindings with 'freshen*Name' + 'establishScopingBinder' (or similar)
+    2. handle variables with 'freshen*Name' + 'registerFree'
+    3. everything else is direct recursion + 'Applicative' stuff
+    -}</span><span>
+</span><span id="line-227"></span><span>    </span><span id="local-6989586621680940107"><span id="establishScoping"><span class="annot"><a href="PlutusCore.Check.Scoping.html#establishScoping"><span class="hs-identifier hs-type">establishScoping</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680940109"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680940107"><span class="hs-identifier hs-type">ann</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Quote.html#Quote"><span class="hs-identifier hs-type">Quote</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680940109"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-228"></span><span>
+</span><span id="line-229"></span><span class="hs-comment">-- That will retraverse the same type multiple times. Should we have @referenceListVia@ as a</span><span>
+</span><span id="line-230"></span><span class="hs-comment">-- primitive instead and derive 'referenceVia' in terms of it for better performance?</span><span>
+</span><span id="line-231"></span><span class="hs-comment">-- Should we only pick an arbitrary sublist of the provided list instead of using the whole list</span><span>
+</span><span id="line-232"></span><span class="hs-comment">-- for better performance? That requires enhancing 'Reference' with @Hedgehog.Gen@ or something.</span><span>
+</span><span id="line-233"></span><span id="local-6989586621680939918"><span id="local-6989586621680939919"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939919"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939918"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621680939919"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><a href="#local-6989586621680939918"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-234"></span><span>    </span><span id="local-6989586621680939915"><span class="annot"><span class="annottext">referenceVia :: (forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; [n] -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="#local-6989586621680939915"><span class="hs-identifier hs-var hs-var hs-var hs-var">referenceVia</span></a></span></span><span> </span><span id="local-6989586621680939914"><span class="annot"><span class="annottext">forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="#local-6989586621680939914"><span class="hs-identifier hs-var">reg</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(t NameAnn -&gt; [n] -&gt; t NameAnn) -&gt; [n] -&gt; t NameAnn -&gt; t NameAnn
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">((t NameAnn -&gt; [n] -&gt; t NameAnn) -&gt; [n] -&gt; t NameAnn -&gt; t NameAnn)
+-&gt; ((n -&gt; t NameAnn -&gt; t NameAnn) -&gt; t NameAnn -&gt; [n] -&gt; t NameAnn)
+-&gt; (n -&gt; t NameAnn -&gt; t NameAnn)
+-&gt; [n]
+-&gt; t NameAnn
+-&gt; t NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(n -&gt; t NameAnn -&gt; t NameAnn) -&gt; t NameAnn -&gt; [n] -&gt; t NameAnn
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Prelude.foldr</span></a></span><span> </span><span class="annot"><span class="annottext">((n -&gt; t NameAnn -&gt; t NameAnn) -&gt; [n] -&gt; t NameAnn -&gt; t NameAnn)
+-&gt; (n -&gt; t NameAnn -&gt; t NameAnn) -&gt; [n] -&gt; t NameAnn -&gt; t NameAnn
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+forall n (t :: * -&gt; *).
+Reference n t =&gt;
+(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceVia"><span class="hs-identifier hs-var">referenceVia</span></a></span><span> </span><span class="annot"><span class="annottext">forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="#local-6989586621680939914"><span class="hs-identifier hs-var">reg</span></a></span></span></span><span>
+</span><span id="line-235"></span><span>
+</span><span id="line-236"></span><span id="local-6989586621680939910"><span id="local-6989586621680939911"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939911"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939910"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">NonEmpty</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939911"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680939910"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-237"></span><span>    </span><span id="local-6989586621680939908"><span class="annot"><span class="annottext">referenceVia :: (forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; NonEmpty n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="#local-6989586621680939908"><span class="hs-identifier hs-var hs-var hs-var hs-var">referenceVia</span></a></span></span><span> </span><span id="local-6989586621680939907"><span class="annot"><span class="annottext">forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="#local-6989586621680939907"><span class="hs-identifier hs-var">reg</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; [n] -&gt; t NameAnn -&gt; t NameAnn
+forall n (t :: * -&gt; *).
+Reference n t =&gt;
+(forall name. ToScopedName name =&gt; name -&gt; NameAnn)
+-&gt; n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceVia"><span class="hs-identifier hs-var">referenceVia</span></a></span><span> </span><span class="annot"><span class="annottext">forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="#local-6989586621680939907"><span class="hs-identifier hs-var">reg</span></a></span><span> </span><span class="annot"><span class="annottext">([n] -&gt; t NameAnn -&gt; t NameAnn)
+-&gt; (NonEmpty n -&gt; [n]) -&gt; NonEmpty n -&gt; t NameAnn -&gt; t NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty n -&gt; [n]
+forall a. NonEmpty a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">NonEmpty.toList</span></a></span></span></span><span>
+</span><span id="line-238"></span><span>
+</span><span id="line-239"></span><span class="hs-comment">-- Given that it's straightforward to provide an implementation for the method,</span><span>
+</span><span id="line-240"></span><span class="hs-comment">-- it would be nice to somehow do that generically by default.</span><span>
+</span><span id="line-241"></span><span class="hs-keyword">class</span><span> </span><span id="CollectScopeInfo"><span class="annot"><a href="PlutusCore.Check.Scoping.html#CollectScopeInfo"><span class="hs-identifier hs-var">CollectScopeInfo</span></a></span></span><span> </span><span id="local-6989586621680940093"><span class="annot"><a href="#local-6989586621680940093"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-242"></span><span>    </span><span class="hs-comment">{-| Collect scoping information after scoping was established and renaming was performed.
+
+    How to provide an implementation:
+
+    1. handle names (both bindings and variables) with 'handleSname'
+    2. everything else is direct recursion + 'Monoid' stuff
+    -}</span><span>
+</span><span id="line-249"></span><span>    </span><span id="collectScopeInfo"><span class="annot"><a href="PlutusCore.Check.Scoping.html#collectScopeInfo"><span class="hs-identifier hs-type">collectScopeInfo</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680940093"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-type">ScopeErrorOrInfo</span></a></span><span>
+</span><span id="line-250"></span><span>
+</span><span id="line-251"></span><span class="hs-comment">-- See Note [Example of a scoping check].</span><span>
+</span><span id="line-252"></span><span class="hs-keyword">type</span><span> </span><span id="Scoping"><span class="annot"><a href="PlutusCore.Check.Scoping.html#Scoping"><span class="hs-identifier hs-var">Scoping</span></a></span></span><span> </span><span id="local-6989586621680939903"><span class="annot"><a href="#local-6989586621680939903"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Check.Scoping.html#EstablishScoping"><span class="hs-identifier hs-type">EstablishScoping</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939903"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#CollectScopeInfo"><span class="hs-identifier hs-type">CollectScopeInfo</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939903"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-253"></span><span>
+</span><span id="line-254"></span><span class="hs-comment">-- | Take a constructor for a binder, a name bound by it, a sort (kind\/type), a value of that sort</span><span>
+</span><span id="line-255"></span><span class="hs-comment">-- (type\/term) and call 'establishScoping' on both the sort and its value and reassemble the</span><span>
+</span><span id="line-256"></span><span class="hs-comment">-- original binder with the annotated sort and its value, but also decorate the reassembled binder</span><span>
+</span><span id="line-257"></span><span class="hs-comment">-- with one out-of-scope variable and one in-scope one.</span><span>
+</span><span id="line-258"></span><span id="local-6989586621680939899"><span id="local-6989586621680939900"><span id="local-6989586621680939901"><span id="local-6989586621680939902"><span class="annot"><a href="PlutusCore.Check.Scoping.html#establishScopingBinder"><span class="hs-identifier hs-type">establishScopingBinder</span></a></span><span>
+</span><span id="line-259"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Reference"><span class="hs-identifier hs-type">Reference</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939902"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939901"><span class="hs-identifier hs-type">value</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939902"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Scoping"><span class="hs-identifier hs-type">Scoping</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939900"><span class="hs-identifier hs-type">sort</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Scoping"><span class="hs-identifier hs-type">Scoping</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939901"><span class="hs-identifier hs-type">value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-260"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939902"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939900"><span class="hs-identifier hs-type">sort</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939901"><span class="hs-identifier hs-type">value</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939901"><span class="hs-identifier hs-type">value</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-261"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939902"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-262"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939900"><span class="hs-identifier hs-type">sort</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939899"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-263"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939901"><span class="hs-identifier hs-type">value</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939899"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-264"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Quote.html#Quote"><span class="hs-identifier hs-type">Quote</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680939901"><span class="hs-identifier hs-type">value</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span class="hs-special">)</span></span></span></span></span><span>
+</span><span id="line-265"></span><span id="establishScopingBinder"><span class="annot"><span class="annottext">establishScopingBinder :: (NameAnn -&gt; name -&gt; sort NameAnn -&gt; value NameAnn -&gt; value NameAnn)
+-&gt; name -&gt; sort ann -&gt; value ann -&gt; Quote (value NameAnn)
+</span><a href="PlutusCore.Check.Scoping.html#establishScopingBinder"><span class="hs-identifier hs-var hs-var">establishScopingBinder</span></a></span></span><span> </span><span id="local-6989586621680939897"><span class="annot"><span class="annottext">NameAnn -&gt; name -&gt; sort NameAnn -&gt; value NameAnn -&gt; value NameAnn
+</span><a href="#local-6989586621680939897"><span class="hs-identifier hs-var">binder</span></a></span></span><span> </span><span id="local-6989586621680939896"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939896"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span id="local-6989586621680939895"><span class="annot"><span class="annottext">sort ann
+</span><a href="#local-6989586621680939895"><span class="hs-identifier hs-var">sort</span></a></span></span><span> </span><span id="local-6989586621680939894"><span class="annot"><span class="annottext">value ann
+</span><a href="#local-6989586621680939894"><span class="hs-identifier hs-var">value</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-266"></span><span>    </span><span id="local-6989586621680939893"><span class="annot"><span class="annottext">sort NameAnn
+</span><a href="#local-6989586621680939893"><span class="hs-identifier hs-var">sortS</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">sort ann -&gt; Quote (sort NameAnn)
+forall (t :: * -&gt; *) ann.
+EstablishScoping t =&gt;
+t ann -&gt; Quote (t NameAnn)
+</span><a href="PlutusCore.Check.Scoping.html#establishScoping"><span class="hs-identifier hs-var">establishScoping</span></a></span><span> </span><span class="annot"><span class="annottext">sort ann
+</span><a href="#local-6989586621680939895"><span class="hs-identifier hs-var">sort</span></a></span><span>
+</span><span id="line-267"></span><span>    </span><span class="annot"><span class="annottext">name -&gt; value NameAnn -&gt; value NameAnn
+forall n (t :: * -&gt; *).
+Reference n t =&gt;
+n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceOutOfScope"><span class="hs-identifier hs-var">referenceOutOfScope</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939896"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">(value NameAnn -&gt; value NameAnn)
+-&gt; (value NameAnn -&gt; value NameAnn)
+-&gt; value NameAnn
+-&gt; value NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span>
+</span><span id="line-268"></span><span>        </span><span class="annot"><span class="annottext">NameAnn -&gt; name -&gt; sort NameAnn -&gt; value NameAnn -&gt; value NameAnn
+</span><a href="#local-6989586621680939897"><span class="hs-identifier hs-var">binder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">name -&gt; NameAnn
+forall name. ToScopedName name =&gt; name -&gt; NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#introduceBound"><span class="hs-identifier hs-var">introduceBound</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939896"><span class="hs-identifier hs-var">name</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939896"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">sort NameAnn
+</span><a href="#local-6989586621680939893"><span class="hs-identifier hs-var">sortS</span></a></span><span> </span><span class="annot"><span class="annottext">(value NameAnn -&gt; value NameAnn)
+-&gt; (value NameAnn -&gt; value NameAnn)
+-&gt; value NameAnn
+-&gt; value NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span>
+</span><span id="line-269"></span><span>            </span><span class="annot"><span class="annottext">name -&gt; value NameAnn -&gt; value NameAnn
+forall n (t :: * -&gt; *).
+Reference n t =&gt;
+n -&gt; t NameAnn -&gt; t NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#referenceBound"><span class="hs-identifier hs-var">referenceBound</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939896"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">(value NameAnn -&gt; value NameAnn)
+-&gt; Quote (value NameAnn) -&gt; Quote (value NameAnn)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span>
+</span><span id="line-270"></span><span>                </span><span class="annot"><span class="annottext">value ann -&gt; Quote (value NameAnn)
+forall (t :: * -&gt; *) ann.
+EstablishScoping t =&gt;
+t ann -&gt; Quote (t NameAnn)
+</span><a href="PlutusCore.Check.Scoping.html#establishScoping"><span class="hs-identifier hs-var">establishScoping</span></a></span><span> </span><span class="annot"><span class="annottext">value ann
+</span><a href="#local-6989586621680939894"><span class="hs-identifier hs-var">value</span></a></span><span>
+</span><span id="line-271"></span><span>
+</span><span id="line-272"></span><span class="hs-comment">-- #############################################</span><span>
+</span><span id="line-273"></span><span class="hs-comment">-- ## Checking coherence of scope information ##</span><span>
+</span><span id="line-274"></span><span class="hs-comment">-- #############################################</span><span>
+</span><span id="line-275"></span><span>
+</span><span id="line-276"></span><span class="hs-comment">-- | Every kind of error thrown by the scope checking machinery at different stages.</span><span>
+</span><span id="line-277"></span><span class="hs-keyword">data</span><span> </span><span id="ScopeError"><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-var">ScopeError</span></a></span></span><span>
+</span><span id="line-278"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="UnannotatedName"><span class="annot"><a href="PlutusCore.Check.Scoping.html#UnannotatedName"><span class="hs-identifier hs-var">UnannotatedName</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-279"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="NameChangedItsScope"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameChangedItsScope"><span class="hs-identifier hs-var">NameChangedItsScope</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-280"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="NameUnexpectedlyDisappeared"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameUnexpectedlyDisappeared"><span class="hs-identifier hs-var">NameUnexpectedlyDisappeared</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-281"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="NameUnexpectedlyStayed"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameUnexpectedlyStayed"><span class="hs-identifier hs-var">NameUnexpectedlyStayed</span></a></span></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span>
+</span><span id="line-282"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="DuplicateBindersInTheInput"><span class="annot"><a href="PlutusCore.Check.Scoping.html#DuplicateBindersInTheInput"><span class="hs-identifier hs-var">DuplicateBindersInTheInput</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-283"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="DuplicateBindersInTheOutput"><span class="annot"><a href="PlutusCore.Check.Scoping.html#DuplicateBindersInTheOutput"><span class="hs-identifier hs-var">DuplicateBindersInTheOutput</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-284"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="OldBindingsDiscordWithBoundVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#OldBindingsDiscordWithBoundVariables"><span class="hs-identifier hs-var">OldBindingsDiscordWithBoundVariables</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-285"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="OldBindingsDiscordWithOutOfScopeVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#OldBindingsDiscordWithOutOfScopeVariables"><span class="hs-identifier hs-var">OldBindingsDiscordWithOutOfScopeVariables</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-286"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="NewBindingsDiscordWithBoundVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NewBindingsDiscordWithBoundVariables"><span class="hs-identifier hs-var">NewBindingsDiscordWithBoundVariables</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-287"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="OldBindingsClashWithFreeVariables"><span class="annot"><a href="PlutusCore.Check.Scoping.html#OldBindingsClashWithFreeVariables"><span class="hs-identifier hs-var">OldBindingsClashWithFreeVariables</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-288"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="OldBindingsClashWithNewBindings"><span class="annot"><a href="PlutusCore.Check.Scoping.html#OldBindingsClashWithNewBindings"><span class="hs-identifier hs-var">OldBindingsClashWithNewBindings</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-289"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="NewBindingsClashWithFreeVariabes"><span class="annot"><a href="PlutusCore.Check.Scoping.html#NewBindingsClashWithFreeVariabes"><span class="hs-identifier hs-var">NewBindingsClashWithFreeVariabes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-290"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680939877"><span id="local-6989586621680939879"><span id="local-6989586621680939881"><span class="annot"><span class="annottext">Int -&gt; ScopeError -&gt; ShowS
+[ScopeError] -&gt; ShowS
+ScopeError -&gt; String
+(Int -&gt; ScopeError -&gt; ShowS)
+-&gt; (ScopeError -&gt; String)
+-&gt; ([ScopeError] -&gt; ShowS)
+-&gt; Show ScopeError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ScopeError] -&gt; ShowS
+$cshowList :: [ScopeError] -&gt; ShowS
+show :: ScopeError -&gt; String
+$cshow :: ScopeError -&gt; String
+showsPrec :: Int -&gt; ScopeError -&gt; ShowS
+$cshowsPrec :: Int -&gt; ScopeError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-291"></span><span>
+</span><span id="line-292"></span><span class="hs-comment">-- | Override the set at the provided 'ScopeEntry' to contain only the provided 'ScopedName'.</span><span>
+</span><span id="line-293"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#overrideSname"><span class="hs-identifier hs-type">overrideSname</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeEntry"><span class="hs-identifier hs-type">ScopeEntry</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-294"></span><span id="overrideSname"><span class="annot"><span class="annottext">overrideSname :: ScopeEntry -&gt; ScopedName -&gt; ScopeInfo -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#overrideSname"><span class="hs-identifier hs-var hs-var">overrideSname</span></a></span></span><span> </span><span id="local-6989586621680939875"><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939875"><span class="hs-identifier hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Map ScopeEntry (Set ScopedName)
+ -&gt; Map ScopeEntry (Set ScopedName))
+-&gt; ScopeInfo -&gt; ScopeInfo
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">coerce</span></a></span><span> </span><span class="annot"><span class="annottext">((Map ScopeEntry (Set ScopedName)
+  -&gt; Map ScopeEntry (Set ScopedName))
+ -&gt; ScopeInfo -&gt; ScopeInfo)
+-&gt; (ScopedName
+    -&gt; Map ScopeEntry (Set ScopedName)
+    -&gt; Map ScopeEntry (Set ScopedName))
+-&gt; ScopedName
+-&gt; ScopeInfo
+-&gt; ScopeInfo
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+-&gt; Set ScopedName
+-&gt; Map ScopeEntry (Set ScopedName)
+-&gt; Map ScopeEntry (Set ScopedName)
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.insert</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939875"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName
+ -&gt; Map ScopeEntry (Set ScopedName)
+ -&gt; Map ScopeEntry (Set ScopedName))
+-&gt; (ScopedName -&gt; Set ScopedName)
+-&gt; ScopedName
+-&gt; Map ScopeEntry (Set ScopedName)
+-&gt; Map ScopeEntry (Set ScopedName)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; Set ScopedName
+forall a. a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.singleton</span></a></span><span>
+</span><span id="line-295"></span><span>
+</span><span id="line-296"></span><span class="hs-comment">-- | Use a 'Stays' to handle an unchanged old name.</span><span>
+</span><span id="line-297"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#applyStays"><span class="hs-identifier hs-type">applyStays</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-type">Stays</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-298"></span><span id="applyStays"><span class="annot"><span class="annottext">applyStays :: Stays -&gt; ScopedName -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#applyStays"><span class="hs-identifier hs-var hs-var">applyStays</span></a></span></span><span> </span><span id="local-6989586621680939871"><span class="annot"><span class="annottext">Stays
+</span><a href="#local-6989586621680939871"><span class="hs-identifier hs-var">stays</span></a></span></span><span> </span><span id="local-6989586621680939870"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939870"><span class="hs-identifier hs-var">sname</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopedName -&gt; ScopeInfo -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#overrideSname"><span class="hs-identifier hs-var">overrideSname</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939869"><span class="hs-identifier hs-var">key</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939870"><span class="hs-identifier hs-var">sname</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#emptyScopeInfo"><span class="hs-identifier hs-var">emptyScopeInfo</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-299"></span><span>    </span><span id="local-6989586621680939869"><span class="annot"><span class="annottext">key :: ScopeEntry
+</span><a href="#local-6989586621680939869"><span class="hs-identifier hs-var hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Stays
+</span><a href="#local-6989586621680939871"><span class="hs-identifier hs-var">stays</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-300"></span><span>        </span><span class="annot"><span class="annottext">Stays
+</span><a href="PlutusCore.Check.Scoping.html#StaysOutOfScopeVariable"><span class="hs-identifier hs-var">StaysOutOfScopeVariable</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#StayedOutOfScopeVariables"><span class="hs-identifier hs-var">StayedOutOfScopeVariables</span></a></span><span>
+</span><span id="line-301"></span><span>        </span><span class="annot"><span class="annottext">Stays
+</span><a href="PlutusCore.Check.Scoping.html#StaysFreeVariable"><span class="hs-identifier hs-var">StaysFreeVariable</span></a></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#StayedFreeVariables"><span class="hs-identifier hs-var">StayedFreeVariables</span></a></span><span>
+</span><span id="line-302"></span><span>
+</span><span id="line-303"></span><span class="hs-comment">-- | Use a 'Disappears' to handle differing old and new names.</span><span>
+</span><span id="line-304"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#applyDisappears"><span class="hs-identifier hs-type">applyDisappears</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-type">Disappears</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-305"></span><span id="applyDisappears"><span class="annot"><span class="annottext">applyDisappears :: Disappears -&gt; ScopedName -&gt; ScopedName -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#applyDisappears"><span class="hs-identifier hs-var hs-var">applyDisappears</span></a></span></span><span> </span><span id="local-6989586621680939867"><span class="annot"><span class="annottext">Disappears
+</span><a href="#local-6989586621680939867"><span class="hs-identifier hs-var">disappears</span></a></span></span><span> </span><span id="local-6989586621680939866"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939866"><span class="hs-identifier hs-var">snameOld</span></a></span></span><span> </span><span id="local-6989586621680939865"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939865"><span class="hs-identifier hs-var">snameNew</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-306"></span><span>    </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopedName -&gt; ScopeInfo -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#overrideSname"><span class="hs-identifier hs-var">overrideSname</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939864"><span class="hs-identifier hs-var">keyNew</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939865"><span class="hs-identifier hs-var">snameNew</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeInfo -&gt; ScopeInfo) -&gt; ScopeInfo -&gt; ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopedName -&gt; ScopeInfo -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#overrideSname"><span class="hs-identifier hs-var">overrideSname</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939863"><span class="hs-identifier hs-var">keyOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939866"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#emptyScopeInfo"><span class="hs-identifier hs-var">emptyScopeInfo</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-307"></span><span>        </span><span class="hs-special">(</span><span id="local-6989586621680939863"><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939863"><span class="hs-identifier hs-var">keyOld</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680939864"><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="#local-6989586621680939864"><span class="hs-identifier hs-var">keyNew</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Disappears
+</span><a href="#local-6989586621680939867"><span class="hs-identifier hs-var">disappears</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-308"></span><span>            </span><span class="annot"><span class="annottext">Disappears
+</span><a href="PlutusCore.Check.Scoping.html#DisappearsBinding"><span class="hs-identifier hs-var">DisappearsBinding</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#DisappearedBindings"><span class="hs-identifier hs-var">DisappearedBindings</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#AppearedBindings"><span class="hs-identifier hs-var">AppearedBindings</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-309"></span><span>            </span><span class="annot"><span class="annottext">Disappears
+</span><a href="PlutusCore.Check.Scoping.html#DisappearsVariable"><span class="hs-identifier hs-var">DisappearsVariable</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#DisappearedVariables"><span class="hs-identifier hs-var">DisappearedVariables</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#AppearedVariables"><span class="hs-identifier hs-var">AppearedVariables</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-310"></span><span>
+</span><span id="line-311"></span><span class="hs-comment">-- | Use a 'NameAction' to handle an old and a new name.</span><span>
+</span><span id="line-312"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#applyNameAction"><span class="hs-identifier hs-type">applyNameAction</span></a></span><span>
+</span><span id="line-313"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-type">NameAction</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopedName"><span class="hs-identifier hs-type">ScopedName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span>
+</span><span id="line-314"></span><span id="applyNameAction"><span class="annot"><span class="annottext">applyNameAction :: NameAction
+-&gt; ScopedName -&gt; ScopedName -&gt; Either ScopeError ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#applyNameAction"><span class="hs-identifier hs-var hs-var">applyNameAction</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Stays"><span class="hs-identifier hs-type">Stays</span></a></span><span> </span><span id="local-6989586621680939861"><span class="annot"><span class="annottext">Stays
+</span><a href="#local-6989586621680939861"><span class="hs-identifier hs-var">stays</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680939860"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939860"><span class="hs-identifier hs-var">snameOld</span></a></span></span><span> </span><span id="local-6989586621680939859"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939859"><span class="hs-identifier hs-var">snameNew</span></a></span></span><span>
+</span><span id="line-315"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939860"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopedName -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939859"><span class="hs-identifier hs-var">snameNew</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. b -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeInfo -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Stays -&gt; ScopedName -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#applyStays"><span class="hs-identifier hs-var">applyStays</span></a></span><span> </span><span class="annot"><span class="annottext">Stays
+</span><a href="#local-6989586621680939861"><span class="hs-identifier hs-var">stays</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939860"><span class="hs-identifier hs-var">snameOld</span></a></span><span>
+</span><span id="line-316"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span>            </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. a -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeError -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#NameUnexpectedlyDisappeared"><span class="hs-identifier hs-var">NameUnexpectedlyDisappeared</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939860"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939859"><span class="hs-identifier hs-var">snameNew</span></a></span><span>
+</span><span id="line-317"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#applyNameAction"><span class="hs-identifier hs-var">applyNameAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Disappears"><span class="hs-identifier hs-type">Disappears</span></a></span><span> </span><span id="local-6989586621680939858"><span class="annot"><span class="annottext">Disappears
+</span><a href="#local-6989586621680939858"><span class="hs-identifier hs-var">disappears</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680939857"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939857"><span class="hs-identifier hs-var">snameOld</span></a></span></span><span> </span><span id="local-6989586621680939856"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939856"><span class="hs-identifier hs-var">snameNew</span></a></span></span><span>
+</span><span id="line-318"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939857"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopedName -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939856"><span class="hs-identifier hs-var">snameNew</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. a -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeError -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#NameUnexpectedlyStayed"><span class="hs-identifier hs-var">NameUnexpectedlyStayed</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939857"><span class="hs-identifier hs-var">snameOld</span></a></span><span>
+</span><span id="line-319"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span>            </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. b -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeInfo -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeInfo -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Disappears -&gt; ScopedName -&gt; ScopedName -&gt; ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#applyDisappears"><span class="hs-identifier hs-var">applyDisappears</span></a></span><span> </span><span class="annot"><span class="annottext">Disappears
+</span><a href="#local-6989586621680939858"><span class="hs-identifier hs-var">disappears</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939857"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939856"><span class="hs-identifier hs-var">snameNew</span></a></span><span>
+</span><span id="line-320"></span><span>
+</span><span id="line-321"></span><span class="hs-comment">-- | Use a 'NameAnn' to handle a new name.</span><span>
+</span><span id="line-322"></span><span id="local-6989586621680939855"><span class="annot"><a href="PlutusCore.Check.Scoping.html#handleSname"><span class="hs-identifier hs-type">handleSname</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ToScopedName"><span class="hs-identifier hs-type">ToScopedName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939855"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939855"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-type">ScopeErrorOrInfo</span></a></span></span><span>
+</span><span id="line-323"></span><span id="handleSname"><span class="annot"><span class="annottext">handleSname :: NameAnn -&gt; name -&gt; ScopeErrorOrInfo
+</span><a href="PlutusCore.Check.Scoping.html#handleSname"><span class="hs-identifier hs-var hs-var">handleSname</span></a></span></span><span> </span><span id="local-6989586621680939853"><span class="annot"><span class="annottext">NameAnn
+</span><a href="#local-6989586621680939853"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680939852"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939852"><span class="hs-identifier hs-var">nameNew</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo
+</span><a href="PlutusCore.Check.Scoping.html#ScopeErrorOrInfo"><span class="hs-identifier hs-var">ScopeErrorOrInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo)
+-&gt; Either ScopeError ScopeInfo -&gt; ScopeErrorOrInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-324"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680939851"><span class="annot"><span class="annottext">snameNew :: ScopedName
+</span><a href="#local-6989586621680939851"><span class="hs-identifier hs-var hs-var">snameNew</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">name -&gt; ScopedName
+forall name. ToScopedName name =&gt; name -&gt; ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#toScopedName"><span class="hs-identifier hs-var">toScopedName</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680939852"><span class="hs-identifier hs-var">nameNew</span></a></span><span>
+</span><span id="line-325"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">NameAnn
+</span><a href="#local-6989586621680939853"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-326"></span><span>        </span><span class="annot"><span class="annottext">NameAnn
+</span><a href="PlutusCore.Check.Scoping.html#NotAName"><span class="hs-identifier hs-var">NotAName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. a -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeError -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#UnannotatedName"><span class="hs-identifier hs-var">UnannotatedName</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939851"><span class="hs-identifier hs-var">snameNew</span></a></span><span>
+</span><span id="line-327"></span><span>        </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAction"><span class="hs-identifier hs-type">NameAction</span></a></span><span> </span><span id="local-6989586621680939850"><span class="annot"><span class="annottext">NameAction
+</span><a href="#local-6989586621680939850"><span class="hs-identifier hs-var">action</span></a></span></span><span> </span><span id="local-6989586621680939849"><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939849"><span class="hs-identifier hs-var">snameOld</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-328"></span><span>            </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939849"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopedName -&gt; Bool
+</span><a href="PlutusCore.Check.Scoping.html#isSameScope"><span class="hs-operator hs-var">`isSameScope`</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939851"><span class="hs-identifier hs-var">snameNew</span></a></span><span>
+</span><span id="line-329"></span><span>                </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">NameAction
+-&gt; ScopedName -&gt; ScopedName -&gt; Either ScopeError ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#applyNameAction"><span class="hs-identifier hs-var">applyNameAction</span></a></span><span> </span><span class="annot"><span class="annottext">NameAction
+</span><a href="#local-6989586621680939850"><span class="hs-identifier hs-var">action</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939849"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939851"><span class="hs-identifier hs-var">snameNew</span></a></span><span>
+</span><span id="line-330"></span><span>                </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. a -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeError -&gt; Either ScopeError ScopeInfo)
+-&gt; ScopeError -&gt; Either ScopeError ScopeInfo
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName -&gt; ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#NameChangedItsScope"><span class="hs-identifier hs-var">NameChangedItsScope</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939849"><span class="hs-identifier hs-var">snameOld</span></a></span><span> </span><span class="annot"><span class="annottext">ScopedName
+</span><a href="#local-6989586621680939851"><span class="hs-identifier hs-var">snameNew</span></a></span><span>
+</span><span id="line-331"></span><span>
+</span><span id="line-332"></span><span id="local-6989586621680939848"><span class="annot"><a href="PlutusCore.Check.Scoping.html#symmetricDifference"><span class="hs-identifier hs-type">symmetricDifference</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939848"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939848"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939848"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939848"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-333"></span><span id="symmetricDifference"><span class="annot"><span class="annottext">symmetricDifference :: Set a -&gt; Set a -&gt; Set a
+</span><a href="PlutusCore.Check.Scoping.html#symmetricDifference"><span class="hs-identifier hs-var hs-var">symmetricDifference</span></a></span></span><span> </span><span id="local-6989586621680939846"><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621680939846"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680939845"><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621680939845"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621680939846"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Set a -&gt; Set a -&gt; Set a
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.union`</span></a></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621680939845"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Set a -&gt; Set a -&gt; Set a
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.difference`</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621680939846"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Set a -&gt; Set a -&gt; Set a
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621680939845"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-334"></span><span>
+</span><span id="line-335"></span><span class="hs-comment">{-| Check that each kind of 'Set' from 'ScopeInfo' relates to all other ones in a certain way.
+We start with these three relations that are based on the assumption that for each binder we add
+at least one out-of-scope variable and at least one in-scope one:
+
+1. disappeared bindings should be the same as stayed out of scope variables
+     (an internal sanity check)
+2. disappeared bindings should be the same as disappeared variables
+     (ensures that old names consistently disappear at the binding and use sites)
+3. appeared bindings should be the same as appeared variables
+     (ensures that new names consistently appear at the binding and use sites)
+
+Once we've ensured all of that, we're left with only three sets and 3C2 equals 3,
+so we only need to consider three more relations:
+
+1. disappeared bindings should not intersect with free variables
+     (an internal sanity check)
+2. appeared bindings should not intersect with disappeared bindings
+3. appeared bindings should not intersect with free variables
+
+The last two ensure that no new name has an old name's unique.
+-}</span><span>
+</span><span id="line-356"></span><span class="annot"><a href="PlutusCore.Check.Scoping.html#checkScopeInfo"><span class="hs-identifier hs-type">checkScopeInfo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeInfo"><span class="hs-identifier hs-type">ScopeInfo</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-357"></span><span id="checkScopeInfo"><span class="annot"><span class="annottext">checkScopeInfo :: ScopeInfo -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkScopeInfo"><span class="hs-identifier hs-var hs-var">checkScopeInfo</span></a></span></span><span> </span><span id="local-6989586621680939842"><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-358"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680939841"><span class="annot"><span class="annottext">disappearedBindings :: Set ScopedName
+</span><a href="#local-6989586621680939841"><span class="hs-identifier hs-var hs-var">disappearedBindings</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#DisappearedBindings"><span class="hs-identifier hs-var">DisappearedBindings</span></a></span><span>       </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span><span>
+</span><span id="line-359"></span><span>        </span><span id="local-6989586621680939840"><span class="annot"><span class="annottext">disappearedVariables :: Set ScopedName
+</span><a href="#local-6989586621680939840"><span class="hs-identifier hs-var hs-var">disappearedVariables</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#DisappearedVariables"><span class="hs-identifier hs-var">DisappearedVariables</span></a></span><span>      </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span><span>
+</span><span id="line-360"></span><span>        </span><span id="local-6989586621680939839"><span class="annot"><span class="annottext">appearedBindings :: Set ScopedName
+</span><a href="#local-6989586621680939839"><span class="hs-identifier hs-var hs-var">appearedBindings</span></a></span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#AppearedBindings"><span class="hs-identifier hs-var">AppearedBindings</span></a></span><span>          </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span><span>
+</span><span id="line-361"></span><span>        </span><span id="local-6989586621680939838"><span class="annot"><span class="annottext">appearedVariables :: Set ScopedName
+</span><a href="#local-6989586621680939838"><span class="hs-identifier hs-var hs-var">appearedVariables</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#AppearedVariables"><span class="hs-identifier hs-var">AppearedVariables</span></a></span><span>         </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span><span>
+</span><span id="line-362"></span><span>        </span><span id="local-6989586621680939837"><span class="annot"><span class="annottext">stayedOutOfScopeVariables :: Set ScopedName
+</span><a href="#local-6989586621680939837"><span class="hs-identifier hs-var hs-var">stayedOutOfScopeVariables</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#StayedOutOfScopeVariables"><span class="hs-identifier hs-var">StayedOutOfScopeVariables</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span><span>
+</span><span id="line-363"></span><span>        </span><span id="local-6989586621680939836"><span class="annot"><span class="annottext">stayedFreeVariables :: Set ScopedName
+</span><a href="#local-6989586621680939836"><span class="hs-identifier hs-var hs-var">stayedFreeVariables</span></a></span></span><span>       </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScopeEntry -&gt; ScopeInfo -&gt; Set ScopedName
+</span><a href="PlutusCore.Check.Scoping.html#to"><span class="hs-identifier hs-var">to</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeEntry
+</span><a href="PlutusCore.Check.Scoping.html#StayedFreeVariables"><span class="hs-identifier hs-var">StayedFreeVariables</span></a></span><span>       </span><span class="annot"><span class="annottext">ScopeInfo
+</span><a href="#local-6989586621680939842"><span class="hs-identifier hs-var">scopeInfo</span></a></span><span>
+</span><span id="line-364"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#OldBindingsDiscordWithOutOfScopeVariables"><span class="hs-identifier hs-var">OldBindingsDiscordWithOutOfScopeVariables</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Either ScopeError ())
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-365"></span><span>        </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939841"><span class="hs-identifier hs-var">disappearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="PlutusCore.Check.Scoping.html#symmetricDifference"><span class="hs-operator hs-var">`symmetricDifference`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939837"><span class="hs-identifier hs-var">stayedOutOfScopeVariables</span></a></span><span>
+</span><span id="line-366"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#OldBindingsDiscordWithBoundVariables"><span class="hs-identifier hs-var">OldBindingsDiscordWithBoundVariables</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Either ScopeError ())
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-367"></span><span>        </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939841"><span class="hs-identifier hs-var">disappearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="PlutusCore.Check.Scoping.html#symmetricDifference"><span class="hs-operator hs-var">`symmetricDifference`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939840"><span class="hs-identifier hs-var">disappearedVariables</span></a></span><span>
+</span><span id="line-368"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#NewBindingsDiscordWithBoundVariables"><span class="hs-identifier hs-var">NewBindingsDiscordWithBoundVariables</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Either ScopeError ())
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-369"></span><span>        </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939839"><span class="hs-identifier hs-var">appearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="PlutusCore.Check.Scoping.html#symmetricDifference"><span class="hs-operator hs-var">`symmetricDifference`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939838"><span class="hs-identifier hs-var">appearedVariables</span></a></span><span>
+</span><span id="line-370"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#OldBindingsClashWithFreeVariables"><span class="hs-identifier hs-var">OldBindingsClashWithFreeVariables</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Either ScopeError ())
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-371"></span><span>        </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939841"><span class="hs-identifier hs-var">disappearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939836"><span class="hs-identifier hs-var">stayedFreeVariables</span></a></span><span>
+</span><span id="line-372"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#OldBindingsClashWithNewBindings"><span class="hs-identifier hs-var">OldBindingsClashWithNewBindings</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Either ScopeError ())
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-373"></span><span>        </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939839"><span class="hs-identifier hs-var">appearedBindings</span></a></span><span>  </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939841"><span class="hs-identifier hs-var">disappearedBindings</span></a></span><span>
+</span><span id="line-374"></span><span>    </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; ScopeError)
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkEmpty"><span class="hs-identifier hs-var">checkEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; ScopeError
+</span><a href="PlutusCore.Check.Scoping.html#NewBindingsClashWithFreeVariabes"><span class="hs-identifier hs-var">NewBindingsClashWithFreeVariabes</span></a></span><span> </span><span class="annot"><span class="annottext">(Set ScopedName -&gt; Either ScopeError ())
+-&gt; Set ScopedName -&gt; Either ScopeError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-375"></span><span>        </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939839"><span class="hs-identifier hs-var">appearedBindings</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName -&gt; Set ScopedName -&gt; Set ScopedName
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`Set.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set ScopedName
+</span><a href="#local-6989586621680939836"><span class="hs-identifier hs-var">stayedFreeVariables</span></a></span><span>
+</span><span id="line-376"></span><span>
+</span><span id="line-377"></span><span class="hs-comment">-- See Note [Example of a scoping check].</span><span>
+</span><span id="line-378"></span><span class="hs-comment">-- | Check if a renamer respects scoping.</span><span>
+</span><span id="line-379"></span><span id="local-6989586621680939834"><span id="local-6989586621680939835"><span class="annot"><a href="PlutusCore.Check.Scoping.html#checkRespectsScoping"><span class="hs-identifier hs-type">checkRespectsScoping</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#Scoping"><span class="hs-identifier hs-type">Scoping</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939835"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680939835"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939835"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#NameAnn"><span class="hs-identifier hs-type">NameAnn</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680939835"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680939834"><span class="hs-identifier hs-type">ann</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Check.Scoping.html#ScopeError"><span class="hs-identifier hs-type">ScopeError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-380"></span><span id="checkRespectsScoping"><span class="annot"><span class="annottext">checkRespectsScoping :: (t NameAnn -&gt; t NameAnn) -&gt; t ann -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkRespectsScoping"><span class="hs-identifier hs-var hs-var">checkRespectsScoping</span></a></span></span><span> </span><span id="local-6989586621680939832"><span class="annot"><span class="annottext">t NameAnn -&gt; t NameAnn
+</span><a href="#local-6989586621680939832"><span class="hs-identifier hs-var">ren</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-381"></span><span>    </span><span class="annot"><span class="annottext">ScopeInfo -&gt; Either ScopeError ()
+</span><a href="PlutusCore.Check.Scoping.html#checkScopeInfo"><span class="hs-identifier hs-var">checkScopeInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeInfo -&gt; Either ScopeError ())
+-&gt; (t ann -&gt; Either ScopeError ScopeInfo)
+-&gt; t ann
+-&gt; Either ScopeError ()
+forall (m :: * -&gt; *) b c a.
+Monad m =&gt;
+(b -&gt; m c) -&gt; (a -&gt; m b) -&gt; a -&gt; m c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;=&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">ScopeErrorOrInfo -&gt; Either ScopeError ScopeInfo
+</span><a href="PlutusCore.Check.Scoping.html#unScopeErrorOrInfo"><span class="hs-identifier hs-var hs-var">unScopeErrorOrInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(ScopeErrorOrInfo -&gt; Either ScopeError ScopeInfo)
+-&gt; (t ann -&gt; ScopeErrorOrInfo)
+-&gt; t ann
+-&gt; Either ScopeError ScopeInfo
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">t NameAnn -&gt; ScopeErrorOrInfo
+forall (t :: * -&gt; *).
+CollectScopeInfo t =&gt;
+t NameAnn -&gt; ScopeErrorOrInfo
+</span><a href="PlutusCore.Check.Scoping.html#collectScopeInfo"><span class="hs-identifier hs-var">collectScopeInfo</span></a></span><span> </span><span class="annot"><span class="annottext">(t NameAnn -&gt; ScopeErrorOrInfo)
+-&gt; (t ann -&gt; t NameAnn) -&gt; t ann -&gt; ScopeErrorOrInfo
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">t NameAnn -&gt; t NameAnn
+</span><a href="#local-6989586621680939832"><span class="hs-identifier hs-var">ren</span></a></span><span> </span><span class="annot"><span class="annottext">(t NameAnn -&gt; t NameAnn)
+-&gt; (t ann -&gt; t NameAnn) -&gt; t ann -&gt; t NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Quote (t NameAnn) -&gt; t NameAnn
+forall a. Quote a -&gt; a
+</span><a href="PlutusCore.Quote.html#runQuote"><span class="hs-identifier hs-var">runQuote</span></a></span><span> </span><span class="annot"><span class="annottext">(Quote (t NameAnn) -&gt; t NameAnn)
+-&gt; (t ann -&gt; Quote (t NameAnn)) -&gt; t ann -&gt; t NameAnn
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">t ann -&gt; Quote (t NameAnn)
+forall (t :: * -&gt; *) ann.
+EstablishScoping t =&gt;
+t ann -&gt; Quote (t NameAnn)
+</span><a href="PlutusCore.Check.Scoping.html#establishScoping"><span class="hs-identifier hs-var">establishScoping</span></a></span><span>
+</span><span id="line-382"></span></pre></body></html>

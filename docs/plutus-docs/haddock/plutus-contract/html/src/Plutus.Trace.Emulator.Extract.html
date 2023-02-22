@@ -1,0 +1,499 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="%24con2tag_GaloC6gOwth7XV6xRYJHbd"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-comment">{-
+Extract validators and partial transactions from emulator traces
+-}</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Trace.Emulator.Extract</span><span class="hs-special">(</span><span>
+</span><span id="line-7"></span><span>  </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ValidatorMode"><span class="hs-identifier">ValidatorMode</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-8"></span><span>  </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#writeScriptsTo"><span class="hs-identifier">writeScriptsTo</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>  </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#showStats"><span class="hs-identifier">showStats</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>  </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ScriptsConfig"><span class="hs-identifier">ScriptsConfig</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>  </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Command"><span class="hs-identifier">Command</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Params</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Params</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">networkIdL</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">protocolParamsL</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/x2wlc4pzn9czb22sf65hrxm8lv8917aj-foldl-lib-foldl-1.4.13-haddock-doc/share/doc/foldl/html/src"><span class="hs-identifier">Control.Foldl</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&amp;)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(.~)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">run</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Aeson</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/p7i4bdfzw3az86kaghzdyb5w0fg4sm47-aeson-pretty-lib-aeson-pretty-0.8.9-haddock-doc/share/doc/aeson-pretty/html/src"><span class="hs-identifier">Data.Aeson.Encode.Pretty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/p7i4bdfzw3az86kaghzdyb5w0fg4sm47-aeson-pretty-lib-aeson-pretty-0.8.9-haddock-doc/share/doc/aeson-pretty/html/src"><span class="hs-identifier">encodePretty</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier">Data.ByteString.Lazy</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BSL</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Foldable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">traverse_</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Int</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Int64</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Monoid</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Sum</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints.OffChain</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">UnbalancedTx</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contract.Request.html"><span class="hs-identifier">Plutus.Contract.Request</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Request.html#MkTxLog"><span class="hs-identifier">MkTxLog</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contract.Wallet.html"><span class="hs-identifier">Plutus.Contract.Wallet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Wallet.html#export"><span class="hs-keyword">export</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.html"><span class="hs-identifier">Plutus.Trace.Emulator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Stream.html#EmulatorConfig"><span class="hs-identifier">EmulatorConfig</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Stream.html#_params"><span class="hs-identifier">_params</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.html#EmulatorTrace"><span class="hs-identifier">EmulatorTrace</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.html"><span class="hs-identifier">Plutus.Trace.Emulator</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Trace</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Api</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier">ExBudget</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Pretty</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2v7aw0qgl2v0lwasqg0zsrzfb9jxmbfn-streaming-lib-streaming-0.2.3.1-haddock-doc/share/doc/streaming/html/src"><span class="hs-identifier">Streaming.Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/w54d85bimsf19dajhyvxss1i32in8xwp-directory-lib-directory-1.3.6.0-haddock-doc/share/doc/directory/html/src"><span class="hs-identifier">System.Directory</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/w54d85bimsf19dajhyvxss1i32in8xwp-directory-lib-directory-1.3.6.0-haddock-doc/share/doc/directory/html/src"><span class="hs-identifier">createDirectoryIfMissing</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/an65kpgb27157scrcvj2lkfnmbgf583h-filepath-lib-filepath-1.4.2.1-haddock-doc/share/doc/filepath/html/src"><span class="hs-identifier">System.FilePath</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/an65kpgb27157scrcvj2lkfnmbgf583h-filepath-lib-filepath-1.4.2.1-haddock-doc/share/doc/filepath/html/src"><span class="hs-operator">(&lt;/&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Text.Printf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">printf</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.Folds.html"><span class="hs-identifier">Wallet.Emulator.Folds</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Folds</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.Stream.html"><span class="hs-identifier">Wallet.Emulator.Stream</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Stream.html#foldEmulatorStreamM"><span class="hs-identifier">foldEmulatorStreamM</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- | Configuration for 'writeScriptsTo'</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">data</span><span> </span><span id="ScriptsConfig"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ScriptsConfig"><span class="hs-identifier hs-var">ScriptsConfig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-41"></span><span>    </span><span id="ScriptsConfig"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ScriptsConfig"><span class="hs-identifier hs-var">ScriptsConfig</span></a></span></span><span>
+</span><span id="line-42"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="scPath"><span class="annot"><span class="annottext">ScriptsConfig -&gt; FilePath
+</span><a href="Plutus.Trace.Emulator.Extract.html#scPath"><span class="hs-identifier hs-var hs-var">scPath</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-comment">-- ^ Folder the extracted scripts should be written to</span><span>
+</span><span id="line-43"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="scCommand"><span class="annot"><span class="annottext">ScriptsConfig -&gt; Command
+</span><a href="Plutus.Trace.Emulator.Extract.html#scCommand"><span class="hs-identifier hs-var hs-var">scCommand</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Command"><span class="hs-identifier hs-type">Command</span></a></span><span> </span><span class="hs-comment">-- ^ Whether to write out complete transactions or just the validator scripts</span><span>
+</span><span id="line-44"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">data</span><span> </span><span id="ValidatorMode"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ValidatorMode"><span class="hs-identifier hs-var">ValidatorMode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FullyAppliedValidators"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#FullyAppliedValidators"><span class="hs-identifier hs-var">FullyAppliedValidators</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="UnappliedValidators"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#UnappliedValidators"><span class="hs-identifier hs-var">UnappliedValidators</span></a></span></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680833137"><span id="local-6989586621680833139"><span class="annot"><span class="annottext">ValidatorMode -&gt; ValidatorMode -&gt; Bool
+(ValidatorMode -&gt; ValidatorMode -&gt; Bool)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; Bool) -&gt; Eq ValidatorMode
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+$c/= :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+== :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+$c== :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680833121"><span id="local-6989586621680833123"><span id="local-6989586621680833125"><span id="local-6989586621680833127"><span id="local-6989586621680833129"><span id="local-6989586621680833131"><span id="local-6989586621680833133"><span class="annot"><span class="annottext">Eq ValidatorMode
+Eq ValidatorMode
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; Ordering)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; Bool)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; Bool)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; Bool)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; Bool)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode)
+-&gt; (ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode)
+-&gt; Ord ValidatorMode
+ValidatorMode -&gt; ValidatorMode -&gt; Bool
+ValidatorMode -&gt; ValidatorMode -&gt; Ordering
+ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode
+$cmin :: ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode
+max :: ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode
+$cmax :: ValidatorMode -&gt; ValidatorMode -&gt; ValidatorMode
+&gt;= :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+$c&gt;= :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+&gt; :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+$c&gt; :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+&lt;= :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+$c&lt;= :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+&lt; :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+$c&lt; :: ValidatorMode -&gt; ValidatorMode -&gt; Bool
+compare :: ValidatorMode -&gt; ValidatorMode -&gt; Ordering
+$ccompare :: ValidatorMode -&gt; ValidatorMode -&gt; Ordering
+$cp1Ord :: Eq ValidatorMode
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680833114"><span id="local-6989586621680833116"><span id="local-6989586621680833118"><span class="annot"><span class="annottext">Int -&gt; ValidatorMode -&gt; ShowS
+[ValidatorMode] -&gt; ShowS
+ValidatorMode -&gt; FilePath
+(Int -&gt; ValidatorMode -&gt; ShowS)
+-&gt; (ValidatorMode -&gt; FilePath)
+-&gt; ([ValidatorMode] -&gt; ShowS)
+-&gt; Show ValidatorMode
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; FilePath) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ValidatorMode] -&gt; ShowS
+$cshowList :: [ValidatorMode] -&gt; ShowS
+show :: ValidatorMode -&gt; FilePath
+$cshow :: ValidatorMode -&gt; FilePath
+showsPrec :: Int -&gt; ValidatorMode -&gt; ShowS
+$cshowsPrec :: Int -&gt; ValidatorMode -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- | Command for 'writeScriptsTo'</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">data</span><span> </span><span id="Command"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Command"><span class="hs-identifier hs-var">Command</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-51"></span><span>    </span><span id="Scripts"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Scripts"><span class="hs-identifier hs-var">Scripts</span></a></span></span><span> </span><span class="hs-comment">-- ^ Write out validator scripts only (flat encoding)</span><span>
+</span><span id="line-52"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="unappliedValidators"><span class="annot"><span class="annottext">Command -&gt; ValidatorMode
+</span><a href="Plutus.Trace.Emulator.Extract.html#unappliedValidators"><span class="hs-identifier hs-var hs-var">unappliedValidators</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ValidatorMode"><span class="hs-identifier hs-type">ValidatorMode</span></a></span><span> </span><span class="hs-comment">-- ^ Whether to write fully applied or unapplied validators</span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="Transactions"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Transactions"><span class="hs-identifier hs-var">Transactions</span></a></span></span><span>  </span><span class="hs-comment">-- ^ Write out partial transactions</span><span>
+</span><span id="line-55"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="networkId"><span class="annot"><span class="annottext">Command -&gt; NetworkId
+</span><a href="Plutus.Trace.Emulator.Extract.html#networkId"><span class="hs-identifier hs-var hs-var">networkId</span></a></span></span><span>          </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.NetworkId</span></a></span><span> </span><span class="hs-comment">-- ^ Network ID to use when creating addresses</span><span>
+</span><span id="line-56"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="protocolParamsJSON"><span class="annot"><span class="annottext">Command -&gt; FilePath
+</span><a href="Plutus.Trace.Emulator.Extract.html#protocolParamsJSON"><span class="hs-identifier hs-var hs-var">protocolParamsJSON</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-comment">-- ^ Location of a JSON file with protocol parameters</span><span>
+</span><span id="line-57"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="MkTxLogs"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#MkTxLogs"><span class="hs-identifier hs-var">MkTxLogs</span></a></span></span><span> </span><span class="hs-comment">-- ^ Write out the arguments and results of 'mkTx' calls</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680833101"><span id="local-6989586621680833103"><span id="local-6989586621680833105"><span class="annot"><span class="annottext">Int -&gt; Command -&gt; ShowS
+[Command] -&gt; ShowS
+Command -&gt; FilePath
+(Int -&gt; Command -&gt; ShowS)
+-&gt; (Command -&gt; FilePath) -&gt; ([Command] -&gt; ShowS) -&gt; Show Command
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; FilePath) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Command] -&gt; ShowS
+$cshowList :: [Command] -&gt; ShowS
+show :: Command -&gt; FilePath
+$cshow :: Command -&gt; FilePath
+showsPrec :: Int -&gt; Command -&gt; ShowS
+$cshowsPrec :: Int -&gt; Command -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680833097"><span id="local-6989586621680833099"><span class="annot"><span class="annottext">Command -&gt; Command -&gt; Bool
+(Command -&gt; Command -&gt; Bool)
+-&gt; (Command -&gt; Command -&gt; Bool) -&gt; Eq Command
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Command -&gt; Command -&gt; Bool
+$c/= :: Command -&gt; Command -&gt; Bool
+== :: Command -&gt; Command -&gt; Bool
+$c== :: Command -&gt; Command -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">{-| Run an emulator trace and write the applied scripts to a file in Flat format
+    using the name as a prefix.
+-}</span><span>
+</span><span id="line-64"></span><span id="local-6989586621680833096"><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#writeScriptsTo"><span class="hs-identifier hs-type">writeScriptsTo</span></a></span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ScriptsConfig"><span class="hs-identifier hs-type">ScriptsConfig</span></a></span><span> </span><span class="hs-comment">-- ^ Configuration</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-comment">-- ^ Prefix to be used for file names</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.html#EmulatorTrace"><span class="hs-identifier hs-type">EmulatorTrace</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680833096"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-comment">-- ^ Emulator trace to extract transactions from</span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Emulator.Stream.html#EmulatorConfig"><span class="hs-identifier hs-type">EmulatorConfig</span></a></span><span> </span><span class="hs-comment">-- ^ Emulator config</span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Sum</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Int64</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-type">ExBudget</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-comment">-- Total size and 'ExBudget' of extracted scripts</span><span>
+</span><span id="line-70"></span><span id="writeScriptsTo"><span class="annot"><span class="annottext">writeScriptsTo :: ScriptsConfig
+-&gt; FilePath
+-&gt; EmulatorTrace a
+-&gt; EmulatorConfig
+-&gt; IO (Sum Int64, ExBudget)
+</span><a href="Plutus.Trace.Emulator.Extract.html#writeScriptsTo"><span class="hs-identifier hs-var hs-var">writeScriptsTo</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#ScriptsConfig"><span class="hs-identifier hs-type">ScriptsConfig</span></a></span><span class="hs-special">{</span><span id="local-6989586621680833094"><span class="annot"><span class="annottext">FilePath
+scPath :: FilePath
+scPath :: ScriptsConfig -&gt; FilePath
+</span><a href="#local-6989586621680833094"><span class="hs-identifier hs-var hs-var">scPath</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680833093"><span class="annot"><span class="annottext">Command
+scCommand :: Command
+scCommand :: ScriptsConfig -&gt; Command
+</span><a href="#local-6989586621680833093"><span class="hs-identifier hs-var hs-var">scCommand</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621680833092"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833092"><span class="hs-identifier hs-var">prefix</span></a></span></span><span> </span><span id="local-6989586621680833091"><span class="annot"><span class="annottext">EmulatorTrace a
+</span><a href="#local-6989586621680833091"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span id="local-6989586621680833090"><span class="annot"><span class="annottext">EmulatorConfig
+</span><a href="#local-6989586621680833090"><span class="hs-identifier hs-var">emulatorCfg</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680833089"><span class="annot"><span class="annottext">stream :: Stream
+  (Of (LogMessage EmulatorEvent))
+  (Eff effs)
+  (Either EmulatorErr a, EmulatorState)
+</span><a href="#local-6989586621680833089"><span class="hs-identifier hs-var hs-var">stream</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">EmulatorConfig
+-&gt; EmulatorTrace a
+-&gt; Stream
+     (Of (LogMessage EmulatorEvent))
+     (Eff effs)
+     (Either EmulatorErr a, EmulatorState)
+forall (effs :: [* -&gt; *]) a.
+EmulatorConfig
+-&gt; EmulatorTrace a
+-&gt; Stream
+     (Of (LogMessage EmulatorEvent))
+     (Eff effs)
+     (Either EmulatorErr a, EmulatorState)
+</span><a href="Plutus.Trace.Emulator.html#runEmulatorStream"><span class="hs-identifier hs-var">Trace.runEmulatorStream</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorConfig
+</span><a href="#local-6989586621680833090"><span class="hs-identifier hs-var">emulatorCfg</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorTrace a
+</span><a href="#local-6989586621680833091"><span class="hs-identifier hs-var">trace</span></a></span><span>
+</span><span id="line-72"></span><span>        </span><span id="local-6989586621680833179"><span class="annot"><a href="#local-6989586621680833087"><span class="hs-identifier hs-type">getEvents</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Emulator.Folds.html#EmulatorEventFold"><span class="hs-identifier hs-type">Folds.EmulatorEventFold</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680833179"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680833179"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-73"></span><span>        </span><span id="local-6989586621680833087"><span class="annot"><span class="annottext">getEvents :: EmulatorEventFold a -&gt; a
+</span><a href="#local-6989586621680833087"><span class="hs-identifier hs-var hs-var">getEvents</span></a></span></span><span> </span><span id="local-6989586621680833086"><span class="annot"><span class="annottext">EmulatorEventFold a
+</span><a href="#local-6989586621680833086"><span class="hs-identifier hs-var">theFold</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Of a (Either EmulatorErr a, EmulatorState) -&gt; a
+forall a b. Of a b -&gt; a
+</span><a href="../file:///nix/store/2v7aw0qgl2v0lwasqg0zsrzfb9jxmbfn-streaming-lib-streaming-0.2.3.1-haddock-doc/share/doc/streaming/html/src"><span class="hs-identifier hs-var">S.fst'</span></a></span><span> </span><span class="annot"><span class="annottext">(Of a (Either EmulatorErr a, EmulatorState) -&gt; a)
+-&gt; Of a (Either EmulatorErr a, EmulatorState) -&gt; a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff '[] (Of a (Either EmulatorErr a, EmulatorState))
+-&gt; Of a (Either EmulatorErr a, EmulatorState)
+forall a. Eff '[] a -&gt; a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">run</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff '[] (Of a (Either EmulatorErr a, EmulatorState))
+ -&gt; Of a (Either EmulatorErr a, EmulatorState))
+-&gt; Eff '[] (Of a (Either EmulatorErr a, EmulatorState))
+-&gt; Of a (Either EmulatorErr a, EmulatorState)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FoldM (Eff '[]) EmulatorEvent a
+-&gt; Stream
+     (Of (LogMessage EmulatorEvent))
+     (Eff '[])
+     (Either EmulatorErr a, EmulatorState)
+-&gt; Eff '[] (Of a (Either EmulatorErr a, EmulatorState))
+forall (effs :: [* -&gt; *]) a b.
+FoldM (Eff effs) EmulatorEvent b
+-&gt; Stream (Of (LogMessage EmulatorEvent)) (Eff effs) a
+-&gt; Eff effs (Of b a)
+</span><a href="Wallet.Emulator.Stream.html#foldEmulatorStreamM"><span class="hs-identifier hs-var">foldEmulatorStreamM</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">EmulatorEventFold a -&gt; FoldM (Eff '[]) EmulatorEvent a
+forall (m :: * -&gt; *) a b. Monad m =&gt; Fold a b -&gt; FoldM m a b
+</span><a href="../file:///nix/store/x2wlc4pzn9czb22sf65hrxm8lv8917aj-foldl-lib-foldl-1.4.13-haddock-doc/share/doc/foldl/html/src"><span class="hs-identifier hs-var">L.generalize</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorEventFold a
+</span><a href="#local-6989586621680833086"><span class="hs-identifier hs-var">theFold</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Stream
+  (Of (LogMessage EmulatorEvent))
+  (Eff '[])
+  (Either EmulatorErr a, EmulatorState)
+forall (effs :: [* -&gt; *]).
+Stream
+  (Of (LogMessage EmulatorEvent))
+  (Eff effs)
+  (Either EmulatorErr a, EmulatorState)
+</span><a href="#local-6989586621680833089"><span class="hs-identifier hs-var">stream</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; FilePath -&gt; IO ()
+</span><a href="../file:///nix/store/w54d85bimsf19dajhyvxss1i32in8xwp-directory-lib-directory-1.3.6.0-haddock-doc/share/doc/directory/html/src"><span class="hs-identifier hs-var">createDirectoryIfMissing</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833094"><span class="hs-identifier hs-var">scPath</span></a></span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Command
+</span><a href="#local-6989586621680833093"><span class="hs-identifier hs-var">scCommand</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-76"></span><span>        </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Scripts"><span class="hs-identifier hs-type">Scripts</span></a></span><span> </span><span class="annot"><span class="annottext">ValidatorMode
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Sum Int64, ExBudget) -&gt; IO (Sum Int64, ExBudget)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(Sum Int64, ExBudget)
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-77"></span><span>        </span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#Transactions"><span class="hs-identifier hs-type">Transactions</span></a></span><span class="hs-special">{</span><span id="local-6989586621680833083"><span class="annot"><span class="annottext">NetworkId
+networkId :: NetworkId
+networkId :: Command -&gt; NetworkId
+</span><a href="#local-6989586621680833083"><span class="hs-identifier hs-var hs-var">networkId</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680833082"><span class="annot"><span class="annottext">FilePath
+protocolParamsJSON :: FilePath
+protocolParamsJSON :: Command -&gt; FilePath
+</span><a href="#local-6989586621680833082"><span class="hs-identifier hs-var hs-var">protocolParamsJSON</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-78"></span><span>            </span><span id="local-6989586621680833081"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680833081"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO ByteString
+</span><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-var">BSL.readFile</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833082"><span class="hs-identifier hs-var">protocolParamsJSON</span></a></span><span>
+</span><span id="line-79"></span><span>            </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Either FilePath ProtocolParameters
+forall a. FromJSON a =&gt; ByteString -&gt; Either FilePath a
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var">Aeson.eitherDecode</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680833081"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-80"></span><span>                </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621680833078"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833078"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">putStrLn</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833078"><span class="hs-identifier hs-var">err</span></a></span><span>
+</span><span id="line-81"></span><span>                </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621680833076"><span class="annot"><span class="annottext">ProtocolParameters
+</span><a href="#local-6989586621680833076"><span class="hs-identifier hs-var">pp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-82"></span><span>                    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680833075"><span class="annot"><span class="annottext">params :: Params
+</span><a href="#local-6989586621680833075"><span class="hs-identifier hs-var hs-var">params</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">EmulatorConfig -&gt; Params
+</span><a href="Wallet.Emulator.Stream.html#_params"><span class="hs-identifier hs-var hs-var">_params</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorConfig
+</span><a href="#local-6989586621680833090"><span class="hs-identifier hs-var">emulatorCfg</span></a></span><span> </span><span class="annot"><span class="annottext">Params -&gt; (Params -&gt; Params) -&gt; Params
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">(ProtocolParameters -&gt; Identity ProtocolParameters)
+-&gt; Params -&gt; Identity Params
+Lens' Params ProtocolParameters
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">protocolParamsL</span></a></span><span> </span><span class="annot"><span class="annottext">((ProtocolParameters -&gt; Identity ProtocolParameters)
+ -&gt; Params -&gt; Identity Params)
+-&gt; ProtocolParameters -&gt; Params -&gt; Params
+forall s t a b. ASetter s t a b -&gt; b -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">.~</span></a></span><span> </span><span class="annot"><span class="annottext">ProtocolParameters
+</span><a href="#local-6989586621680833076"><span class="hs-identifier hs-var">pp</span></a></span><span>
+</span><span id="line-83"></span><span>                                                     </span><span class="annot"><span class="annottext">Params -&gt; (Params -&gt; Params) -&gt; Params
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">(NetworkId -&gt; Identity NetworkId) -&gt; Params -&gt; Identity Params
+Lens' Params NetworkId
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">networkIdL</span></a></span><span> </span><span class="annot"><span class="annottext">((NetworkId -&gt; Identity NetworkId) -&gt; Params -&gt; Identity Params)
+-&gt; NetworkId -&gt; Params -&gt; Params
+forall s t a b. ASetter s t a b -&gt; b -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">.~</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621680833083"><span class="hs-identifier hs-var">networkId</span></a></span><span>
+</span><span id="line-84"></span><span>                    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">((Int, UnbalancedTx) -&gt; IO ()) -&gt; [(Int, UnbalancedTx)] -&gt; IO ()
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Foldable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">traverse_</span></a></span><span>
+</span><span id="line-85"></span><span>                        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Int -&gt; UnbalancedTx -&gt; IO ()) -&gt; (Int, UnbalancedTx) -&gt; IO ()
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">uncurry</span></a></span><span> </span><span class="annot"><span class="annottext">((Int -&gt; UnbalancedTx -&gt; IO ()) -&gt; (Int, UnbalancedTx) -&gt; IO ())
+-&gt; (Int -&gt; UnbalancedTx -&gt; IO ()) -&gt; (Int, UnbalancedTx) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Params -&gt; FilePath -&gt; FilePath -&gt; Int -&gt; UnbalancedTx -&gt; IO ()
+</span><a href="Plutus.Trace.Emulator.Extract.html#writeTransaction"><span class="hs-identifier hs-var">writeTransaction</span></a></span><span> </span><span class="annot"><span class="annottext">Params
+</span><a href="#local-6989586621680833075"><span class="hs-identifier hs-var">params</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833094"><span class="hs-identifier hs-var">scPath</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833092"><span class="hs-identifier hs-var">prefix</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span>                        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Int] -&gt; [UnbalancedTx] -&gt; [(Int, UnbalancedTx)]
+forall a b. [a] -&gt; [b] -&gt; [(a, b)]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">zip</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-glyph">::</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">..</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">([UnbalancedTx] -&gt; [(Int, UnbalancedTx)])
+-&gt; [UnbalancedTx] -&gt; [(Int, UnbalancedTx)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorEventFold [UnbalancedTx] -&gt; [UnbalancedTx]
+forall a. EmulatorEventFold a -&gt; a
+</span><a href="#local-6989586621680833087"><span class="hs-identifier hs-var">getEvents</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorEventFold [UnbalancedTx]
+</span><a href="Wallet.Emulator.Folds.html#walletTxBalanceEvents"><span class="hs-identifier hs-var">Folds.walletTxBalanceEvents</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-87"></span><span>            </span><span class="annot"><span class="annottext">(Sum Int64, ExBudget) -&gt; IO (Sum Int64, ExBudget)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(Sum Int64, ExBudget)
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-88"></span><span>        </span><span class="annot"><span class="annottext">Command
+</span><a href="Plutus.Trace.Emulator.Extract.html#MkTxLogs"><span class="hs-identifier hs-var">MkTxLogs</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-89"></span><span>            </span><span class="annot"><span class="annottext">((Int, MkTxLog) -&gt; IO ()) -&gt; [(Int, MkTxLog)] -&gt; IO ()
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Foldable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">traverse_</span></a></span><span>
+</span><span id="line-90"></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Int -&gt; MkTxLog -&gt; IO ()) -&gt; (Int, MkTxLog) -&gt; IO ()
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">uncurry</span></a></span><span> </span><span class="annot"><span class="annottext">((Int -&gt; MkTxLog -&gt; IO ()) -&gt; (Int, MkTxLog) -&gt; IO ())
+-&gt; (Int -&gt; MkTxLog -&gt; IO ()) -&gt; (Int, MkTxLog) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; Int -&gt; MkTxLog -&gt; IO ()
+</span><a href="Plutus.Trace.Emulator.Extract.html#writeMkTxLog"><span class="hs-identifier hs-var">writeMkTxLog</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833094"><span class="hs-identifier hs-var">scPath</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833092"><span class="hs-identifier hs-var">prefix</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Int] -&gt; [MkTxLog] -&gt; [(Int, MkTxLog)]
+forall a b. [a] -&gt; [b] -&gt; [(a, b)]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">zip</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-glyph">::</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">..</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">([MkTxLog] -&gt; [(Int, MkTxLog)]) -&gt; [MkTxLog] -&gt; [(Int, MkTxLog)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorEventFold [MkTxLog] -&gt; [MkTxLog]
+forall a. EmulatorEventFold a -&gt; a
+</span><a href="#local-6989586621680833087"><span class="hs-identifier hs-var">getEvents</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorEventFold [MkTxLog]
+</span><a href="Wallet.Emulator.Folds.html#mkTxLogs"><span class="hs-identifier hs-var">Folds.mkTxLogs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>            </span><span class="annot"><span class="annottext">(Sum Int64, ExBudget) -&gt; IO (Sum Int64, ExBudget)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(Sum Int64, ExBudget)
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#showStats"><span class="hs-identifier hs-type">showStats</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Int64</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-type">ExBudget</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-95"></span><span id="showStats"><span class="annot"><span class="annottext">showStats :: Int64 -&gt; ExBudget -&gt; FilePath
+</span><a href="Plutus.Trace.Emulator.Extract.html#showStats"><span class="hs-identifier hs-var hs-var">showStats</span></a></span></span><span> </span><span id="local-6989586621680833069"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680833069"><span class="hs-identifier hs-var">byteSize</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-type">ExBudget</span></a></span><span> </span><span id="local-6989586621680833067"><span class="annot"><span class="annottext">ExCPU
+</span><a href="#local-6989586621680833067"><span class="hs-identifier hs-var">exCPU</span></a></span></span><span> </span><span id="local-6989586621680833066"><span class="annot"><span class="annottext">ExMemory
+</span><a href="#local-6989586621680833066"><span class="hs-identifier hs-var">exMemory</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;Size: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833065"><span class="hs-identifier hs-var">size</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;kB, Cost: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ExCPU -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">ExCPU
+</span><a href="#local-6989586621680833067"><span class="hs-identifier hs-var">exCPU</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;, &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ExMemory -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">ExMemory
+</span><a href="#local-6989586621680833066"><span class="hs-identifier hs-var">exMemory</span></a></span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-97"></span><span>        </span><span id="local-6989586621680833065"><span class="annot"><span class="annottext">size :: FilePath
+</span><a href="#local-6989586621680833065"><span class="hs-identifier hs-var hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Double -&gt; FilePath
+forall r. PrintfType r =&gt; FilePath -&gt; r
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">printf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;%.1f&quot;</span></span><span class="hs-glyph">::</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64 -&gt; Double
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680833069"><span class="hs-identifier hs-var">byteSize</span></a></span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Fractional a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">/</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">1024.0</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Double</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#writeTransaction"><span class="hs-identifier hs-type">writeTransaction</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">Params</span></a></span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-102"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">UnbalancedTx</span></a></span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span id="writeTransaction"><span class="annot"><span class="annottext">writeTransaction :: Params -&gt; FilePath -&gt; FilePath -&gt; Int -&gt; UnbalancedTx -&gt; IO ()
+</span><a href="Plutus.Trace.Emulator.Extract.html#writeTransaction"><span class="hs-identifier hs-var hs-var">writeTransaction</span></a></span></span><span> </span><span id="local-6989586621680833062"><span class="annot"><span class="annottext">Params
+</span><a href="#local-6989586621680833062"><span class="hs-identifier hs-var">params</span></a></span></span><span> </span><span id="local-6989586621680833061"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833061"><span class="hs-identifier hs-var">fp</span></a></span></span><span> </span><span id="local-6989586621680833060"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833060"><span class="hs-identifier hs-var">prefix</span></a></span></span><span> </span><span id="local-6989586621680833059"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680833059"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span id="local-6989586621680833058"><span class="annot"><span class="annottext">UnbalancedTx
+</span><a href="#local-6989586621680833058"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680833057"><span class="annot"><span class="annottext">filename1 :: FilePath
+</span><a href="#local-6989586621680833057"><span class="hs-identifier hs-var hs-var">filename1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833061"><span class="hs-identifier hs-var">fp</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+</span><a href="../file:///nix/store/an65kpgb27157scrcvj2lkfnmbgf583h-filepath-lib-filepath-1.4.2.1-haddock-doc/share/doc/filepath/html/src"><span class="hs-operator hs-var">&lt;/&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833060"><span class="hs-identifier hs-var">prefix</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;-&quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680833059"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;.json&quot;</span></span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Params -&gt; UnbalancedTx -&gt; Either CardanoLedgerError ExportTx
+</span><a href="Plutus.Contract.Wallet.html#export"><span class="hs-keyword hs-var">export</span></a></span><span> </span><span class="annot"><span class="annottext">Params
+</span><a href="#local-6989586621680833062"><span class="hs-identifier hs-var">params</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+</span><a href="#local-6989586621680833058"><span class="hs-identifier hs-var">tx</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-109"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621680833056"><span class="annot"><span class="annottext">CardanoLedgerError
+</span><a href="#local-6989586621680833056"><span class="hs-identifier hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-110"></span><span>            </span><span class="annot"><span class="annottext">FilePath -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">putStrLn</span></a></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;Export tx failed for &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833057"><span class="hs-identifier hs-var">filename1</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;. Reason: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc Any -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CardanoLedgerError -&gt; Doc Any
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoLedgerError
+</span><a href="#local-6989586621680833056"><span class="hs-identifier hs-var">err</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621680833054"><span class="annot"><span class="annottext">ExportTx
+</span><a href="#local-6989586621680833054"><span class="hs-identifier hs-var">exportTx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-112"></span><span>            </span><span class="annot"><span class="annottext">FilePath -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">putStrLn</span></a></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;Writing partial transaction JSON: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833057"><span class="hs-identifier hs-var">filename1</span></a></span><span>
+</span><span id="line-113"></span><span>            </span><span class="annot"><span class="annottext">FilePath -&gt; ByteString -&gt; IO ()
+</span><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-var">BSL.writeFile</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833057"><span class="hs-identifier hs-var">filename1</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; IO ()) -&gt; ByteString -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ExportTx -&gt; ByteString
+forall a. ToJSON a =&gt; a -&gt; ByteString
+</span><a href="../file:///nix/store/p7i4bdfzw3az86kaghzdyb5w0fg4sm47-aeson-pretty-lib-aeson-pretty-0.8.9-haddock-doc/share/doc/aeson-pretty/html/src"><span class="hs-identifier hs-var">encodePretty</span></a></span><span> </span><span class="annot"><span class="annottext">ExportTx
+</span><a href="#local-6989586621680833054"><span class="hs-identifier hs-var">exportTx</span></a></span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span class="annot"><a href="Plutus.Trace.Emulator.Extract.html#writeMkTxLog"><span class="hs-identifier hs-type">writeMkTxLog</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.Request.html#MkTxLog"><span class="hs-identifier hs-type">MkTxLog</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span id="writeMkTxLog"><span class="annot"><span class="annottext">writeMkTxLog :: FilePath -&gt; FilePath -&gt; Int -&gt; MkTxLog -&gt; IO ()
+</span><a href="Plutus.Trace.Emulator.Extract.html#writeMkTxLog"><span class="hs-identifier hs-var hs-var">writeMkTxLog</span></a></span></span><span> </span><span id="local-6989586621680833052"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833052"><span class="hs-identifier hs-var">fp</span></a></span></span><span> </span><span id="local-6989586621680833051"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833051"><span class="hs-identifier hs-var">prefix</span></a></span></span><span> </span><span id="local-6989586621680833050"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680833050"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span id="local-6989586621680833049"><span class="annot"><span class="annottext">MkTxLog
+</span><a href="#local-6989586621680833049"><span class="hs-identifier hs-var">event</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-117"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680833048"><span class="annot"><span class="annottext">filename1 :: FilePath
+</span><a href="#local-6989586621680833048"><span class="hs-identifier hs-var hs-var">filename1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833052"><span class="hs-identifier hs-var">fp</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+</span><a href="../file:///nix/store/an65kpgb27157scrcvj2lkfnmbgf583h-filepath-lib-filepath-1.4.2.1-haddock-doc/share/doc/filepath/html/src"><span class="hs-operator hs-var">&lt;/&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833051"><span class="hs-identifier hs-var">prefix</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;-&quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680833050"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;-mkTx.json&quot;</span></span><span>
+</span><span id="line-118"></span><span>    </span><span class="annot"><span class="annottext">FilePath -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">putStrLn</span></a></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; IO ()) -&gt; FilePath -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;Writing mkTxLog transaction JSON: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833048"><span class="hs-identifier hs-var">filename1</span></a></span><span>
+</span><span id="line-119"></span><span>    </span><span class="annot"><span class="annottext">FilePath -&gt; ByteString -&gt; IO ()
+</span><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-var">BSL.writeFile</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621680833048"><span class="hs-identifier hs-var">filename1</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; IO ()) -&gt; ByteString -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">MkTxLog -&gt; ByteString
+forall a. ToJSON a =&gt; a -&gt; ByteString
+</span><a href="../file:///nix/store/p7i4bdfzw3az86kaghzdyb5w0fg4sm47-aeson-pretty-lib-aeson-pretty-0.8.9-haddock-doc/share/doc/aeson-pretty/html/src"><span class="hs-identifier hs-var">encodePretty</span></a></span><span> </span><span class="annot"><span class="annottext">MkTxLog
+</span><a href="#local-6989586621680833049"><span class="hs-identifier hs-var">event</span></a></span><span>
+</span><span id="line-120"></span></pre></body></html>

@@ -1,0 +1,342 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE GADTs            #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase       #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes       #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell  #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-comment">{-
+
+A handler for the 'ContractStore'  effect that stores everything in a TVar.
+
+-}</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.PAB.Db.Memory.ContractStore</span><span class="hs-special">(</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemContractInstanceState"><span class="hs-identifier">InMemContractInstanceState</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#handleContractStore"><span class="hs-identifier">handleContractStore</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier">InMemInstances</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#initialInMemInstances"><span class="hs-identifier">initialInMemInstances</span></a></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">TVar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">STM</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">LastMember</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Member</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">type</span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator">(~&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Error</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">throwError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Reader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Reader</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">ask</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad.IO.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">MonadIO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.IORef</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">IORef</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.IORef</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">IORef</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Map</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html"><span class="hs-identifier">Plutus.PAB.Effects.Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractStore"><span class="hs-identifier">ContractStore</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html"><span class="hs-identifier">Plutus.PAB.Effects.Contract</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Contract</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html"><span class="hs-identifier">Plutus.PAB.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier">PABError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Webserver.Types.html"><span class="hs-identifier">Plutus.PAB.Webserver.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Webserver.Types.html#ContractActivationArgs"><span class="hs-identifier">ContractActivationArgs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Wallet.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">ContractInstanceId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- | The current state of a contract instance</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- Considering InstanceState contractState as mutable to avoid bottleneck when updating InMemInstances especially</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- when an instance already exists. Note also that PutState is adjusted so as to avoid full map update</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- when instance already exists.</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">data</span><span> </span><span id="InMemContractInstanceState"><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemContractInstanceState"><span class="hs-identifier hs-var">InMemContractInstanceState</span></a></span></span><span> </span><span id="local-6989586621680388643"><span class="annot"><a href="#local-6989586621680388643"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-41"></span><span>    </span><span id="InMemContractInstanceState"><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemContractInstanceState"><span class="hs-identifier hs-var">InMemContractInstanceState</span></a></span></span><span>
+</span><span id="line-42"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="_contractDef"><span class="annot"><span class="annottext">InMemContractInstanceState t
+-&gt; ContractActivationArgs (ContractDef t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractDef"><span class="hs-identifier hs-var hs-var">_contractDef</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.PAB.Webserver.Types.html#ContractActivationArgs"><span class="hs-identifier hs-type">ContractActivationArgs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractDef"><span class="hs-identifier hs-type">Contract.ContractDef</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388643"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="_contractState"><span class="annot"><span class="annottext">InMemContractInstanceState t -&gt; TVar (State t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractState"><span class="hs-identifier hs-var hs-var">_contractState</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">TVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#State"><span class="hs-identifier hs-type">Contract.State</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388643"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">newtype</span><span> </span><span id="InMemInstances"><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-var">InMemInstances</span></a></span></span><span> </span><span id="local-6989586621680388669"><span class="annot"><a href="#local-6989586621680388669"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="InMemInstances"><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-var">InMemInstances</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unInMemInstances"><span class="annot"><span class="annottext">InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#unInMemInstances"><span class="hs-identifier hs-var hs-var">unInMemInstances</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">IORef</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractInstanceId</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemContractInstanceState"><span class="hs-identifier hs-type">InMemContractInstanceState</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388669"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#initialInMemInstances"><span class="hs-identifier hs-type">initialInMemInstances</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680388612"><span class="annot"><a href="#local-6989586621680388612"><span class="hs-identifier hs-type">t</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-type">InMemInstances</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388612"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span id="initialInMemInstances"><span class="annot"><span class="annottext">initialInMemInstances :: IO (InMemInstances t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#initialInMemInstances"><span class="hs-identifier hs-var hs-var">initialInMemInstances</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; InMemInstances t
+forall t.
+IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; InMemInstances t
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-var">InMemInstances</span></a></span><span> </span><span class="annot"><span class="annottext">(IORef (Map ContractInstanceId (InMemContractInstanceState t))
+ -&gt; InMemInstances t)
+-&gt; IO
+     (IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; IO (InMemInstances t)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContractInstanceId (InMemContractInstanceState t)
+-&gt; IO
+     (IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+forall a. a -&gt; IO (IORef a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">IORef.newIORef</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContractInstanceId (InMemContractInstanceState t)
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | Handle the 'ContractStore' effect by writing the state to the</span><span>
+</span><span id="line-52"></span><span class="hs-comment">--   TVar in 'SimulatorState'</span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#handleContractStore"><span class="hs-identifier hs-type">handleContractStore</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680388609"><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span id="local-6989586621680388608"><span class="annot"><a href="#local-6989586621680388608"><span class="hs-identifier hs-type">effs</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">LastMember</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388608"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Reader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-type">InMemInstances</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680388608"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier hs-type">PABError</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680388608"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractStore"><span class="hs-identifier hs-type">ContractStore</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-60"></span><span>    </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388608"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-61"></span><span id="handleContractStore"><span class="annot"><span class="annottext">handleContractStore :: ContractStore t ~&gt; Eff effs
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#handleContractStore"><span class="hs-identifier hs-var hs-var">handleContractStore</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-62"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#PutState"><span class="hs-identifier hs-type">Contract.PutState</span></a></span><span> </span><span id="local-6989586621680388606"><span class="annot"><span class="annottext">ContractActivationArgs (ContractDef t)
+</span><a href="#local-6989586621680388606"><span class="hs-identifier hs-var">definition</span></a></span></span><span> </span><span id="local-6989586621680388605"><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388605"><span class="hs-identifier hs-var">instanceId</span></a></span></span><span> </span><span id="local-6989586621680388604"><span class="annot"><span class="annottext">State t
+</span><a href="#local-6989586621680388604"><span class="hs-identifier hs-var">state</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-63"></span><span>        </span><span id="local-6989586621680388603"><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388603"><span class="hs-identifier hs-var">instancesTVar</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+forall t.
+InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#unInMemInstances"><span class="hs-identifier hs-var hs-var">unInMemInstances</span></a></span><span> </span><span class="annot"><span class="annottext">(InMemInstances t
+ -&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; Eff effs (InMemInstances t)
+-&gt; Eff
+     effs
+     (IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+Member (Reader (InMemInstances t)) effs =&gt;
+Eff effs (InMemInstances t)
+forall r (effs :: [* -&gt; *]). Member (Reader r) effs =&gt; Eff effs r
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">ask</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-type">InMemInstances</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>        </span><span id="local-6989586621680388602"><span class="annot"><span class="annottext">Map ContractInstanceId (InMemContractInstanceState t)
+</span><a href="#local-6989586621680388602"><span class="hs-identifier hs-var">instances</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; Eff effs (Map ContractInstanceId (InMemContractInstanceState t))
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Map ContractInstanceId (InMemContractInstanceState t))
+ -&gt; Eff
+      effs (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; IO (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; Eff effs (Map ContractInstanceId (InMemContractInstanceState t))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; IO (Map ContractInstanceId (InMemContractInstanceState t))
+forall a. IORef a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">IORef.readIORef</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388603"><span class="hs-identifier hs-var">instancesTVar</span></a></span><span>
+</span><span id="line-65"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+-&gt; Maybe (InMemContractInstanceState t)
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.lookup</span></a></span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388605"><span class="hs-identifier hs-var">instanceId</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContractInstanceId (InMemContractInstanceState t)
+</span><a href="#local-6989586621680388602"><span class="hs-identifier hs-var">instances</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-66"></span><span>          </span><span class="annot"><span class="annottext">Maybe (InMemContractInstanceState t)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-67"></span><span>            </span><span class="hs-comment">-- adding new entry</span><span>
+</span><span id="line-68"></span><span>            </span><span id="local-6989586621680388598"><span class="annot"><span class="annottext">TVar (State t)
+</span><a href="#local-6989586621680388598"><span class="hs-identifier hs-var">stateTVar</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (TVar (State t)) -&gt; Eff effs (TVar (State t))
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">State t -&gt; IO (TVar (State t))
+forall a. a -&gt; IO (TVar a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">STM.newTVarIO</span></a></span><span> </span><span class="annot"><span class="annottext">State t
+</span><a href="#local-6989586621680388604"><span class="hs-identifier hs-var">state</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680388596"><span class="annot"><span class="annottext">instState :: InMemContractInstanceState t
+</span><a href="#local-6989586621680388596"><span class="hs-identifier hs-var hs-var">instState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">InMemContractInstanceState :: forall t.
+ContractActivationArgs (ContractDef t)
+-&gt; TVar (State t) -&gt; InMemContractInstanceState t
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemContractInstanceState"><span class="hs-identifier hs-type">InMemContractInstanceState</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">_contractDef :: ContractActivationArgs (ContractDef t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractDef"><span class="hs-identifier hs-var">_contractDef</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ContractActivationArgs (ContractDef t)
+</span><a href="#local-6989586621680388606"><span class="hs-identifier hs-var">definition</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_contractState :: TVar (State t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractState"><span class="hs-identifier hs-var">_contractState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TVar (State t)
+</span><a href="#local-6989586621680388598"><span class="hs-identifier hs-var">stateTVar</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-70"></span><span>            </span><span class="annot"><span class="annottext">IO () -&gt; Eff effs ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; Eff effs ()) -&gt; IO () -&gt; Eff effs ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; (Map ContractInstanceId (InMemContractInstanceState t)
+    -&gt; Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; IO ()
+forall a. IORef a -&gt; (a -&gt; a) -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">IORef.modifyIORef'</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388603"><span class="hs-identifier hs-var">instancesTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ContractInstanceId
+-&gt; InMemContractInstanceState t
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+forall k a. Ord k =&gt; k -&gt; a -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.insert</span></a></span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388605"><span class="hs-identifier hs-var">instanceId</span></a></span><span> </span><span class="annot"><span class="annottext">InMemContractInstanceState t
+</span><a href="#local-6989586621680388596"><span class="hs-identifier hs-var">instState</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span>          </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621680388593"><span class="annot"><span class="annottext">InMemContractInstanceState t
+</span><a href="#local-6989586621680388593"><span class="hs-identifier hs-var">oldInstState</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-72"></span><span>            </span><span class="hs-comment">-- only update state</span><span>
+</span><span id="line-73"></span><span>            </span><span class="annot"><span class="annottext">IO () -&gt; Eff effs ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; Eff effs ()) -&gt; IO () -&gt; Eff effs ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">STM.atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; IO ()) -&gt; STM () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-74"></span><span>              </span><span class="annot"><span class="annottext">TVar (State t) -&gt; (State t -&gt; State t) -&gt; STM ()
+forall a. TVar a -&gt; (a -&gt; a) -&gt; STM ()
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">STM.modifyTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">InMemContractInstanceState t -&gt; TVar (State t)
+forall t. InMemContractInstanceState t -&gt; TVar (State t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractState"><span class="hs-identifier hs-var hs-var">_contractState</span></a></span><span> </span><span class="annot"><span class="annottext">InMemContractInstanceState t
+</span><a href="#local-6989586621680388593"><span class="hs-identifier hs-var">oldInstState</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">State t
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">State t
+</span><a href="#local-6989586621680388604"><span class="hs-identifier hs-var">state</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#GetState"><span class="hs-identifier hs-type">Contract.GetState</span></a></span><span> </span><span id="local-6989586621680388589"><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388589"><span class="hs-identifier hs-var">instanceId</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-77"></span><span>        </span><span id="local-6989586621680388588"><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388588"><span class="hs-identifier hs-var">instancesTVar</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+forall t.
+InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#unInMemInstances"><span class="hs-identifier hs-var hs-var">unInMemInstances</span></a></span><span> </span><span class="annot"><span class="annottext">(InMemInstances t
+ -&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; Eff effs (InMemInstances t)
+-&gt; Eff
+     effs
+     (IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+Member (Reader (InMemInstances t)) effs =&gt;
+Eff effs (InMemInstances t)
+forall r (effs :: [* -&gt; *]). Member (Reader r) effs =&gt; Eff effs r
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">ask</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-type">InMemInstances</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>        </span><span id="local-6989586621680388587"><span class="annot"><span class="annottext">Map ContractInstanceId (InMemContractInstanceState t)
+</span><a href="#local-6989586621680388587"><span class="hs-identifier hs-var">instances</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; Eff effs (Map ContractInstanceId (InMemContractInstanceState t))
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Map ContractInstanceId (InMemContractInstanceState t))
+ -&gt; Eff
+      effs (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; IO (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; Eff effs (Map ContractInstanceId (InMemContractInstanceState t))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; IO (Map ContractInstanceId (InMemContractInstanceState t))
+forall a. IORef a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">IORef.readIORef</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388588"><span class="hs-identifier hs-var">instancesTVar</span></a></span><span>
+</span><span id="line-79"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+-&gt; Maybe (InMemContractInstanceState t)
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.lookup</span></a></span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388589"><span class="hs-identifier hs-var">instanceId</span></a></span><span> </span><span class="annot"><span class="annottext">Map ContractInstanceId (InMemContractInstanceState t)
+</span><a href="#local-6989586621680388587"><span class="hs-identifier hs-var">instances</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-80"></span><span>          </span><span class="annot"><span class="annottext">Maybe (InMemContractInstanceState t)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PABError -&gt; Eff effs x
+forall e (effs :: [* -&gt; *]) a.
+Member (Error e) effs =&gt;
+e -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ContractInstanceId -&gt; PABError
+</span><a href="Plutus.PAB.Types.html#ContractInstanceNotFound"><span class="hs-identifier hs-var">ContractInstanceNotFound</span></a></span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388589"><span class="hs-identifier hs-var">instanceId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>          </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621680388585"><span class="annot"><span class="annottext">InMemContractInstanceState t
+</span><a href="#local-6989586621680388585"><span class="hs-identifier hs-var">instState</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-82"></span><span>            </span><span class="annot"><span class="annottext">IO x -&gt; Eff effs x
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO x -&gt; Eff effs x) -&gt; IO x -&gt; Eff effs x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">STM x -&gt; IO x
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">STM.atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM x -&gt; IO x) -&gt; STM x -&gt; IO x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TVar x -&gt; STM x
+forall a. TVar a -&gt; STM a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">STM.readTVar</span></a></span><span> </span><span class="annot"><span class="annottext">(TVar x -&gt; STM x) -&gt; TVar x -&gt; STM x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">InMemContractInstanceState t -&gt; TVar (State t)
+forall t. InMemContractInstanceState t -&gt; TVar (State t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractState"><span class="hs-identifier hs-var hs-var">_contractState</span></a></span><span> </span><span class="annot"><span class="annottext">InMemContractInstanceState t
+</span><a href="#local-6989586621680388585"><span class="hs-identifier hs-var">instState</span></a></span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#GetContracts"><span class="hs-identifier hs-type">Contract.GetContracts</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe ContractActivityStatus
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-85"></span><span>        </span><span id="local-6989586621680388582"><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388582"><span class="hs-identifier hs-var">instancesTVar</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+forall t.
+InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#unInMemInstances"><span class="hs-identifier hs-var hs-var">unInMemInstances</span></a></span><span> </span><span class="annot"><span class="annottext">(InMemInstances t
+ -&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; Eff effs (InMemInstances t)
+-&gt; Eff
+     effs
+     (IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+Member (Reader (InMemInstances t)) effs =&gt;
+Eff effs (InMemInstances t)
+forall r (effs :: [* -&gt; *]). Member (Reader r) effs =&gt; Eff effs r
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">ask</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-type">InMemInstances</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span>        </span><span class="annot"><span class="annottext">(InMemContractInstanceState t
+ -&gt; ContractActivationArgs (ContractDef t))
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+-&gt; Map ContractInstanceId (ContractActivationArgs (ContractDef t))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">InMemContractInstanceState t
+-&gt; ContractActivationArgs (ContractDef t)
+forall t.
+InMemContractInstanceState t
+-&gt; ContractActivationArgs (ContractDef t)
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#_contractDef"><span class="hs-identifier hs-var hs-var">_contractDef</span></a></span><span> </span><span class="annot"><span class="annottext">(Map ContractInstanceId (InMemContractInstanceState t)
+ -&gt; Map ContractInstanceId (ContractActivationArgs (ContractDef t)))
+-&gt; Eff effs (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; Eff
+     effs
+     (Map ContractInstanceId (ContractActivationArgs (ContractDef t)))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; Eff effs (Map ContractInstanceId (InMemContractInstanceState t))
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; IO (Map ContractInstanceId (InMemContractInstanceState t))
+forall a. IORef a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">IORef.readIORef</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388582"><span class="hs-identifier hs-var">instancesTVar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-87"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#PutStartInstance"><span class="hs-identifier hs-type">Contract.PutStartInstance</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; Eff effs ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-88"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#PutStopInstance"><span class="hs-identifier hs-type">Contract.PutStopInstance</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; Eff effs ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span>    </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#DeleteState"><span class="hs-identifier hs-type">Contract.DeleteState</span></a></span><span> </span><span id="local-6989586621680388578"><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388578"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-90"></span><span>      </span><span id="local-6989586621680388577"><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388577"><span class="hs-identifier hs-var">instancesTVar</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+forall t.
+InMemInstances t
+-&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="Plutus.PAB.Db.Memory.ContractStore.html#unInMemInstances"><span class="hs-identifier hs-var hs-var">unInMemInstances</span></a></span><span> </span><span class="annot"><span class="annottext">(InMemInstances t
+ -&gt; IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+-&gt; Eff effs (InMemInstances t)
+-&gt; Eff
+     effs
+     (IORef (Map ContractInstanceId (InMemContractInstanceState t)))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+Member (Reader (InMemInstances t)) effs =&gt;
+Eff effs (InMemInstances t)
+forall r (effs :: [* -&gt; *]). Member (Reader r) effs =&gt; Eff effs r
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">ask</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Memory.ContractStore.html#InMemInstances"><span class="hs-identifier hs-type">InMemInstances</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388609"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>      </span><span class="annot"><span class="annottext">IO () -&gt; Eff effs ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; (Map ContractInstanceId (InMemContractInstanceState t)
+    -&gt; Map ContractInstanceId (InMemContractInstanceState t))
+-&gt; IO ()
+forall a. IORef a -&gt; (a -&gt; a) -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">IORef.modifyIORef'</span></a></span><span> </span><span class="annot"><span class="annottext">IORef (Map ContractInstanceId (InMemContractInstanceState t))
+</span><a href="#local-6989586621680388577"><span class="hs-identifier hs-var">instancesTVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ContractInstanceId
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+-&gt; Map ContractInstanceId (InMemContractInstanceState t)
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.delete</span></a></span><span> </span><span class="annot"><span class="annottext">ContractInstanceId
+</span><a href="#local-6989586621680388578"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span></pre></body></html>

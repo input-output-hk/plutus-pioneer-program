@@ -1,0 +1,762 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveGeneric   #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns  #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TupleSections   #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies    #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-comment">{-| The disk state is the part of the chain index that is kept on disk. This
+module defines an in-memory implementation of the disk state which can be
+used in the emulator.
+-}</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.ChainIndex.Emulator.DiskState</span><span class="hs-special">(</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier">DiskState</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#dataMap"><span class="hs-identifier">dataMap</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#scriptMap"><span class="hs-identifier">scriptMap</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#redeemerMap"><span class="hs-identifier">redeemerMap</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#txMap"><span class="hs-identifier">txMap</span></a></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#addressMap"><span class="hs-identifier">addressMap</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#assetClassMap"><span class="hs-identifier">assetClassMap</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#fromTx"><span class="hs-identifier">fromTx</span></a></span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier">CredentialMap</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#unCredentialMap"><span class="hs-identifier">unCredentialMap</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier">AssetClassMap</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#unAssetClassMap"><span class="hs-identifier">unAssetClassMap</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#diagnostics"><span class="hs-identifier">diagnostics</span></a></span><span>
+</span><span id="line-26"></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">At</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Index</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">IxValue</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Ixed</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">lens</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">makeLenses</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">view</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&amp;)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(.~)</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(^.)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Map</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/v5mncn1m77q8z96gsbph0gyf6rg9vh0w-semigroups-lib-semigroups-0.20-haddock-doc/share/doc/semigroups/html/src"><span class="hs-identifier">Data.Semigroup.Generic</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/v5mncn1m77q8z96gsbph0gyf6rg9vh0w-semigroups-lib-semigroups-0.20-haddock-doc/share/doc/semigroups/html/src"><span class="hs-identifier">GenericSemigroupMonoid</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Set</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Set</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Datum</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">DatumHash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Redeemer</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">RedeemerHash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Script</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">ScriptHash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TxId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TxOutRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">cardanoAddressCredential</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ada</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Ledger.Credential</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Credential</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Tx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Versioned</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Tx.html"><span class="hs-identifier">Plutus.ChainIndex.Tx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTx"><span class="hs-identifier">ChainIndexTx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTxOut"><span class="hs-identifier">ChainIndexTxOut</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#citxData"><span class="hs-identifier">citxData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#citxScripts"><span class="hs-identifier">citxScripts</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#citxTxId"><span class="hs-identifier">citxTxId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Tx.html#txOutsWithRef"><span class="hs-identifier">txOutsWithRef</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-41"></span><span>                             </span><span class="annot"><a href="Plutus.ChainIndex.Tx.html#txRedeemersWithHash"><span class="hs-identifier">txRedeemersWithHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html"><span class="hs-identifier">Plutus.ChainIndex.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Types.html#Diagnostics"><span class="hs-identifier">Diagnostics</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">AssetClass</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">AssetClass</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">flattenValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- | Set of transaction output references for each address.</span><span>
+</span><span id="line-46"></span><span id="local-6989586621679721878"><span id="local-6989586621679721879"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="CredentialMap"><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="CredentialMap"><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="_unCredentialMap"><span class="annot"><span class="annottext">CredentialMap -&gt; Map Credential (Set TxOutRef)
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_unCredentialMap"><span class="hs-identifier hs-var hs-var">_unCredentialMap</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Credential</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679721872"><span id="local-6989586621679721874"><span class="annot"><span class="annottext">CredentialMap -&gt; CredentialMap -&gt; Bool
+(CredentialMap -&gt; CredentialMap -&gt; Bool)
+-&gt; (CredentialMap -&gt; CredentialMap -&gt; Bool) -&gt; Eq CredentialMap
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CredentialMap -&gt; CredentialMap -&gt; Bool
+$c/= :: CredentialMap -&gt; CredentialMap -&gt; Bool
+== :: CredentialMap -&gt; CredentialMap -&gt; Bool
+$c== :: CredentialMap -&gt; CredentialMap -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721865"><span id="local-6989586621679721867"><span id="local-6989586621679721869"><span class="annot"><span class="annottext">Int -&gt; CredentialMap -&gt; ShowS
+[CredentialMap] -&gt; ShowS
+CredentialMap -&gt; String
+(Int -&gt; CredentialMap -&gt; ShowS)
+-&gt; (CredentialMap -&gt; String)
+-&gt; ([CredentialMap] -&gt; ShowS)
+-&gt; Show CredentialMap
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CredentialMap] -&gt; ShowS
+$cshowList :: [CredentialMap] -&gt; ShowS
+show :: CredentialMap -&gt; String
+$cshow :: CredentialMap -&gt; String
+showsPrec :: Int -&gt; CredentialMap -&gt; ShowS
+$cshowsPrec :: Int -&gt; CredentialMap -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. CredentialMap -&gt; Rep CredentialMap x)
+-&gt; (forall x. Rep CredentialMap x -&gt; CredentialMap)
+-&gt; Generic CredentialMap
+forall x. Rep CredentialMap x -&gt; CredentialMap
+forall x. CredentialMap -&gt; Rep CredentialMap x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep CredentialMap x -&gt; CredentialMap
+$cfrom :: forall x. CredentialMap -&gt; Rep CredentialMap x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span id="unCredentialMap"><span class="hs-identifier">makeLenses</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">CredentialMap</span></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="IxValue"><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">IxValue</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="Index"><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">Index</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Credential</span></a></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-type">Ixed</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>    </span><span id="local-6989586621679721858"><span class="annot"><span class="annottext">ix :: Index CredentialMap
+-&gt; Traversal' CredentialMap (IxValue CredentialMap)
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">ix</span></a></span></span><span> </span><span id="local-6989586621679721856"><span class="annot"><span class="annottext">Index CredentialMap
+</span><a href="#local-6989586621679721856"><span class="hs-identifier hs-var">cred</span></a></span></span><span> </span><span id="local-6989586621679721855"><span class="annot"><span class="annottext">IxValue CredentialMap -&gt; f (IxValue CredentialMap)
+</span><a href="#local-6989586621679721855"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span id="local-6989586621679721854"><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721854"><span class="hs-identifier hs-var">mp</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef) -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Credential (Set TxOutRef) -&gt; CredentialMap)
+-&gt; f (Map Credential (Set TxOutRef)) -&gt; f CredentialMap
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map Credential (Set TxOutRef))
+-&gt; (IxValue (Map Credential (Set TxOutRef))
+    -&gt; f (IxValue (Map Credential (Set TxOutRef))))
+-&gt; Map Credential (Set TxOutRef)
+-&gt; f (Map Credential (Set TxOutRef))
+forall m. Ixed m =&gt; Index m -&gt; Traversal' m (IxValue m)
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map Credential (Set TxOutRef))
+Index CredentialMap
+</span><a href="#local-6989586621679721856"><span class="hs-identifier hs-var">cred</span></a></span><span> </span><span class="annot"><span class="annottext">IxValue (Map Credential (Set TxOutRef))
+-&gt; f (IxValue (Map Credential (Set TxOutRef)))
+IxValue CredentialMap -&gt; f (IxValue CredentialMap)
+</span><a href="#local-6989586621679721855"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721854"><span class="hs-identifier hs-var">mp</span></a></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>    </span><span id="local-6989586621679721849"><span class="annot"><span class="annottext">at :: Index CredentialMap
+-&gt; Lens' CredentialMap (Maybe (IxValue CredentialMap))
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">at</span></a></span></span><span> </span><span id="local-6989586621679721847"><span class="annot"><span class="annottext">Index CredentialMap
+</span><a href="#local-6989586621679721847"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(CredentialMap -&gt; Maybe (Set TxOutRef))
+-&gt; (CredentialMap -&gt; Maybe (Set TxOutRef) -&gt; CredentialMap)
+-&gt; Lens
+     CredentialMap
+     CredentialMap
+     (Maybe (Set TxOutRef))
+     (Maybe (Set TxOutRef))
+forall s a b t. (s -&gt; a) -&gt; (s -&gt; b -&gt; t) -&gt; Lens s t a b
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">lens</span></a></span><span> </span><span class="annot"><span class="annottext">CredentialMap -&gt; Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721846"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">CredentialMap -&gt; Maybe (Set TxOutRef) -&gt; CredentialMap
+</span><a href="#local-6989586621679721845"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-59"></span><span>        </span><span id="local-6989586621679721846"><span class="annot"><span class="annottext">g :: CredentialMap -&gt; Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721846"><span class="hs-identifier hs-var hs-var">g</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span id="local-6989586621679721844"><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721844"><span class="hs-identifier hs-var">mp</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721844"><span class="hs-identifier hs-var">mp</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+-&gt; Getting
+     (Maybe (Set TxOutRef))
+     (Map Credential (Set TxOutRef))
+     (Maybe (Set TxOutRef))
+-&gt; Maybe (Set TxOutRef)
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map Credential (Set TxOutRef))
+-&gt; Lens'
+     (Map Credential (Set TxOutRef))
+     (Maybe (IxValue (Map Credential (Set TxOutRef))))
+forall m. At m =&gt; Index m -&gt; Lens' m (Maybe (IxValue m))
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">at</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map Credential (Set TxOutRef))
+Index CredentialMap
+</span><a href="#local-6989586621679721847"><span class="hs-identifier hs-var">idx</span></a></span><span>
+</span><span id="line-60"></span><span>        </span><span id="local-6989586621679721845"><span class="annot"><span class="annottext">s :: CredentialMap -&gt; Maybe (Set TxOutRef) -&gt; CredentialMap
+</span><a href="#local-6989586621679721845"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span id="local-6989586621679721843"><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721843"><span class="hs-identifier hs-var">mp</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679721842"><span class="annot"><span class="annottext">Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721842"><span class="hs-identifier hs-var">refs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef) -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Credential (Set TxOutRef) -&gt; CredentialMap)
+-&gt; Map Credential (Set TxOutRef) -&gt; CredentialMap
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721843"><span class="hs-identifier hs-var">mp</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+-&gt; (Map Credential (Set TxOutRef) -&gt; Map Credential (Set TxOutRef))
+-&gt; Map Credential (Set TxOutRef)
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map Credential (Set TxOutRef))
+-&gt; Lens'
+     (Map Credential (Set TxOutRef))
+     (Maybe (IxValue (Map Credential (Set TxOutRef))))
+forall m. At m =&gt; Index m -&gt; Lens' m (Maybe (IxValue m))
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">at</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map Credential (Set TxOutRef))
+Index CredentialMap
+</span><a href="#local-6989586621679721847"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">((Maybe (Set TxOutRef) -&gt; Identity (Maybe (Set TxOutRef)))
+ -&gt; Map Credential (Set TxOutRef)
+ -&gt; Identity (Map Credential (Set TxOutRef)))
+-&gt; Maybe (Set TxOutRef)
+-&gt; Map Credential (Set TxOutRef)
+-&gt; Map Credential (Set TxOutRef)
+forall s t a b. ASetter s t a b -&gt; b -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">.~</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721842"><span class="hs-identifier hs-var">refs</span></a></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679721837"><span id="local-6989586621679721839"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span id="local-6989586621679721835"><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721835"><span class="hs-identifier hs-var">l</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679721834"><span class="annot"><span class="annottext">&lt;&gt; :: CredentialMap -&gt; CredentialMap -&gt; CredentialMap
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span> </span><span id="local-6989586621679721833"><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721833"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef) -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Credential (Set TxOutRef) -&gt; CredentialMap)
+-&gt; Map Credential (Set TxOutRef) -&gt; CredentialMap
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef)
+-&gt; Map Credential (Set TxOutRef)
+-&gt; Map Credential (Set TxOutRef)
+-&gt; Map Credential (Set TxOutRef)
+forall k a. Ord k =&gt; (a -&gt; a -&gt; a) -&gt; Map k a -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.unionWith</span></a></span><span> </span><span class="annot"><span class="annottext">Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721835"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+</span><a href="#local-6989586621679721833"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679721827"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>    </span><span id="local-6989586621679721825"><span class="annot"><span class="annottext">mappend :: CredentialMap -&gt; CredentialMap -&gt; CredentialMap
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mappend</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CredentialMap -&gt; CredentialMap -&gt; CredentialMap
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span>
+</span><span id="line-67"></span><span>    </span><span id="local-6989586621679721824"><span class="annot"><span class="annottext">mempty :: CredentialMap
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef) -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef)
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- | Convert the outputs of the transaction into a 'CredentialMap'.</span><span>
+</span><span id="line-70"></span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#txCredentialMap"><span class="hs-identifier hs-type">txCredentialMap</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTx"><span class="hs-identifier hs-type">ChainIndexTx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span>
+</span><span id="line-71"></span><span id="txCredentialMap"><span class="annot"><span class="annottext">txCredentialMap :: ChainIndexTx -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#txCredentialMap"><span class="hs-identifier hs-var hs-var">txCredentialMap</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679721822"><span class="annot"><span class="annottext">credential :: ChainIndexTxOut -&gt; Credential
+</span><a href="#local-6989586621679721822"><span class="hs-identifier hs-var hs-var">credential</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTxOut"><span class="hs-identifier hs-type">ChainIndexTxOut</span></a></span><span class="hs-special">{</span><span id="local-6989586621679721820"><span class="annot"><span class="annottext">CardanoAddress
+citoAddress :: ChainIndexTxOut -&gt; CardanoAddress
+citoAddress :: CardanoAddress
+</span><a href="Plutus.ChainIndex.Types.html#citoAddress"><span class="hs-identifier hs-var hs-var">citoAddress</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CardanoAddress -&gt; Credential
+forall era. AddressInEra era -&gt; Credential
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">cardanoAddressCredential</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621679721820"><span class="hs-identifier hs-var">citoAddress</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef) -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-var">CredentialMap</span></a></span><span>
+</span><span id="line-74"></span><span>       </span><span class="annot"><span class="annottext">(Map Credential (Set TxOutRef) -&gt; CredentialMap)
+-&gt; (ChainIndexTx -&gt; Map Credential (Set TxOutRef))
+-&gt; ChainIndexTx
+-&gt; CredentialMap
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef)
+-&gt; [(Credential, Set TxOutRef)] -&gt; Map Credential (Set TxOutRef)
+forall k a. Ord k =&gt; (a -&gt; a -&gt; a) -&gt; [(k, a)] -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.fromListWith</span></a></span><span> </span><span class="annot"><span class="annottext">Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span>
+</span><span id="line-75"></span><span>       </span><span class="annot"><span class="annottext">([(Credential, Set TxOutRef)] -&gt; Map Credential (Set TxOutRef))
+-&gt; (ChainIndexTx -&gt; [(Credential, Set TxOutRef)])
+-&gt; ChainIndexTx
+-&gt; Map Credential (Set TxOutRef)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">((ChainIndexTxOut, TxOutRef) -&gt; (Credential, Set TxOutRef))
+-&gt; [(ChainIndexTxOut, TxOutRef)] -&gt; [(Credential, Set TxOutRef)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ChainIndexTxOut -&gt; Credential)
+-&gt; (TxOutRef -&gt; Set TxOutRef)
+-&gt; (ChainIndexTxOut, TxOutRef)
+-&gt; (Credential, Set TxOutRef)
+forall (p :: * -&gt; * -&gt; *) a b c d.
+Bifunctor p =&gt;
+(a -&gt; b) -&gt; (c -&gt; d) -&gt; p a c -&gt; p b d
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">bimap</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTxOut -&gt; Credential
+</span><a href="#local-6989586621679721822"><span class="hs-identifier hs-var">credential</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; Set TxOutRef
+forall a. a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.singleton</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>       </span><span class="annot"><span class="annottext">([(ChainIndexTxOut, TxOutRef)] -&gt; [(Credential, Set TxOutRef)])
+-&gt; (ChainIndexTx -&gt; [(ChainIndexTxOut, TxOutRef)])
+-&gt; ChainIndexTx
+-&gt; [(Credential, Set TxOutRef)]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx -&gt; [(ChainIndexTxOut, TxOutRef)]
+</span><a href="Plutus.ChainIndex.Tx.html#txOutsWithRef"><span class="hs-identifier hs-var">txOutsWithRef</span></a></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- | Set of transaction output references for each asset class.</span><span>
+</span><span id="line-79"></span><span id="local-6989586621679721813"><span id="local-6989586621679721814"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="AssetClassMap"><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="AssetClassMap"><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="_unAssetClassMap"><span class="annot"><span class="annottext">AssetClassMap -&gt; Map AssetClass (Set TxOutRef)
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_unAssetClassMap"><span class="hs-identifier hs-var hs-var">_unAssetClassMap</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">AssetClass</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-80"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679721807"><span id="local-6989586621679721809"><span class="annot"><span class="annottext">AssetClassMap -&gt; AssetClassMap -&gt; Bool
+(AssetClassMap -&gt; AssetClassMap -&gt; Bool)
+-&gt; (AssetClassMap -&gt; AssetClassMap -&gt; Bool) -&gt; Eq AssetClassMap
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: AssetClassMap -&gt; AssetClassMap -&gt; Bool
+$c/= :: AssetClassMap -&gt; AssetClassMap -&gt; Bool
+== :: AssetClassMap -&gt; AssetClassMap -&gt; Bool
+$c== :: AssetClassMap -&gt; AssetClassMap -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721801"><span id="local-6989586621679721803"><span id="local-6989586621679721805"><span class="annot"><span class="annottext">Int -&gt; AssetClassMap -&gt; ShowS
+[AssetClassMap] -&gt; ShowS
+AssetClassMap -&gt; String
+(Int -&gt; AssetClassMap -&gt; ShowS)
+-&gt; (AssetClassMap -&gt; String)
+-&gt; ([AssetClassMap] -&gt; ShowS)
+-&gt; Show AssetClassMap
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [AssetClassMap] -&gt; ShowS
+$cshowList :: [AssetClassMap] -&gt; ShowS
+show :: AssetClassMap -&gt; String
+$cshow :: AssetClassMap -&gt; String
+showsPrec :: Int -&gt; AssetClassMap -&gt; ShowS
+$cshowsPrec :: Int -&gt; AssetClassMap -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. AssetClassMap -&gt; Rep AssetClassMap x)
+-&gt; (forall x. Rep AssetClassMap x -&gt; AssetClassMap)
+-&gt; Generic AssetClassMap
+forall x. Rep AssetClassMap x -&gt; AssetClassMap
+forall x. AssetClassMap -&gt; Rep AssetClassMap x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep AssetClassMap x -&gt; AssetClassMap
+$cfrom :: forall x. AssetClassMap -&gt; Rep AssetClassMap x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span id="unAssetClassMap"><span class="hs-identifier">makeLenses</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">AssetClassMap</span></span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="IxValue"><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">IxValue</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span>
+</span><span id="line-85"></span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="Index"><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">Index</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">AssetClass</span></a></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-type">Ixed</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-88"></span><span>    </span><span id="local-6989586621679721797"><span class="annot"><span class="annottext">ix :: Index AssetClassMap
+-&gt; Traversal' AssetClassMap (IxValue AssetClassMap)
+</span><a href="#local-6989586621679721797"><span class="hs-identifier hs-var hs-var hs-var hs-var">ix</span></a></span></span><span> </span><span id="local-6989586621679721796"><span class="annot"><span class="annottext">Index AssetClassMap
+</span><a href="#local-6989586621679721796"><span class="hs-identifier hs-var">ac</span></a></span></span><span> </span><span id="local-6989586621679721795"><span class="annot"><span class="annottext">IxValue AssetClassMap -&gt; f (IxValue AssetClassMap)
+</span><a href="#local-6989586621679721795"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span id="local-6989586621679721794"><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721794"><span class="hs-identifier hs-var">mp</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span><span> </span><span class="annot"><span class="annottext">(Map AssetClass (Set TxOutRef) -&gt; AssetClassMap)
+-&gt; f (Map AssetClass (Set TxOutRef)) -&gt; f AssetClassMap
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map AssetClass (Set TxOutRef))
+-&gt; (IxValue (Map AssetClass (Set TxOutRef))
+    -&gt; f (IxValue (Map AssetClass (Set TxOutRef))))
+-&gt; Map AssetClass (Set TxOutRef)
+-&gt; f (Map AssetClass (Set TxOutRef))
+forall m. Ixed m =&gt; Index m -&gt; Traversal' m (IxValue m)
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map AssetClass (Set TxOutRef))
+Index AssetClassMap
+</span><a href="#local-6989586621679721796"><span class="hs-identifier hs-var">ac</span></a></span><span> </span><span class="annot"><span class="annottext">IxValue (Map AssetClass (Set TxOutRef))
+-&gt; f (IxValue (Map AssetClass (Set TxOutRef)))
+IxValue AssetClassMap -&gt; f (IxValue AssetClassMap)
+</span><a href="#local-6989586621679721795"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721794"><span class="hs-identifier hs-var">mp</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-type">At</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-91"></span><span>    </span><span id="local-6989586621679721791"><span class="annot"><span class="annottext">at :: Index AssetClassMap
+-&gt; Lens' AssetClassMap (Maybe (IxValue AssetClassMap))
+</span><a href="#local-6989586621679721791"><span class="hs-identifier hs-var hs-var hs-var hs-var">at</span></a></span></span><span> </span><span id="local-6989586621679721790"><span class="annot"><span class="annottext">Index AssetClassMap
+</span><a href="#local-6989586621679721790"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(AssetClassMap -&gt; Maybe (Set TxOutRef))
+-&gt; (AssetClassMap -&gt; Maybe (Set TxOutRef) -&gt; AssetClassMap)
+-&gt; Lens
+     AssetClassMap
+     AssetClassMap
+     (Maybe (Set TxOutRef))
+     (Maybe (Set TxOutRef))
+forall s a b t. (s -&gt; a) -&gt; (s -&gt; b -&gt; t) -&gt; Lens s t a b
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">lens</span></a></span><span> </span><span class="annot"><span class="annottext">AssetClassMap -&gt; Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721789"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">AssetClassMap -&gt; Maybe (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="#local-6989586621679721788"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-92"></span><span>        </span><span id="local-6989586621679721789"><span class="annot"><span class="annottext">g :: AssetClassMap -&gt; Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721789"><span class="hs-identifier hs-var hs-var">g</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span id="local-6989586621679721787"><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721787"><span class="hs-identifier hs-var">mp</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721787"><span class="hs-identifier hs-var">mp</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+-&gt; Getting
+     (Maybe (Set TxOutRef))
+     (Map AssetClass (Set TxOutRef))
+     (Maybe (Set TxOutRef))
+-&gt; Maybe (Set TxOutRef)
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map AssetClass (Set TxOutRef))
+-&gt; Lens'
+     (Map AssetClass (Set TxOutRef))
+     (Maybe (IxValue (Map AssetClass (Set TxOutRef))))
+forall m. At m =&gt; Index m -&gt; Lens' m (Maybe (IxValue m))
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">at</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map AssetClass (Set TxOutRef))
+Index AssetClassMap
+</span><a href="#local-6989586621679721790"><span class="hs-identifier hs-var">idx</span></a></span><span>
+</span><span id="line-93"></span><span>        </span><span id="local-6989586621679721788"><span class="annot"><span class="annottext">s :: AssetClassMap -&gt; Maybe (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="#local-6989586621679721788"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span id="local-6989586621679721786"><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721786"><span class="hs-identifier hs-var">mp</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679721785"><span class="annot"><span class="annottext">Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721785"><span class="hs-identifier hs-var">refs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span><span> </span><span class="annot"><span class="annottext">(Map AssetClass (Set TxOutRef) -&gt; AssetClassMap)
+-&gt; Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721786"><span class="hs-identifier hs-var">mp</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+-&gt; (Map AssetClass (Set TxOutRef) -&gt; Map AssetClass (Set TxOutRef))
+-&gt; Map AssetClass (Set TxOutRef)
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map AssetClass (Set TxOutRef))
+-&gt; Lens'
+     (Map AssetClass (Set TxOutRef))
+     (Maybe (IxValue (Map AssetClass (Set TxOutRef))))
+forall m. At m =&gt; Index m -&gt; Lens' m (Maybe (IxValue m))
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">at</span></a></span><span> </span><span class="annot"><span class="annottext">Index (Map AssetClass (Set TxOutRef))
+Index AssetClassMap
+</span><a href="#local-6989586621679721790"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">((Maybe (Set TxOutRef) -&gt; Identity (Maybe (Set TxOutRef)))
+ -&gt; Map AssetClass (Set TxOutRef)
+ -&gt; Identity (Map AssetClass (Set TxOutRef)))
+-&gt; Maybe (Set TxOutRef)
+-&gt; Map AssetClass (Set TxOutRef)
+-&gt; Map AssetClass (Set TxOutRef)
+forall s t a b. ASetter s t a b -&gt; b -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">.~</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe (Set TxOutRef)
+</span><a href="#local-6989586621679721785"><span class="hs-identifier hs-var">refs</span></a></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679721780"><span id="local-6989586621679721782"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span id="local-6989586621679721779"><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721779"><span class="hs-identifier hs-var">l</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679721778"><span class="annot"><span class="annottext">&lt;&gt; :: AssetClassMap -&gt; AssetClassMap -&gt; AssetClassMap
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span> </span><span id="local-6989586621679721777"><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721777"><span class="hs-identifier hs-var">r</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span><span> </span><span class="annot"><span class="annottext">(Map AssetClass (Set TxOutRef) -&gt; AssetClassMap)
+-&gt; Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef)
+-&gt; Map AssetClass (Set TxOutRef)
+-&gt; Map AssetClass (Set TxOutRef)
+-&gt; Map AssetClass (Set TxOutRef)
+forall k a. Ord k =&gt; (a -&gt; a -&gt; a) -&gt; Map k a -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.unionWith</span></a></span><span> </span><span class="annot"><span class="annottext">Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721779"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+</span><a href="#local-6989586621679721777"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679721772"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>    </span><span id="local-6989586621679721771"><span class="annot"><span class="annottext">mappend :: AssetClassMap -&gt; AssetClassMap -&gt; AssetClassMap
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mappend</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">AssetClassMap -&gt; AssetClassMap -&gt; AssetClassMap
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span id="local-6989586621679721770"><span class="annot"><span class="annottext">mempty :: AssetClassMap
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef)
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- | Convert the outputs of the transaction into a 'AssetClassMap'.</span><span>
+</span><span id="line-103"></span><span class="hs-comment">--</span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- Note that we don't store the Ada currency, as all 'TxOutRef' contain Ada.</span><span>
+</span><span id="line-105"></span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#txAssetClassMap"><span class="hs-identifier hs-type">txAssetClassMap</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTx"><span class="hs-identifier hs-type">ChainIndexTx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span>
+</span><span id="line-106"></span><span id="txAssetClassMap"><span class="annot"><span class="annottext">txAssetClassMap :: ChainIndexTx -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#txAssetClassMap"><span class="hs-identifier hs-var hs-var">txAssetClassMap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-107"></span><span>    </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef) -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-var">AssetClassMap</span></a></span><span>
+</span><span id="line-108"></span><span>      </span><span class="annot"><span class="annottext">(Map AssetClass (Set TxOutRef) -&gt; AssetClassMap)
+-&gt; (ChainIndexTx -&gt; Map AssetClass (Set TxOutRef))
+-&gt; ChainIndexTx
+-&gt; AssetClassMap
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef)
+-&gt; [(AssetClass, Set TxOutRef)] -&gt; Map AssetClass (Set TxOutRef)
+forall k a. Ord k =&gt; (a -&gt; a -&gt; a) -&gt; [(k, a)] -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.fromListWith</span></a></span><span> </span><span class="annot"><span class="annottext">Set TxOutRef -&gt; Set TxOutRef -&gt; Set TxOutRef
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span>
+</span><span id="line-109"></span><span>      </span><span class="annot"><span class="annottext">([(AssetClass, Set TxOutRef)] -&gt; Map AssetClass (Set TxOutRef))
+-&gt; (ChainIndexTx -&gt; [(AssetClass, Set TxOutRef)])
+-&gt; ChainIndexTx
+-&gt; Map AssetClass (Set TxOutRef)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">((ChainIndexTxOut, TxOutRef) -&gt; [(AssetClass, Set TxOutRef)])
+-&gt; [(ChainIndexTxOut, TxOutRef)] -&gt; [(AssetClass, Set TxOutRef)]
+forall (t :: * -&gt; *) a b. Foldable t =&gt; (a -&gt; [b]) -&gt; t a -&gt; [b]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">concatMap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679721767"><span class="annot"><span class="annottext">ChainIndexTxOut
+</span><a href="#local-6989586621679721767"><span class="hs-identifier hs-var">txOut</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721766"><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621679721766"><span class="hs-identifier hs-var">txOutRef</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-110"></span><span>          </span><span class="annot"><span class="annottext">(AssetClass -&gt; (AssetClass, Set TxOutRef))
+-&gt; [AssetClass] -&gt; [(AssetClass, Set TxOutRef)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-special">,</span></span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; Set TxOutRef
+forall a. a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.singleton</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621679721766"><span class="hs-identifier hs-var">txOutRef</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([AssetClass] -&gt; [(AssetClass, Set TxOutRef)])
+-&gt; [AssetClass] -&gt; [(AssetClass, Set TxOutRef)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTxOut -&gt; [AssetClass]
+</span><a href="#local-6989586621679721765"><span class="hs-identifier hs-var">assetClassesOfTxOut</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTxOut
+</span><a href="#local-6989586621679721767"><span class="hs-identifier hs-var">txOut</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>      </span><span class="annot"><span class="annottext">([(ChainIndexTxOut, TxOutRef)] -&gt; [(AssetClass, Set TxOutRef)])
+-&gt; (ChainIndexTx -&gt; [(ChainIndexTxOut, TxOutRef)])
+-&gt; ChainIndexTx
+-&gt; [(AssetClass, Set TxOutRef)]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx -&gt; [(ChainIndexTxOut, TxOutRef)]
+</span><a href="Plutus.ChainIndex.Tx.html#txOutsWithRef"><span class="hs-identifier hs-var">txOutsWithRef</span></a></span><span>
+</span><span id="line-112"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-113"></span><span>    </span><span class="annot"><a href="#local-6989586621679721765"><span class="hs-identifier hs-type">assetClassesOfTxOut</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTxOut"><span class="hs-identifier hs-type">ChainIndexTxOut</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">AssetClass</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-114"></span><span>    </span><span id="local-6989586621679721765"><span class="annot"><span class="annottext">assetClassesOfTxOut :: ChainIndexTxOut -&gt; [AssetClass]
+</span><a href="#local-6989586621679721765"><span class="hs-identifier hs-var hs-var">assetClassesOfTxOut</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTxOut"><span class="hs-identifier hs-type">ChainIndexTxOut</span></a></span><span class="hs-special">{</span><span id="local-6989586621679721764"><span class="annot"><span class="annottext">Value
+citoValue :: ChainIndexTxOut -&gt; Value
+citoValue :: Value
+</span><a href="Plutus.ChainIndex.Types.html#citoValue"><span class="hs-identifier hs-var hs-var">citoValue</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-115"></span><span>      </span><span class="annot"><span class="annottext">((CurrencySymbol, TokenName, Integer) -&gt; AssetClass)
+-&gt; [(CurrencySymbol, TokenName, Integer)] -&gt; [AssetClass]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679721762"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621679721762"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721761"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621679721761"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(CurrencySymbol, TokenName) -&gt; AssetClass
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">AssetClass</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621679721762"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621679721761"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span>           </span><span class="annot"><span class="annottext">([(CurrencySymbol, TokenName, Integer)] -&gt; [AssetClass])
+-&gt; [(CurrencySymbol, TokenName, Integer)] -&gt; [AssetClass]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">((CurrencySymbol, TokenName, Integer) -&gt; Bool)
+-&gt; [(CurrencySymbol, TokenName, Integer)]
+-&gt; [(CurrencySymbol, TokenName, Integer)]
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">filter</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679721760"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621679721760"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721759"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621679721759"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">not</span></a></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool) -&gt; Bool -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621679721760"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; CurrencySymbol -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.adaSymbol</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621679721759"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName -&gt; TokenName -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.adaToken</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-117"></span><span>           </span><span class="annot"><span class="annottext">([(CurrencySymbol, TokenName, Integer)]
+ -&gt; [(CurrencySymbol, TokenName, Integer)])
+-&gt; [(CurrencySymbol, TokenName, Integer)]
+-&gt; [(CurrencySymbol, TokenName, Integer)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; [(CurrencySymbol, TokenName, Integer)]
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">flattenValue</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679721764"><span class="hs-identifier hs-var">citoValue</span></a></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span class="hs-comment">-- | Data that we keep on disk. (This type is used for testing only - we need</span><span>
+</span><span id="line-120"></span><span class="hs-comment">--   other structures for the disk-backed storage)</span><span>
+</span><span id="line-121"></span><span id="local-6989586621679721753"><span id="local-6989586621679721754"></span></span><span class="hs-keyword">data</span><span> </span><span id="DiskState"><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-var">DiskState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-122"></span><span>    </span><span id="DiskState"><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-var">DiskState</span></a></span></span><span>
+</span><span id="line-123"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="_DataMap"><span class="annot"><span class="annottext">DiskState -&gt; Map DatumHash Datum
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_DataMap"><span class="hs-identifier hs-var hs-var">_DataMap</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">DatumHash</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Datum</span></a></span><span>
+</span><span id="line-124"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="_ScriptMap"><span class="annot"><span class="annottext">DiskState -&gt; Map ScriptHash (Versioned Script)
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_ScriptMap"><span class="hs-identifier hs-var hs-var">_ScriptMap</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Versioned</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Script</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="_RedeemerMap"><span class="annot"><span class="annottext">DiskState -&gt; Map RedeemerHash Redeemer
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_RedeemerMap"><span class="hs-identifier hs-var hs-var">_RedeemerMap</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">RedeemerHash</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Redeemer</span></a></span><span>
+</span><span id="line-126"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="_TxMap"><span class="annot"><span class="annottext">DiskState -&gt; Map TxId ChainIndexTx
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_TxMap"><span class="hs-identifier hs-var hs-var">_TxMap</span></a></span></span><span>         </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxId</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTx"><span class="hs-identifier hs-type">ChainIndexTx</span></a></span><span>
+</span><span id="line-127"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="_AddressMap"><span class="annot"><span class="annottext">DiskState -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_AddressMap"><span class="hs-identifier hs-var hs-var">_AddressMap</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#CredentialMap"><span class="hs-identifier hs-type">CredentialMap</span></a></span><span>
+</span><span id="line-128"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="_AssetClassMap"><span class="annot"><span class="annottext">DiskState -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_AssetClassMap"><span class="hs-identifier hs-var hs-var">_AssetClassMap</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#AssetClassMap"><span class="hs-identifier hs-type">AssetClassMap</span></a></span><span>
+</span><span id="line-129"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-130"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679721742"><span id="local-6989586621679721744"><span class="annot"><span class="annottext">DiskState -&gt; DiskState -&gt; Bool
+(DiskState -&gt; DiskState -&gt; Bool)
+-&gt; (DiskState -&gt; DiskState -&gt; Bool) -&gt; Eq DiskState
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: DiskState -&gt; DiskState -&gt; Bool
+$c/= :: DiskState -&gt; DiskState -&gt; Bool
+== :: DiskState -&gt; DiskState -&gt; Bool
+$c== :: DiskState -&gt; DiskState -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721736"><span id="local-6989586621679721738"><span id="local-6989586621679721740"><span class="annot"><span class="annottext">Int -&gt; DiskState -&gt; ShowS
+[DiskState] -&gt; ShowS
+DiskState -&gt; String
+(Int -&gt; DiskState -&gt; ShowS)
+-&gt; (DiskState -&gt; String)
+-&gt; ([DiskState] -&gt; ShowS)
+-&gt; Show DiskState
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [DiskState] -&gt; ShowS
+$cshowList :: [DiskState] -&gt; ShowS
+show :: DiskState -&gt; String
+$cshow :: DiskState -&gt; String
+showsPrec :: Int -&gt; DiskState -&gt; ShowS
+$cshowsPrec :: Int -&gt; DiskState -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. DiskState -&gt; Rep DiskState x)
+-&gt; (forall x. Rep DiskState x -&gt; DiskState) -&gt; Generic DiskState
+forall x. Rep DiskState x -&gt; DiskState
+forall x. DiskState -&gt; Rep DiskState x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep DiskState x -&gt; DiskState
+$cfrom :: forall x. DiskState -&gt; Rep DiskState x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679721728"><span id="local-6989586621679721730"><span id="local-6989586621679721732"><span class="annot"><span class="annottext">b -&gt; DiskState -&gt; DiskState
+NonEmpty DiskState -&gt; DiskState
+DiskState -&gt; DiskState -&gt; DiskState
+(DiskState -&gt; DiskState -&gt; DiskState)
+-&gt; (NonEmpty DiskState -&gt; DiskState)
+-&gt; (forall b. Integral b =&gt; b -&gt; DiskState -&gt; DiskState)
+-&gt; Semigroup DiskState
+forall b. Integral b =&gt; b -&gt; DiskState -&gt; DiskState
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (NonEmpty a -&gt; a)
+-&gt; (forall b. Integral b =&gt; b -&gt; a -&gt; a)
+-&gt; Semigroup a
+stimes :: b -&gt; DiskState -&gt; DiskState
+$cstimes :: forall b. Integral b =&gt; b -&gt; DiskState -&gt; DiskState
+sconcat :: NonEmpty DiskState -&gt; DiskState
+$csconcat :: NonEmpty DiskState -&gt; DiskState
+&lt;&gt; :: DiskState -&gt; DiskState -&gt; DiskState
+$c&lt;&gt; :: DiskState -&gt; DiskState -&gt; DiskState
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Semigroup</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721721"><span id="local-6989586621679721723"><span id="local-6989586621679721725"><span class="annot"><span class="annottext">Semigroup DiskState
+DiskState
+Semigroup DiskState
+-&gt; DiskState
+-&gt; (DiskState -&gt; DiskState -&gt; DiskState)
+-&gt; ([DiskState] -&gt; DiskState)
+-&gt; Monoid DiskState
+[DiskState] -&gt; DiskState
+DiskState -&gt; DiskState -&gt; DiskState
+forall a.
+Semigroup a -&gt; a -&gt; (a -&gt; a -&gt; a) -&gt; ([a] -&gt; a) -&gt; Monoid a
+mconcat :: [DiskState] -&gt; DiskState
+$cmconcat :: [DiskState] -&gt; DiskState
+mappend :: DiskState -&gt; DiskState -&gt; DiskState
+$cmappend :: DiskState -&gt; DiskState -&gt; DiskState
+mempty :: DiskState
+$cmempty :: DiskState
+$cp1Monoid :: Semigroup DiskState
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Monoid</span></a></span></span></span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">via</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/v5mncn1m77q8z96gsbph0gyf6rg9vh0w-semigroups-lib-semigroups-0.20-haddock-doc/share/doc/semigroups/html/src"><span class="hs-identifier hs-type">GenericSemigroupMonoid</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-type">DiskState</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span id="assetClassMap"><span id="addressMap"><span id="txMap"><span id="redeemerMap"><span id="scriptMap"><span id="dataMap"><span class="hs-identifier">makeLenses</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">DiskState</span></span></span></span></span></span></span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- | The data we store on disk for a given 'ChainIndexTx'</span><span>
+</span><span id="line-136"></span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#fromTx"><span class="hs-identifier hs-type">fromTx</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#ChainIndexTx"><span class="hs-identifier hs-type">ChainIndexTx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-type">DiskState</span></a></span><span>
+</span><span id="line-137"></span><span id="fromTx"><span class="annot"><span class="annottext">fromTx :: ChainIndexTx -&gt; DiskState
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#fromTx"><span class="hs-identifier hs-var hs-var">fromTx</span></a></span></span><span> </span><span id="local-6989586621679721720"><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-138"></span><span>    </span><span class="annot"><span class="annottext">DiskState :: Map DatumHash Datum
+-&gt; Map ScriptHash (Versioned Script)
+-&gt; Map RedeemerHash Redeemer
+-&gt; Map TxId ChainIndexTx
+-&gt; CredentialMap
+-&gt; AssetClassMap
+-&gt; DiskState
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-type">DiskState</span></a></span><span>
+</span><span id="line-139"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_DataMap :: Map DatumHash Datum
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_DataMap"><span class="hs-identifier hs-var">_DataMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Getting (Map DatumHash Datum) ChainIndexTx (Map DatumHash Datum)
+-&gt; ChainIndexTx -&gt; Map DatumHash Datum
+forall s (m :: * -&gt; *) a. MonadReader s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">view</span></a></span><span> </span><span class="annot"><span class="annottext">Getting (Map DatumHash Datum) ChainIndexTx (Map DatumHash Datum)
+Lens' ChainIndexTx (Map DatumHash Datum)
+</span><a href="Plutus.ChainIndex.Types.html#citxData"><span class="hs-identifier hs-var">citxData</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-140"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_ScriptMap :: Map ScriptHash (Versioned Script)
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_ScriptMap"><span class="hs-identifier hs-var">_ScriptMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Getting
+  (Map ScriptHash (Versioned Script))
+  ChainIndexTx
+  (Map ScriptHash (Versioned Script))
+-&gt; ChainIndexTx -&gt; Map ScriptHash (Versioned Script)
+forall s (m :: * -&gt; *) a. MonadReader s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">view</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (Map ScriptHash (Versioned Script))
+  ChainIndexTx
+  (Map ScriptHash (Versioned Script))
+Lens' ChainIndexTx (Map ScriptHash (Versioned Script))
+</span><a href="Plutus.ChainIndex.Types.html#citxScripts"><span class="hs-identifier hs-var">citxScripts</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-141"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_TxMap :: Map TxId ChainIndexTx
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_TxMap"><span class="hs-identifier hs-var">_TxMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxId -&gt; ChainIndexTx -&gt; Map TxId ChainIndexTx
+forall k a. k -&gt; a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.singleton</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Getting TxId ChainIndexTx TxId -&gt; ChainIndexTx -&gt; TxId
+forall s (m :: * -&gt; *) a. MonadReader s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">view</span></a></span><span> </span><span class="annot"><span class="annottext">Getting TxId ChainIndexTx TxId
+Lens' ChainIndexTx TxId
+</span><a href="Plutus.ChainIndex.Types.html#citxTxId"><span class="hs-identifier hs-var">citxTxId</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-142"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_RedeemerMap :: Map RedeemerHash Redeemer
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_RedeemerMap"><span class="hs-identifier hs-var">_RedeemerMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ChainIndexTx -&gt; Map RedeemerHash Redeemer
+</span><a href="Plutus.ChainIndex.Tx.html#txRedeemersWithHash"><span class="hs-identifier hs-var">txRedeemersWithHash</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-143"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_AddressMap :: CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_AddressMap"><span class="hs-identifier hs-var">_AddressMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ChainIndexTx -&gt; CredentialMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#txCredentialMap"><span class="hs-identifier hs-var">txCredentialMap</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-144"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_AssetClassMap :: AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_AssetClassMap"><span class="hs-identifier hs-var">_AssetClassMap</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ChainIndexTx -&gt; AssetClassMap
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#txAssetClassMap"><span class="hs-identifier hs-var">txAssetClassMap</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexTx
+</span><a href="#local-6989586621679721720"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-145"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#diagnostics"><span class="hs-identifier hs-type">diagnostics</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-type">DiskState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Types.html#Diagnostics"><span class="hs-identifier hs-type">Diagnostics</span></a></span><span>
+</span><span id="line-148"></span><span id="diagnostics"><span class="annot"><span class="annottext">diagnostics :: DiskState -&gt; Diagnostics
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#diagnostics"><span class="hs-identifier hs-var hs-var">diagnostics</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.DiskState.html#DiskState"><span class="hs-identifier hs-type">DiskState</span></a></span><span class="hs-special">{</span><span id="local-6989586621679721718"><span class="annot"><span class="annottext">Map DatumHash Datum
+_DataMap :: Map DatumHash Datum
+_DataMap :: DiskState -&gt; Map DatumHash Datum
+</span><a href="#local-6989586621679721718"><span class="hs-identifier hs-var hs-var">_DataMap</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721717"><span class="annot"><span class="annottext">Map ScriptHash (Versioned Script)
+_ScriptMap :: Map ScriptHash (Versioned Script)
+_ScriptMap :: DiskState -&gt; Map ScriptHash (Versioned Script)
+</span><a href="#local-6989586621679721717"><span class="hs-identifier hs-var hs-var">_ScriptMap</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721716"><span class="annot"><span class="annottext">Map TxId ChainIndexTx
+_TxMap :: Map TxId ChainIndexTx
+_TxMap :: DiskState -&gt; Map TxId ChainIndexTx
+</span><a href="#local-6989586621679721716"><span class="hs-identifier hs-var hs-var">_TxMap</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721715"><span class="annot"><span class="annottext">Map RedeemerHash Redeemer
+_RedeemerMap :: Map RedeemerHash Redeemer
+_RedeemerMap :: DiskState -&gt; Map RedeemerHash Redeemer
+</span><a href="#local-6989586621679721715"><span class="hs-identifier hs-var hs-var">_RedeemerMap</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721714"><span class="annot"><span class="annottext">CredentialMap
+_AddressMap :: CredentialMap
+_AddressMap :: DiskState -&gt; CredentialMap
+</span><a href="#local-6989586621679721714"><span class="hs-identifier hs-var hs-var">_AddressMap</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679721713"><span class="annot"><span class="annottext">AssetClassMap
+_AssetClassMap :: AssetClassMap
+_AssetClassMap :: DiskState -&gt; AssetClassMap
+</span><a href="#local-6989586621679721713"><span class="hs-identifier hs-var hs-var">_AssetClassMap</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-149"></span><span>    </span><span class="annot"><span class="annottext">Diagnostics :: Integer
+-&gt; Integer
+-&gt; Integer
+-&gt; Integer
+-&gt; Int
+-&gt; Int
+-&gt; [TxId]
+-&gt; [ChainIndexTxOut]
+-&gt; Diagnostics
+</span><a href="Plutus.ChainIndex.Types.html#Diagnostics"><span class="hs-identifier hs-type">Diagnostics</span></a></span><span>
+</span><span id="line-150"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">numTransactions :: Integer
+</span><a href="Plutus.ChainIndex.Types.html#numTransactions"><span class="hs-identifier hs-var">numTransactions</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a. Integral a =&gt; a -&gt; Integer
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Integer) -&gt; Int -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxId ChainIndexTx -&gt; Int
+forall k a. Map k a -&gt; Int
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.size</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxId ChainIndexTx
+</span><a href="#local-6989586621679721716"><span class="hs-identifier hs-var">_TxMap</span></a></span><span>
+</span><span id="line-151"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">numScripts :: Integer
+</span><a href="Plutus.ChainIndex.Types.html#numScripts"><span class="hs-identifier hs-var">numScripts</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a. Integral a =&gt; a -&gt; Integer
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Integer) -&gt; Int -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map ScriptHash (Versioned Script) -&gt; Int
+forall k a. Map k a -&gt; Int
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.size</span></a></span><span> </span><span class="annot"><span class="annottext">Map ScriptHash (Versioned Script)
+</span><a href="#local-6989586621679721717"><span class="hs-identifier hs-var">_ScriptMap</span></a></span><span>
+</span><span id="line-152"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">numAddresses :: Integer
+</span><a href="Plutus.ChainIndex.Types.html#numAddresses"><span class="hs-identifier hs-var">numAddresses</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a. Integral a =&gt; a -&gt; Integer
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Integer) -&gt; Int -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map Credential (Set TxOutRef) -&gt; Int
+forall k a. Map k a -&gt; Int
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.size</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Credential (Set TxOutRef) -&gt; Int)
+-&gt; Map Credential (Set TxOutRef) -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CredentialMap -&gt; Map Credential (Set TxOutRef)
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_unCredentialMap"><span class="hs-identifier hs-var hs-var">_unCredentialMap</span></a></span><span> </span><span class="annot"><span class="annottext">CredentialMap
+</span><a href="#local-6989586621679721714"><span class="hs-identifier hs-var">_AddressMap</span></a></span><span>
+</span><span id="line-153"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">numAssetClasses :: Integer
+</span><a href="Plutus.ChainIndex.Types.html#numAssetClasses"><span class="hs-identifier hs-var">numAssetClasses</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a. Integral a =&gt; a -&gt; Integer
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Integer) -&gt; Int -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map AssetClass (Set TxOutRef) -&gt; Int
+forall k a. Map k a -&gt; Int
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.size</span></a></span><span> </span><span class="annot"><span class="annottext">(Map AssetClass (Set TxOutRef) -&gt; Int)
+-&gt; Map AssetClass (Set TxOutRef) -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">AssetClassMap -&gt; Map AssetClass (Set TxOutRef)
+</span><a href="Plutus.ChainIndex.Emulator.DiskState.html#_unAssetClassMap"><span class="hs-identifier hs-var hs-var">_unAssetClassMap</span></a></span><span> </span><span class="annot"><span class="annottext">AssetClassMap
+</span><a href="#local-6989586621679721713"><span class="hs-identifier hs-var">_AssetClassMap</span></a></span><span>
+</span><span id="line-154"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">someTransactions :: [TxId]
+</span><a href="Plutus.ChainIndex.Types.html#someTransactions"><span class="hs-identifier hs-var">someTransactions</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [TxId] -&gt; [TxId]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">take</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">10</span></span><span> </span><span class="annot"><span class="annottext">([TxId] -&gt; [TxId]) -&gt; [TxId] -&gt; [TxId]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">((TxId, ChainIndexTx) -&gt; TxId) -&gt; [(TxId, ChainIndexTx)] -&gt; [TxId]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">(TxId, ChainIndexTx) -&gt; TxId
+forall a b. (a, b) -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fst</span></a></span><span> </span><span class="annot"><span class="annottext">([(TxId, ChainIndexTx)] -&gt; [TxId])
+-&gt; [(TxId, ChainIndexTx)] -&gt; [TxId]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxId ChainIndexTx -&gt; [(TxId, ChainIndexTx)]
+forall k a. Map k a -&gt; [(k, a)]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.toList</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxId ChainIndexTx
+</span><a href="#local-6989586621679721716"><span class="hs-identifier hs-var">_TxMap</span></a></span><span>
+</span><span id="line-155"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">unspentTxOuts :: [ChainIndexTxOut]
+</span><a href="Plutus.ChainIndex.Types.html#unspentTxOuts"><span class="hs-identifier hs-var">unspentTxOuts</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-156"></span><span>        </span><span class="hs-comment">-- These 2 are filled in Handlers.hs</span><span>
+</span><span id="line-157"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">numUnmatchedInputs :: Int
+</span><a href="Plutus.ChainIndex.Types.html#numUnmatchedInputs"><span class="hs-identifier hs-var">numUnmatchedInputs</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-158"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">numUnspentOutputs :: Int
+</span><a href="Plutus.ChainIndex.Types.html#numUnspentOutputs"><span class="hs-identifier hs-var">numUnspentOutputs</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-159"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-160"></span></pre></body></html>

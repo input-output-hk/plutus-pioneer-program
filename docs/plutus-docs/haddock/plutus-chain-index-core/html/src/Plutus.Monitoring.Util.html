@@ -1,0 +1,452 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts   #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE GADTs              #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase         #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns     #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings  #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes         #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators      #-}</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Monitoring.Util</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-13"></span><span>      </span><span class="annot"><a href="Plutus.Monitoring.Util.html#handleLogMsgTrace"><span class="hs-identifier">handleLogMsgTrace</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Monitoring.Util.html#handleLogMsgTraceMap"><span class="hs-identifier">handleLogMsgTraceMap</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Monitoring.Util.html#handleObserveTrace"><span class="hs-identifier">handleObserveTrace</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Monitoring.Util.html#runLogEffects"><span class="hs-identifier">runLogEffects</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Monitoring.Util.html#convertLog"><span class="hs-identifier">convertLog</span></a></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Monitoring.Util.html#toSeverity"><span class="hs-identifier">toSeverity</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Monitoring.Util.html#PrettyObject"><span class="hs-identifier">PrettyObject</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Configuration.Model</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CM</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Data.Counter</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Data.LogItem</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Data.Severity</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Data.SubTrace</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Data.Trace</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Data.Tracer</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ToObject</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Observer.Monadic</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Trace</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">Control.Monad.Catch</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">MonadCatch</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Log</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">LogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">LogObserve</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Observation</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Log</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad.IO.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">MonadIO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson.Key</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Aeson</span></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson.KeyMap</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Aeson</span></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Foldable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">for_</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Functor.Contravariant</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Contravariant</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">fromMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/vicspv6q7nknvxmcyg08ybn40xl6qz5y-text-class-lib-text-class-2022.7.1-haddock-doc/share/doc/text-class/html/src"><span class="hs-identifier">Data.Text.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/vicspv6q7nknvxmcyg08ybn40xl6qz5y-text-class-lib-text-class-2022.7.1-haddock-doc/share/doc/text-class/html/src"><span class="hs-identifier">ToText</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text.Lazy</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Pretty</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">defaultLayoutOptions</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">layoutPretty</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Prettyprinter.Render.Text</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Render</span></span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="annot"><a href="Plutus.Monitoring.Util.html#toSeverity"><span class="hs-identifier hs-type">toSeverity</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">L.LogLevel</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Severity</span></span><span>
+</span><span id="line-51"></span><span id="toSeverity"><span class="annot"><span class="annottext">toSeverity :: LogLevel -&gt; Severity
+</span><a href="Plutus.Monitoring.Util.html#toSeverity"><span class="hs-identifier hs-var hs-var">toSeverity</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-52"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Debug</span></a></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Debug</span></span><span>
+</span><span id="line-53"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Info</span></a></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Info</span></span><span>
+</span><span id="line-54"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Notice</span></a></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Notice</span></span><span>
+</span><span id="line-55"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Warning</span></a></span><span>   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Warning</span></span><span>
+</span><span id="line-56"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Error</span></a></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Error</span></span><span>
+</span><span id="line-57"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Critical</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Critical</span></span><span>
+</span><span id="line-58"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Alert</span></a></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Alert</span></span><span>
+</span><span id="line-59"></span><span>  </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.Emergency</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Emergency</span></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- | Handle the 'LogMsg' effect by logging messages to a 'Trace'</span><span>
+</span><span id="line-63"></span><span class="annot"><a href="Plutus.Monitoring.Util.html#handleLogMsgTrace"><span class="hs-identifier hs-type">handleLogMsgTrace</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679726482"><span class="annot"><a href="#local-6989586621679726482"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679726484"><span class="annot"><a href="#local-6989586621679726484"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679726483"><span class="annot"><a href="#local-6989586621679726483"><span class="hs-identifier hs-type">effs</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">LastMember</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726484"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726483"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726484"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="#local-6989586621679726484"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726482"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726482"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-69"></span><span>  </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726483"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-70"></span><span id="handleLogMsgTrace"><span class="annot"><span class="annottext">handleLogMsgTrace :: Trace m a -&gt; LogMsg a ~&gt; Eff effs
+</span><a href="Plutus.Monitoring.Util.html#handleLogMsgTrace"><span class="hs-identifier hs-var hs-var">handleLogMsgTrace</span></a></span></span><span> </span><span id="local-6989586621679726357"><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726357"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-71"></span><span>  </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LMessage</span></a></span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">L.LogMessage</span></a></span><span class="hs-special">{</span><span id="local-6989586621679726354"><span class="annot"><span class="annottext">LogLevel
+_logLevel :: forall a. LogMessage a -&gt; LogLevel
+_logLevel :: LogLevel
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var hs-var">L._logLevel</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679726352"><span class="annot"><span class="annottext">a
+_logMessageContent :: forall a. LogMessage a -&gt; a
+_logMessageContent :: a
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var hs-var">L._logMessageContent</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679726350"><span class="annot"><span class="annottext">defaultPrivacy :: PrivacyAnnotation
+</span><a href="#local-6989586621679726350"><span class="hs-identifier hs-var hs-var">defaultPrivacy</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PrivacyAnnotation
+</span><span class="hs-identifier hs-var">Public</span></span><span> </span><span class="hs-comment">-- TODO: Configurable / add to 'L.LogMessage'?</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">m () -&gt; Eff effs ()
+forall (m :: * -&gt; *) (effs :: [* -&gt; *]) a.
+(Monad m, LastMember m effs) =&gt;
+m a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">sendM</span></a></span><span> </span><span class="annot"><span class="annottext">(m () -&gt; Eff effs ()) -&gt; m () -&gt; Eff effs ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Trace m a -&gt; PrivacyAnnotation -&gt; Severity -&gt; a -&gt; m ()
+forall (m :: * -&gt; *) a.
+MonadIO m =&gt;
+Trace m a -&gt; PrivacyAnnotation -&gt; Severity -&gt; a -&gt; m ()
+</span><span class="hs-identifier hs-var">traceNamedItem</span></span><span> </span><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726357"><span class="hs-identifier hs-var">trace</span></a></span><span> </span><span class="annot"><span class="annottext">PrivacyAnnotation
+</span><a href="#local-6989586621679726350"><span class="hs-identifier hs-var">defaultPrivacy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LogLevel -&gt; Severity
+</span><a href="Plutus.Monitoring.Util.html#toSeverity"><span class="hs-identifier hs-var">toSeverity</span></a></span><span> </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="#local-6989586621679726354"><span class="hs-identifier hs-var">_logLevel</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679726352"><span class="hs-identifier hs-var">_logMessageContent</span></a></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span class="hs-comment">-- | Handle the 'LogMsg' effect by logging messages to a mapped 'Trace'</span><span>
+</span><span id="line-76"></span><span class="annot"><a href="Plutus.Monitoring.Util.html#handleLogMsgTraceMap"><span class="hs-identifier hs-type">handleLogMsgTraceMap</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679726346"><span class="annot"><a href="#local-6989586621679726346"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span id="local-6989586621679726345"><span class="annot"><a href="#local-6989586621679726345"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621679726344"><span class="annot"><a href="#local-6989586621679726344"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679726343"><span class="annot"><a href="#local-6989586621679726343"><span class="hs-identifier hs-type">effs</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">LastMember</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726344"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726343"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726344"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679726346"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679726345"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="#local-6989586621679726344"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726345"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726346"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-83"></span><span>  </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726343"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-84"></span><span id="handleLogMsgTraceMap"><span class="annot"><span class="annottext">handleLogMsgTraceMap :: (b -&gt; a) -&gt; Trace m a -&gt; LogMsg b ~&gt; Eff effs
+</span><a href="Plutus.Monitoring.Util.html#handleLogMsgTraceMap"><span class="hs-identifier hs-var hs-var">handleLogMsgTraceMap</span></a></span></span><span> </span><span id="local-6989586621679726342"><span class="annot"><span class="annottext">b -&gt; a
+</span><a href="#local-6989586621679726342"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679726341"><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726341"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Trace m b -&gt; LogMsg b ~&gt; Eff effs
+forall a (m :: * -&gt; *) (effs :: [* -&gt; *]).
+(LastMember m effs, MonadIO m) =&gt;
+Trace m a -&gt; LogMsg a ~&gt; Eff effs
+</span><a href="Plutus.Monitoring.Util.html#handleLogMsgTrace"><span class="hs-identifier hs-var">handleLogMsgTrace</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((LoggerName, LogObject b) -&gt; (LoggerName, LogObject a))
+-&gt; Trace m a -&gt; Trace m b
+forall (f :: * -&gt; *) a b. Contravariant f =&gt; (a -&gt; b) -&gt; f b -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">contramap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(LogObject b -&gt; LogObject a)
+-&gt; (LoggerName, LogObject b) -&gt; (LoggerName, LogObject a)
+forall (p :: * -&gt; * -&gt; *) b c a.
+Bifunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">second</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(b -&gt; a) -&gt; LogObject b -&gt; LogObject a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; a
+</span><a href="#local-6989586621679726342"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726341"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="annot"><a href="Plutus.Monitoring.Util.html#runLogEffects"><span class="hs-identifier hs-type">runLogEffects</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679726338"><span class="annot"><a href="#local-6989586621679726338"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679726337"><span class="annot"><a href="#local-6989586621679726337"><span class="hs-identifier hs-type">l</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-88"></span><span>    </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726338"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="#local-6989586621679726338"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726337"><span class="hs-identifier hs-type">l</span></a></span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726337"><span class="hs-identifier hs-type">l</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679726338"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-91"></span><span>    </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726338"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-92"></span><span id="runLogEffects"><span class="annot"><span class="annottext">runLogEffects :: Trace m l -&gt; Eff '[LogMsg l, m] ~&gt; m
+</span><a href="Plutus.Monitoring.Util.html#runLogEffects"><span class="hs-identifier hs-var hs-var">runLogEffects</span></a></span></span><span> </span><span id="local-6989586621679726336"><span class="annot"><span class="annottext">Trace m l
+</span><a href="#local-6989586621679726336"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Eff '[m] x -&gt; m x
+forall (m :: * -&gt; *) a. Monad m =&gt; Eff '[m] a -&gt; m a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">runM</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff '[m] x -&gt; m x)
+-&gt; (Eff '[LogMsg l, m] x -&gt; Eff '[m] x)
+-&gt; Eff '[LogMsg l, m] x
+-&gt; m x
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(LogMsg l ~&gt; Eff '[m]) -&gt; Eff '[LogMsg l, m] ~&gt; Eff '[m]
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+(eff ~&gt; Eff effs) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpret</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Trace m l -&gt; LogMsg l ~&gt; Eff '[m]
+forall a (m :: * -&gt; *) (effs :: [* -&gt; *]).
+(LastMember m effs, MonadIO m) =&gt;
+Trace m a -&gt; LogMsg a ~&gt; Eff effs
+</span><a href="Plutus.Monitoring.Util.html#handleLogMsgTrace"><span class="hs-identifier hs-var">handleLogMsgTrace</span></a></span><span> </span><span class="annot"><span class="annottext">Trace m l
+</span><a href="#local-6989586621679726336"><span class="hs-identifier hs-var">trace</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- | Convert tracer structured log data</span><span>
+</span><span id="line-95"></span><span id="local-6989586621679726330"><span id="local-6989586621679726331"><span id="local-6989586621679726332"><span class="annot"><a href="Plutus.Monitoring.Util.html#convertLog"><span class="hs-identifier hs-type">convertLog</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679726332"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679726331"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="#local-6989586621679726330"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726331"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="#local-6989586621679726330"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726332"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-96"></span><span id="convertLog"><span class="annot"><span class="annottext">convertLog :: (a -&gt; b) -&gt; Trace m b -&gt; Trace m a
+</span><a href="Plutus.Monitoring.Util.html#convertLog"><span class="hs-identifier hs-var hs-var">convertLog</span></a></span></span><span> </span><span id="local-6989586621679726329"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679726329"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((LoggerName, LogObject a) -&gt; (LoggerName, LogObject b))
+-&gt; Trace m b -&gt; Trace m a
+forall (f :: * -&gt; *) a b. Contravariant f =&gt; (a -&gt; b) -&gt; f b -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">contramap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(LogObject a -&gt; LogObject b)
+-&gt; (LoggerName, LogObject a) -&gt; (LoggerName, LogObject b)
+forall (p :: * -&gt; * -&gt; *) b c a.
+Bifunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">second</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; LogObject a -&gt; LogObject b
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679726329"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-comment">-- | Handle the 'LogObserve' effect using the 'Cardano.BM.Observer.Monadic'</span><span>
+</span><span id="line-99"></span><span class="hs-comment">--   observer functions</span><span>
+</span><span id="line-100"></span><span class="annot"><a href="Plutus.Monitoring.Util.html#handleObserveTrace"><span class="hs-identifier hs-type">handleObserveTrace</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679726328"><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span></span><span> </span><span id="local-6989586621679726327"><span class="annot"><a href="#local-6989586621679726327"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621679726326"><span class="annot"><a href="#local-6989586621679726326"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-102"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">LastMember</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726327"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-103"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726327"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-104"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier hs-type">MonadCatch</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726327"><span class="hs-identifier hs-type">m</span></a></span><span>
+</span><span id="line-105"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CM.Configuration</span></span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="#local-6989586621679726327"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726326"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-108"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogObserve</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">L.LogMessage</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>  </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-110"></span><span id="handleObserveTrace"><span class="annot"><span class="annottext">handleObserveTrace :: Configuration
+-&gt; Trace m a
+-&gt; Eff (LogObserve (LogMessage LoggerName) : effs) ~&gt; Eff effs
+</span><a href="Plutus.Monitoring.Util.html#handleObserveTrace"><span class="hs-identifier hs-var hs-var">handleObserveTrace</span></a></span></span><span> </span><span id="local-6989586621679726325"><span class="annot"><span class="annottext">Configuration
+</span><a href="#local-6989586621679726325"><span class="hs-identifier hs-var">config</span></a></span></span><span> </span><span id="local-6989586621679726324"><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726324"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span>  </span><span class="hs-comment">-- We need to call 'observeOpen' and 'observeClose' with the appropriate</span><span>
+</span><span id="line-113"></span><span>  </span><span class="hs-comment">-- arguments.</span><span>
+</span><span id="line-114"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-115"></span><span>  </span><span class="hs-comment">-- 'observeBefore' makes the call to 'observeOpen' and 'observeAfter'</span><span>
+</span><span id="line-116"></span><span>  </span><span class="hs-comment">-- makes the call to 'observeClose.'</span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span class="annot"><a href="#local-6989586621679726323"><span class="hs-identifier hs-type">observeBefore</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">L.LogMessage</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">SubTrace</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CounterState</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-119"></span><span>      </span><span id="local-6989586621679726323"><span class="annot"><span class="annottext">observeBefore :: LogMessage LoggerName -&gt; Eff effs (Maybe (SubTrace, CounterState))
+</span><a href="#local-6989586621679726323"><span class="hs-identifier hs-var hs-var">observeBefore</span></a></span></span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">L.LogMessage</span></a></span><span class="hs-special">{</span><span id="local-6989586621679726322"><span class="annot"><span class="annottext">LogLevel
+_logLevel :: LogLevel
+_logLevel :: forall a. LogMessage a -&gt; LogLevel
+</span><a href="#local-6989586621679726322"><span class="hs-identifier hs-var hs-var">L._logLevel</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679726321"><span class="annot"><span class="annottext">LoggerName
+_logMessageContent :: LoggerName
+_logMessageContent :: forall a. LogMessage a -&gt; a
+</span><a href="#local-6989586621679726321"><span class="hs-identifier hs-var hs-var">L._logMessageContent</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span>        </span><span class="hs-comment">-- find the correct subtrace using the logging config and the content</span><span>
+</span><span id="line-122"></span><span>        </span><span class="hs-comment">-- of the message.</span><span>
+</span><span id="line-123"></span><span>        </span><span id="local-6989586621679726320"><span class="annot"><span class="annottext">SubTrace
+</span><a href="#local-6989586621679726320"><span class="hs-identifier hs-var">subtrace</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">SubTrace -&gt; Maybe SubTrace -&gt; SubTrace
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">SubTrace
+</span><span class="hs-identifier hs-var">Neutral</span></span><span> </span><span class="annot"><span class="annottext">(Maybe SubTrace -&gt; SubTrace)
+-&gt; Eff effs (Maybe SubTrace) -&gt; Eff effs SubTrace
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">m (Maybe SubTrace) -&gt; Eff effs (Maybe SubTrace)
+forall (m :: * -&gt; *) (effs :: [* -&gt; *]) a.
+(Monad m, LastMember m effs) =&gt;
+m a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">sendM</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IO (Maybe SubTrace) -&gt; m (Maybe SubTrace)
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe SubTrace) -&gt; m (Maybe SubTrace))
+-&gt; IO (Maybe SubTrace) -&gt; m (Maybe SubTrace)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Configuration -&gt; LoggerName -&gt; IO (Maybe SubTrace)
+</span><span class="hs-identifier hs-var">CM.findSubTrace</span></span><span> </span><span class="annot"><span class="annottext">Configuration
+</span><a href="#local-6989586621679726325"><span class="hs-identifier hs-var">config</span></a></span><span> </span><span class="annot"><span class="annottext">LoggerName
+</span><a href="#local-6989586621679726321"><span class="hs-identifier hs-var">_logMessageContent</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span>        </span><span class="hs-comment">-- 'observeOpen' produces the state of the counters at the beginning of</span><span>
+</span><span id="line-126"></span><span>        </span><span class="hs-comment">-- the action. We return 'counterState' and 'subtrace' so that</span><span>
+</span><span id="line-127"></span><span>        </span><span class="hs-comment">-- they are available in 'observeAfter'.</span><span>
+</span><span id="line-128"></span><span>        </span><span id="local-6989586621679726315"><span class="annot"><span class="annottext">Either SomeException CounterState
+</span><a href="#local-6989586621679726315"><span class="hs-identifier hs-var">mCountersid</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (Either SomeException CounterState)
+-&gt; Eff effs (Either SomeException CounterState)
+forall (m :: * -&gt; *) (effs :: [* -&gt; *]) a.
+(Monad m, LastMember m effs) =&gt;
+m a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">sendM</span></a></span><span> </span><span class="annot"><span class="annottext">(m (Either SomeException CounterState)
+ -&gt; Eff effs (Either SomeException CounterState))
+-&gt; m (Either SomeException CounterState)
+-&gt; Eff effs (Either SomeException CounterState)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">SubTrace
+-&gt; Severity -&gt; Trace m a -&gt; m (Either SomeException CounterState)
+forall (m :: * -&gt; *) a.
+(MonadCatch m, MonadIO m) =&gt;
+SubTrace
+-&gt; Severity -&gt; Trace m a -&gt; m (Either SomeException CounterState)
+</span><span class="hs-identifier hs-var">observeOpen</span></span><span> </span><span class="annot"><span class="annottext">SubTrace
+</span><a href="#local-6989586621679726320"><span class="hs-identifier hs-var">subtrace</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LogLevel -&gt; Severity
+</span><a href="Plutus.Monitoring.Util.html#toSeverity"><span class="hs-identifier hs-var">toSeverity</span></a></span><span> </span><span class="annot"><span class="annottext">LogLevel
+</span><a href="#local-6989586621679726322"><span class="hs-identifier hs-var">_logLevel</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726324"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-129"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either SomeException CounterState
+</span><a href="#local-6989586621679726315"><span class="hs-identifier hs-var">mCountersid</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-130"></span><span>          </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><span class="hs-identifier">_</span></span><span>             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (SubTrace, CounterState)
+-&gt; Eff effs (Maybe (SubTrace, CounterState))
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe (SubTrace, CounterState)
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-131"></span><span>          </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621679726313"><span class="annot"><span class="annottext">CounterState
+</span><a href="#local-6989586621679726313"><span class="hs-identifier hs-var">counterState</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (SubTrace, CounterState)
+-&gt; Eff effs (Maybe (SubTrace, CounterState))
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(SubTrace, CounterState) -&gt; Maybe (SubTrace, CounterState)
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SubTrace
+</span><a href="#local-6989586621679726320"><span class="hs-identifier hs-var">subtrace</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">CounterState
+</span><a href="#local-6989586621679726313"><span class="hs-identifier hs-var">counterState</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span>      </span><span class="annot"><a href="#local-6989586621679726312"><span class="hs-identifier hs-type">observeAfter</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">Observation</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">L.LogMessage</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">SubTrace</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">CounterState</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726328"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-134"></span><span>      </span><span id="local-6989586621679726312"><span class="annot"><span class="annottext">observeAfter :: Observation
+  (LogMessage LoggerName) (Maybe (SubTrace, CounterState))
+-&gt; Eff effs ()
+</span><a href="#local-6989586621679726312"><span class="hs-identifier hs-var hs-var">observeAfter</span></a></span></span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">Observation</span></a></span><span class="hs-special">{</span><span id="local-6989586621679726310"><span class="annot"><span class="annottext">Maybe (SubTrace, CounterState)
+obsStart :: forall v s. Observation v s -&gt; s
+obsStart :: Maybe (SubTrace, CounterState)
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var hs-var">obsStart</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-135"></span><span>        </span><span class="annot"><span class="annottext">Maybe (SubTrace, CounterState)
+-&gt; ((SubTrace, CounterState) -&gt; Eff effs ()) -&gt; Eff effs ()
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Foldable t, Applicative f) =&gt;
+t a -&gt; (a -&gt; f b) -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">for_</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe (SubTrace, CounterState)
+</span><a href="#local-6989586621679726310"><span class="hs-identifier hs-var">obsStart</span></a></span><span> </span><span class="annot"><span class="annottext">(((SubTrace, CounterState) -&gt; Eff effs ()) -&gt; Eff effs ())
+-&gt; ((SubTrace, CounterState) -&gt; Eff effs ()) -&gt; Eff effs ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679726308"><span class="annot"><span class="annottext">SubTrace
+</span><a href="#local-6989586621679726308"><span class="hs-identifier hs-var">subtrace</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679726307"><span class="annot"><span class="annottext">CounterState
+</span><a href="#local-6989586621679726307"><span class="hs-identifier hs-var">counterState</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-136"></span><span>          </span><span class="annot"><span class="annottext">Eff effs (Either SomeException ()) -&gt; Eff effs ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff effs (Either SomeException ()) -&gt; Eff effs ())
+-&gt; Eff effs (Either SomeException ()) -&gt; Eff effs ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">m (Either SomeException ()) -&gt; Eff effs (Either SomeException ())
+forall (m :: * -&gt; *) (effs :: [* -&gt; *]) a.
+(Monad m, LastMember m effs) =&gt;
+m a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">sendM</span></a></span><span> </span><span class="annot"><span class="annottext">(m (Either SomeException ()) -&gt; Eff effs (Either SomeException ()))
+-&gt; m (Either SomeException ())
+-&gt; Eff effs (Either SomeException ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">SubTrace
+-&gt; Severity
+-&gt; Trace m a
+-&gt; CounterState
+-&gt; [(LOMeta, LOContent a)]
+-&gt; m (Either SomeException ())
+forall (m :: * -&gt; *) a.
+(MonadCatch m, MonadIO m) =&gt;
+SubTrace
+-&gt; Severity
+-&gt; Trace m a
+-&gt; CounterState
+-&gt; [(LOMeta, LOContent a)]
+-&gt; m (Either SomeException ())
+</span><span class="hs-identifier hs-var">observeClose</span></span><span> </span><span class="annot"><span class="annottext">SubTrace
+</span><a href="#local-6989586621679726308"><span class="hs-identifier hs-var">subtrace</span></a></span><span> </span><span class="annot"><span class="annottext">Severity
+</span><span class="hs-identifier hs-var">Info</span></span><span> </span><span class="annot"><span class="annottext">Trace m a
+</span><a href="#local-6989586621679726324"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">CounterState
+</span><a href="#local-6989586621679726307"><span class="hs-identifier hs-var">counterState</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span>  </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">(LogMessage LoggerName
+ -&gt; Eff effs (Maybe (SubTrace, CounterState)))
+-&gt; (Observation
+      (LogMessage LoggerName) (Maybe (SubTrace, CounterState))
+    -&gt; Eff effs ())
+-&gt; Eff (LogObserve (LogMessage LoggerName) : effs) ~&gt; Eff effs
+forall v s (effs :: [* -&gt; *]).
+(v -&gt; Eff effs s)
+-&gt; (Observation v s -&gt; Eff effs ())
+-&gt; Eff (LogObserve v : effs) ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">L.handleObserve</span></a></span><span>
+</span><span id="line-139"></span><span>      </span><span class="annot"><span class="annottext">LogMessage LoggerName -&gt; Eff effs (Maybe (SubTrace, CounterState))
+</span><a href="#local-6989586621679726323"><span class="hs-identifier hs-var">observeBefore</span></a></span><span>
+</span><span id="line-140"></span><span>      </span><span class="annot"><span class="annottext">Observation
+  (LogMessage LoggerName) (Maybe (SubTrace, CounterState))
+-&gt; Eff effs ()
+</span><a href="#local-6989586621679726312"><span class="hs-identifier hs-var">observeAfter</span></a></span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span class="hs-comment">-- | A 'ToObject' instance that uses 'Pretty' as its 'textTransformer'</span><span>
+</span><span id="line-143"></span><span class="hs-keyword">newtype</span><span> </span><span id="PrettyObject"><span class="annot"><a href="Plutus.Monitoring.Util.html#PrettyObject"><span class="hs-identifier hs-var">PrettyObject</span></a></span></span><span> </span><span id="local-6989586621679726304"><span class="annot"><a href="#local-6989586621679726304"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PrettyObject"><span class="annot"><a href="Plutus.Monitoring.Util.html#PrettyObject"><span class="hs-identifier hs-var">PrettyObject</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unPrettyObject"><span class="annot"><span class="annottext">PrettyObject t -&gt; t
+</span><a href="Plutus.Monitoring.Util.html#unPrettyObject"><span class="hs-identifier hs-var hs-var">unPrettyObject</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679726304"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-144"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679726294"><span id="local-6989586621679726296"><span id="local-6989586621679726298"><span id="local-6989586621679726300"><span class="annot"><span class="annottext">[PrettyObject t] -&gt; Encoding
+[PrettyObject t] -&gt; Value
+PrettyObject t -&gt; Encoding
+PrettyObject t -&gt; Value
+(PrettyObject t -&gt; Value)
+-&gt; (PrettyObject t -&gt; Encoding)
+-&gt; ([PrettyObject t] -&gt; Value)
+-&gt; ([PrettyObject t] -&gt; Encoding)
+-&gt; ToJSON (PrettyObject t)
+forall t. ToJSON t =&gt; [PrettyObject t] -&gt; Encoding
+forall t. ToJSON t =&gt; [PrettyObject t] -&gt; Value
+forall t. ToJSON t =&gt; PrettyObject t -&gt; Encoding
+forall t. ToJSON t =&gt; PrettyObject t -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [PrettyObject t] -&gt; Encoding
+$ctoEncodingList :: forall t. ToJSON t =&gt; [PrettyObject t] -&gt; Encoding
+toJSONList :: [PrettyObject t] -&gt; Value
+$ctoJSONList :: forall t. ToJSON t =&gt; [PrettyObject t] -&gt; Value
+toEncoding :: PrettyObject t -&gt; Encoding
+$ctoEncoding :: forall t. ToJSON t =&gt; PrettyObject t -&gt; Encoding
+toJSON :: PrettyObject t -&gt; Value
+$ctoJSON :: forall t. ToJSON t =&gt; PrettyObject t -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679726289"><span id="local-6989586621679726291"><span class="annot"><span class="annottext">Value -&gt; Parser [PrettyObject t]
+Value -&gt; Parser (PrettyObject t)
+(Value -&gt; Parser (PrettyObject t))
+-&gt; (Value -&gt; Parser [PrettyObject t]) -&gt; FromJSON (PrettyObject t)
+forall t. FromJSON t =&gt; Value -&gt; Parser [PrettyObject t]
+forall t. FromJSON t =&gt; Value -&gt; Parser (PrettyObject t)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [PrettyObject t]
+$cparseJSONList :: forall t. FromJSON t =&gt; Value -&gt; Parser [PrettyObject t]
+parseJSON :: Value -&gt; Parser (PrettyObject t)
+$cparseJSON :: forall t. FromJSON t =&gt; Value -&gt; Parser (PrettyObject t)
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span>
+</span><span id="line-146"></span><span id="local-6989586621679726287"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-type">Pretty</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726287"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ToObject</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Monitoring.Util.html#PrettyObject"><span class="hs-identifier hs-type">PrettyObject</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726287"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-147"></span><span>    </span><span id="local-6989586621679726283"><span class="annot"><span class="annottext">toObject :: TracingVerbosity -&gt; PrettyObject t -&gt; Object
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">toObject</span></span></span><span> </span><span class="annot"><span class="annottext">TracingVerbosity
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679726281"><span class="annot"><span class="annottext">PrettyObject t
+</span><a href="#local-6989586621679726281"><span class="hs-identifier hs-var">o</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-148"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679726280"><span class="annot"><span class="annottext">str :: LoggerName
+</span><a href="#local-6989586621679726280"><span class="hs-identifier hs-var hs-var">str</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PrettyObject t -&gt; LoggerName
+forall a. ToText a =&gt; a -&gt; LoggerName
+</span><a href="../file:///nix/store/vicspv6q7nknvxmcyg08ybn40xl6qz5y-text-class-lib-text-class-2022.7.1-haddock-doc/share/doc/text-class/html/src"><span class="hs-identifier hs-var">toText</span></a></span><span> </span><span class="annot"><span class="annottext">PrettyObject t
+</span><a href="#local-6989586621679726281"><span class="hs-identifier hs-var">o</span></a></span><span>
+</span><span id="line-149"></span><span>        </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Key -&gt; Value -&gt; Object
+forall v. Key -&gt; v -&gt; KeyMap v
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var">Aeson.singleton</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LoggerName -&gt; Key
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var">Aeson.fromText</span></a></span><span> </span><span class="annot"><span class="annottext">LoggerName
+</span><span class="hs-string">&quot;string&quot;</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LoggerName -&gt; Value
+forall a. ToJSON a =&gt; a -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var">toJSON</span></a></span><span> </span><span class="annot"><span class="annottext">LoggerName
+</span><a href="#local-6989586621679726280"><span class="hs-identifier hs-var">str</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-150"></span><span>    </span><span id="local-6989586621679726275"><span class="annot"><span class="annottext">textTransformer :: PrettyObject t -&gt; Object -&gt; LoggerName
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">textTransformer</span></span></span><span> </span><span id="local-6989586621679726273"><span class="annot"><span class="annottext">PrettyObject t
+</span><a href="#local-6989586621679726273"><span class="hs-identifier hs-var">o</span></a></span></span><span> </span><span class="annot"><span class="annottext">Object
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PrettyObject t -&gt; LoggerName
+forall a. ToText a =&gt; a -&gt; LoggerName
+</span><a href="../file:///nix/store/vicspv6q7nknvxmcyg08ybn40xl6qz5y-text-class-lib-text-class-2022.7.1-haddock-doc/share/doc/text-class/html/src"><span class="hs-identifier hs-var">toText</span></a></span><span> </span><span class="annot"><span class="annottext">PrettyObject t
+</span><a href="#local-6989586621679726273"><span class="hs-identifier hs-var">o</span></a></span></span><span>
+</span><span id="line-151"></span><span>
+</span><span id="line-152"></span><span id="local-6989586621679726272"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-type">Pretty</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726272"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/vicspv6q7nknvxmcyg08ybn40xl6qz5y-text-class-lib-text-class-2022.7.1-haddock-doc/share/doc/text-class/html/src"><span class="hs-identifier hs-type">ToText</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Monitoring.Util.html#PrettyObject"><span class="hs-identifier hs-type">PrettyObject</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679726272"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-153"></span><span>    </span><span id="local-6989586621679726269"><span class="annot"><span class="annottext">toText :: PrettyObject t -&gt; LoggerName
+</span><a href="#local-6989586621679726269"><span class="hs-identifier hs-var hs-var hs-var hs-var">toText</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Monitoring.Util.html#PrettyObject"><span class="hs-identifier hs-type">PrettyObject</span></a></span><span> </span><span id="local-6989586621679726268"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679726268"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; LoggerName
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.toStrict</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; LoggerName) -&gt; (Doc Any -&gt; Text) -&gt; Doc Any -&gt; LoggerName
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">SimpleDocStream Any -&gt; Text
+forall ann. SimpleDocStream ann -&gt; Text
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">Render.renderLazy</span></a></span><span> </span><span class="annot"><span class="annottext">(SimpleDocStream Any -&gt; Text)
+-&gt; (Doc Any -&gt; SimpleDocStream Any) -&gt; Doc Any -&gt; Text
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">LayoutOptions -&gt; Doc Any -&gt; SimpleDocStream Any
+forall ann. LayoutOptions -&gt; Doc ann -&gt; SimpleDocStream ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">layoutPretty</span></a></span><span> </span><span class="annot"><span class="annottext">LayoutOptions
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">defaultLayoutOptions</span></a></span><span> </span><span class="annot"><span class="annottext">(Doc Any -&gt; LoggerName) -&gt; Doc Any -&gt; LoggerName
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">t -&gt; Doc Any
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679726268"><span class="hs-identifier hs-var">t</span></a></span></span><span>
+</span><span id="line-154"></span></pre></body></html>

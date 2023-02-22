@@ -1,0 +1,973 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE AllowAmbiguousTypes   #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE GADTs                 #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns        #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE PackageImports        #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables   #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TupleSections         #-}</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Marconi.Indexers</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Concurrent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">MVar</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">forkIO</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">modifyMVar_</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">newMVar</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">readMVar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Concurrent.QSemN</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">QSemN</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">newQSemN</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">signalQSemN</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">waitQSemN</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">atomically</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM.TChan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">TChan</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">dupTChan</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">newBroadcastTChanIO</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">readTChan</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">writeTChan</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">view</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens.Operators</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(^.)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">findIndex</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">foldl1'</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">intersect</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Map</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">fromMaybe</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">mapMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2v7aw0qgl2v0lwasqg0zsrzfb9jxmbfn-streaming-lib-streaming-0.2.3.1-haddock-doc/share/doc/streaming/html/src"><span class="hs-identifier">Streaming.Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Block</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">BlockHeader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">BlockHeader</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">BlockInMode</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">BlockInMode</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">CardanoMode</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>                    </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">ChainPoint</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">ChainPoint</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">ChainPointAtGenesis</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Hash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">ScriptData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/23iksdwzvi0j57sz95bbyk0pb1i98fah-cardano-slotting-lib-cardano-slotting-0.1.0.2-haddock-doc/share/doc/cardano-slotting/html/src"><span class="hs-identifier">SlotNo</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Tx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Tx</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">chainPointToSlotNo</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-string">&quot;cardano-api&quot;</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api.Shelley</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Shelley</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/azj0kfbgizyr4qj49lql36z31i3346pb-cardano-ledger-alonzo-lib-cardano-ledger-alonzo-0.1.0.0-haddock-doc/share/doc/cardano-ledger-alonzo/html/src"><span class="hs-identifier">Cardano.Ledger.Alonzo.TxWitness</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Alonzo</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">Cardano.Streaming</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">RollBackward</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">RollForward</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM.TMVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">TMVar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Index.Datum.html"><span class="hs-identifier">Marconi.Index.Datum</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Index.Datum.html#DatumIndex"><span class="hs-identifier">DatumIndex</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Index.Datum.html"><span class="hs-identifier">Marconi.Index.Datum</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Datum</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html"><span class="hs-identifier">Marconi.Index.ScriptTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">ScriptTx</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Index.Utxo.html"><span class="hs-identifier">Marconi.Index.Utxo</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Utxo</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Types.html"><span class="hs-identifier">Marconi.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Types.html#TargetAddresses"><span class="hs-identifier">TargetAddresses</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../rewindable-index/html/src"><span class="hs-identifier">RewindableIndex.Index.VSplit</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ix</span></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../rewindable-index/html/src"><span class="hs-identifier">RewindableIndex.Storable</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Storable</span></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- DatumIndexer</span><span>
+</span><span id="line-42"></span><span class="annot"><a href="Marconi.Indexers.html#getDatums"><span class="hs-identifier hs-type">getDatums</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/23iksdwzvi0j57sz95bbyk0pb1i98fah-cardano-slotting-lib-cardano-slotting-0.1.0.2-haddock-doc/share/doc/cardano-slotting/html/src"><span class="hs-identifier hs-type">SlotNo</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Hash</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-43"></span><span id="getDatums"><span class="annot"><span class="annottext">getDatums :: BlockInMode CardanoMode
+-&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+</span><a href="Marconi.Indexers.html#getDatums"><span class="hs-identifier hs-var hs-var">getDatums</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockHeader</span></a></span><span> </span><span id="local-6989586621679328768"><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328768"><span class="hs-identifier hs-var">slotNo</span></a></span></span><span> </span><span class="annot"><span class="annottext">Hash BlockHeader
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">BlockNo
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679328767"><span class="annot"><span class="annottext">[Tx era]
+</span><a href="#local-6989586621679328767"><span class="hs-identifier hs-var">txs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">EraInMode era CardanoMode
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Tx era -&gt; [(SlotNo, (Hash ScriptData, ScriptData))])
+-&gt; [Tx era] -&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+forall (t :: * -&gt; *) a b. Foldable t =&gt; (a -&gt; [b]) -&gt; t a -&gt; [b]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">concatMap</span></a></span><span> </span><span class="annot"><span class="annottext">Tx era -&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+forall era. Tx era -&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+</span><a href="#local-6989586621679328765"><span class="hs-identifier hs-var">extractDatumsFromTx</span></a></span><span> </span><span class="annot"><span class="annottext">[Tx era]
+</span><a href="#local-6989586621679328767"><span class="hs-identifier hs-var">txs</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-45"></span><span>        </span><span id="local-6989586621679328972"><span class="annot"><a href="#local-6989586621679328765"><span class="hs-identifier hs-type">extractDatumsFromTx</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Tx</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679328972"><span class="hs-identifier hs-type">era</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/23iksdwzvi0j57sz95bbyk0pb1i98fah-cardano-slotting-lib-cardano-slotting-0.1.0.2-haddock-doc/share/doc/cardano-slotting/html/src"><span class="hs-identifier hs-type">SlotNo</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Hash</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">]</span></span><span>
+</span><span id="line-46"></span><span>        </span><span id="local-6989586621679328765"><span class="annot"><span class="annottext">extractDatumsFromTx :: Tx era -&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+</span><a href="#local-6989586621679328765"><span class="hs-identifier hs-var hs-var">extractDatumsFromTx</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Tx</span></a></span><span> </span><span id="local-6989586621679328764"><span class="annot"><span class="annottext">TxBody era
+</span><a href="#local-6989586621679328764"><span class="hs-identifier hs-var">txBody</span></a></span></span><span> </span><span class="annot"><span class="annottext">[KeyWitness era]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-47"></span><span>            </span><span class="annot"><span class="annottext">((Hash ScriptData, ScriptData)
+ -&gt; (SlotNo, (Hash ScriptData, ScriptData)))
+-&gt; [(Hash ScriptData, ScriptData)]
+-&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328768"><span class="hs-identifier hs-var">slotNo</span></a></span><span class="hs-special">,</span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>            </span><span class="annot"><span class="annottext">([(Hash ScriptData, ScriptData)]
+ -&gt; [(SlotNo, (Hash ScriptData, ScriptData))])
+-&gt; (TxBody era -&gt; [(Hash ScriptData, ScriptData)])
+-&gt; TxBody era
+-&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Map (Hash ScriptData) ScriptData -&gt; [(Hash ScriptData, ScriptData)]
+forall k a. Map k a -&gt; [(k, a)]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.assocs</span></a></span><span>
+</span><span id="line-49"></span><span>            </span><span class="annot"><span class="annottext">(Map (Hash ScriptData) ScriptData
+ -&gt; [(Hash ScriptData, ScriptData)])
+-&gt; (TxBody era -&gt; Map (Hash ScriptData) ScriptData)
+-&gt; TxBody era
+-&gt; [(Hash ScriptData, ScriptData)]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TxBody era -&gt; Map (Hash ScriptData) ScriptData
+forall era. TxBody era -&gt; Map (Hash ScriptData) ScriptData
+</span><a href="Marconi.Indexers.html#scriptDataFromCardanoTxBody"><span class="hs-identifier hs-var">scriptDataFromCardanoTxBody</span></a></span><span>
+</span><span id="line-50"></span><span>            </span><span class="annot"><span class="annottext">(TxBody era -&gt; [(SlotNo, (Hash ScriptData, ScriptData))])
+-&gt; TxBody era -&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TxBody era
+</span><a href="#local-6989586621679328764"><span class="hs-identifier hs-var">txBody</span></a></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span id="local-6989586621679328959"><span class="annot"><a href="Marconi.Indexers.html#scriptDataFromCardanoTxBody"><span class="hs-identifier hs-type">scriptDataFromCardanoTxBody</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxBody</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679328959"><span class="hs-identifier hs-type">era</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Hash</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span></span><span>
+</span><span id="line-53"></span><span id="scriptDataFromCardanoTxBody"><span class="annot"><span class="annottext">scriptDataFromCardanoTxBody :: TxBody era -&gt; Map (Hash ScriptData) ScriptData
+</span><a href="Marconi.Indexers.html#scriptDataFromCardanoTxBody"><span class="hs-identifier hs-var hs-var">scriptDataFromCardanoTxBody</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Shelley.ShelleyTxBody</span></a></span><span> </span><span class="annot"><span class="annottext">ShelleyBasedEra era
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">TxBody (ShelleyLedgerEra era)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">[Script (ShelleyLedgerEra era)]
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxBodyScriptData</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptDataSupportedInEra era
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679328758"><span class="annot"><span class="annottext">TxDats (ShelleyLedgerEra era)
+</span><a href="#local-6989586621679328758"><span class="hs-identifier hs-var">dats</span></a></span></span><span> </span><span class="annot"><span class="annottext">Redeemers (ShelleyLedgerEra era)
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe (AuxiliaryData (ShelleyLedgerEra era))
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">TxScriptValidity era
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-54"></span><span>    </span><span class="annot"><span class="annottext">TxDats (ShelleyLedgerEra era) -&gt; Map (Hash ScriptData) ScriptData
+forall era. TxDats era -&gt; Map (Hash ScriptData) ScriptData
+</span><a href="#local-6989586621679328757"><span class="hs-identifier hs-var">extractData</span></a></span><span> </span><span class="annot"><span class="annottext">TxDats (ShelleyLedgerEra era)
+</span><a href="#local-6989586621679328758"><span class="hs-identifier hs-var">dats</span></a></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-56"></span><span>    </span><span id="local-6989586621679328944"><span class="annot"><a href="#local-6989586621679328757"><span class="hs-identifier hs-type">extractData</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/azj0kfbgizyr4qj49lql36z31i3346pb-cardano-ledger-alonzo-lib-cardano-ledger-alonzo-0.1.0.0-haddock-doc/share/doc/cardano-ledger-alonzo/html/src"><span class="hs-identifier hs-type">Alonzo.TxDats</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679328944"><span class="hs-identifier hs-type">era</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Hash</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ScriptData</span></a></span></span><span>
+</span><span id="line-57"></span><span>    </span><span id="local-6989586621679328757"><span class="annot"><span class="annottext">extractData :: TxDats era -&gt; Map (Hash ScriptData) ScriptData
+</span><a href="#local-6989586621679328757"><span class="hs-identifier hs-var hs-var">extractData</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/azj0kfbgizyr4qj49lql36z31i3346pb-cardano-ledger-alonzo-lib-cardano-ledger-alonzo-0.1.0.0-haddock-doc/share/doc/cardano-ledger-alonzo/html/src"><span class="hs-identifier hs-type">Alonzo.TxDats'</span></a></span><span> </span><span id="local-6989586621679328755"><span class="annot"><span class="annottext">Map (DataHash (Crypto era)) (Data era)
+</span><a href="#local-6989586621679328755"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-58"></span><span>      </span><span class="annot"><span class="annottext">[(Hash ScriptData, ScriptData)] -&gt; Map (Hash ScriptData) ScriptData
+forall k a. Ord k =&gt; [(k, a)] -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.fromList</span></a></span><span>
+</span><span id="line-59"></span><span>      </span><span class="annot"><span class="annottext">([(Hash ScriptData, ScriptData)]
+ -&gt; Map (Hash ScriptData) ScriptData)
+-&gt; (Map (DataHash (Crypto era)) (Data era)
+    -&gt; [(Hash ScriptData, ScriptData)])
+-&gt; Map (DataHash (Crypto era)) (Data era)
+-&gt; Map (Hash ScriptData) ScriptData
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(Data era -&gt; (Hash ScriptData, ScriptData))
+-&gt; [Data era] -&gt; [(Hash ScriptData, ScriptData)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679328753"><span class="annot"><span class="annottext">ScriptData
+</span><a href="#local-6989586621679328753"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ScriptData -&gt; Hash ScriptData
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">C.hashScriptData</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptData
+</span><a href="#local-6989586621679328753"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ScriptData
+</span><a href="#local-6989586621679328753"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ScriptData -&gt; (Hash ScriptData, ScriptData))
+-&gt; (Data era -&gt; ScriptData)
+-&gt; Data era
+-&gt; (Hash ScriptData, ScriptData)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Data era -&gt; ScriptData
+forall ledgerera. Data ledgerera -&gt; ScriptData
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">Shelley.fromAlonzoData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>      </span><span class="annot"><span class="annottext">([Data era] -&gt; [(Hash ScriptData, ScriptData)])
+-&gt; (Map (DataHash (Crypto era)) (Data era) -&gt; [Data era])
+-&gt; Map (DataHash (Crypto era)) (Data era)
+-&gt; [(Hash ScriptData, ScriptData)]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Map (DataHash (Crypto era)) (Data era) -&gt; [Data era]
+forall k a. Map k a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.elems</span></a></span><span>
+</span><span id="line-61"></span><span>      </span><span class="annot"><span class="annottext">(Map (DataHash (Crypto era)) (Data era)
+ -&gt; Map (Hash ScriptData) ScriptData)
+-&gt; Map (DataHash (Crypto era)) (Data era)
+-&gt; Map (Hash ScriptData) ScriptData
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map (DataHash (Crypto era)) (Data era)
+</span><a href="#local-6989586621679328755"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Marconi.Indexers.html#scriptDataFromCardanoTxBody"><span class="hs-identifier hs-var">scriptDataFromCardanoTxBody</span></a></span><span> </span><span class="annot"><span class="annottext">TxBody era
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map (Hash ScriptData) ScriptData
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-comment">{- | The way we synchronise channel consumption is by waiting on a QSemN for each
+     of the spawn indexers to finish processing the current event.
+
+     The channel is used to transmit the next event to the listening indexers. Note
+     that even if the channel is unbound it will actually only ever hold one event
+     because it will be blocked until the processing of the event finishes on all
+     indexers.
+
+     The indexer count is where we save the number of running indexers so we know for
+     how many we are waiting.
+-}</span><span>
+</span><span id="line-75"></span><span class="hs-keyword">data</span><span> </span><span id="Coordinator"><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-var">Coordinator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Coordinator"><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-var">Coordinator</span></a></span></span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="_channel"><span class="annot"><span class="annottext">Coordinator -&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="Marconi.Indexers.html#_channel"><span class="hs-identifier hs-var hs-var">_channel</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TChan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="_barrier"><span class="annot"><span class="annottext">Coordinator -&gt; QSemN
+</span><a href="Marconi.Indexers.html#_barrier"><span class="hs-identifier hs-var hs-var">_barrier</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">QSemN</span></a></span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="_indexerCount"><span class="annot"><span class="annottext">Coordinator -&gt; Int
+</span><a href="Marconi.Indexers.html#_indexerCount"><span class="hs-identifier hs-var hs-var">_indexerCount</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="annot"><a href="Marconi.Indexers.html#initialCoordinator"><span class="hs-identifier hs-type">initialCoordinator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span>
+</span><span id="line-82"></span><span id="initialCoordinator"><span class="annot"><span class="annottext">initialCoordinator :: Int -&gt; IO Coordinator
+</span><a href="Marconi.Indexers.html#initialCoordinator"><span class="hs-identifier hs-var hs-var">initialCoordinator</span></a></span></span><span> </span><span id="local-6989586621679328744"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328744"><span class="hs-identifier hs-var">indexerCount</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-83"></span><span>  </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; QSemN -&gt; Int -&gt; Coordinator
+</span><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-var">Coordinator</span></a></span><span> </span><span class="annot"><span class="annottext">(TChan (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; QSemN -&gt; Int -&gt; Coordinator)
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; IO (QSemN -&gt; Int -&gt; Coordinator)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. IO (TChan a)
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">newBroadcastTChanIO</span></a></span><span>
+</span><span id="line-84"></span><span>              </span><span class="annot"><span class="annottext">IO (QSemN -&gt; Int -&gt; Coordinator)
+-&gt; IO QSemN -&gt; IO (Int -&gt; Coordinator)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO QSemN
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">newQSemN</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-85"></span><span>              </span><span class="annot"><span class="annottext">IO (Int -&gt; Coordinator) -&gt; IO Int -&gt; IO Coordinator
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO Int
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328744"><span class="hs-identifier hs-var">indexerCount</span></a></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- The points should/could provide shared access to the indexers themselves. The result</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- is a list of points (rather than just one) since it offers more resume possibilities</span><span>
+</span><span id="line-89"></span><span class="hs-comment">-- to the node (in the unlikely case there were some rollbacks during downtime).</span><span>
+</span><span id="line-90"></span><span class="hs-keyword">type</span><span> </span><span id="Worker"><span class="annot"><a href="Marconi.Indexers.html#Worker"><span class="hs-identifier hs-var">Worker</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-type">Storable.StorablePoint</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html#ScriptTxHandle"><span class="hs-identifier hs-type">ScriptTx.ScriptTxHandle</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="annot"><a href="Marconi.Indexers.html#datumWorker"><span class="hs-identifier hs-type">datumWorker</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Worker"><span class="hs-identifier hs-type">Worker</span></a></span><span>
+</span><span id="line-93"></span><span id="datumWorker"><span class="annot"><span class="annottext">datumWorker :: Worker
+</span><a href="Marconi.Indexers.html#datumWorker"><span class="hs-identifier hs-var hs-var">datumWorker</span></a></span></span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span class="hs-special">{</span><span id="local-6989586621679328741"><span class="annot"><span class="annottext">QSemN
+_barrier :: QSemN
+_barrier :: Coordinator -&gt; QSemN
+</span><a href="#local-6989586621679328741"><span class="hs-identifier hs-var hs-var">_barrier</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328740"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+_channel :: TChan (ChainSyncEvent (BlockInMode CardanoMode))
+_channel :: Coordinator -&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328740"><span class="hs-identifier hs-var hs-var">_channel</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621679328739"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328739"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-94"></span><span>  </span><span id="local-6989586621679328738"><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328738"><span class="hs-identifier hs-var">ix</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Depth -&gt; IO DatumIndex
+</span><a href="Marconi.Index.Datum.html#open"><span class="hs-identifier hs-var">Datum.open</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328739"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Depth
+</span><a href="Marconi.Index.Datum.html#Depth"><span class="hs-identifier hs-var">Datum.Depth</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2160</span></span><span class="hs-special">)</span><span>
+</span><span id="line-95"></span><span>  </span><span id="local-6989586621679328735"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328735"><span class="hs-identifier hs-var">workerChannel</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+ -&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; (TChan (ChainSyncEvent (BlockInMode CardanoMode))
+    -&gt; STM (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. TChan a -&gt; STM (TChan a)
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">dupTChan</span></a></span><span> </span><span class="annot"><span class="annottext">(TChan (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328740"><span class="hs-identifier hs-var">_channel</span></a></span><span>
+</span><span id="line-96"></span><span>  </span><span class="annot"><span class="annottext">IO ThreadId -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO ThreadId -&gt; IO ()) -&gt; (IO () -&gt; IO ThreadId) -&gt; IO () -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO ThreadId
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forkIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; DatumIndex -&gt; IO ()
+</span><a href="#local-6989586621679328734"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328735"><span class="hs-identifier hs-var">workerChannel</span></a></span><span> </span><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328738"><span class="hs-identifier hs-var">ix</span></a></span><span>
+</span><span id="line-97"></span><span>  </span><span class="annot"><span class="annottext">[ChainPoint] -&gt; IO [ChainPoint]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">ChainPointAtGenesis</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-98"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><a href="#local-6989586621679328734"><span class="hs-identifier hs-type">innerLoop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TChan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Index.Datum.html#DatumIndex"><span class="hs-identifier hs-type">DatumIndex</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-100"></span><span>    </span><span id="local-6989586621679328734"><span class="annot"><span class="annottext">innerLoop :: TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; DatumIndex -&gt; IO ()
+</span><a href="#local-6989586621679328734"><span class="hs-identifier hs-var hs-var">innerLoop</span></a></span></span><span> </span><span id="local-6989586621679328733"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328733"><span class="hs-identifier hs-var">ch</span></a></span></span><span> </span><span id="local-6989586621679328732"><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328732"><span class="hs-identifier hs-var">index</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-101"></span><span>      </span><span class="annot"><span class="annottext">QSemN -&gt; Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">signalQSemN</span></a></span><span> </span><span class="annot"><span class="annottext">QSemN
+</span><a href="#local-6989586621679328741"><span class="hs-identifier hs-var">_barrier</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-102"></span><span>      </span><span id="local-6989586621679328731"><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328731"><span class="hs-identifier hs-var">event</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (ChainSyncEvent (BlockInMode CardanoMode))
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; IO (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; STM (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (ChainSyncEvent (BlockInMode CardanoMode))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; STM (ChainSyncEvent (BlockInMode CardanoMode))
+forall a. TChan a -&gt; STM a
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">readTChan</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328733"><span class="hs-identifier hs-var">ch</span></a></span><span>
+</span><span id="line-103"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328731"><span class="hs-identifier hs-var">event</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-104"></span><span>        </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span id="local-6989586621679328730"><span class="annot"><span class="annottext">BlockInMode CardanoMode
+</span><a href="#local-6989586621679328730"><span class="hs-identifier hs-var">blk</span></a></span></span><span> </span><span id="local-6989586621679328729"><span class="annot"><span class="annottext">ChainTip
+</span><a href="#local-6989586621679328729"><span class="hs-identifier hs-var">_ct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-105"></span><span>          </span><span class="annot"><span class="annottext">[(SlotNo, (Hash ScriptData, ScriptData))]
+-&gt; DatumIndex -&gt; IO DatumIndex
+forall (m :: * -&gt; *) h (v :: * -&gt; *) e n q r.
+(Monad m, PrimMonad m, MVector (Mutable v) e) =&gt;
+e -&gt; SplitIndex m h v e n q r -&gt; m (SplitIndex m h v e n q r)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.insert</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">BlockInMode CardanoMode
+-&gt; [(SlotNo, (Hash ScriptData, ScriptData))]
+</span><a href="Marconi.Indexers.html#getDatums"><span class="hs-identifier hs-var">getDatums</span></a></span><span> </span><span class="annot"><span class="annottext">BlockInMode CardanoMode
+</span><a href="#local-6989586621679328730"><span class="hs-identifier hs-var">blk</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328732"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">IO DatumIndex -&gt; (DatumIndex -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; DatumIndex -&gt; IO ()
+</span><a href="#local-6989586621679328734"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328733"><span class="hs-identifier hs-var">ch</span></a></span><span>
+</span><span id="line-106"></span><span>        </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">RollBackward</span></a></span><span> </span><span id="local-6989586621679328727"><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679328727"><span class="hs-identifier hs-var">cp</span></a></span></span><span> </span><span id="local-6989586621679328726"><span class="annot"><span class="annottext">ChainTip
+</span><a href="#local-6989586621679328726"><span class="hs-identifier hs-var">_ct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-107"></span><span>          </span><span id="local-6989586621679328725"><span class="annot"><span class="annottext">[[(SlotNo, (Hash ScriptData, ScriptData))]]
+</span><a href="#local-6989586621679328725"><span class="hs-identifier hs-var">events</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Storage Vector IO [(SlotNo, (Hash ScriptData, ScriptData))]
+-&gt; IO [[(SlotNo, (Hash ScriptData, ScriptData))]]
+forall (v :: * -&gt; *) (m :: * -&gt; *) e.
+(MVector (Mutable v) e, PrimMonad m, Show e) =&gt;
+Storage v m e -&gt; m [e]
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.getEvents</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328732"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">DatumIndex
+-&gt; Getting
+     (Storage Vector IO [(SlotNo, (Hash ScriptData, ScriptData))])
+     DatumIndex
+     (Storage Vector IO [(SlotNo, (Hash ScriptData, ScriptData))])
+-&gt; Storage Vector IO [(SlotNo, (Hash ScriptData, ScriptData))]
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (Storage Vector IO [(SlotNo, (Hash ScriptData, ScriptData))])
+  DatumIndex
+  (Storage Vector IO [(SlotNo, (Hash ScriptData, ScriptData))])
+forall (m :: * -&gt; *) h (v :: * -&gt; *) e n q r.
+Lens' (SplitIndex m h v e n q r) (Storage v m e)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.storage</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>          </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; DatumIndex -&gt; IO ()
+</span><a href="#local-6989586621679328734"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328733"><span class="hs-identifier hs-var">ch</span></a></span><span> </span><span class="annot"><span class="annottext">(DatumIndex -&gt; IO ()) -&gt; DatumIndex -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-109"></span><span>            </span><span class="annot"><span class="annottext">DatumIndex -&gt; Maybe DatumIndex -&gt; DatumIndex
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328732"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe DatumIndex -&gt; DatumIndex) -&gt; Maybe DatumIndex -&gt; DatumIndex
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-110"></span><span>              </span><span id="local-6989586621679328722"><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328722"><span class="hs-identifier hs-var">slot</span></a></span></span><span>   </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ChainPoint -&gt; Maybe SlotNo
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">chainPointToSlotNo</span></a></span><span> </span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679328727"><span class="hs-identifier hs-var">cp</span></a></span><span>
+</span><span id="line-111"></span><span>              </span><span id="local-6989586621679328721"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328721"><span class="hs-identifier hs-var">offset</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">([(SlotNo, (Hash ScriptData, ScriptData))] -&gt; Bool)
+-&gt; [[(SlotNo, (Hash ScriptData, ScriptData))]] -&gt; Maybe Int
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; Maybe Int
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">findIndex</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">((SlotNo, (Hash ScriptData, ScriptData)) -&gt; Bool)
+-&gt; [(SlotNo, (Hash ScriptData, ScriptData))] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; (a -&gt; Bool) -&gt; t a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">any</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679328719"><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328719"><span class="hs-identifier hs-var">s</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(Hash ScriptData, ScriptData)
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328719"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">SlotNo -&gt; SlotNo -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328722"><span class="hs-identifier hs-var">slot</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[[(SlotNo, (Hash ScriptData, ScriptData))]]
+</span><a href="#local-6989586621679328725"><span class="hs-identifier hs-var">events</span></a></span><span>
+</span><span id="line-112"></span><span>              </span><span class="annot"><span class="annottext">Int -&gt; DatumIndex -&gt; Maybe DatumIndex
+forall (v :: * -&gt; *) e (m :: * -&gt; *) h n q r.
+MVector (Mutable v) e =&gt;
+Int -&gt; SplitIndex m h v e n q r -&gt; Maybe (SplitIndex m h v e n q r)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.rewind</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328721"><span class="hs-identifier hs-var">offset</span></a></span><span> </span><span class="annot"><span class="annottext">DatumIndex
+</span><a href="#local-6989586621679328732"><span class="hs-identifier hs-var">index</span></a></span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | does the transaction contain a targetAddress</span><span>
+</span><span id="line-115"></span><span id="local-6989586621679328716"><span class="annot"><a href="Marconi.Indexers.html#isInTargetTxOut"><span class="hs-identifier hs-type">isInTargetTxOut</span></a></span><span>
+</span><span id="line-116"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Types.html#TargetAddresses"><span class="hs-identifier hs-type">TargetAddresses</span></a></span><span>        </span><span class="hs-comment">-- ^ non empty list of target address</span><span>
+</span><span id="line-117"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxOut</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.CtxTx</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679328716"><span class="hs-identifier hs-type">era</span></a></span><span>    </span><span class="hs-comment">-- ^  a cardano transaction out that contains an address</span><span>
+</span><span id="line-118"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span></span><span>
+</span><span id="line-119"></span><span id="isInTargetTxOut"><span class="annot"><span class="annottext">isInTargetTxOut :: TargetAddresses -&gt; TxOut CtxTx era -&gt; Bool
+</span><a href="Marconi.Indexers.html#isInTargetTxOut"><span class="hs-identifier hs-var hs-var">isInTargetTxOut</span></a></span></span><span> </span><span id="local-6989586621679328714"><span class="annot"><span class="annottext">TargetAddresses
+</span><a href="#local-6989586621679328714"><span class="hs-identifier hs-var">targetAddresses</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.TxOut</span></a></span><span> </span><span id="local-6989586621679328712"><span class="annot"><span class="annottext">AddressInEra era
+</span><a href="#local-6989586621679328712"><span class="hs-identifier hs-var">address</span></a></span></span><span> </span><span class="annot"><span class="annottext">TxOutValue era
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">TxOutDatum CtxTx era
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ReferenceScript era
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">AddressInEra era
+</span><a href="#local-6989586621679328712"><span class="hs-identifier hs-var">address</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.AddressInEra</span></a></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">C.ShelleyAddressInEra</span></a></span><span> </span><span class="annot"><span class="annottext">ShelleyBasedEra era
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679328709"><span class="annot"><span class="annottext">Address addrtype
+</span><a href="#local-6989586621679328709"><span class="hs-identifier hs-var">addr</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Address addrtype
+</span><a href="#local-6989586621679328709"><span class="hs-identifier hs-var">addr</span></a></span><span> </span><span class="annot"><span class="annottext">Address addrtype -&gt; NonEmpty (Address addrtype) -&gt; Bool
+forall (t :: * -&gt; *) a. (Foldable t, Eq a) =&gt; a -&gt; t a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">`elem`</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (Address addrtype)
+TargetAddresses
+</span><a href="#local-6989586621679328714"><span class="hs-identifier hs-var">targetAddresses</span></a></span><span>
+</span><span id="line-121"></span><span>    </span><span class="annot"><span class="annottext">AddressInEra era
+</span><span class="hs-identifier">_</span></span><span>                                                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="annot"><a href="Marconi.Indexers.html#utxoWorker"><span class="hs-identifier hs-type">utxoWorker</span></a></span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Index.Utxo.html#UtxoIndex"><span class="hs-identifier hs-type">Utxo.UtxoIndex</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.Utxo.html#UtxoIndex"><span class="hs-identifier hs-type">Utxo.UtxoIndex</span></a></span><span class="hs-special">)</span><span>    </span><span class="hs-comment">-- ^ CPS function used in the queryApi thread, needs to be non-blocking</span><span>
+</span><span id="line-125"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Marconi.Types.html#TargetAddresses"><span class="hs-identifier hs-type">TargetAddresses</span></a></span><span>                    </span><span class="hs-comment">-- ^ Target addresses to filter for</span><span>
+</span><span id="line-126"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Worker"><span class="hs-identifier hs-type">Worker</span></a></span><span>
+</span><span id="line-127"></span><span id="utxoWorker"><span class="annot"><span class="annottext">utxoWorker :: (UtxoIndex -&gt; IO UtxoIndex) -&gt; Maybe TargetAddresses -&gt; Worker
+</span><a href="Marconi.Indexers.html#utxoWorker"><span class="hs-identifier hs-var hs-var">utxoWorker</span></a></span></span><span> </span><span id="local-6989586621679328706"><span class="annot"><span class="annottext">UtxoIndex -&gt; IO UtxoIndex
+</span><a href="#local-6989586621679328706"><span class="hs-identifier hs-var">indexerCallback</span></a></span></span><span> </span><span id="local-6989586621679328705"><span class="annot"><span class="annottext">Maybe TargetAddresses
+</span><a href="#local-6989586621679328705"><span class="hs-identifier hs-var">maybeTargetAddresses</span></a></span></span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span class="hs-special">{</span><span id="local-6989586621679328704"><span class="annot"><span class="annottext">QSemN
+_barrier :: QSemN
+_barrier :: Coordinator -&gt; QSemN
+</span><a href="#local-6989586621679328704"><span class="hs-identifier hs-var hs-var">_barrier</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328703"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+_channel :: TChan (ChainSyncEvent (BlockInMode CardanoMode))
+_channel :: Coordinator -&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328703"><span class="hs-identifier hs-var hs-var">_channel</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621679328702"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328702"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-128"></span><span>    </span><span id="local-6989586621679328701"><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328701"><span class="hs-identifier hs-var">ix</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Depth -&gt; IO UtxoIndex
+</span><a href="Marconi.Index.Utxo.html#open"><span class="hs-identifier hs-var">Utxo.open</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328702"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Depth
+</span><a href="Marconi.Index.Utxo.html#Depth"><span class="hs-identifier hs-var">Utxo.Depth</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2160</span></span><span class="hs-special">)</span><span>
+</span><span id="line-129"></span><span>    </span><span id="local-6989586621679328698"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328698"><span class="hs-identifier hs-var">workerChannel</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+ -&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; (TChan (ChainSyncEvent (BlockInMode CardanoMode))
+    -&gt; STM (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. TChan a -&gt; STM (TChan a)
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">dupTChan</span></a></span><span> </span><span class="annot"><span class="annottext">(TChan (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328703"><span class="hs-identifier hs-var">_channel</span></a></span><span>
+</span><span id="line-130"></span><span>    </span><span class="annot"><span class="annottext">IO ThreadId -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO ThreadId -&gt; IO ()) -&gt; (IO () -&gt; IO ThreadId) -&gt; IO () -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO ThreadId
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forkIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; UtxoIndex -&gt; IO ()
+</span><a href="#local-6989586621679328697"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328698"><span class="hs-identifier hs-var">workerChannel</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328701"><span class="hs-identifier hs-var">ix</span></a></span><span>
+</span><span id="line-131"></span><span>    </span><span class="annot"><span class="annottext">[ChainPoint] -&gt; IO [ChainPoint]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">ChainPointAtGenesis</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-132"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-133"></span><span>    </span><span class="annot"><a href="#local-6989586621679328697"><span class="hs-identifier hs-type">innerLoop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TChan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Index.Utxo.html#UtxoIndex"><span class="hs-identifier hs-type">Utxo.UtxoIndex</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-134"></span><span>    </span><span id="local-6989586621679328697"><span class="annot"><span class="annottext">innerLoop :: TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; UtxoIndex -&gt; IO ()
+</span><a href="#local-6989586621679328697"><span class="hs-identifier hs-var hs-var">innerLoop</span></a></span></span><span> </span><span id="local-6989586621679328696"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328696"><span class="hs-identifier hs-var">ch</span></a></span></span><span> </span><span id="local-6989586621679328695"><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-135"></span><span>      </span><span class="annot"><span class="annottext">QSemN -&gt; Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">signalQSemN</span></a></span><span> </span><span class="annot"><span class="annottext">QSemN
+</span><a href="#local-6989586621679328704"><span class="hs-identifier hs-var">_barrier</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-136"></span><span>      </span><span class="annot"><span class="annottext">IO UtxoIndex -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO UtxoIndex -&gt; IO ()) -&gt; IO UtxoIndex -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex -&gt; IO UtxoIndex
+</span><a href="#local-6989586621679328706"><span class="hs-identifier hs-var">indexerCallback</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="hs-comment">-- refresh the query STM/CPS with new storage pointers/counters state</span><span>
+</span><span id="line-137"></span><span>      </span><span id="local-6989586621679328694"><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328694"><span class="hs-identifier hs-var">event</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (ChainSyncEvent (BlockInMode CardanoMode))
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; IO (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; STM (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (ChainSyncEvent (BlockInMode CardanoMode))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; STM (ChainSyncEvent (BlockInMode CardanoMode))
+forall a. TChan a -&gt; STM a
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">readTChan</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328696"><span class="hs-identifier hs-var">ch</span></a></span><span>
+</span><span id="line-138"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328694"><span class="hs-identifier hs-var">event</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-139"></span><span>        </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockHeader</span></a></span><span> </span><span id="local-6989586621679328693"><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328693"><span class="hs-identifier hs-var">slotNo</span></a></span></span><span> </span><span class="annot"><span class="annottext">Hash BlockHeader
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679328692"><span class="annot"><span class="annottext">BlockNo
+</span><a href="#local-6989586621679328692"><span class="hs-identifier hs-var">blkNo</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679328691"><span class="annot"><span class="annottext">[Tx era]
+</span><a href="#local-6989586621679328691"><span class="hs-identifier hs-var">txs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">EraInMode era CardanoMode
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679328690"><span class="annot"><span class="annottext">ChainTip
+</span><a href="#local-6989586621679328690"><span class="hs-identifier hs-var">_ct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-140"></span><span>            </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe TargetAddresses
+-&gt; SlotNo -&gt; BlockNo -&gt; [Tx era] -&gt; Maybe UtxoEvent
+forall era.
+IsCardanoEra era =&gt;
+Maybe TargetAddresses
+-&gt; SlotNo -&gt; BlockNo -&gt; [Tx era] -&gt; Maybe UtxoEvent
+</span><a href="Marconi.Index.Utxo.html#getUtxoEvents"><span class="hs-identifier hs-var">Utxo.getUtxoEvents</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe TargetAddresses
+</span><a href="#local-6989586621679328705"><span class="hs-identifier hs-var">maybeTargetAddresses</span></a></span><span> </span><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328693"><span class="hs-identifier hs-var">slotNo</span></a></span><span> </span><span class="annot"><span class="annottext">BlockNo
+</span><a href="#local-6989586621679328692"><span class="hs-identifier hs-var">blkNo</span></a></span><span> </span><span class="annot"><span class="annottext">[Tx era]
+</span><a href="#local-6989586621679328691"><span class="hs-identifier hs-var">txs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-141"></span><span>                  </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679328688"><span class="annot"><span class="annottext">UtxoEvent
+</span><a href="#local-6989586621679328688"><span class="hs-identifier hs-var">us</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>  </span><span class="annot"><span class="annottext">UtxoEvent -&gt; UtxoIndex -&gt; IO UtxoIndex
+forall (m :: * -&gt; *) h (v :: * -&gt; *) e n q r.
+(Monad m, PrimMonad m, MVector (Mutable v) e) =&gt;
+e -&gt; SplitIndex m h v e n q r -&gt; m (SplitIndex m h v e n q r)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.insert</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoEvent
+</span><a href="#local-6989586621679328688"><span class="hs-identifier hs-var">us</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span><span>  </span><span class="annot"><span class="annottext">IO UtxoIndex -&gt; (UtxoIndex -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; UtxoIndex -&gt; IO ()
+</span><a href="#local-6989586621679328697"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328696"><span class="hs-identifier hs-var">ch</span></a></span><span>
+</span><span id="line-142"></span><span>                  </span><span class="annot"><span class="annottext">Maybe UtxoEvent
+</span><span class="hs-identifier">_</span></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; UtxoIndex -&gt; IO ()
+</span><a href="#local-6989586621679328697"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328696"><span class="hs-identifier hs-var">ch</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span><span>
+</span><span id="line-143"></span><span>        </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">RollBackward</span></a></span><span> </span><span id="local-6989586621679328687"><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679328687"><span class="hs-identifier hs-var">cp</span></a></span></span><span> </span><span id="local-6989586621679328686"><span class="annot"><span class="annottext">ChainTip
+</span><a href="#local-6989586621679328686"><span class="hs-identifier hs-var">_ct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-144"></span><span>          </span><span id="local-6989586621679328685"><span class="annot"><span class="annottext">[UtxoEvent]
+</span><a href="#local-6989586621679328685"><span class="hs-identifier hs-var">events</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Storage Vector IO UtxoEvent -&gt; IO [UtxoEvent]
+forall (v :: * -&gt; *) (m :: * -&gt; *) e.
+(MVector (Mutable v) e, PrimMonad m, Show e) =&gt;
+Storage v m e -&gt; m [e]
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.getEvents</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+-&gt; Getting
+     (Storage Vector IO UtxoEvent)
+     UtxoIndex
+     (Storage Vector IO UtxoEvent)
+-&gt; Storage Vector IO UtxoEvent
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting
+  (Storage Vector IO UtxoEvent)
+  UtxoIndex
+  (Storage Vector IO UtxoEvent)
+forall (m :: * -&gt; *) h (v :: * -&gt; *) e n q r.
+Lens' (SplitIndex m h v e n q r) (Storage v m e)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.storage</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span>          </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; UtxoIndex -&gt; IO ()
+</span><a href="#local-6989586621679328697"><span class="hs-identifier hs-var">innerLoop</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328696"><span class="hs-identifier hs-var">ch</span></a></span><span> </span><span class="annot"><span class="annottext">(UtxoIndex -&gt; IO ()) -&gt; UtxoIndex -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-146"></span><span>            </span><span class="annot"><span class="annottext">UtxoIndex -&gt; Maybe UtxoIndex -&gt; UtxoIndex
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe UtxoIndex -&gt; UtxoIndex) -&gt; Maybe UtxoIndex -&gt; UtxoIndex
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-147"></span><span>              </span><span id="local-6989586621679328684"><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328684"><span class="hs-identifier hs-var">slot</span></a></span></span><span>   </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ChainPoint -&gt; Maybe SlotNo
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">chainPointToSlotNo</span></a></span><span> </span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679328687"><span class="hs-identifier hs-var">cp</span></a></span><span>
+</span><span id="line-148"></span><span>              </span><span id="local-6989586621679328683"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328683"><span class="hs-identifier hs-var">offset</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(UtxoEvent -&gt; Bool) -&gt; [UtxoEvent] -&gt; Maybe Int
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; Maybe Int
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">findIndex</span></a></span><span>  </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679328682"><span class="annot"><span class="annottext">UtxoEvent
+</span><a href="#local-6989586621679328682"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UtxoEvent
+</span><a href="#local-6989586621679328682"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoEvent -&gt; Getting SlotNo UtxoEvent SlotNo -&gt; SlotNo
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting SlotNo UtxoEvent SlotNo
+Lens' UtxoEvent SlotNo
+</span><a href="Marconi.Index.Utxo.html#utxoEventSlotNo"><span class="hs-identifier hs-var">Utxo.utxoEventSlotNo</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">SlotNo -&gt; SlotNo -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328684"><span class="hs-identifier hs-var">slot</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[UtxoEvent]
+</span><a href="#local-6989586621679328685"><span class="hs-identifier hs-var">events</span></a></span><span>
+</span><span id="line-149"></span><span>              </span><span class="annot"><span class="annottext">Int -&gt; UtxoIndex -&gt; Maybe UtxoIndex
+forall (v :: * -&gt; *) e (m :: * -&gt; *) h n q r.
+MVector (Mutable v) e =&gt;
+Int -&gt; SplitIndex m h v e n q r -&gt; Maybe (SplitIndex m h v e n q r)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Ix.rewind</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328683"><span class="hs-identifier hs-var">offset</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679328695"><span class="hs-identifier hs-var">index</span></a></span><span>
+</span><span id="line-150"></span><span>
+</span><span id="line-151"></span><span class="annot"><a href="Marconi.Indexers.html#scriptTxWorker_"><span class="hs-identifier hs-type">scriptTxWorker_</span></a></span><span>
+</span><span id="line-152"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-type">Storable.StorableEvent</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html#ScriptTxHandle"><span class="hs-identifier hs-type">ScriptTx.ScriptTxHandle</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-153"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html#Depth"><span class="hs-identifier hs-type">ScriptTx.Depth</span></a></span><span>
+</span><span id="line-154"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TChan</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MVar</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html#ScriptTxIndexer"><span class="hs-identifier hs-type">ScriptTx.ScriptTxIndexer</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-155"></span><span id="scriptTxWorker_"><span class="annot"><span class="annottext">scriptTxWorker_ :: (StorableEvent ScriptTxHandle -&gt; IO [()])
+-&gt; Depth
+-&gt; Coordinator
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; FilePath
+-&gt; IO (IO (), MVar ScriptTxIndexer)
+</span><a href="Marconi.Indexers.html#scriptTxWorker_"><span class="hs-identifier hs-var hs-var">scriptTxWorker_</span></a></span></span><span> </span><span id="local-6989586621679328679"><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle -&gt; IO [()]
+</span><a href="#local-6989586621679328679"><span class="hs-identifier hs-var">onInsert</span></a></span></span><span> </span><span id="local-6989586621679328678"><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679328678"><span class="hs-identifier hs-var">depth</span></a></span></span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span class="hs-special">{</span><span id="local-6989586621679328677"><span class="annot"><span class="annottext">QSemN
+_barrier :: QSemN
+_barrier :: Coordinator -&gt; QSemN
+</span><a href="#local-6989586621679328677"><span class="hs-identifier hs-var hs-var">_barrier</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621679328676"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328676"><span class="hs-identifier hs-var">ch</span></a></span></span><span> </span><span id="local-6989586621679328675"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328675"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-156"></span><span>  </span><span id="local-6989586621679328674"><span class="annot"><span class="annottext">ScriptTxIndexer
+</span><a href="#local-6989586621679328674"><span class="hs-identifier hs-var">indexer</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Depth -&gt; IO ScriptTxIndexer
+</span><a href="Marconi.Index.ScriptTx.html#open"><span class="hs-identifier hs-var">ScriptTx.open</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328675"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="annot"><span class="annottext">Depth
+</span><a href="#local-6989586621679328678"><span class="hs-identifier hs-var">depth</span></a></span><span>
+</span><span id="line-157"></span><span>  </span><span id="local-6989586621679328672"><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328672"><span class="hs-identifier hs-var">mIndexer</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ScriptTxIndexer -&gt; IO (MVar ScriptTxIndexer)
+forall a. a -&gt; IO (MVar a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">newMVar</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptTxIndexer
+</span><a href="#local-6989586621679328674"><span class="hs-identifier hs-var">indexer</span></a></span><span>
+</span><span id="line-158"></span><span>  </span><span class="annot"><span class="annottext">(IO (), MVar ScriptTxIndexer) -&gt; IO (IO (), MVar ScriptTxIndexer)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">MVar ScriptTxIndexer -&gt; IO ()
+</span><a href="#local-6989586621679328671"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328672"><span class="hs-identifier hs-var">mIndexer</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328672"><span class="hs-identifier hs-var">mIndexer</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-160"></span><span>    </span><span class="annot"><a href="#local-6989586621679328671"><span class="hs-identifier hs-type">loop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MVar</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html#ScriptTxIndexer"><span class="hs-identifier hs-type">ScriptTx.ScriptTxIndexer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-161"></span><span>    </span><span id="local-6989586621679328671"><span class="annot"><span class="annottext">loop :: MVar ScriptTxIndexer -&gt; IO ()
+</span><a href="#local-6989586621679328671"><span class="hs-identifier hs-var hs-var">loop</span></a></span></span><span> </span><span id="local-6989586621679328670"><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328670"><span class="hs-identifier hs-var">index</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-162"></span><span>      </span><span class="annot"><span class="annottext">QSemN -&gt; Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">signalQSemN</span></a></span><span> </span><span class="annot"><span class="annottext">QSemN
+</span><a href="#local-6989586621679328677"><span class="hs-identifier hs-var">_barrier</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-163"></span><span>      </span><span id="local-6989586621679328669"><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328669"><span class="hs-identifier hs-var">event</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (ChainSyncEvent (BlockInMode CardanoMode))
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; IO (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; STM (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (ChainSyncEvent (BlockInMode CardanoMode))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; STM (ChainSyncEvent (BlockInMode CardanoMode))
+forall a. TChan a -&gt; STM a
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">readTChan</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328676"><span class="hs-identifier hs-var">ch</span></a></span><span>
+</span><span id="line-164"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328669"><span class="hs-identifier hs-var">event</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-165"></span><span>        </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679328668"><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockHeader</span></a></span><span> </span><span id="local-6989586621679328667"><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328667"><span class="hs-identifier hs-var">slotNo</span></a></span></span><span> </span><span id="local-6989586621679328666"><span class="annot"><span class="annottext">Hash BlockHeader
+</span><a href="#local-6989586621679328666"><span class="hs-identifier hs-var">hsh</span></a></span></span><span> </span><span class="annot"><span class="annottext">BlockNo
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679328665"><span class="annot"><span class="annottext">[Tx era]
+</span><a href="#local-6989586621679328665"><span class="hs-identifier hs-var">txs</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679328668"><span class="hs-identifier hs-type">era</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">EraInMode era CardanoMode
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679328664"><span class="annot"><span class="annottext">ChainTip
+</span><a href="#local-6989586621679328664"><span class="hs-identifier hs-var">_ct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-166"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679328663"><span class="annot"><span class="annottext">u :: StorableEvent ScriptTxHandle
+</span><a href="#local-6989586621679328663"><span class="hs-identifier hs-var hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Tx era] -&gt; ChainPoint -&gt; StorableEvent ScriptTxHandle
+forall era.
+IsCardanoEra era =&gt;
+[Tx era] -&gt; ChainPoint -&gt; StorableEvent ScriptTxHandle
+</span><a href="Marconi.Index.ScriptTx.html#toUpdate"><span class="hs-identifier hs-var">ScriptTx.toUpdate</span></a></span><span> </span><span class="annot"><span class="annottext">[Tx era]
+</span><a href="#local-6989586621679328665"><span class="hs-identifier hs-var">txs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">SlotNo -&gt; Hash BlockHeader -&gt; ChainPoint
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">ChainPoint</span></a></span><span> </span><span class="annot"><span class="annottext">SlotNo
+</span><a href="#local-6989586621679328667"><span class="hs-identifier hs-var">slotNo</span></a></span><span> </span><span class="annot"><span class="annottext">Hash BlockHeader
+</span><a href="#local-6989586621679328666"><span class="hs-identifier hs-var">hsh</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>          </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+-&gt; (ScriptTxIndexer -&gt; IO ScriptTxIndexer) -&gt; IO ()
+forall a. MVar a -&gt; (a -&gt; IO a) -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">modifyMVar_</span></a></span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328670"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle
+-&gt; ScriptTxIndexer -&gt; StorableMonad ScriptTxHandle ScriptTxIndexer
+forall h.
+(Buffered h, PrimMonad (StorableMonad h)) =&gt;
+StorableEvent h -&gt; State h -&gt; StorableMonad h (State h)
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Storable.insert</span></a></span><span> </span><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle
+</span><a href="#local-6989586621679328663"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-168"></span><span>          </span><span class="annot"><span class="annottext">IO [()] -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO [()] -&gt; IO ()) -&gt; IO [()] -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle -&gt; IO [()]
+</span><a href="#local-6989586621679328679"><span class="hs-identifier hs-var">onInsert</span></a></span><span> </span><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle
+</span><a href="#local-6989586621679328663"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-169"></span><span>          </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer -&gt; IO ()
+</span><a href="#local-6989586621679328671"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328670"><span class="hs-identifier hs-var">index</span></a></span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span>        </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">RollBackward</span></a></span><span> </span><span id="local-6989586621679328660"><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679328660"><span class="hs-identifier hs-var">cp</span></a></span></span><span> </span><span id="local-6989586621679328659"><span class="annot"><span class="annottext">ChainTip
+</span><a href="#local-6989586621679328659"><span class="hs-identifier hs-var">_ct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-172"></span><span>          </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+-&gt; (ScriptTxIndexer -&gt; IO ScriptTxIndexer) -&gt; IO ()
+forall a. MVar a -&gt; (a -&gt; IO a) -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">modifyMVar_</span></a></span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328670"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">((ScriptTxIndexer -&gt; IO ScriptTxIndexer) -&gt; IO ())
+-&gt; (ScriptTxIndexer -&gt; IO ScriptTxIndexer) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679328658"><span class="annot"><span class="annottext">ScriptTxIndexer
+</span><a href="#local-6989586621679328658"><span class="hs-identifier hs-var">ix</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ScriptTxIndexer -&gt; Maybe ScriptTxIndexer -&gt; ScriptTxIndexer
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptTxIndexer
+</span><a href="#local-6989586621679328658"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe ScriptTxIndexer -&gt; ScriptTxIndexer)
+-&gt; IO (Maybe ScriptTxIndexer) -&gt; IO ScriptTxIndexer
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">StorablePoint ScriptTxHandle
+-&gt; ScriptTxIndexer
+-&gt; StorableMonad ScriptTxHandle (Maybe ScriptTxIndexer)
+forall h.
+(Rewindable h, HasPoint (StorableEvent h) (StorablePoint h),
+ PrimMonad (StorableMonad h), Eq (StorablePoint h)) =&gt;
+StorablePoint h -&gt; State h -&gt; StorableMonad h (Maybe (State h))
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Storable.rewind</span></a></span><span> </span><span class="annot"><span class="annottext">ChainPoint
+StorablePoint ScriptTxHandle
+</span><a href="#local-6989586621679328660"><span class="hs-identifier hs-var">cp</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptTxIndexer
+</span><a href="#local-6989586621679328658"><span class="hs-identifier hs-var">ix</span></a></span><span>
+</span><span id="line-173"></span><span>          </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer -&gt; IO ()
+</span><a href="#local-6989586621679328671"><span class="hs-identifier hs-var">loop</span></a></span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328670"><span class="hs-identifier hs-var">index</span></a></span><span>
+</span><span id="line-174"></span><span>
+</span><span id="line-175"></span><span class="annot"><a href="Marconi.Indexers.html#scriptTxWorker"><span class="hs-identifier hs-type">scriptTxWorker</span></a></span><span>
+</span><span id="line-176"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-type">Storable.StorableEvent</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.ScriptTx.html#ScriptTxHandle"><span class="hs-identifier hs-type">ScriptTx.ScriptTxHandle</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-177"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Worker"><span class="hs-identifier hs-type">Worker</span></a></span><span>
+</span><span id="line-178"></span><span id="scriptTxWorker"><span class="annot"><span class="annottext">scriptTxWorker :: (StorableEvent ScriptTxHandle -&gt; IO [()]) -&gt; Worker
+</span><a href="Marconi.Indexers.html#scriptTxWorker"><span class="hs-identifier hs-var hs-var">scriptTxWorker</span></a></span></span><span> </span><span id="local-6989586621679328655"><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle -&gt; IO [()]
+</span><a href="#local-6989586621679328655"><span class="hs-identifier hs-var">onInsert</span></a></span></span><span> </span><span id="local-6989586621679328654"><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328654"><span class="hs-identifier hs-var">coordinator</span></a></span></span><span> </span><span id="local-6989586621679328653"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328653"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-179"></span><span>  </span><span id="local-6989586621679328652"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328652"><span class="hs-identifier hs-var">workerChannel</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+ -&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; (TChan (ChainSyncEvent (BlockInMode CardanoMode))
+    -&gt; STM (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; STM (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a. TChan a -&gt; STM (TChan a)
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">dupTChan</span></a></span><span> </span><span class="annot"><span class="annottext">(TChan (ChainSyncEvent (BlockInMode CardanoMode))
+ -&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode))))
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; IO (TChan (ChainSyncEvent (BlockInMode CardanoMode)))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator -&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="Marconi.Indexers.html#_channel"><span class="hs-identifier hs-var hs-var">_channel</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328654"><span class="hs-identifier hs-var">coordinator</span></a></span><span>
+</span><span id="line-180"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621679328651"><span class="annot"><span class="annottext">IO ()
+</span><a href="#local-6989586621679328651"><span class="hs-identifier hs-var">loop</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328650"><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328650"><span class="hs-identifier hs-var">ix</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(StorableEvent ScriptTxHandle -&gt; IO [()])
+-&gt; Depth
+-&gt; Coordinator
+-&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; FilePath
+-&gt; IO (IO (), MVar ScriptTxIndexer)
+</span><a href="Marconi.Indexers.html#scriptTxWorker_"><span class="hs-identifier hs-var">scriptTxWorker_</span></a></span><span> </span><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle -&gt; IO [()]
+</span><a href="#local-6989586621679328655"><span class="hs-identifier hs-var">onInsert</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Depth
+</span><a href="Marconi.Index.ScriptTx.html#Depth"><span class="hs-identifier hs-var">ScriptTx.Depth</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2160</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328654"><span class="hs-identifier hs-var">coordinator</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328652"><span class="hs-identifier hs-var">workerChannel</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328653"><span class="hs-identifier hs-var">path</span></a></span><span>
+</span><span id="line-181"></span><span>  </span><span class="annot"><span class="annottext">IO ThreadId -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO ThreadId -&gt; IO ()) -&gt; (IO () -&gt; IO ThreadId) -&gt; IO () -&gt; IO ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO ThreadId
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forkIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IO ()
+</span><a href="#local-6989586621679328651"><span class="hs-identifier hs-var">loop</span></a></span><span>
+</span><span id="line-182"></span><span>  </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer -&gt; IO ScriptTxIndexer
+forall a. MVar a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">readMVar</span></a></span><span> </span><span class="annot"><span class="annottext">MVar ScriptTxIndexer
+</span><a href="#local-6989586621679328650"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">IO ScriptTxIndexer
+-&gt; (ScriptTxIndexer -&gt; IO [ChainPoint]) -&gt; IO [ChainPoint]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptTxHandle -&gt; IO [ChainPoint]
+forall h. Resumable h =&gt; h -&gt; StorableMonad h [StorablePoint h]
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Storable.resumeFromStorage</span></a></span><span> </span><span class="annot"><span class="annottext">(ScriptTxHandle -&gt; IO [ChainPoint])
+-&gt; (ScriptTxIndexer -&gt; ScriptTxHandle)
+-&gt; ScriptTxIndexer
+-&gt; IO [ChainPoint]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting ScriptTxHandle ScriptTxIndexer ScriptTxHandle
+-&gt; ScriptTxIndexer -&gt; ScriptTxHandle
+forall s (m :: * -&gt; *) a. MonadReader s m =&gt; Getting a s a -&gt; m a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">view</span></a></span><span> </span><span class="annot"><span class="annottext">Getting ScriptTxHandle ScriptTxIndexer ScriptTxHandle
+forall h. Lens' (State h) h
+</span><a href="../../../../rewindable-index/html/src"><span class="hs-identifier hs-var">Storable.handle</span></a></span><span>
+</span><span id="line-183"></span><span>
+</span><span id="line-184"></span><span class="hs-keyword">newtype</span><span> </span><span id="UtxoQueryTMVar"><span class="annot"><a href="Marconi.Indexers.html#UtxoQueryTMVar"><span class="hs-identifier hs-var">UtxoQueryTMVar</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="UtxoQueryTMVar"><span class="annot"><a href="Marconi.Indexers.html#UtxoQueryTMVar"><span class="hs-identifier hs-var">UtxoQueryTMVar</span></a></span></span><span>
+</span><span id="line-185"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="unUtxoIndex"><span class="annot"><span class="annottext">UtxoQueryTMVar -&gt; TMVar UtxoIndex
+</span><a href="Marconi.Indexers.html#unUtxoIndex"><span class="hs-identifier hs-var hs-var">unUtxoIndex</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-type">TMVar</span></a></span><span> </span><span class="annot"><a href="Marconi.Index.Utxo.html#UtxoIndex"><span class="hs-identifier hs-type">Utxo.UtxoIndex</span></a></span><span>      </span><span class="hs-comment">-- ^ for query thread to access in-memory utxos</span><span>
+</span><span id="line-186"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-187"></span><span>
+</span><span id="line-188"></span><span class="annot"><a href="Marconi.Indexers.html#filterIndexers"><span class="hs-identifier hs-type">filterIndexers</span></a></span><span>
+</span><span id="line-189"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-190"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-191"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-192"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Marconi.Types.html#TargetAddresses"><span class="hs-identifier hs-type">TargetAddresses</span></a></span><span>
+</span><span id="line-193"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Indexers.html#Worker"><span class="hs-identifier hs-type">Worker</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-194"></span><span id="filterIndexers"><span class="annot"><span class="annottext">filterIndexers :: Maybe FilePath
+-&gt; Maybe FilePath
+-&gt; Maybe FilePath
+-&gt; Maybe TargetAddresses
+-&gt; [(Worker, FilePath)]
+</span><a href="Marconi.Indexers.html#filterIndexers"><span class="hs-identifier hs-var hs-var">filterIndexers</span></a></span></span><span> </span><span id="local-6989586621679328643"><span class="annot"><span class="annottext">Maybe FilePath
+</span><a href="#local-6989586621679328643"><span class="hs-identifier hs-var">utxoPath</span></a></span></span><span> </span><span id="local-6989586621679328642"><span class="annot"><span class="annottext">Maybe FilePath
+</span><a href="#local-6989586621679328642"><span class="hs-identifier hs-var">datumPath</span></a></span></span><span> </span><span id="local-6989586621679328641"><span class="annot"><span class="annottext">Maybe FilePath
+</span><a href="#local-6989586621679328641"><span class="hs-identifier hs-var">scriptTxPath</span></a></span></span><span> </span><span id="local-6989586621679328640"><span class="annot"><span class="annottext">Maybe TargetAddresses
+</span><a href="#local-6989586621679328640"><span class="hs-identifier hs-var">maybeTargetAddresses</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-195"></span><span>  </span><span class="annot"><span class="annottext">((Coordinator -&gt; FilePath -&gt; IO [ChainPoint], Maybe FilePath)
+ -&gt; Maybe (Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath))
+-&gt; [(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], Maybe FilePath)]
+-&gt; [(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)]
+forall a b. (a -&gt; Maybe b) -&gt; [a] -&gt; [b]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mapMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], Maybe FilePath)
+-&gt; Maybe (Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)
+forall a b. (a, Maybe b) -&gt; Maybe (a, b)
+</span><a href="#local-6989586621679328639"><span class="hs-identifier hs-var">liftMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">[(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], Maybe FilePath)]
+</span><a href="#local-6989586621679328638"><span class="hs-identifier hs-var">pairs</span></a></span><span>
+</span><span id="line-196"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-197"></span><span>    </span><span id="local-6989586621679328639"><span class="annot"><span class="annottext">liftMaybe :: (a, Maybe b) -&gt; Maybe (a, b)
+</span><a href="#local-6989586621679328639"><span class="hs-identifier hs-var hs-var">liftMaybe</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679328637"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679328637"><span class="hs-identifier hs-var">worker</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328636"><span class="annot"><span class="annottext">Maybe b
+</span><a href="#local-6989586621679328636"><span class="hs-identifier hs-var">maybePath</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe b
+</span><a href="#local-6989586621679328636"><span class="hs-identifier hs-var">maybePath</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-198"></span><span>      </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679328635"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679328635"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(a, b) -&gt; Maybe (a, b)
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679328637"><span class="hs-identifier hs-var">worker</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679328635"><span class="hs-identifier hs-var">path</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>      </span><span class="annot"><span class="annottext">Maybe b
+</span><span class="hs-identifier">_</span></span><span>         </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe (a, b)
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-200"></span><span>    </span><span id="local-6989586621679328638"><span class="annot"><span class="annottext">pairs :: [(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], Maybe FilePath)]
+</span><a href="#local-6989586621679328638"><span class="hs-identifier hs-var hs-var">pairs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-201"></span><span>        </span><span class="hs-special">[</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(UtxoIndex -&gt; IO UtxoIndex) -&gt; Maybe TargetAddresses -&gt; Worker
+</span><a href="Marconi.Indexers.html#utxoWorker"><span class="hs-identifier hs-var">utxoWorker</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex -&gt; IO UtxoIndex
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe TargetAddresses
+</span><a href="#local-6989586621679328640"><span class="hs-identifier hs-var">maybeTargetAddresses</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Maybe FilePath
+</span><a href="#local-6989586621679328643"><span class="hs-identifier hs-var">utxoPath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-202"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Coordinator -&gt; FilePath -&gt; IO [ChainPoint]
+Worker
+</span><a href="Marconi.Indexers.html#datumWorker"><span class="hs-identifier hs-var">datumWorker</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Maybe FilePath
+</span><a href="#local-6989586621679328642"><span class="hs-identifier hs-var">datumPath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-203"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(StorableEvent ScriptTxHandle -&gt; IO [()]) -&gt; Worker
+</span><a href="Marconi.Indexers.html#scriptTxWorker"><span class="hs-identifier hs-var">scriptTxWorker</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">StorableEvent ScriptTxHandle
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[()] -&gt; IO [()]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Maybe FilePath
+</span><a href="#local-6989586621679328641"><span class="hs-identifier hs-var">scriptTxPath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-204"></span><span>        </span><span class="hs-special">]</span><span>
+</span><span id="line-205"></span><span>
+</span><span id="line-206"></span><span class="annot"><a href="Marconi.Indexers.html#startIndexers"><span class="hs-identifier hs-type">startIndexers</span></a></span><span>
+</span><span id="line-207"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Indexers.html#Worker"><span class="hs-identifier hs-type">Worker</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-208"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">[</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">ChainPoint</span></a></span><span class="hs-special">]</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-209"></span><span id="startIndexers"><span class="annot"><span class="annottext">startIndexers :: [(Worker, FilePath)] -&gt; IO ([ChainPoint], Coordinator)
+</span><a href="Marconi.Indexers.html#startIndexers"><span class="hs-identifier hs-var hs-var">startIndexers</span></a></span></span><span> </span><span id="local-6989586621679328633"><span class="annot"><span class="annottext">[(Worker, FilePath)]
+</span><a href="#local-6989586621679328633"><span class="hs-identifier hs-var">indexers</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-210"></span><span>  </span><span id="local-6989586621679328632"><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328632"><span class="hs-identifier hs-var">coordinator</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO Coordinator
+</span><a href="Marconi.Indexers.html#initialCoordinator"><span class="hs-identifier hs-var">initialCoordinator</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; IO Coordinator) -&gt; Int -&gt; IO Coordinator
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">length</span></a></span><span> </span><span class="annot"><span class="annottext">[(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)]
+[(Worker, FilePath)]
+</span><a href="#local-6989586621679328633"><span class="hs-identifier hs-var">indexers</span></a></span><span>
+</span><span id="line-211"></span><span>  </span><span id="local-6989586621679328630"><span class="annot"><span class="annottext">[[ChainPoint]]
+</span><a href="#local-6989586621679328630"><span class="hs-identifier hs-var">startingPoints</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">((Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)
+ -&gt; IO [ChainPoint])
+-&gt; [(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)]
+-&gt; IO [[ChainPoint]]
+forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Traversable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m (t b)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mapM</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679328628"><span class="annot"><span class="annottext">Coordinator -&gt; FilePath -&gt; IO [ChainPoint]
+</span><a href="#local-6989586621679328628"><span class="hs-identifier hs-var">ix</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328627"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328627"><span class="hs-identifier hs-var">fp</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Coordinator -&gt; FilePath -&gt; IO [ChainPoint]
+</span><a href="#local-6989586621679328628"><span class="hs-identifier hs-var">ix</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328632"><span class="hs-identifier hs-var">coordinator</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679328627"><span class="hs-identifier hs-var">fp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[(Coordinator -&gt; FilePath -&gt; IO [ChainPoint], FilePath)]
+[(Worker, FilePath)]
+</span><a href="#local-6989586621679328633"><span class="hs-identifier hs-var">indexers</span></a></span><span>
+</span><span id="line-212"></span><span>  </span><span class="hs-comment">-- We want to use the set of points that are common to all indexers</span><span>
+</span><span id="line-213"></span><span>  </span><span class="hs-comment">-- giving priority to recent ones.</span><span>
+</span><span id="line-214"></span><span>  </span><span class="annot"><span class="annottext">([ChainPoint], Coordinator) -&gt; IO ([ChainPoint], Coordinator)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">([ChainPoint] -&gt; [ChainPoint] -&gt; [ChainPoint])
+-&gt; [[ChainPoint]] -&gt; [ChainPoint]
+forall a. (a -&gt; a -&gt; a) -&gt; [a] -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldl1'</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainPoint] -&gt; [ChainPoint] -&gt; [ChainPoint]
+forall a. Eq a =&gt; [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">intersect</span></a></span><span> </span><span class="annot"><span class="annottext">[[ChainPoint]]
+</span><a href="#local-6989586621679328630"><span class="hs-identifier hs-var">startingPoints</span></a></span><span>
+</span><span id="line-215"></span><span>       </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328632"><span class="hs-identifier hs-var">coordinator</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-216"></span><span>
+</span><span id="line-217"></span><span id="local-6989586621679328626"><span class="annot"><a href="Marconi.Indexers.html#mkIndexerStream"><span class="hs-identifier hs-type">mkIndexerStream</span></a></span><span>
+</span><span id="line-218"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span>
+</span><span id="line-219"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/2v7aw0qgl2v0lwasqg0zsrzfb9jxmbfn-streaming-lib-streaming-0.2.3.1-haddock-doc/share/doc/streaming/html/src"><span class="hs-identifier hs-type">S.Stream</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2v7aw0qgl2v0lwasqg0zsrzfb9jxmbfn-streaming-lib-streaming-0.2.3.1-haddock-doc/share/doc/streaming/html/src"><span class="hs-identifier hs-type">S.Of</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679328626"><span class="hs-identifier hs-type">r</span></a></span><span>
+</span><span id="line-220"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-221"></span><span id="mkIndexerStream"><span class="annot"><span class="annottext">mkIndexerStream :: Coordinator
+-&gt; Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+-&gt; IO ()
+</span><a href="Marconi.Indexers.html#mkIndexerStream"><span class="hs-identifier hs-var hs-var">mkIndexerStream</span></a></span></span><span> </span><span id="local-6989586621679328624"><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328624"><span class="hs-identifier hs-var">coordinator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Coordinator
+ -&gt; ChainSyncEvent (BlockInMode CardanoMode) -&gt; IO Coordinator)
+-&gt; IO Coordinator
+-&gt; (Coordinator -&gt; IO ())
+-&gt; Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+-&gt; IO ()
+forall (m :: * -&gt; *) x a b r.
+Monad m =&gt;
+(x -&gt; a -&gt; m x) -&gt; m x -&gt; (x -&gt; m b) -&gt; Stream (Of a) m r -&gt; m b
+</span><a href="../file:///nix/store/2v7aw0qgl2v0lwasqg0zsrzfb9jxmbfn-streaming-lib-streaming-0.2.3.1-haddock-doc/share/doc/streaming/html/src"><span class="hs-identifier hs-var">S.foldM_</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator
+-&gt; ChainSyncEvent (BlockInMode CardanoMode) -&gt; IO Coordinator
+</span><a href="#local-6989586621679328622"><span class="hs-identifier hs-var">step</span></a></span><span> </span><span class="annot"><span class="annottext">IO Coordinator
+</span><a href="#local-6989586621679328621"><span class="hs-identifier hs-var">initial</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator -&gt; IO ()
+</span><a href="#local-6989586621679328620"><span class="hs-identifier hs-var">finish</span></a></span><span>
+</span><span id="line-222"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-223"></span><span>    </span><span class="annot"><a href="#local-6989586621679328621"><span class="hs-identifier hs-type">initial</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span>
+</span><span id="line-224"></span><span>    </span><span id="local-6989586621679328621"><span class="annot"><span class="annottext">initial :: IO Coordinator
+</span><a href="#local-6989586621679328621"><span class="hs-identifier hs-var hs-var">initial</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Coordinator -&gt; IO Coordinator
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328624"><span class="hs-identifier hs-var">coordinator</span></a></span><span>
+</span><span id="line-225"></span><span>
+</span><span id="line-226"></span><span>    </span><span class="annot"><a href="#local-6989586621679328622"><span class="hs-identifier hs-type">step</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">BlockInMode</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-type">CardanoMode</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span>
+</span><span id="line-227"></span><span>    </span><span id="local-6989586621679328622"><span class="annot"><span class="annottext">step :: Coordinator
+-&gt; ChainSyncEvent (BlockInMode CardanoMode) -&gt; IO Coordinator
+</span><a href="#local-6989586621679328622"><span class="hs-identifier hs-var hs-var">step</span></a></span></span><span> </span><span id="local-6989586621679328619"><span class="annot"><span class="annottext">c :: Coordinator
+</span><a href="#local-6989586621679328619"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span class="hs-special">{</span><span id="local-6989586621679328618"><span class="annot"><span class="annottext">QSemN
+_barrier :: QSemN
+_barrier :: Coordinator -&gt; QSemN
+</span><a href="#local-6989586621679328618"><span class="hs-identifier hs-var hs-var">_barrier</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328617"><span class="annot"><span class="annottext">Int
+_indexerCount :: Int
+_indexerCount :: Coordinator -&gt; Int
+</span><a href="#local-6989586621679328617"><span class="hs-identifier hs-var hs-var">_indexerCount</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679328616"><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+_channel :: TChan (ChainSyncEvent (BlockInMode CardanoMode))
+_channel :: Coordinator -&gt; TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328616"><span class="hs-identifier hs-var hs-var">_channel</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621679328615"><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328615"><span class="hs-identifier hs-var">event</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-228"></span><span>      </span><span class="annot"><span class="annottext">QSemN -&gt; Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">waitQSemN</span></a></span><span> </span><span class="annot"><span class="annottext">QSemN
+</span><a href="#local-6989586621679328618"><span class="hs-identifier hs-var">_barrier</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679328617"><span class="hs-identifier hs-var">_indexerCount</span></a></span><span>
+</span><span id="line-229"></span><span>      </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; IO ()) -&gt; STM () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+-&gt; ChainSyncEvent (BlockInMode CardanoMode) -&gt; STM ()
+forall a. TChan a -&gt; a -&gt; STM ()
+</span><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier hs-var">writeTChan</span></a></span><span> </span><span class="annot"><span class="annottext">TChan (ChainSyncEvent (BlockInMode CardanoMode))
+</span><a href="#local-6989586621679328616"><span class="hs-identifier hs-var">_channel</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent (BlockInMode CardanoMode)
+</span><a href="#local-6989586621679328615"><span class="hs-identifier hs-var">event</span></a></span><span>
+</span><span id="line-230"></span><span>      </span><span class="annot"><span class="annottext">Coordinator -&gt; IO Coordinator
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679328619"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-231"></span><span>
+</span><span id="line-232"></span><span>    </span><span class="annot"><a href="#local-6989586621679328620"><span class="hs-identifier hs-type">finish</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Indexers.html#Coordinator"><span class="hs-identifier hs-type">Coordinator</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-233"></span><span>    </span><span id="local-6989586621679328620"><span class="annot"><span class="annottext">finish :: Coordinator -&gt; IO ()
+</span><a href="#local-6989586621679328620"><span class="hs-identifier hs-var hs-var">finish</span></a></span></span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-234"></span></pre></body></html>

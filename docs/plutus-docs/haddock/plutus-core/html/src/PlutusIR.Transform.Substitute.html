@@ -1,0 +1,218 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- | Implements naive substitution functions for replacing type and term variables.</span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusIR.Transform.Substitute</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-5"></span><span>      </span><span class="annot"><a href="PlutusIR.Transform.Substitute.html#substVar"><span class="hs-identifier">substVar</span></a></span><span>
+</span><span id="line-6"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Subst.html#substTyVar"><span class="hs-identifier">substTyVar</span></a></span><span>
+</span><span id="line-7"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Subst.html#typeSubstTyNames"><span class="hs-identifier">typeSubstTyNames</span></a></span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusIR.Transform.Substitute.html#termSubstNames"><span class="hs-identifier">termSubstNames</span></a></span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusIR.Transform.Substitute.html#termSubstTyNames"><span class="hs-identifier">termSubstTyNames</span></a></span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusIR.Transform.Substitute.html#bindingSubstNames"><span class="hs-identifier">bindingSubstNames</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusIR.Transform.Substitute.html#bindingSubstTyNames"><span class="hs-identifier">bindingSubstTyNames</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.html"><span class="hs-identifier">PlutusIR</span></a></span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Subst.html"><span class="hs-identifier">PlutusCore.Subst</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Subst.html#substTyVar"><span class="hs-identifier">substTyVar</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Subst.html#typeSubstTyNames"><span class="hs-identifier">typeSubstTyNames</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- Needs to be different from the PLC version since we have different Terms</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- | Replace a variable using the given function.</span><span>
+</span><span id="line-24"></span><span id="local-6989586621680969107"><span id="local-6989586621680969108"><span id="local-6989586621680969109"><span id="local-6989586621680969110"><span id="local-6989586621680969111"><span class="annot"><a href="PlutusIR.Transform.Substitute.html#substVar"><span class="hs-identifier hs-type">substVar</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680969111"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969110"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969111"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969109"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969108"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969107"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969110"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969111"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969109"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969108"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969107"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969110"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969111"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969109"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969108"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969107"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span>
+</span><span id="line-25"></span><span id="substVar"><span class="annot"><span class="annottext">substVar :: (name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="PlutusIR.Transform.Substitute.html#substVar"><span class="hs-identifier hs-var hs-var">substVar</span></a></span></span><span> </span><span id="local-6989586621680969047"><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="#local-6989586621680969047"><span class="hs-identifier hs-var">nameF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Var"><span class="hs-identifier hs-type">Var</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680969045"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680969045"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="#local-6989586621680969047"><span class="hs-identifier hs-var">nameF</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680969045"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-26"></span><span class="annot"><a href="PlutusIR.Transform.Substitute.html#substVar"><span class="hs-identifier hs-var">substVar</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><span class="hs-identifier">_</span></span><span>     </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><span class="hs-identifier">_</span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe (Term tyname name uni fun a)
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- | Naively substitute names using the given functions (i.e. do not substitute binders).</span><span>
+</span><span id="line-29"></span><span id="local-6989586621680969065"><span id="local-6989586621680969066"><span id="local-6989586621680969067"><span id="local-6989586621680969068"><span id="local-6989586621680969069"><span class="annot"><a href="PlutusIR.Transform.Substitute.html#termSubstNames"><span class="hs-identifier hs-type">termSubstNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680969069"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969068"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969069"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969067"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969066"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969065"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969068"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969069"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969067"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969066"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969065"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969068"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969069"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969067"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969066"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969065"><span class="hs-identifier hs-type">a</span></a></span></span></span></span></span></span><span>
+</span><span id="line-30"></span><span id="termSubstNames"><span class="annot"><span class="annottext">termSubstNames :: (name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#termSubstNames"><span class="hs-identifier hs-var hs-var">termSubstNames</span></a></span></span><span> </span><span id="local-6989586621680969044"><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="#local-6989586621680969044"><span class="hs-identifier hs-var">nameF</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall a b. ASetter a b a b -&gt; (b -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">transformOf</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal'
+  (Term tyname name uni fun a) (Term tyname name uni fun a)
+</span><a href="PlutusIR.Core.Plated.html#termSubterms"><span class="hs-identifier hs-var">termSubterms</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680969041"><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969041"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+-&gt; Maybe (Term tyname name uni fun a) -&gt; Term tyname name uni fun a
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969041"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a -&gt; Maybe (Term tyname name uni fun a)
+forall name tyname (uni :: * -&gt; *) fun a.
+(name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="PlutusIR.Transform.Substitute.html#substVar"><span class="hs-identifier hs-var">substVar</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="#local-6989586621680969044"><span class="hs-identifier hs-var">nameF</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969041"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- | Naively substitute type names using the given functions (i.e. do not substitute binders).</span><span>
+</span><span id="line-33"></span><span id="local-6989586621680969092"><span id="local-6989586621680969093"><span id="local-6989586621680969094"><span id="local-6989586621680969095"><span id="local-6989586621680969096"><span class="annot"><a href="PlutusIR.Transform.Substitute.html#termSubstTyNames"><span class="hs-identifier hs-type">termSubstTyNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680969096"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Type"><span class="hs-identifier hs-type">Type</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969096"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969095"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969094"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969096"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969093"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969095"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969092"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969094"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969096"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969093"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969095"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969092"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969094"><span class="hs-identifier hs-type">a</span></a></span></span></span></span></span></span><span>
+</span><span id="line-34"></span><span id="termSubstTyNames"><span class="annot"><span class="annottext">termSubstTyNames :: (tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#termSubstTyNames"><span class="hs-identifier hs-var hs-var">termSubstTyNames</span></a></span></span><span> </span><span id="local-6989586621680969039"><span class="annot"><span class="annottext">tyname -&gt; Maybe (Type tyname uni a)
+</span><a href="#local-6989586621680969039"><span class="hs-identifier hs-var">tynameF</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal'
+  (Term tyname name uni fun a) (Term tyname name uni fun a)
+</span><a href="PlutusIR.Core.Plated.html#termSubterms"><span class="hs-identifier hs-var">termSubterms</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+forall tyname (uni :: * -&gt; *) a name fun.
+(tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#termSubstTyNames"><span class="hs-identifier hs-var">termSubstTyNames</span></a></span><span> </span><span class="annot"><span class="annottext">tyname -&gt; Maybe (Type tyname uni a)
+</span><a href="#local-6989586621680969039"><span class="hs-identifier hs-var">tynameF</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Type tyname uni a)
+  (Type tyname uni a)
+-&gt; (Type tyname uni a -&gt; Type tyname uni a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Type tyname uni a)
+  (Type tyname uni a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal' (Term tyname name uni fun a) (Type tyname uni a)
+</span><a href="PlutusIR.Core.Plated.html#termSubtypes"><span class="hs-identifier hs-var">termSubtypes</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Type tyname uni a -&gt; Type tyname uni a
+forall tyname (uni :: * -&gt; *) ann.
+(tyname -&gt; Maybe (Type tyname uni ann))
+-&gt; Type tyname uni ann -&gt; Type tyname uni ann
+</span><a href="PlutusCore.Subst.html#typeSubstTyNames"><span class="hs-identifier hs-var">typeSubstTyNames</span></a></span><span> </span><span class="annot"><span class="annottext">tyname -&gt; Maybe (Type tyname uni a)
+</span><a href="#local-6989586621680969039"><span class="hs-identifier hs-var">tynameF</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- | Naively substitute names using the given functions (i.e. do not substitute binders).</span><span>
+</span><span id="line-37"></span><span id="local-6989586621680969031"><span id="local-6989586621680969032"><span id="local-6989586621680969033"><span id="local-6989586621680969034"><span id="local-6989586621680969035"><span class="annot"><a href="PlutusIR.Transform.Substitute.html#bindingSubstNames"><span class="hs-identifier hs-type">bindingSubstNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680969035"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969034"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969035"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969033"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969032"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969031"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969034"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969035"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969033"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969032"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969031"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969034"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969035"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969033"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969032"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969031"><span class="hs-identifier hs-type">a</span></a></span></span></span></span></span></span><span>
+</span><span id="line-38"></span><span id="bindingSubstNames"><span class="annot"><span class="annottext">bindingSubstNames :: (name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Binding tyname name uni fun a -&gt; Binding tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#bindingSubstNames"><span class="hs-identifier hs-var hs-var">bindingSubstNames</span></a></span></span><span> </span><span id="local-6989586621680969030"><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="#local-6989586621680969030"><span class="hs-identifier hs-var">nameF</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Binding tyname name uni fun a)
+  (Binding tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Binding tyname name uni fun a
+-&gt; Binding tyname name uni fun a
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Binding tyname name uni fun a)
+  (Binding tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal'
+  (Binding tyname name uni fun a) (Term tyname name uni fun a)
+</span><a href="PlutusIR.Core.Plated.html#bindingSubterms"><span class="hs-identifier hs-var">bindingSubterms</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+forall name tyname (uni :: * -&gt; *) fun a.
+(name -&gt; Maybe (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#termSubstNames"><span class="hs-identifier hs-var">termSubstNames</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; Maybe (Term tyname name uni fun a)
+</span><a href="#local-6989586621680969030"><span class="hs-identifier hs-var">nameF</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- | Naively substitute type names using the given functions (i.e. do not substitute binders).</span><span>
+</span><span id="line-41"></span><span id="local-6989586621680969024"><span id="local-6989586621680969025"><span id="local-6989586621680969026"><span id="local-6989586621680969027"><span id="local-6989586621680969028"><span class="annot"><a href="PlutusIR.Transform.Substitute.html#bindingSubstTyNames"><span class="hs-identifier hs-type">bindingSubstTyNames</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680969028"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Type"><span class="hs-identifier hs-type">Type</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969028"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969027"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969026"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969028"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969025"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969027"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969024"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969026"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969028"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969025"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969027"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969024"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969026"><span class="hs-identifier hs-type">a</span></a></span></span></span></span></span></span><span>
+</span><span id="line-42"></span><span id="bindingSubstTyNames"><span class="annot"><span class="annottext">bindingSubstTyNames :: (tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Binding tyname name uni fun a -&gt; Binding tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#bindingSubstTyNames"><span class="hs-identifier hs-var hs-var">bindingSubstTyNames</span></a></span></span><span> </span><span id="local-6989586621680969023"><span class="annot"><span class="annottext">tyname -&gt; Maybe (Type tyname uni a)
+</span><a href="#local-6989586621680969023"><span class="hs-identifier hs-var">tynameF</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Binding tyname name uni fun a)
+  (Binding tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Binding tyname name uni fun a
+-&gt; Binding tyname name uni fun a
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Binding tyname name uni fun a)
+  (Binding tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal'
+  (Binding tyname name uni fun a) (Term tyname name uni fun a)
+</span><a href="PlutusIR.Core.Plated.html#bindingSubterms"><span class="hs-identifier hs-var">bindingSubterms</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+forall tyname (uni :: * -&gt; *) a name fun.
+(tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Substitute.html#termSubstTyNames"><span class="hs-identifier hs-var">termSubstTyNames</span></a></span><span> </span><span class="annot"><span class="annottext">tyname -&gt; Maybe (Type tyname uni a)
+</span><a href="#local-6989586621680969023"><span class="hs-identifier hs-var">tynameF</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Binding tyname name uni fun a -&gt; Binding tyname name uni fun a)
+-&gt; (Binding tyname name uni fun a -&gt; Binding tyname name uni fun a)
+-&gt; Binding tyname name uni fun a
+-&gt; Binding tyname name uni fun a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Binding tyname name uni fun a)
+  (Binding tyname name uni fun a)
+  (Type tyname uni a)
+  (Type tyname uni a)
+-&gt; (Type tyname uni a -&gt; Type tyname uni a)
+-&gt; Binding tyname name uni fun a
+-&gt; Binding tyname name uni fun a
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">over</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Binding tyname name uni fun a)
+  (Binding tyname name uni fun a)
+  (Type tyname uni a)
+  (Type tyname uni a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal' (Binding tyname name uni fun a) (Type tyname uni a)
+</span><a href="PlutusIR.Core.Plated.html#bindingSubtypes"><span class="hs-identifier hs-var">bindingSubtypes</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(tyname -&gt; Maybe (Type tyname uni a))
+-&gt; Type tyname uni a -&gt; Type tyname uni a
+forall tyname (uni :: * -&gt; *) ann.
+(tyname -&gt; Maybe (Type tyname uni ann))
+-&gt; Type tyname uni ann -&gt; Type tyname uni ann
+</span><a href="PlutusCore.Subst.html#typeSubstTyNames"><span class="hs-identifier hs-var">typeSubstTyNames</span></a></span><span> </span><span class="annot"><span class="annottext">tyname -&gt; Maybe (Type tyname uni a)
+</span><a href="#local-6989586621680969023"><span class="hs-identifier hs-var">tynameF</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span></pre></body></html>

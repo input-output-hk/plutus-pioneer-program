@@ -1,0 +1,467 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards   #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# OPTIONS_GHC -g -fplugin-opt PlutusTx.Plugin:coverage-all #-}</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Uniswap.Pool</span><span>
+</span><span id="line-7"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateAdditionalLiquidity"><span class="hs-identifier">calculateAdditionalLiquidity</span></a></span><span>
+</span><span id="line-8"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateInitialLiquidity"><span class="hs-identifier">calculateInitialLiquidity</span></a></span><span>
+</span><span id="line-9"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateRemoval"><span class="hs-identifier">calculateRemoval</span></a></span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#checkSwap"><span class="hs-identifier">checkSwap</span></a></span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#lpTicker"><span class="hs-identifier">lpTicker</span></a></span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TokenName</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">unAssetClass</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">unCurrencySymbol</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html"><span class="hs-identifier">Plutus.Contracts.Uniswap.Types</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">ratio</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Sqrt</span></a></span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateInitialLiquidity"><span class="hs-pragma hs-type">calculateInitialLiquidity</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- | The initial liquidity is 'ceil( sqrt(x*y) )' where 'x' is the amount of</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- 'Coin A' and y the amount of 'Coin B'.  See Eq. 13 of the Uniswap v2 paper.</span><span>
+</span><span id="line-22"></span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateInitialLiquidity"><span class="hs-identifier hs-type">calculateInitialLiquidity</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Liquidity"><span class="hs-identifier hs-type">Liquidity</span></a></span><span>
+</span><span id="line-23"></span><span id="calculateInitialLiquidity"><span class="annot"><span class="annottext">calculateInitialLiquidity :: Amount A -&gt; Amount B -&gt; Amount Liquidity
+</span><a href="Plutus.Contracts.Uniswap.Pool.html#calculateInitialLiquidity"><span class="hs-identifier hs-var hs-var">calculateInitialLiquidity</span></a></span></span><span> </span><span id="local-6989586621680985620"><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985620"><span class="hs-identifier hs-var">outA</span></a></span></span><span> </span><span id="local-6989586621680985619"><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985619"><span class="hs-identifier hs-var">outB</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Amount Liquidity
+forall a. Integer -&gt; Amount a
+</span><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-var">Amount</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Amount Liquidity) -&gt; Integer -&gt; Amount Liquidity
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Sqrt
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">isqrt</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Amount A -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985620"><span class="hs-identifier hs-var">outA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985619"><span class="hs-identifier hs-var">outB</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-24"></span><span>    </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">Exactly</span></a></span><span> </span><span id="local-6989586621680985612"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985612"><span class="hs-identifier hs-var">l</span></a></span></span><span>
+</span><span id="line-25"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985612"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985612"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">Approximately</span></a></span><span> </span><span id="local-6989586621680985609"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985609"><span class="hs-identifier hs-var">l</span></a></span></span><span>
+</span><span id="line-27"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985609"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985609"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-28"></span><span>    </span><span class="annot"><span class="annottext">Sqrt
+</span><span class="hs-identifier">_</span></span><span>           </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">BuiltinString -&gt; Integer
+forall a. BuiltinString -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceError</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;insufficient liquidity&quot;</span></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateAdditionalLiquidity"><span class="hs-pragma hs-type">calculateAdditionalLiquidity</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-31"></span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateAdditionalLiquidity"><span class="hs-identifier hs-type">calculateAdditionalLiquidity</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Liquidity"><span class="hs-identifier hs-type">Liquidity</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Liquidity"><span class="hs-identifier hs-type">Liquidity</span></a></span><span>
+</span><span id="line-32"></span><span id="calculateAdditionalLiquidity"><span class="annot"><span class="annottext">calculateAdditionalLiquidity :: Amount A
+-&gt; Amount B
+-&gt; Amount Liquidity
+-&gt; Amount A
+-&gt; Amount B
+-&gt; Amount Liquidity
+</span><a href="Plutus.Contracts.Uniswap.Pool.html#calculateAdditionalLiquidity"><span class="hs-identifier hs-var hs-var">calculateAdditionalLiquidity</span></a></span></span><span> </span><span id="local-6989586621680985606"><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985606"><span class="hs-identifier hs-var">oldA'</span></a></span></span><span> </span><span id="local-6989586621680985605"><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985605"><span class="hs-identifier hs-var">oldB'</span></a></span></span><span> </span><span id="local-6989586621680985604"><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985604"><span class="hs-identifier hs-var">liquidity</span></a></span></span><span> </span><span id="local-6989586621680985603"><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985603"><span class="hs-identifier hs-var">delA'</span></a></span></span><span> </span><span id="local-6989586621680985602"><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985602"><span class="hs-identifier hs-var">delB'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Rational -&gt; Sqrt
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">rsqrt</span></a></span><span> </span><span class="annot"><span class="annottext">Rational
+</span><a href="#local-6989586621680985600"><span class="hs-identifier hs-var">ratio</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-34"></span><span>    </span><span class="annot"><span class="annottext">Sqrt
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">Imaginary</span></a></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">BuiltinString -&gt; Amount Liquidity
+forall a. BuiltinString -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceError</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;insufficient liquidity&quot;</span></span><span>
+</span><span id="line-35"></span><span>    </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">Exactly</span></a></span><span> </span><span id="local-6989586621680985598"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985598"><span class="hs-identifier hs-var">x</span></a></span></span><span>       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Amount Liquidity
+forall a. Integer -&gt; Amount a
+</span><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-var">Amount</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985598"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Amount Liquidity -&gt; Amount Liquidity
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985604"><span class="hs-identifier hs-var">liquidity</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">Approximately</span></a></span><span> </span><span id="local-6989586621680985596"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985596"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Amount Liquidity
+forall a. Integer -&gt; Amount a
+</span><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-var">Amount</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985596"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Amount Liquidity -&gt; Amount Liquidity
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985604"><span class="hs-identifier hs-var">liquidity</span></a></span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-38"></span><span>    </span><span id="local-6989586621680985600"><span class="annot"><span class="annottext">ratio :: Rational
+</span><a href="#local-6989586621680985600"><span class="hs-identifier hs-var hs-var">ratio</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Rational
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">unsafeRatio</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985604"><span class="hs-identifier hs-var">liquidity</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Amount Liquidity -&gt; Amount Liquidity
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985604"><span class="hs-identifier hs-var">liquidity</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Amount Liquidity -&gt; Amount Liquidity
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985594"><span class="hs-identifier hs-var">newProd</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985593"><span class="hs-identifier hs-var">oldProd</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-comment">-- Unwrap, as we're combining terms</span><span>
+</span><span id="line-41"></span><span>    </span><span id="local-6989586621680985592"><span class="annot"><span class="annottext">oldA :: Integer
+</span><a href="#local-6989586621680985592"><span class="hs-identifier hs-var hs-var">oldA</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount A -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985606"><span class="hs-identifier hs-var">oldA'</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span id="local-6989586621680985591"><span class="annot"><span class="annottext">oldB :: Integer
+</span><a href="#local-6989586621680985591"><span class="hs-identifier hs-var hs-var">oldB</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount B -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985605"><span class="hs-identifier hs-var">oldB'</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span id="local-6989586621680985590"><span class="annot"><span class="annottext">delA :: Integer
+</span><a href="#local-6989586621680985590"><span class="hs-identifier hs-var hs-var">delA</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount A -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985603"><span class="hs-identifier hs-var">delA'</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span id="local-6989586621680985589"><span class="annot"><span class="annottext">delB :: Integer
+</span><a href="#local-6989586621680985589"><span class="hs-identifier hs-var hs-var">delB</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount B -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985602"><span class="hs-identifier hs-var">delB'</span></a></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span>    </span><span class="annot"><a href="#local-6989586621680985593"><span class="hs-identifier hs-type">oldProd</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680985594"><span class="hs-identifier hs-type">newProd</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Liquidity"><span class="hs-identifier hs-type">Liquidity</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span id="local-6989586621680985593"><span class="annot"><span class="annottext">oldProd :: Amount Liquidity
+</span><a href="#local-6989586621680985593"><span class="hs-identifier hs-var hs-var">oldProd</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Amount Liquidity
+forall a. Integer -&gt; Amount a
+</span><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-var">Amount</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Amount Liquidity) -&gt; Integer -&gt; Amount Liquidity
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985592"><span class="hs-identifier hs-var">oldA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985591"><span class="hs-identifier hs-var">oldB</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span id="local-6989586621680985594"><span class="annot"><span class="annottext">newProd :: Amount Liquidity
+</span><a href="#local-6989586621680985594"><span class="hs-identifier hs-var hs-var">newProd</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Amount Liquidity
+forall a. Integer -&gt; Amount a
+</span><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-var">Amount</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Amount Liquidity) -&gt; Integer -&gt; Amount Liquidity
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985592"><span class="hs-identifier hs-var">oldA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985590"><span class="hs-identifier hs-var">delA</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985591"><span class="hs-identifier hs-var">oldB</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985589"><span class="hs-identifier hs-var">delB</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateRemoval"><span class="hs-pragma hs-type">calculateRemoval</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | See Definition 3 of &lt;https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf&gt;.</span><span>
+</span><span id="line-52"></span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#calculateRemoval"><span class="hs-identifier hs-type">calculateRemoval</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Liquidity"><span class="hs-identifier hs-type">Liquidity</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Liquidity"><span class="hs-identifier hs-type">Liquidity</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span id="calculateRemoval"><span class="annot"><span class="annottext">calculateRemoval :: Amount A
+-&gt; Amount B
+-&gt; Amount Liquidity
+-&gt; Amount Liquidity
+-&gt; (Amount A, Amount B)
+</span><a href="Plutus.Contracts.Uniswap.Pool.html#calculateRemoval"><span class="hs-identifier hs-var hs-var">calculateRemoval</span></a></span></span><span> </span><span id="local-6989586621680985588"><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985588"><span class="hs-identifier hs-var">inA</span></a></span></span><span> </span><span id="local-6989586621680985587"><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985587"><span class="hs-identifier hs-var">inB</span></a></span></span><span> </span><span id="local-6989586621680985586"><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985586"><span class="hs-identifier hs-var">liquidity'</span></a></span></span><span> </span><span id="local-6989586621680985585"><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985585"><span class="hs-identifier hs-var">diff'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Amount A -&gt; Amount A
+forall a. Amount a -&gt; Amount a
+</span><a href="#local-6989586621680985584"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985588"><span class="hs-identifier hs-var">inA</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Amount B -&gt; Amount B
+forall a. Amount a -&gt; Amount a
+</span><a href="#local-6989586621680985584"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985587"><span class="hs-identifier hs-var">inB</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>    </span><span id="local-6989586621680985642"><span class="annot"><a href="#local-6989586621680985584"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680985642"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680985642"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-56"></span><span>    </span><span id="local-6989586621680985584"><span class="annot"><span class="annottext">f :: Amount a -&gt; Amount a
+</span><a href="#local-6989586621680985584"><span class="hs-identifier hs-var hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Amount a
+forall a. Integer -&gt; Amount a
+</span><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-var">Amount</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Amount a)
+-&gt; (Amount a -&gt; Integer) -&gt; Amount a -&gt; Amount a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer
+</span><a href="#local-6989586621680985582"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Integer)
+-&gt; (Amount a -&gt; Integer) -&gt; Amount a -&gt; Integer
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Amount a -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span>    </span><span id="local-6989586621680985581"><span class="annot"><span class="annottext">diff :: Integer
+</span><a href="#local-6989586621680985581"><span class="hs-identifier hs-var hs-var">diff</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985585"><span class="hs-identifier hs-var">diff'</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621680985580"><span class="annot"><span class="annottext">liquidity :: Integer
+</span><a href="#local-6989586621680985580"><span class="hs-identifier hs-var hs-var">liquidity</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount Liquidity -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount Liquidity
+</span><a href="#local-6989586621680985586"><span class="hs-identifier hs-var">liquidity'</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><a href="#local-6989586621680985582"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span id="local-6989586621680985582"><span class="annot"><span class="annottext">g :: Integer -&gt; Integer
+</span><a href="#local-6989586621680985582"><span class="hs-identifier hs-var hs-var">g</span></a></span></span><span> </span><span id="local-6989586621680985579"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985579"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985579"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">divide</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985579"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985581"><span class="hs-identifier hs-var">diff</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985580"><span class="hs-identifier hs-var">liquidity</span></a></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#checkSwap"><span class="hs-pragma hs-type">checkSwap</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-65"></span><span class="hs-comment">-- | A swap is valid if the fee is computed correctly, and we're swapping some</span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- positive amount of A for B.  See: &lt;https://uniswap.org/whitepaper.pdf&gt; Eq (11) (Page 7.)</span><span>
+</span><span id="line-67"></span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#checkSwap"><span class="hs-identifier hs-type">checkSwap</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#A"><span class="hs-identifier hs-type">A</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#Amount"><span class="hs-identifier hs-type">Amount</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-68"></span><span id="checkSwap"><span class="annot"><span class="annottext">checkSwap :: Amount A -&gt; Amount B -&gt; Amount A -&gt; Amount B -&gt; Bool
+</span><a href="Plutus.Contracts.Uniswap.Pool.html#checkSwap"><span class="hs-identifier hs-var hs-var">checkSwap</span></a></span></span><span> </span><span id="local-6989586621680985577"><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985577"><span class="hs-identifier hs-var">oldA'</span></a></span></span><span> </span><span id="local-6989586621680985576"><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985576"><span class="hs-identifier hs-var">oldB'</span></a></span></span><span> </span><span id="local-6989586621680985575"><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985575"><span class="hs-identifier hs-var">newA'</span></a></span></span><span> </span><span id="local-6989586621680985574"><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985574"><span class="hs-identifier hs-var">newB'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-69"></span><span>    </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;expected positive oldA&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985572"><span class="hs-identifier hs-var">oldA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;expected positive oldB&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985570"><span class="hs-identifier hs-var">oldB</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;expected positive-newA&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985569"><span class="hs-identifier hs-var">newA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;expected positive-newB&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985568"><span class="hs-identifier hs-var">newB</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;expected product to increase&quot;</span></span><span>
+</span><span id="line-74"></span><span>        </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985569"><span class="hs-identifier hs-var">newA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985567"><span class="hs-identifier hs-var">feeDen</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985566"><span class="hs-identifier hs-var">inA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985565"><span class="hs-identifier hs-var">feeNum</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985568"><span class="hs-identifier hs-var">newB</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985567"><span class="hs-identifier hs-var">feeDen</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985564"><span class="hs-identifier hs-var">inB</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985565"><span class="hs-identifier hs-var">feeNum</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>         </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;=</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985567"><span class="hs-identifier hs-var">feeDen</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985567"><span class="hs-identifier hs-var">feeDen</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985572"><span class="hs-identifier hs-var">oldA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. MultiplicativeSemigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985570"><span class="hs-identifier hs-var">oldB</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-comment">-- Unwrap; because we are mixing terms.</span><span>
+</span><span id="line-78"></span><span>    </span><span id="local-6989586621680985572"><span class="annot"><span class="annottext">oldA :: Integer
+</span><a href="#local-6989586621680985572"><span class="hs-identifier hs-var hs-var">oldA</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount A -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985577"><span class="hs-identifier hs-var">oldA'</span></a></span><span>
+</span><span id="line-79"></span><span>    </span><span id="local-6989586621680985570"><span class="annot"><span class="annottext">oldB :: Integer
+</span><a href="#local-6989586621680985570"><span class="hs-identifier hs-var hs-var">oldB</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount B -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985576"><span class="hs-identifier hs-var">oldB'</span></a></span><span>
+</span><span id="line-80"></span><span>    </span><span id="local-6989586621680985569"><span class="annot"><span class="annottext">newA :: Integer
+</span><a href="#local-6989586621680985569"><span class="hs-identifier hs-var hs-var">newA</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount A -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount A
+</span><a href="#local-6989586621680985575"><span class="hs-identifier hs-var">newA'</span></a></span><span>
+</span><span id="line-81"></span><span>    </span><span id="local-6989586621680985568"><span class="annot"><span class="annottext">newB :: Integer
+</span><a href="#local-6989586621680985568"><span class="hs-identifier hs-var hs-var">newB</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Amount B -&gt; Integer
+forall a. Amount a -&gt; Integer
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unAmount"><span class="hs-identifier hs-var hs-var">unAmount</span></a></span><span> </span><span class="annot"><span class="annottext">Amount B
+</span><a href="#local-6989586621680985574"><span class="hs-identifier hs-var">newB'</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span>    </span><span id="local-6989586621680985566"><span class="annot"><span class="annottext">inA :: Integer
+</span><a href="#local-6989586621680985566"><span class="hs-identifier hs-var hs-var">inA</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">max</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Integer) -&gt; Integer -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985569"><span class="hs-identifier hs-var">newA</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985572"><span class="hs-identifier hs-var">oldA</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span id="local-6989586621680985564"><span class="annot"><span class="annottext">inB :: Integer
+</span><a href="#local-6989586621680985564"><span class="hs-identifier hs-var hs-var">inB</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">max</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Integer) -&gt; Integer -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985568"><span class="hs-identifier hs-var">newB</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. AdditiveGroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680985570"><span class="hs-identifier hs-var">oldB</span></a></span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-comment">-- The uniswap fee is 0.3%; here it is multiplied by 1000, so that the</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">-- on-chain code deals only in integers.</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-comment">-- See: &lt;https://uniswap.org/whitepaper.pdf&gt; Eq (11) (Page 7.)</span><span>
+</span><span id="line-88"></span><span>    </span><span class="annot"><a href="#local-6989586621680985565"><span class="hs-identifier hs-type">feeNum</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680985567"><span class="hs-identifier hs-type">feeDen</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-89"></span><span>    </span><span id="local-6989586621680985565"><span class="annot"><span class="annottext">feeNum :: Integer
+</span><a href="#local-6989586621680985565"><span class="hs-identifier hs-var hs-var">feeNum</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">3</span></span><span>
+</span><span id="line-90"></span><span>    </span><span id="local-6989586621680985567"><span class="annot"><span class="annottext">feeDen :: Integer
+</span><a href="#local-6989586621680985567"><span class="hs-identifier hs-var hs-var">feeDen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1000</span></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#lpTicker"><span class="hs-pragma hs-type">lpTicker</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- | Generate a unique token name for this particular pool; based on the</span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- tokens it exchanges. This should be such that looking for a pool exchanging</span><span>
+</span><span id="line-95"></span><span class="hs-comment">-- any two tokens always yields a unique name.</span><span>
+</span><span id="line-96"></span><span class="annot"><a href="Plutus.Contracts.Uniswap.Pool.html#lpTicker"><span class="hs-identifier hs-type">lpTicker</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#LiquidityPool"><span class="hs-identifier hs-type">LiquidityPool</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span>
+</span><span id="line-97"></span><span id="lpTicker"><span class="annot"><span class="annottext">lpTicker :: LiquidityPool -&gt; TokenName
+</span><a href="Plutus.Contracts.Uniswap.Pool.html#lpTicker"><span class="hs-identifier hs-var hs-var">lpTicker</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Uniswap.Types.html#LiquidityPool"><span class="hs-identifier hs-type">LiquidityPool</span></a></span><span class="hs-special">{</span><span id="local-6989586621680985559"><span id="local-6989586621680985560"><span class="annot"><span class="annottext">Coin A
+Coin B
+lpCoinB :: LiquidityPool -&gt; Coin B
+lpCoinA :: LiquidityPool -&gt; Coin A
+lpCoinB :: Coin B
+lpCoinA :: Coin A
+</span><a href="Plutus.Contracts.Uniswap.Types.html#lpCoinB"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; TokenName
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">TokenName</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680985555"><span class="hs-identifier hs-var">hash</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>      </span><span id="local-6989586621680985554"><span class="annot"><span class="annottext">cA :: (CurrencySymbol, TokenName)
+</span><a href="#local-6989586621680985554"><span class="hs-identifier hs-var">cA</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span id="local-6989586621680985553"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985553"><span class="hs-identifier hs-var">csA</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680985552"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985552"><span class="hs-identifier hs-var">tokA</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">AssetClass -&gt; (CurrencySymbol, TokenName)
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">unAssetClass</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Coin A -&gt; AssetClass
+forall a. Coin a -&gt; AssetClass
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unCoin"><span class="hs-identifier hs-var hs-var">unCoin</span></a></span><span> </span><span class="annot"><span class="annottext">Coin A
+</span><a href="#local-6989586621680985560"><span class="hs-identifier hs-var">lpCoinA</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-100"></span><span>      </span><span id="local-6989586621680985550"><span class="annot"><span class="annottext">cB :: (CurrencySymbol, TokenName)
+</span><a href="#local-6989586621680985550"><span class="hs-identifier hs-var">cB</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span id="local-6989586621680985549"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985549"><span class="hs-identifier hs-var">csB</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680985548"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985548"><span class="hs-identifier hs-var">tokB</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">AssetClass -&gt; (CurrencySymbol, TokenName)
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">unAssetClass</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Coin B -&gt; AssetClass
+forall a. Coin a -&gt; AssetClass
+</span><a href="Plutus.Contracts.Uniswap.Types.html#unCoin"><span class="hs-identifier hs-var hs-var">unCoin</span></a></span><span> </span><span class="annot"><span class="annottext">Coin B
+</span><a href="#local-6989586621680985559"><span class="hs-identifier hs-var">lpCoinB</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>      </span><span class="hs-special">(</span><span class="hs-special">(</span><span id="local-6989586621680985547"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985547"><span class="hs-identifier hs-var">x1</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680985546"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985546"><span class="hs-identifier hs-var">y1</span></a></span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680985545"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985545"><span class="hs-identifier hs-var">x2</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680985544"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985544"><span class="hs-identifier hs-var">y2</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">(CurrencySymbol, TokenName)
+</span><a href="#local-6989586621680985554"><span class="hs-identifier hs-var">cA</span></a></span><span> </span><span class="annot"><span class="annottext">(CurrencySymbol, TokenName) -&gt; (CurrencySymbol, TokenName) -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">(CurrencySymbol, TokenName)
+</span><a href="#local-6989586621680985550"><span class="hs-identifier hs-var">cB</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985553"><span class="hs-identifier hs-var">csA</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985552"><span class="hs-identifier hs-var">tokA</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985549"><span class="hs-identifier hs-var">csB</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985548"><span class="hs-identifier hs-var">tokB</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985549"><span class="hs-identifier hs-var">csB</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985548"><span class="hs-identifier hs-var">tokB</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985553"><span class="hs-identifier hs-var">csA</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985552"><span class="hs-identifier hs-var">tokA</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span>      </span><span id="local-6989586621680985542"><span class="annot"><span class="annottext">h1 :: BuiltinByteString
+</span><a href="#local-6989586621680985542"><span class="hs-identifier hs-var hs-var">h1</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; BuiltinByteString)
+-&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName -&gt; BuiltinByteString
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">unTokenName</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985546"><span class="hs-identifier hs-var">y1</span></a></span><span>
+</span><span id="line-105"></span><span>      </span><span id="local-6989586621680985539"><span class="annot"><span class="annottext">h2 :: BuiltinByteString
+</span><a href="#local-6989586621680985539"><span class="hs-identifier hs-var hs-var">h2</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; BuiltinByteString)
+-&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName -&gt; BuiltinByteString
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">unTokenName</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680985544"><span class="hs-identifier hs-var">y2</span></a></span><span>
+</span><span id="line-106"></span><span>      </span><span id="local-6989586621680985538"><span class="annot"><span class="annottext">h3 :: BuiltinByteString
+</span><a href="#local-6989586621680985538"><span class="hs-identifier hs-var hs-var">h3</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; BuiltinByteString)
+-&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; BuiltinByteString
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">unCurrencySymbol</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985547"><span class="hs-identifier hs-var">x1</span></a></span><span>
+</span><span id="line-107"></span><span>      </span><span id="local-6989586621680985537"><span class="annot"><span class="annottext">h4 :: BuiltinByteString
+</span><a href="#local-6989586621680985537"><span class="hs-identifier hs-var hs-var">h4</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; BuiltinByteString)
+-&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; BuiltinByteString
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">unCurrencySymbol</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680985545"><span class="hs-identifier hs-var">x2</span></a></span><span>
+</span><span id="line-108"></span><span>      </span><span id="local-6989586621680985555"><span class="annot"><span class="annottext">hash :: BuiltinByteString
+</span><a href="#local-6989586621680985555"><span class="hs-identifier hs-var hs-var">hash</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">sha2_256</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; BuiltinByteString)
+-&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680985542"><span class="hs-identifier hs-var">h1</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680985539"><span class="hs-identifier hs-var">h2</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680985538"><span class="hs-identifier hs-var">h3</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; BuiltinByteString -&gt; BuiltinByteString
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString
+</span><a href="#local-6989586621680985537"><span class="hs-identifier hs-var">h4</span></a></span><span>
+</span><span id="line-109"></span></pre></body></html>
