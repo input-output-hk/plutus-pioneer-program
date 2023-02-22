@@ -12,6 +12,16 @@ This repository contains the lectures, code examples, homework, and installation
 
 This documentation looks better in GitBook at the following link: <https://iog-academy.gitbook.io/plutus-pioneers-program-fourth-cohort/>
 
+## Lectures
+
+* [Lecture 1](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3xFHJJKdyfo9eB0Iw-OQDd)
+  * [Welcome and Introduction](https://youtu.be/g4fBo4QPir0)
+  * [Setting up Our Development Environment](https://youtu.be/-cmIqKCzzOU)
+  * [Kuber Marketplace Demo](https://youtu.be/ZaB-7ZYBi3g)
+  * [Hashing & Digital Signatures](https://youtu.be/f-WKPWbk9Jg)
+  * [The EUTxO-Model](https://youtu.be/ulYDNaEKf4g)
+  * [Homework](https://youtu.be/Ey903I-R1KY)
+
 ## Repository Structure
 
 The most relevant directories of this repository are structured as follows:
