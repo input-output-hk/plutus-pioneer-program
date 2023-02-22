@@ -119,11 +119,18 @@ RUN echo "alias start-node='cardano-node run \
 
 FROM cardano_node as kuber
 
+# In case we need to build from source
 # install kuber
-RUN git clone https://github.com/dQuadrant/kuber \
-  && cd kuber \
-  && cabal update \
-  && cd server \
-  && cabal build \
-  && cabal install
+#RUN git clone https://github.com/dQuadrant/kuber \
+#  && cd kuber \
+#  && cabal update \
+#  && cd server \
+#  && cabal build \
+#  && cabal install
+
+# install kuber
+RUN wget https://github.com/rober-m/kuber/releases/download/babbage-era/$(arch)-linux-kuber \
+  && chmod +x $(arch)-linux-kuber \
+  && mv $(arch)-linux-kuber /usr/bin/kuber \
+  && echo "export NETWORK=preview" >> ~/.bashrc
 
