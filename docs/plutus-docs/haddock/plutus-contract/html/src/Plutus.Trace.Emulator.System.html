@@ -1,0 +1,525 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE AllowAmbiguousTypes #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DataKinds           #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts    #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase          #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE MonoLocalBinds      #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators       #-}</span><span>
+</span><span id="line-9"></span><span class="hs-comment">{-
+
+Defines the system threads. One thread for each simulated agent, and a block
+maker thread for the blockchain / network.
+
+-}</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Trace.Emulator.System</span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#launchSystemThreads"><span class="hs-identifier">launchSystemThreads</span></a></span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#appendNewTipBlock"><span class="hs-identifier">appendNewTipBlock</span></a></span><span>
+</span><span id="line-18"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Chain</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">ChainControlEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">modifySlot</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">processBlock</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">forM_</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Coroutine</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/snd5q6v3qrq7cdxpn9nlwg98vvy50j53-data-default-lib-data-default-0.7.1.1-haddock-doc/share/doc/data-default/html/src"><span class="hs-identifier">Data.Default</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier">def</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Foldable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">traverse_</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">maybeToList</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html"><span class="hs-identifier">Wallet.Emulator.MultiAgent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentControlEffect"><span class="hs-identifier">MultiAgentControlEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentEffect"><span class="hs-identifier">MultiAgentEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#walletAction"><span class="hs-identifier">walletAction</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#walletControlAction"><span class="hs-identifier">walletControlAction</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.String</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">IsString</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Block</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Slot</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.ChainIndex</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">ChainIndexControlEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">ChainSyncBlock</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Block</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Tip</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Tip</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">TipAtGenesis</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">appendBlocks</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>                          </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">blockId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">fromOnChainTx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">getTip</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html"><span class="hs-identifier">Plutus.Trace.Emulator.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier">EmulatorMessage</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Trace.Scheduler.html"><span class="hs-identifier">Plutus.Trace.Scheduler</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Scheduler.html#EmSystemCall"><span class="hs-identifier">EmSystemCall</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Scheduler.html#MessageCall"><span class="hs-identifier">MessageCall</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Scheduler.html#Priority"><span class="hs-identifier">Priority</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Tag.html#Tag"><span class="hs-identifier">Tag</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Scheduler.html#fork"><span class="hs-identifier">fork</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Scheduler.html#mkSysCall"><span class="hs-identifier">mkSysCall</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Scheduler.html#sleep"><span class="hs-identifier">sleep</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.NodeClient.html"><span class="hs-identifier">Wallet.Emulator.NodeClient</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.NodeClient.html#ChainClientNotification"><span class="hs-identifier">ChainClientNotification</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Emulator.NodeClient.html#clientNotify"><span class="hs-identifier">clientNotify</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html"><span class="hs-identifier">Wallet.Emulator.Wallet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier">Wallet</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-comment">{- Note [Simulator Time]
+
+Simulator time is measured in slots, and the current time is part of the state
+of the emulated node. Advancing the clock is done by the 'blockMaker' thread, a
+thread that does nothing but produce a new block &amp; slot each time it is woken
+up.
+
+Threads that need to do to multiple things in the same slot (for example,
+contract instances handling several requests) suspend themselves with the
+'Normal' priority. The block maker thread suspends itself with 'Sleeping', so
+every time it is woken up, all threads with the 'Normal' priority have been
+processed. As a result, the simulated clock advances to the next slot whenever
+there is nothing left to do in the current slot.
+
+-}</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">{- Note [Simulated Agents]
+
+Each of the simulated agents runs its own thread. The agent listens to block
+added and slot changed notifications, and updates its chain index accordingly.
+
+Every contract instance runs in the context of an agent. If we want to test how
+a contract instance reacts to network issues, we can freeze the agent's thread
+and unfreeze it later on. While frozen, the agent thread will not update its
+internal chain index, so it keeps an outdated view of the blockchain. When the
+thread is unfrozen, it will receive &amp; process all blockchain events since the
+last time it ran in the order they arrived. So no messages are dropped - they
+just arrive later.
+
+-}</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- | Start the system threads.</span><span>
+</span><span id="line-70"></span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#launchSystemThreads"><span class="hs-identifier hs-type">launchSystemThreads</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680829489"><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span></span><span> </span><span id="local-6989586621680829488"><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">ChainControlEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentEffect"><span class="hs-identifier hs-type">MultiAgentEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentControlEffect"><span class="hs-identifier hs-type">MultiAgentControlEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Yield</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Scheduler.html#EmSystemCall"><span class="hs-identifier hs-type">EmSystemCall</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span id="launchSystemThreads"><span class="annot"><span class="annottext">launchSystemThreads :: [Wallet]
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+</span><a href="Plutus.Trace.Emulator.System.html#launchSystemThreads"><span class="hs-identifier hs-var hs-var">launchSystemThreads</span></a></span></span><span> </span><span id="local-6989586621680829487"><span class="annot"><span class="annottext">[Wallet]
+</span><a href="#local-6989586621680829487"><span class="hs-identifier hs-var">wallets</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-78"></span><span>    </span><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Priority
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     (Maybe EmulatorMessage)
+forall (effs :: [* -&gt; *]) systemEvent (effs2 :: [* -&gt; *]) a.
+Member
+  (Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent))
+  effs2 =&gt;
+Priority -&gt; Eff effs2 (Maybe systemEvent)
+</span><a href="Plutus.Trace.Scheduler.html#sleep"><span class="hs-identifier hs-var">sleep</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Priority
+</span><a href="Plutus.Trace.Scheduler.html#Sleeping"><span class="hs-identifier hs-var">Sleeping</span></a></span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-comment">-- 1. Threads for updating the agents' states. See note [Simulated Agents]</span><span>
+</span><span id="line-80"></span><span>    </span><span class="annot"><span class="annottext">(Wallet
+ -&gt; Eff
+      (Yield
+         (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+         : effs)
+      (Maybe EmulatorMessage))
+-&gt; [Wallet]
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Foldable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">traverse_</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680829485"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829485"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Tag
+-&gt; Priority
+-&gt; Eff
+     (Reader ThreadId
+        : Yield
+            (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     (Maybe EmulatorMessage)
+forall (effs :: [* -&gt; *]) systemEvent (effs2 :: [* -&gt; *]) a.
+Member
+  (Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent))
+  effs2 =&gt;
+Tag
+-&gt; Priority
+-&gt; Eff
+     (Reader ThreadId
+        : Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent)
+        : effs)
+     ()
+-&gt; Eff effs2 (Maybe systemEvent)
+</span><a href="Plutus.Trace.Scheduler.html#fork"><span class="hs-identifier hs-var">fork</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Wallet -&gt; Tag
+</span><a href="Plutus.Trace.Emulator.System.html#agentTag"><span class="hs-identifier hs-var">agentTag</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829485"><span class="hs-identifier hs-var">w</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Priority
+</span><a href="Plutus.Trace.Scheduler.html#Normal"><span class="hs-identifier hs-var">Normal</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff
+   (Reader ThreadId
+      : Yield
+          (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+      : effs)
+   ()
+ -&gt; Eff
+      (Yield
+         (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+         : effs)
+      (Maybe EmulatorMessage))
+-&gt; Eff
+     (Reader ThreadId
+        : Yield
+            (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     (Maybe EmulatorMessage)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+-&gt; Eff
+     (Reader ThreadId
+        : Yield
+            (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+forall (effs :: [* -&gt; *]) (effs2 :: [* -&gt; *]) a.
+(Member MultiAgentEffect effs2,
+ Member MultiAgentControlEffect effs2,
+ Member
+   (Yield
+      (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage))
+   effs2) =&gt;
+Wallet -&gt; Eff effs2 ()
+</span><a href="Plutus.Trace.Emulator.System.html#agentThread"><span class="hs-identifier hs-var">agentThread</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829485"><span class="hs-identifier hs-var">w</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Wallet]
+</span><a href="#local-6989586621680829487"><span class="hs-identifier hs-var">wallets</span></a></span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-comment">-- 2. Block maker thread. See note [Simulator Time]</span><span>
+</span><span id="line-82"></span><span>    </span><span class="annot"><span class="annottext">Eff
+  (Yield
+     (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+     : effs)
+  (Maybe EmulatorMessage)
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff
+   (Yield
+      (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+      : effs)
+   (Maybe EmulatorMessage)
+ -&gt; Eff
+      (Yield
+         (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+         : effs)
+      ())
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     (Maybe EmulatorMessage)
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Tag
+-&gt; Priority
+-&gt; Eff
+     (Reader ThreadId
+        : Yield
+            (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     ()
+-&gt; Eff
+     (Yield
+        (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+        : effs)
+     (Maybe EmulatorMessage)
+forall (effs :: [* -&gt; *]) systemEvent (effs2 :: [* -&gt; *]) a.
+Member
+  (Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent))
+  effs2 =&gt;
+Tag
+-&gt; Priority
+-&gt; Eff
+     (Reader ThreadId
+        : Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent)
+        : effs)
+     ()
+-&gt; Eff effs2 (Maybe systemEvent)
+</span><a href="Plutus.Trace.Scheduler.html#fork"><span class="hs-identifier hs-var">fork</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Tag
+</span><a href="Plutus.Trace.Emulator.System.html#blockMakerTag"><span class="hs-identifier hs-var">blockMakerTag</span></a></span><span> </span><span class="annot"><span class="annottext">Priority
+</span><a href="Plutus.Trace.Scheduler.html#Normal"><span class="hs-identifier hs-var">Normal</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Member
+   ChainControlEffect
+   (Reader ThreadId
+      : Yield
+          (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+      : effs),
+ Member
+   (Yield
+      (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage))
+   (Reader ThreadId
+      : Yield
+          (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+      : effs)) =&gt;
+Eff
+  (Reader ThreadId
+     : Yield
+         (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage)
+     : effs)
+  ()
+forall (effs :: [* -&gt; *]) (effs2 :: [* -&gt; *]) a.
+(Member ChainControlEffect effs2,
+ Member
+   (Yield
+      (EmSystemCall effs EmulatorMessage a) (Maybe EmulatorMessage))
+   effs2) =&gt;
+Eff effs2 ()
+</span><a href="Plutus.Trace.Emulator.System.html#blockMaker"><span class="hs-identifier hs-var">blockMaker</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829489"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829488"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- | Tag for an agent thread. See note [Thread Tag]</span><span>
+</span><span id="line-85"></span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#agentTag"><span class="hs-identifier hs-type">agentTag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Trace.Tag.html#Tag"><span class="hs-identifier hs-type">Tag</span></a></span><span>
+</span><span id="line-86"></span><span id="agentTag"><span class="annot"><span class="annottext">agentTag :: Wallet -&gt; Tag
+</span><a href="Plutus.Trace.Emulator.System.html#agentTag"><span class="hs-identifier hs-var hs-var">agentTag</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe String
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680829478"><span class="annot"><span class="annottext">WalletId
+</span><a href="#local-6989586621680829478"><span class="hs-identifier hs-var">i</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Tag
+forall a. IsString a =&gt; String -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromString</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;W &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">WalletId -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">WalletId
+</span><a href="#local-6989586621680829478"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- | Tag for the block maker thread. See note [Thread Tag]</span><span>
+</span><span id="line-89"></span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#blockMakerTag"><span class="hs-identifier hs-type">blockMakerTag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Trace.Tag.html#Tag"><span class="hs-identifier hs-type">Tag</span></a></span><span>
+</span><span id="line-90"></span><span id="blockMakerTag"><span class="annot"><span class="annottext">blockMakerTag :: Tag
+</span><a href="Plutus.Trace.Emulator.System.html#blockMakerTag"><span class="hs-identifier hs-var hs-var">blockMakerTag</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tag
+</span><span class="hs-string">&quot;block maker&quot;</span></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- | The block maker thread. See note [Simulator Time]</span><span>
+</span><span id="line-93"></span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#blockMaker"><span class="hs-identifier hs-type">blockMaker</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680829577"><span class="annot"><a href="#local-6989586621680829577"><span class="hs-identifier hs-type">effs</span></a></span></span><span> </span><span id="local-6989586621680829578"><span class="annot"><a href="#local-6989586621680829578"><span class="hs-identifier hs-type">effs2</span></a></span></span><span> </span><span id="local-6989586621680829576"><span class="annot"><a href="#local-6989586621680829576"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-type">ChainControlEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829578"><span class="hs-identifier hs-type">effs2</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Yield</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Scheduler.html#EmSystemCall"><span class="hs-identifier hs-type">EmSystemCall</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829577"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829576"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680829578"><span class="hs-identifier hs-type">effs2</span></a></span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829578"><span class="hs-identifier hs-type">effs2</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-98"></span><span id="blockMaker"><span class="annot"><span class="annottext">blockMaker :: Eff effs2 ()
+</span><a href="Plutus.Trace.Emulator.System.html#blockMaker"><span class="hs-identifier hs-var hs-var">blockMaker</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Eff effs2 ()
+</span><a href="#local-6989586621680829476"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>    </span><span id="local-6989586621680829476"><span class="annot"><span class="annottext">go :: Eff effs2 ()
+</span><a href="#local-6989586621680829476"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-100"></span><span>        </span><span id="local-6989586621680829475"><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680829475"><span class="hs-identifier hs-var">newBlock</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Eff effs2 Block
+forall (effs :: [* -&gt; *]).
+Member ChainControlEffect effs =&gt;
+Eff effs Block
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">processBlock</span></a></span><span>
+</span><span id="line-101"></span><span>        </span><span id="local-6989586621680829474"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829474"><span class="hs-identifier hs-var">newSlot</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(Slot -&gt; Slot) -&gt; Eff effs2 Slot
+forall (effs :: [* -&gt; *]).
+Member ChainControlEffect effs =&gt;
+(Slot -&gt; Slot) -&gt; Eff effs Slot
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var">modifySlot</span></a></span><span> </span><span class="annot"><span class="annottext">Slot -&gt; Slot
+forall a. Enum a =&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">succ</span></a></span><span>
+</span><span id="line-102"></span><span>        </span><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Priority
+-&gt; SysCall effs EmulatorMessage a
+-&gt; Eff effs2 (Maybe EmulatorMessage)
+forall (effs :: [* -&gt; *]) systemEvent (effs2 :: [* -&gt; *]) a.
+Member
+  (Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent))
+  effs2 =&gt;
+Priority
+-&gt; SysCall effs systemEvent a -&gt; Eff effs2 (Maybe systemEvent)
+</span><a href="Plutus.Trace.Scheduler.html#mkSysCall"><span class="hs-identifier hs-var">mkSysCall</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829577"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829576"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Priority
+</span><a href="Plutus.Trace.Scheduler.html#Sleeping"><span class="hs-identifier hs-var">Sleeping</span></a></span><span> </span><span class="annot"><span class="annottext">(SysCall effs EmulatorMessage a
+ -&gt; Eff effs2 (Maybe EmulatorMessage))
+-&gt; SysCall effs EmulatorMessage a
+-&gt; Eff effs2 (Maybe EmulatorMessage)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">MessageCall EmulatorMessage -&gt; SysCall effs EmulatorMessage a
+forall a b. a -&gt; Either a b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">(MessageCall EmulatorMessage -&gt; SysCall effs EmulatorMessage a)
+-&gt; MessageCall EmulatorMessage -&gt; SysCall effs EmulatorMessage a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">EmulatorMessage -&gt; MessageCall EmulatorMessage
+forall systemEvent. systemEvent -&gt; MessageCall systemEvent
+</span><a href="Plutus.Trace.Scheduler.html#Broadcast"><span class="hs-identifier hs-var">Broadcast</span></a></span><span> </span><span class="annot"><span class="annottext">(EmulatorMessage -&gt; MessageCall EmulatorMessage)
+-&gt; EmulatorMessage -&gt; MessageCall EmulatorMessage
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[Block] -&gt; Slot -&gt; EmulatorMessage
+</span><a href="Plutus.Trace.Emulator.Types.html#NewSlot"><span class="hs-identifier hs-var">NewSlot</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680829475"><span class="hs-identifier hs-var">newBlock</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829474"><span class="hs-identifier hs-var">newSlot</span></a></span><span>
+</span><span id="line-103"></span><span>        </span><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Priority -&gt; Eff effs2 (Maybe EmulatorMessage)
+forall (effs :: [* -&gt; *]) systemEvent (effs2 :: [* -&gt; *]) a.
+Member
+  (Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent))
+  effs2 =&gt;
+Priority -&gt; Eff effs2 (Maybe systemEvent)
+</span><a href="Plutus.Trace.Scheduler.html#sleep"><span class="hs-identifier hs-var">sleep</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829577"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829578"><span class="hs-identifier hs-type">effs2</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829576"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Priority
+</span><a href="Plutus.Trace.Scheduler.html#Sleeping"><span class="hs-identifier hs-var">Sleeping</span></a></span><span>
+</span><span id="line-104"></span><span>        </span><span class="annot"><span class="annottext">Eff effs2 ()
+</span><a href="#local-6989586621680829476"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- | Thread for a simulated agent. See note [Simulated Agents]</span><span>
+</span><span id="line-107"></span><span class="annot"><a href="Plutus.Trace.Emulator.System.html#agentThread"><span class="hs-identifier hs-type">agentThread</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680829583"><span class="annot"><a href="#local-6989586621680829583"><span class="hs-identifier hs-type">effs</span></a></span></span><span> </span><span id="local-6989586621680829585"><span class="annot"><a href="#local-6989586621680829585"><span class="hs-identifier hs-type">effs2</span></a></span></span><span> </span><span id="local-6989586621680829582"><span class="annot"><a href="#local-6989586621680829582"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentEffect"><span class="hs-identifier hs-type">MultiAgentEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829585"><span class="hs-identifier hs-type">effs2</span></a></span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentControlEffect"><span class="hs-identifier hs-type">MultiAgentControlEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829585"><span class="hs-identifier hs-type">effs2</span></a></span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Yield</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Scheduler.html#EmSystemCall"><span class="hs-identifier hs-type">EmSystemCall</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829583"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829582"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680829585"><span class="hs-identifier hs-type">effs2</span></a></span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829585"><span class="hs-identifier hs-type">effs2</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-114"></span><span id="agentThread"><span class="annot"><span class="annottext">agentThread :: Wallet -&gt; Eff effs2 ()
+</span><a href="Plutus.Trace.Emulator.System.html#agentThread"><span class="hs-identifier hs-var hs-var">agentThread</span></a></span></span><span> </span><span id="local-6989586621680829470"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829470"><span class="hs-identifier hs-var">wllt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Eff effs2 ()
+</span><a href="#local-6989586621680829469"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-115"></span><span>    </span><span id="local-6989586621680829469"><span class="annot"><span class="annottext">go :: Eff effs2 ()
+</span><a href="#local-6989586621680829469"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-116"></span><span>        </span><span id="local-6989586621680829468"><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><a href="#local-6989586621680829468"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Priority -&gt; Eff effs2 (Maybe EmulatorMessage)
+forall (effs :: [* -&gt; *]) systemEvent (effs2 :: [* -&gt; *]) a.
+Member
+  (Yield (EmSystemCall effs systemEvent a) (Maybe systemEvent))
+  effs2 =&gt;
+Priority -&gt; Eff effs2 (Maybe systemEvent)
+</span><a href="Plutus.Trace.Scheduler.html#sleep"><span class="hs-identifier hs-var">sleep</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829583"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#EmulatorMessage"><span class="hs-identifier hs-type">EmulatorMessage</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680829582"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Priority
+</span><a href="Plutus.Trace.Scheduler.html#Sleeping"><span class="hs-identifier hs-var">Sleeping</span></a></span><span>
+</span><span id="line-117"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680829467"><span class="annot"><span class="annottext">clientNotis :: [ChainClientNotification]
+</span><a href="#local-6989586621680829467"><span class="hs-identifier hs-var hs-var">clientNotis</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe EmulatorMessage -&gt; [EmulatorMessage]
+forall a. Maybe a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">maybeToList</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><a href="#local-6989586621680829468"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="annot"><span class="annottext">[EmulatorMessage]
+-&gt; (EmulatorMessage -&gt; [ChainClientNotification])
+-&gt; [ChainClientNotification]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-118"></span><span>                </span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#NewSlot"><span class="hs-identifier hs-type">NewSlot</span></a></span><span> </span><span id="local-6989586621680829466"><span class="annot"><span class="annottext">[Block]
+</span><a href="#local-6989586621680829466"><span class="hs-identifier hs-var">blocks</span></a></span></span><span> </span><span id="local-6989586621680829465"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829465"><span class="hs-identifier hs-var">slot</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Block -&gt; ChainClientNotification)
+-&gt; [Block] -&gt; [ChainClientNotification]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Block -&gt; ChainClientNotification
+</span><a href="Wallet.Emulator.NodeClient.html#BlockValidated"><span class="hs-identifier hs-var">BlockValidated</span></a></span><span> </span><span class="annot"><span class="annottext">[Block]
+</span><a href="#local-6989586621680829466"><span class="hs-identifier hs-var">blocks</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainClientNotification]
+-&gt; [ChainClientNotification] -&gt; [ChainClientNotification]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Slot -&gt; ChainClientNotification
+</span><a href="Wallet.Emulator.NodeClient.html#SlotChanged"><span class="hs-identifier hs-var">SlotChanged</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829465"><span class="hs-identifier hs-var">slot</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-119"></span><span>                </span><span class="annot"><span class="annottext">EmulatorMessage
+</span><span class="hs-identifier">_</span></span><span>                   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-120"></span><span>        </span><span class="annot"><span class="annottext">[ChainClientNotification]
+-&gt; (ChainClientNotification -&gt; Eff effs2 ()) -&gt; Eff effs2 ()
+forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Foldable t, Monad m) =&gt;
+t a -&gt; (a -&gt; m b) -&gt; m ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forM_</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainClientNotification]
+</span><a href="#local-6989586621680829467"><span class="hs-identifier hs-var">clientNotis</span></a></span><span> </span><span class="annot"><span class="annottext">((ChainClientNotification -&gt; Eff effs2 ()) -&gt; Eff effs2 ())
+-&gt; (ChainClientNotification -&gt; Eff effs2 ()) -&gt; Eff effs2 ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680829462"><span class="annot"><span class="annottext">ChainClientNotification
+</span><a href="#local-6989586621680829462"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Wallet -&gt; Eff EmulatedWalletControlEffects () -&gt; Eff effs2 ()
+forall (effs :: [* -&gt; *]) r.
+Member MultiAgentControlEffect effs =&gt;
+Wallet -&gt; Eff EmulatedWalletControlEffects r -&gt; Eff effs r
+</span><a href="Wallet.Emulator.MultiAgent.html#walletControlAction"><span class="hs-identifier hs-var">walletControlAction</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829470"><span class="hs-identifier hs-var">wllt</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff EmulatedWalletControlEffects () -&gt; Eff effs2 ())
+-&gt; Eff EmulatedWalletControlEffects () -&gt; Eff effs2 ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainClientNotification -&gt; Eff EmulatedWalletControlEffects ()
+forall (effs :: [* -&gt; *]).
+Member NodeClientControlEffect effs =&gt;
+ChainClientNotification -&gt; Eff effs ()
+</span><a href="Wallet.Emulator.NodeClient.html#clientNotify"><span class="hs-identifier hs-var">clientNotify</span></a></span><span> </span><span class="annot"><span class="annottext">ChainClientNotification
+</span><a href="#local-6989586621680829462"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span>        </span><span id="local-6989586621680829461"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680829461"><span class="hs-identifier hs-var">currentTip</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Wallet -&gt; Eff EmulatedWalletEffects Tip -&gt; Eff effs2 Tip
+forall (effs :: [* -&gt; *]) r.
+Member MultiAgentEffect effs =&gt;
+Wallet -&gt; Eff EmulatedWalletEffects r -&gt; Eff effs r
+</span><a href="Wallet.Emulator.MultiAgent.html#walletAction"><span class="hs-identifier hs-var">walletAction</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829470"><span class="hs-identifier hs-var">wllt</span></a></span><span> </span><span class="annot"><span class="annottext">Eff EmulatedWalletEffects Tip
+forall (effs :: [* -&gt; *]).
+Member ChainIndexQueryEffect effs =&gt;
+Eff effs Tip
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">getTip</span></a></span><span>
+</span><span id="line-123"></span><span>        </span><span class="annot"><span class="annottext">Wallet -&gt; Eff EmulatedWalletControlEffects () -&gt; Eff effs2 ()
+forall (effs :: [* -&gt; *]) r.
+Member MultiAgentControlEffect effs =&gt;
+Wallet -&gt; Eff EmulatedWalletControlEffects r -&gt; Eff effs r
+</span><a href="Wallet.Emulator.MultiAgent.html#walletControlAction"><span class="hs-identifier hs-var">walletControlAction</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829470"><span class="hs-identifier hs-var">wllt</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff EmulatedWalletControlEffects () -&gt; Eff effs2 ())
+-&gt; Eff EmulatedWalletControlEffects () -&gt; Eff effs2 ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-124"></span><span>          </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><a href="#local-6989586621680829468"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-125"></span><span>            </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Emulator.Types.html#NewSlot"><span class="hs-identifier hs-type">NewSlot</span></a></span><span> </span><span id="local-6989586621680829460"><span class="annot"><span class="annottext">[Block]
+</span><a href="#local-6989586621680829460"><span class="hs-identifier hs-var">blocks</span></a></span></span><span> </span><span id="local-6989586621680829459"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829459"><span class="hs-identifier hs-var">slot</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-126"></span><span>              </span><span class="annot"><span class="annottext">Tip -&gt; Block -&gt; Slot -&gt; Eff EmulatedWalletControlEffects ()
+forall (effs :: [* -&gt; *]).
+Member ChainIndexControlEffect effs =&gt;
+Tip -&gt; Block -&gt; Slot -&gt; Eff effs ()
+</span><a href="Plutus.Trace.Emulator.System.html#appendNewTipBlock"><span class="hs-identifier hs-var">appendNewTipBlock</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680829461"><span class="hs-identifier hs-var">currentTip</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Block] -&gt; Block
+forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">concat</span></a></span><span> </span><span class="annot"><span class="annottext">[Block]
+</span><a href="#local-6989586621680829460"><span class="hs-identifier hs-var">blocks</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829459"><span class="hs-identifier hs-var">slot</span></a></span><span>
+</span><span id="line-127"></span><span>            </span><span class="annot"><span class="annottext">Maybe EmulatorMessage
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; Eff EmulatedWalletControlEffects ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span>        </span><span class="annot"><span class="annottext">Eff effs2 ()
+</span><a href="#local-6989586621680829469"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-130"></span><span>
+</span><span id="line-131"></span><span class="hs-comment">-- | Append a block to the chain index for a specific slot.</span><span>
+</span><span id="line-132"></span><span id="local-6989586621680829526"><span class="annot"><a href="Plutus.Trace.Emulator.System.html#appendNewTipBlock"><span class="hs-identifier hs-type">appendNewTipBlock</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-133"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">ChainIndexControlEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829526"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-134"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span class="hs-comment">-- ^ Most recent tip</span><span>
+</span><span id="line-136"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Block</span></a></span><span> </span><span class="hs-comment">-- ^ List of transactions</span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span class="hs-comment">-- ^ Next slot to append the block</span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829526"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-139"></span><span id="appendNewTipBlock"><span class="annot"><span class="annottext">appendNewTipBlock :: Tip -&gt; Block -&gt; Slot -&gt; Eff effs ()
+</span><a href="Plutus.Trace.Emulator.System.html#appendNewTipBlock"><span class="hs-identifier hs-var hs-var">appendNewTipBlock</span></a></span></span><span> </span><span id="local-6989586621680829457"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680829457"><span class="hs-identifier hs-var">lastTip</span></a></span></span><span> </span><span id="local-6989586621680829456"><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680829456"><span class="hs-identifier hs-var">block</span></a></span></span><span> </span><span id="local-6989586621680829455"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829455"><span class="hs-identifier hs-var">newSlot</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-140"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680829454"><span class="annot"><span class="annottext">nextBlockNo :: BlockNumber
+</span><a href="#local-6989586621680829454"><span class="hs-identifier hs-var hs-var">nextBlockNo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680829457"><span class="hs-identifier hs-var">lastTip</span></a></span><span> </span><span class="hs-keyword">of</span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">TipAtGenesis</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">BlockNumber
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-141"></span><span>                                    </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680829453"><span class="annot"><span class="annottext">BlockNumber
+</span><a href="#local-6989586621680829453"><span class="hs-identifier hs-var">n</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">BlockNumber
+</span><a href="#local-6989586621680829453"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">BlockNumber -&gt; BlockNumber -&gt; BlockNumber
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">BlockNumber
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-142"></span><span>      </span><span id="local-6989586621680829451"><span class="annot"><span class="annottext">newTip :: Tip
+</span><a href="#local-6989586621680829451"><span class="hs-identifier hs-var hs-var">newTip</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Slot -&gt; BlockId -&gt; BlockNumber -&gt; Tip
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">Tip</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680829455"><span class="hs-identifier hs-var">newSlot</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Block -&gt; BlockId
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">blockId</span></a></span><span> </span><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680829456"><span class="hs-identifier hs-var">block</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">BlockNumber
+</span><a href="#local-6989586621680829454"><span class="hs-identifier hs-var">nextBlockNo</span></a></span><span>
+</span><span id="line-143"></span><span>  </span><span class="annot"><span class="annottext">[ChainSyncBlock] -&gt; Eff effs ()
+forall (effs :: [* -&gt; *]).
+Member ChainIndexControlEffect effs =&gt;
+[ChainSyncBlock] -&gt; Eff effs ()
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">appendBlocks</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Tip -&gt; [(ChainIndexTx, TxProcessOption)] -&gt; ChainSyncBlock
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">Block</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680829451"><span class="hs-identifier hs-var">newTip</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(OnChainTx -&gt; (ChainIndexTx, TxProcessOption))
+-&gt; Block -&gt; [(ChainIndexTx, TxProcessOption)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680829450"><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680829450"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OnChainTx -&gt; ChainIndexTx
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">fromOnChainTx</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680829450"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TxProcessOption
+forall a. Default a =&gt; a
+</span><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier hs-var">def</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Block
+</span><a href="#local-6989586621680829456"><span class="hs-identifier hs-var">block</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-144"></span></pre></body></html>

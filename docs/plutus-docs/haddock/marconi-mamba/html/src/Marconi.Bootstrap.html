@@ -1,0 +1,319 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- This module bootstraps the mamba JSON RPC server, it acts as a glue conntecting the</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- JSON-RPC, HttpServer, marconiIndexer, and marconi cache</span><span>
+</span><span id="line-4"></span><span class="hs-comment">--</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Marconi.Bootstrap</span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">atomically</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Exception</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">catch</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(^.)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List.NonEmpty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">fromList</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">nub</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">pack</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">defaultLayoutOptions</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">layoutPretty</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">pretty</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator">(&lt;+&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Prettyprinter.Render.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">renderStrict</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">Cardano.Api</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">AsType</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">AsShelleyAddress</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">ChainPoint</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">ChainPointAtGenesis</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier">deserialiseFromBech32</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Setup</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">withTrace</span></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Trace</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">logError</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Tracing</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">defaultConfigStdout</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">Cardano.Streaming</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">ChainSyncEventException</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">NoIntersectionFound</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier">withChainSyncEventStream</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Api.HttpServer.html"><span class="hs-identifier">Marconi.Api.HttpServer</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Http</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html"><span class="hs-identifier">Marconi.Api.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Api.Types.html#CliArgs"><span class="hs-identifier">CliArgs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Api.Types.html#CliArgs"><span class="hs-identifier">CliArgs</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#HasDBQueryEnv"><span class="hs-identifier">HasDBQueryEnv</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Api.Types.html#queryTMVar"><span class="hs-identifier">queryTMVar</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#HasJsonRpcEnv"><span class="hs-identifier">HasJsonRpcEnv</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Api.Types.html#queryEnv"><span class="hs-identifier">queryEnv</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>                          </span><span class="annot"><a href="Marconi.Api.Types.html#JsonRpcEnv"><span class="hs-identifier">JsonRpcEnv</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Api.Types.html#JsonRpcEnv"><span class="hs-identifier">JsonRpcEnv</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#_httpSettings"><span class="hs-identifier">_httpSettings</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#_queryEnv"><span class="hs-identifier">_queryEnv</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#RpcPortNumber"><span class="hs-identifier">RpcPortNumber</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">TargetAddresses</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>                          </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">UtxoQueryTMVar</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">UtxoQueryTMVar</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Marconi.Api.UtxoIndexersQuery.html"><span class="hs-identifier">Marconi.Api.UtxoIndexersQuery</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">QApi</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">Marconi.Indexers</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">mkIndexerStream</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">startIndexers</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier">utxoWorker</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier">Network.Wai.Handler.Warp</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier">defaultSettings</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier">setPort</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- | Bootstraps the JSON-RPC  http server with appropriate settings and marconi cache</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- this is just a wrapper for the bootstrapHttp in json-rpc package</span><span>
+</span><span id="line-31"></span><span class="annot"><a href="Marconi.Bootstrap.html#bootstrapJsonRpc"><span class="hs-identifier hs-type">bootstrapJsonRpc</span></a></span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#RpcPortNumber"><span class="hs-identifier hs-type">RpcPortNumber</span></a></span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier hs-type">TargetAddresses</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#JsonRpcEnv"><span class="hs-identifier hs-type">JsonRpcEnv</span></a></span><span>
+</span><span id="line-35"></span><span id="bootstrapJsonRpc"><span class="annot"><span class="annottext">bootstrapJsonRpc :: Maybe RpcPortNumber -&gt; TargetAddresses -&gt; IO JsonRpcEnv
+</span><a href="Marconi.Bootstrap.html#bootstrapJsonRpc"><span class="hs-identifier hs-var hs-var">bootstrapJsonRpc</span></a></span></span><span> </span><span id="local-6989586621679334760"><span class="annot"><span class="annottext">Maybe RpcPortNumber
+</span><a href="#local-6989586621679334760"><span class="hs-identifier hs-var">maybePort</span></a></span></span><span> </span><span id="local-6989586621679334759"><span class="annot"><span class="annottext">TargetAddresses
+</span><a href="#local-6989586621679334759"><span class="hs-identifier hs-var">targetAddresses</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-36"></span><span>    </span><span id="local-6989586621679334758"><span class="annot"><span class="annottext">DBQueryEnv
+</span><a href="#local-6989586621679334758"><span class="hs-identifier hs-var">queryenv</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TargetAddresses -&gt; IO DBQueryEnv
+</span><a href="Marconi.Api.UtxoIndexersQuery.html#bootstrap"><span class="hs-identifier hs-var">QApi.bootstrap</span></a></span><span> </span><span class="annot"><span class="annottext">TargetAddresses
+</span><a href="#local-6989586621679334759"><span class="hs-identifier hs-var">targetAddresses</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679334756"><span class="annot"><span class="annottext">httpsettings :: Settings
+</span><a href="#local-6989586621679334756"><span class="hs-identifier hs-var hs-var">httpsettings</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>  </span><span class="annot"><span class="annottext">Settings
+-&gt; (RpcPortNumber -&gt; Settings) -&gt; Maybe RpcPortNumber -&gt; Settings
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="annot"><span class="annottext">Settings
+</span><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier hs-var">defaultSettings</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(RpcPortNumber -&gt; Settings -&gt; Settings)
+-&gt; Settings -&gt; RpcPortNumber -&gt; Settings
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">RpcPortNumber -&gt; Settings -&gt; Settings
+</span><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier hs-var">setPort</span></a></span><span> </span><span class="annot"><span class="annottext">Settings
+</span><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier hs-var">defaultSettings</span></a></span><span> </span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe RpcPortNumber
+</span><a href="#local-6989586621679334760"><span class="hs-identifier hs-var">maybePort</span></a></span><span>
+</span><span id="line-38"></span><span>    </span><span class="annot"><span class="annottext">JsonRpcEnv -&gt; IO JsonRpcEnv
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(JsonRpcEnv -&gt; IO JsonRpcEnv) -&gt; JsonRpcEnv -&gt; IO JsonRpcEnv
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">JsonRpcEnv :: Settings -&gt; DBQueryEnv -&gt; JsonRpcEnv
+</span><a href="Marconi.Api.Types.html#JsonRpcEnv"><span class="hs-identifier hs-type">JsonRpcEnv</span></a></span><span>
+</span><span id="line-39"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">_httpSettings :: Settings
+</span><a href="Marconi.Api.Types.html#_httpSettings"><span class="hs-identifier hs-var">_httpSettings</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Settings
+</span><a href="#local-6989586621679334756"><span class="hs-identifier hs-var">httpsettings</span></a></span><span>
+</span><span id="line-40"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_queryEnv :: DBQueryEnv
+</span><a href="Marconi.Api.Types.html#_queryEnv"><span class="hs-identifier hs-var">_queryEnv</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DBQueryEnv
+</span><a href="#local-6989586621679334758"><span class="hs-identifier hs-var">queryenv</span></a></span><span>
+</span><span id="line-41"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="annot"><a href="Marconi.Bootstrap.html#bootstrapHttp"><span class="hs-identifier hs-type">bootstrapHttp</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#JsonRpcEnv"><span class="hs-identifier hs-type">JsonRpcEnv</span></a></span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span id="bootstrapHttp"><span class="annot"><span class="annottext">bootstrapHttp :: JsonRpcEnv -&gt; IO ()
+</span><a href="Marconi.Bootstrap.html#bootstrapHttp"><span class="hs-identifier hs-var hs-var">bootstrapHttp</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">JsonRpcEnv -&gt; IO ()
+</span><a href="Marconi.Api.HttpServer.html#bootstrap"><span class="hs-identifier hs-var">Http.bootstrap</span></a></span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- |  marconi cardano blockchain indexer</span><span>
+</span><span id="line-49"></span><span class="annot"><a href="Marconi.Bootstrap.html#bootstrapUtxoIndexers"><span class="hs-identifier hs-type">bootstrapUtxoIndexers</span></a></span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#CliArgs"><span class="hs-identifier hs-type">CliArgs</span></a></span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Marconi.Api.Types.html#JsonRpcEnv"><span class="hs-identifier hs-type">JsonRpcEnv</span></a></span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span id="bootstrapUtxoIndexers"><span class="annot"><span class="annottext">bootstrapUtxoIndexers :: CliArgs -&gt; JsonRpcEnv -&gt; IO ()
+</span><a href="Marconi.Bootstrap.html#bootstrapUtxoIndexers"><span class="hs-identifier hs-var hs-var">bootstrapUtxoIndexers</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Marconi.Api.Types.html#CliArgs"><span class="hs-identifier hs-type">CliArgs</span></a></span><span> </span><span id="local-6989586621679334750"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679334750"><span class="hs-identifier hs-var">socket</span></a></span></span><span> </span><span id="local-6989586621679334749"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679334749"><span class="hs-identifier hs-var">dbPath</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe RpcPortNumber
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679334748"><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621679334748"><span class="hs-identifier hs-var">networkId</span></a></span></span><span> </span><span id="local-6989586621679334747"><span class="annot"><span class="annottext">TargetAddresses
+</span><a href="#local-6989586621679334747"><span class="hs-identifier hs-var">targetAddresses</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679334746"><span class="annot"><span class="annottext">JsonRpcEnv
+</span><a href="#local-6989586621679334746"><span class="hs-identifier hs-var">env</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier hs-type">UtxoQueryTMVar</span></a></span><span> </span><span id="local-6989586621679334745"><span class="annot"><span class="annottext">TMVar UtxoIndex
+</span><a href="#local-6989586621679334745"><span class="hs-identifier hs-var">qTMVar</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">JsonRpcEnv
+</span><a href="#local-6989586621679334746"><span class="hs-identifier hs-var">env</span></a></span><span> </span><span class="annot"><span class="annottext">JsonRpcEnv
+-&gt; Getting UtxoQueryTMVar JsonRpcEnv UtxoQueryTMVar
+-&gt; UtxoQueryTMVar
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">(DBQueryEnv -&gt; Const UtxoQueryTMVar DBQueryEnv)
+-&gt; JsonRpcEnv -&gt; Const UtxoQueryTMVar JsonRpcEnv
+forall c. HasJsonRpcEnv c =&gt; Lens' c DBQueryEnv
+</span><a href="Marconi.Api.Types.html#queryEnv"><span class="hs-identifier hs-var">queryEnv</span></a></span><span> </span><span class="annot"><span class="annottext">((DBQueryEnv -&gt; Const UtxoQueryTMVar DBQueryEnv)
+ -&gt; JsonRpcEnv -&gt; Const UtxoQueryTMVar JsonRpcEnv)
+-&gt; ((UtxoQueryTMVar -&gt; Const UtxoQueryTMVar UtxoQueryTMVar)
+    -&gt; DBQueryEnv -&gt; Const UtxoQueryTMVar DBQueryEnv)
+-&gt; Getting UtxoQueryTMVar JsonRpcEnv UtxoQueryTMVar
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(UtxoQueryTMVar -&gt; Const UtxoQueryTMVar UtxoQueryTMVar)
+-&gt; DBQueryEnv -&gt; Const UtxoQueryTMVar DBQueryEnv
+forall c. HasDBQueryEnv c =&gt; Lens' c UtxoQueryTMVar
+</span><a href="Marconi.Api.Types.html#queryTMVar"><span class="hs-identifier hs-var">queryTMVar</span></a></span><span>
+</span><span id="line-55"></span><span>      </span><span class="annot"><a href="#local-6989586621679334743"><span class="hs-identifier hs-type">callbackIndexer</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier hs-type">QApi.UtxoIndex</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier hs-type">QApi.UtxoIndex</span></a></span><span>
+</span><span id="line-56"></span><span>      </span><span id="local-6989586621679334743"><span class="annot"><span class="annottext">callbackIndexer :: UtxoIndex -&gt; IO UtxoIndex
+</span><a href="#local-6989586621679334743"><span class="hs-identifier hs-var hs-var">callbackIndexer</span></a></span></span><span> </span><span id="local-6989586621679334742"><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679334742"><span class="hs-identifier hs-var">index</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">STM UtxoIndex -&gt; IO UtxoIndex
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM UtxoIndex -&gt; IO UtxoIndex) -&gt; STM UtxoIndex -&gt; IO UtxoIndex
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TMVar UtxoIndex -&gt; UtxoIndex -&gt; STM ()
+forall a. TMVar a -&gt; a -&gt; STM ()
+</span><a href="Marconi.Api.UtxoIndexersQuery.html#writeTMVar"><span class="hs-identifier hs-var">QApi.writeTMVar</span></a></span><span> </span><span class="annot"><span class="annottext">TMVar UtxoIndex
+</span><a href="#local-6989586621679334745"><span class="hs-identifier hs-var">qTMVar</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679334742"><span class="hs-identifier hs-var">index</span></a></span><span> </span><span class="annot"><span class="annottext">STM () -&gt; STM UtxoIndex -&gt; STM UtxoIndex
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; m b -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex -&gt; STM UtxoIndex
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex
+</span><a href="#local-6989586621679334742"><span class="hs-identifier hs-var">index</span></a></span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[ChainPoint]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679334740"><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679334740"><span class="hs-identifier hs-var">coordinator</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-58"></span><span>      </span><span class="annot"><span class="annottext">[(Worker, FilePath)] -&gt; IO ([ChainPoint], Coordinator)
+</span><a href="../../../../marconi/html/src"><span class="hs-identifier hs-var">startIndexers</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">(UtxoIndex -&gt; IO UtxoIndex) -&gt; Maybe TargetAddresses -&gt; Worker
+</span><a href="../../../../marconi/html/src"><span class="hs-identifier hs-var">utxoWorker</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoIndex -&gt; IO UtxoIndex
+</span><a href="#local-6989586621679334743"><span class="hs-identifier hs-var">callbackIndexer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TargetAddresses -&gt; Maybe TargetAddresses
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">TargetAddresses
+</span><a href="#local-6989586621679334747"><span class="hs-identifier hs-var">targetAddresses</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>                     </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679334749"><span class="hs-identifier hs-var">dbPath</span></a></span><span> </span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679334739"><span class="annot"><span class="annottext">indexers :: Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+-&gt; IO ()
+</span><a href="#local-6989586621679334739"><span class="hs-identifier hs-var hs-var">indexers</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Coordinator
+-&gt; Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+-&gt; IO ()
+forall r.
+Coordinator
+-&gt; Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+-&gt; IO ()
+</span><a href="../../../../marconi/html/src"><span class="hs-identifier hs-var">mkIndexerStream</span></a></span><span> </span><span class="annot"><span class="annottext">Coordinator
+</span><a href="#local-6989586621679334740"><span class="hs-identifier hs-var">coordinator</span></a></span><span>
+</span><span id="line-61"></span><span>      </span><span id="local-6989586621679334738"><span class="annot"><span class="annottext">chainPoint :: ChainPoint
+</span><a href="#local-6989586621679334738"><span class="hs-identifier hs-var hs-var">chainPoint</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">ChainPointAtGenesis</span></a></span><span>
+</span><span id="line-62"></span><span>  </span><span id="local-6989586621679334737"><span class="annot"><span class="annottext">Configuration
+</span><a href="#local-6989586621679334737"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Configuration
+</span><span class="hs-identifier hs-var">defaultConfigStdout</span></span><span>
+</span><span id="line-63"></span><span>  </span><span class="annot"><span class="annottext">Configuration -&gt; Text -&gt; (Trace IO Text -&gt; IO ()) -&gt; IO ()
+forall (m :: * -&gt; *) a t.
+(MonadIO m, MonadMask m, ToJSON a, FromJSON a, ToObject a) =&gt;
+Configuration -&gt; Text -&gt; (Trace m a -&gt; m t) -&gt; m t
+</span><span class="hs-identifier hs-var">withTrace</span></span><span> </span><span class="annot"><span class="annottext">Configuration
+</span><a href="#local-6989586621679334737"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;marconi-mamba&quot;</span></span><span> </span><span class="annot"><span class="annottext">((Trace IO Text -&gt; IO ()) -&gt; IO ())
+-&gt; (Trace IO Text -&gt; IO ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679334736"><span class="annot"><span class="annottext">Trace IO Text
+</span><a href="#local-6989586621679334736"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-64"></span><span>    </span><span class="annot"><span class="annottext">FilePath
+-&gt; NetworkId
+-&gt; [ChainPoint]
+-&gt; (Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO Any
+    -&gt; IO ())
+-&gt; IO ()
+forall r b.
+FilePath
+-&gt; NetworkId
+-&gt; [ChainPoint]
+-&gt; (Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+    -&gt; IO b)
+-&gt; IO b
+</span><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-var">withChainSyncEventStream</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679334750"><span class="hs-identifier hs-var">socket</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621679334748"><span class="hs-identifier hs-var">networkId</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679334738"><span class="hs-identifier hs-var">chainPoint</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO Any
+-&gt; IO ()
+forall r.
+Stream (Of (ChainSyncEvent (BlockInMode CardanoMode))) IO r
+-&gt; IO ()
+</span><a href="#local-6989586621679334739"><span class="hs-identifier hs-var">indexers</span></a></span><span>
+</span><span id="line-65"></span><span>    </span><span class="annot"><span class="annottext">IO () -&gt; (ChainSyncEventException -&gt; IO ()) -&gt; IO ()
+forall e a. Exception e =&gt; IO a -&gt; (e -&gt; IO a) -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">`catch`</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">ChainSyncEventException
+</span><a href="../../../../cardano-streaming/html/src"><span class="hs-identifier hs-var">NoIntersectionFound</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-66"></span><span>      </span><span class="annot"><span class="annottext">Trace IO Text -&gt; Text -&gt; IO ()
+forall (m :: * -&gt; *) a. MonadIO m =&gt; Trace m a -&gt; a -&gt; m ()
+</span><span class="hs-identifier hs-var">logError</span></span><span> </span><span class="annot"><span class="annottext">Trace IO Text
+</span><a href="#local-6989586621679334736"><span class="hs-identifier hs-var">trace</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; IO ()) -&gt; Text -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-67"></span><span>          </span><span class="annot"><span class="annottext">SimpleDocStream Any -&gt; Text
+forall ann. SimpleDocStream ann -&gt; Text
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">renderStrict</span></a></span><span> </span><span class="annot"><span class="annottext">(SimpleDocStream Any -&gt; Text) -&gt; SimpleDocStream Any -&gt; Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-68"></span><span>              </span><span class="annot"><span class="annottext">LayoutOptions -&gt; Doc Any -&gt; SimpleDocStream Any
+forall ann. LayoutOptions -&gt; Doc ann -&gt; SimpleDocStream ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">layoutPretty</span></a></span><span> </span><span class="annot"><span class="annottext">LayoutOptions
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">defaultLayoutOptions</span></a></span><span> </span><span class="annot"><span class="annottext">(Doc Any -&gt; SimpleDocStream Any) -&gt; Doc Any -&gt; SimpleDocStream Any
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-69"></span><span>                  </span><span class="annot"><span class="annottext">Doc Any
+</span><span class="hs-string">&quot;No intersection found when looking for the chain point&quot;</span></span><span>
+</span><span id="line-70"></span><span>                  </span><span class="annot"><span class="annottext">Doc Any -&gt; Doc Any -&gt; Doc Any
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FilePath -&gt; Doc Any
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Doc Any)
+-&gt; (ChainPoint -&gt; FilePath) -&gt; ChainPoint -&gt; Doc Any
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ChainPoint -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span>  </span><span class="annot"><span class="annottext">(ChainPoint -&gt; Doc Any) -&gt; ChainPoint -&gt; Doc Any
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainPoint
+</span><a href="#local-6989586621679334738"><span class="hs-identifier hs-var">chainPoint</span></a></span><span class="hs-special">)</span><span>  </span><span class="annot"><span class="annottext">Doc Any -&gt; Doc Any -&gt; Doc Any
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc Any
+</span><span class="hs-string">&quot;.&quot;</span></span><span>
+</span><span id="line-71"></span><span>                  </span><span class="annot"><span class="annottext">Doc Any -&gt; Doc Any -&gt; Doc Any
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc Any
+</span><span class="hs-string">&quot;Please check the slot number and the block hash do belong to the chain&quot;</span></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | parses a white space separated address list</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- Note, duplicate addresses are rmoved</span><span>
+</span><span id="line-75"></span><span class="annot"><a href="Marconi.Bootstrap.html#targetAddressParser"><span class="hs-identifier hs-type">targetAddressParser</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>           </span><span class="hs-comment">-- ^ contains white spece delimeted lis of addresses</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../marconi/html/src"><span class="hs-identifier hs-type">TargetAddresses</span></a></span><span>  </span><span class="hs-comment">-- ^ a non empty list of valid addresses</span><span>
+</span><span id="line-78"></span><span id="targetAddressParser"><span class="annot"><span class="annottext">targetAddressParser :: FilePath -&gt; TargetAddresses
+</span><a href="Marconi.Bootstrap.html#targetAddressParser"><span class="hs-identifier hs-var hs-var">targetAddressParser</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-79"></span><span>    </span><span class="annot"><span class="annottext">TargetAddresses -&gt; TargetAddresses
+forall a. Eq a =&gt; NonEmpty a -&gt; NonEmpty a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">nub</span></a></span><span>
+</span><span id="line-80"></span><span>    </span><span class="annot"><span class="annottext">(TargetAddresses -&gt; TargetAddresses)
+-&gt; (FilePath -&gt; TargetAddresses) -&gt; FilePath -&gt; TargetAddresses
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[Address ShelleyAddr] -&gt; TargetAddresses
+forall a. [a] -&gt; NonEmpty a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromList</span></a></span><span>
+</span><span id="line-81"></span><span>    </span><span class="annot"><span class="annottext">([Address ShelleyAddr] -&gt; TargetAddresses)
+-&gt; (FilePath -&gt; [Address ShelleyAddr])
+-&gt; FilePath
+-&gt; TargetAddresses
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Either Bech32DecodeError [Address ShelleyAddr]
+-&gt; [Address ShelleyAddr]
+forall e a. Show e =&gt; Either e a -&gt; a
+</span><a href="Marconi.Bootstrap.html#fromJustWithError"><span class="hs-identifier hs-var">fromJustWithError</span></a></span><span>
+</span><span id="line-82"></span><span>    </span><span class="annot"><span class="annottext">(Either Bech32DecodeError [Address ShelleyAddr]
+ -&gt; [Address ShelleyAddr])
+-&gt; (FilePath -&gt; Either Bech32DecodeError [Address ShelleyAddr])
+-&gt; FilePath
+-&gt; [Address ShelleyAddr]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; Either Bech32DecodeError (Address ShelleyAddr))
+-&gt; [FilePath] -&gt; Either Bech32DecodeError [Address ShelleyAddr]
+forall (t :: * -&gt; *) (f :: * -&gt; *) a b.
+(Traversable t, Applicative f) =&gt;
+(a -&gt; f b) -&gt; t a -&gt; f (t b)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">traverse</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; Either Bech32DecodeError (Address ShelleyAddr)
+</span><a href="#local-6989586621679334730"><span class="hs-identifier hs-var">deserializeToCardano</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Either Bech32DecodeError (Address ShelleyAddr))
+-&gt; (FilePath -&gt; Text)
+-&gt; FilePath
+-&gt; Either Bech32DecodeError (Address ShelleyAddr)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">pack</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="annottext">([FilePath] -&gt; Either Bech32DecodeError [Address ShelleyAddr])
+-&gt; (FilePath -&gt; [FilePath])
+-&gt; FilePath
+-&gt; Either Bech32DecodeError [Address ShelleyAddr]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; [FilePath]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">words</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-85"></span><span>        </span><span id="local-6989586621679334730"><span class="annot"><span class="annottext">deserializeToCardano :: Text -&gt; Either Bech32DecodeError (Address ShelleyAddr)
+</span><a href="#local-6989586621679334730"><span class="hs-identifier hs-var hs-var">deserializeToCardano</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">AsType (Address ShelleyAddr)
+-&gt; Text -&gt; Either Bech32DecodeError (Address ShelleyAddr)
+forall a.
+SerialiseAsBech32 a =&gt;
+AsType a -&gt; Text -&gt; Either Bech32DecodeError a
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">deserialiseFromBech32</span></a></span><span> </span><span class="annot"><span class="annottext">AsType (Address ShelleyAddr)
+</span><a href="../file:///nix/store/r16vjy39pj2p47ag6d6qd397xdpngrlp-cardano-api-lib-cardano-api-1.35.4-haddock-doc/share/doc/cardano-api/html/src"><span class="hs-identifier hs-var">AsShelleyAddress</span></a></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- | Exit program with error</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- Note, if the targetAddress parser fails, or is empty, there is nothing to do for the hotStore.</span><span>
+</span><span id="line-89"></span><span class="hs-comment">-- In such case we should fail fast</span><span>
+</span><span id="line-90"></span><span id="local-6989586621679334805"><span id="local-6989586621679334806"><span class="annot"><a href="Marconi.Bootstrap.html#fromJustWithError"><span class="hs-identifier hs-type">fromJustWithError</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Show</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679334806"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679334806"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679334805"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679334805"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-91"></span><span id="fromJustWithError"><span class="annot"><span class="annottext">fromJustWithError :: Either e a -&gt; a
+</span><a href="Marconi.Bootstrap.html#fromJustWithError"><span class="hs-identifier hs-var hs-var">fromJustWithError</span></a></span></span><span> </span><span id="local-6989586621679334728"><span class="annot"><span class="annottext">Either e a
+</span><a href="#local-6989586621679334728"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either e a
+</span><a href="#local-6989586621679334728"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-92"></span><span>    </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621679334727"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679334727"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-93"></span><span>        </span><span class="annot"><span class="annottext">FilePath -&gt; a
+forall a. HasCallStack =&gt; FilePath -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">(FilePath -&gt; a) -&gt; FilePath -&gt; a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;\n!!!\n Abnormal Termination with Error: &quot;</span></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; FilePath
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">e -&gt; FilePath
+forall a. Show a =&gt; a -&gt; FilePath
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679334727"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath -&gt; FilePath -&gt; FilePath
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><span class="hs-string">&quot;\n!!!\n&quot;</span></span><span>
+</span><span id="line-94"></span><span>    </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621679334725"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679334725"><span class="hs-identifier hs-var">accounts</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679334725"><span class="hs-identifier hs-var">accounts</span></a></span><span>
+</span><span id="line-95"></span></pre></body></html>

@@ -1,0 +1,444 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds           #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass      #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric       #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies  #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts    #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards     #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell     #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications    #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies        #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- | A &quot;pay-to-pubkey&quot; transaction output implemented as a Plutus</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--   contract. This is useful if you need something that behaves like</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--   a pay-to-pubkey output, but is not (easily) identified by wallets</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--   as one.</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.PubKey</span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.PubKey.html#pubKeyContract"><span class="hs-identifier">pubKeyContract</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#typedValidator"><span class="hs-identifier">typedValidator</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyError"><span class="hs-identifier">PubKeyError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#AsPubKeyError"><span class="hs-identifier">AsPubKeyError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Monad.Error.Lens</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Params</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">pNetworkId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">initialise</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">to</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">TypedValidator</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Contexts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.ChainIndex.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Tip</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Tip</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">TipAtGenesis</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Contract</span></span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="annot"><a href="Plutus.Contracts.PubKey.html#mkValidator"><span class="hs-identifier hs-type">mkValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptContext</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-38"></span><span id="mkValidator"><span class="annot"><span class="annottext">mkValidator :: PaymentPubKeyHash -&gt; () -&gt; () -&gt; ScriptContext -&gt; Bool
+</span><a href="Plutus.Contracts.PubKey.html#mkValidator"><span class="hs-identifier hs-var hs-var">mkValidator</span></a></span></span><span> </span><span id="local-6989586621680977236"><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680977236"><span class="hs-identifier hs-var">pk'</span></a></span></span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680977235"><span class="annot"><span class="annottext">ScriptContext
+</span><a href="#local-6989586621680977235"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; PubKeyHash -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">V.txSignedBy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ScriptContext -&gt; TxInfo
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">scriptContextTxInfo</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptContext
+</span><a href="#local-6989586621680977235"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; PubKeyHash
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var hs-var">unPaymentPubKeyHash</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680977236"><span class="hs-identifier hs-var">pk'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">data</span><span> </span><span id="PubKeyContract"><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-var">PubKeyContract</span></a></span></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.ValidatorTypes</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-type">PubKeyContract</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="RedeemerType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">RedeemerType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-type">PubKeyContract</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="DatumType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">DatumType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-type">PubKeyContract</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="annot"><a href="Plutus.Contracts.PubKey.html#typedValidator"><span class="hs-identifier hs-type">typedValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.TypedValidator</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-type">PubKeyContract</span></a></span><span>
+</span><span id="line-47"></span><span id="typedValidator"><span class="annot"><span class="annottext">typedValidator :: PaymentPubKeyHash -&gt; TypedValidator PubKeyContract
+</span><a href="Plutus.Contracts.PubKey.html#typedValidator"><span class="hs-identifier hs-var hs-var">typedValidator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompiledCode (PaymentPubKeyHash -&gt; ValidatorType PubKeyContract)
+-&gt; CompiledCode (ValidatorType PubKeyContract -&gt; UntypedValidator)
+-&gt; PaymentPubKeyHash
+-&gt; TypedValidator PubKeyContract
+forall a param.
+Lift DefaultUni param =&gt;
+CompiledCode (param -&gt; ValidatorType a)
+-&gt; CompiledCode (ValidatorType a -&gt; UntypedValidator)
+-&gt; param
+-&gt; TypedValidator a
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkTypedValidatorParam</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-type">PubKeyContract</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">mkValidator</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">wrap</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-51"></span><span>        </span><span id="local-6989586621680977226"><span class="annot"><span class="annottext">wrap :: (() -&gt; () -&gt; ScriptContext -&gt; Bool) -&gt; UntypedValidator
+</span><a href="#local-6989586621680977226"><span class="hs-identifier hs-var hs-var">wrap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(() -&gt; () -&gt; ScriptContext -&gt; Bool) -&gt; UntypedValidator
+forall sc d r.
+(IsScriptContext sc, UnsafeFromData d, UnsafeFromData r) =&gt;
+(d -&gt; r -&gt; sc -&gt; Bool) -&gt; UntypedValidator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkUntypedValidator</span></a></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span id="local-6989586621680977223"><span id="local-6989586621680977224"></span></span><span class="hs-keyword">data</span><span> </span><span id="PubKeyError"><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyError"><span class="hs-identifier hs-var">PubKeyError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-54"></span><span>    </span><span id="ScriptOutputMissing"><span class="annot"><a href="Plutus.Contracts.PubKey.html#ScriptOutputMissing"><span class="hs-identifier hs-var">ScriptOutputMissing</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="MultipleScriptOutputs"><span class="annot"><a href="Plutus.Contracts.PubKey.html#MultipleScriptOutputs"><span class="hs-identifier hs-var">MultipleScriptOutputs</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="PKContractError"><span class="annot"><a href="Plutus.Contracts.PubKey.html#PKContractError"><span class="hs-identifier hs-var">PKContractError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680977216"><span id="local-6989586621680977218"><span class="annot"><span class="annottext">PubKeyError -&gt; PubKeyError -&gt; Bool
+(PubKeyError -&gt; PubKeyError -&gt; Bool)
+-&gt; (PubKeyError -&gt; PubKeyError -&gt; Bool) -&gt; Eq PubKeyError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PubKeyError -&gt; PubKeyError -&gt; Bool
+$c/= :: PubKeyError -&gt; PubKeyError -&gt; Bool
+== :: PubKeyError -&gt; PubKeyError -&gt; Bool
+$c== :: PubKeyError -&gt; PubKeyError -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680977209"><span id="local-6989586621680977211"><span id="local-6989586621680977213"><span class="annot"><span class="annottext">Int -&gt; PubKeyError -&gt; ShowS
+[PubKeyError] -&gt; ShowS
+PubKeyError -&gt; String
+(Int -&gt; PubKeyError -&gt; ShowS)
+-&gt; (PubKeyError -&gt; String)
+-&gt; ([PubKeyError] -&gt; ShowS)
+-&gt; Show PubKeyError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PubKeyError] -&gt; ShowS
+$cshowList :: [PubKeyError] -&gt; ShowS
+show :: PubKeyError -&gt; String
+$cshow :: PubKeyError -&gt; String
+showsPrec :: Int -&gt; PubKeyError -&gt; ShowS
+$cshowsPrec :: Int -&gt; PubKeyError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. PubKeyError -&gt; Rep PubKeyError x)
+-&gt; (forall x. Rep PubKeyError x -&gt; PubKeyError)
+-&gt; Generic PubKeyError
+forall x. Rep PubKeyError x -&gt; PubKeyError
+forall x. PubKeyError -&gt; Rep PubKeyError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep PubKeyError x -&gt; PubKeyError
+$cfrom :: forall x. PubKeyError -&gt; Rep PubKeyError x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680977197"><span id="local-6989586621680977199"><span id="local-6989586621680977201"><span id="local-6989586621680977203"><span class="annot"><span class="annottext">[PubKeyError] -&gt; Encoding
+[PubKeyError] -&gt; Value
+PubKeyError -&gt; Encoding
+PubKeyError -&gt; Value
+(PubKeyError -&gt; Value)
+-&gt; (PubKeyError -&gt; Encoding)
+-&gt; ([PubKeyError] -&gt; Value)
+-&gt; ([PubKeyError] -&gt; Encoding)
+-&gt; ToJSON PubKeyError
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [PubKeyError] -&gt; Encoding
+$ctoEncodingList :: [PubKeyError] -&gt; Encoding
+toJSONList :: [PubKeyError] -&gt; Value
+$ctoJSONList :: [PubKeyError] -&gt; Value
+toEncoding :: PubKeyError -&gt; Encoding
+$ctoEncoding :: PubKeyError -&gt; Encoding
+toJSON :: PubKeyError -&gt; Value
+$ctoJSON :: PubKeyError -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680977192"><span id="local-6989586621680977194"><span class="annot"><span class="annottext">Value -&gt; Parser [PubKeyError]
+Value -&gt; Parser PubKeyError
+(Value -&gt; Parser PubKeyError)
+-&gt; (Value -&gt; Parser [PubKeyError]) -&gt; FromJSON PubKeyError
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [PubKeyError]
+$cparseJSONList :: Value -&gt; Parser [PubKeyError]
+parseJSON :: Value -&gt; Parser PubKeyError
+$cparseJSON :: Value -&gt; Parser PubKeyError
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span id="_PKContractError"><span id="_MultipleScriptOutputs"><span id="_ScriptOutputMissing"><span id="_PubKeyError"><span id="local-6989586621680977180"><span id="local-6989586621680977182"><span id="local-6989586621680977184"><span id="local-6989586621680977186"><span id="local-6989586621680977188"><span id="local-6989586621680977189"><span id="local-6989586621680977190"><span id="AsPubKeyError"><span id="local-6989586621680977397"><span class="hs-identifier">makeClassyPrisms</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">PubKeyError</span></span></span></span></span></span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680977154"><span id="local-6989586621680977156"><span id="local-6989586621680977158"><span id="local-6989586621680977160"><span id="local-6989586621680977162"><span id="local-6989586621680977164"><span id="local-6989586621680977166"><span id="local-6989586621680977168"><span id="local-6989586621680977170"><span id="local-6989586621680977172"><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyError"><span class="hs-identifier hs-type">PubKeyError</span></a></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>    </span><span id="local-6989586621680977152"><span class="annot"><span class="annottext">_ContractError :: p ContractError (f ContractError) -&gt; p PubKeyError (f PubKeyError)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">_ContractError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">p ContractError (f ContractError) -&gt; p PubKeyError (f PubKeyError)
+forall r. AsPubKeyError r =&gt; Prism' r ContractError
+</span><a href="Plutus.Contracts.PubKey.html#_PKContractError"><span class="hs-identifier hs-var">_PKContractError</span></a></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-comment">-- | Lock some funds in a 'PayToPubKey' contract, returning the output's address</span><span>
+</span><span id="line-66"></span><span class="hs-comment">--   and a 'TxIn' transaction input that can spend it.</span><span>
+</span><span id="line-67"></span><span class="annot"><a href="Plutus.Contracts.PubKey.html#pubKeyContract"><span class="hs-identifier hs-type">pubKeyContract</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680977150"><span class="annot"><a href="#local-6989586621680977150"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680977149"><span class="annot"><a href="#local-6989586621680977149"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680977148"><span class="annot"><a href="#local-6989586621680977148"><span class="hs-identifier hs-type">e</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#AsPubKeyError"><span class="hs-identifier hs-type">AsPubKeyError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977148"><span class="hs-identifier hs-type">e</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977150"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977149"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977148"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">DecoratedTxOut</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">TypedValidator</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.PubKey.html#PubKeyContract"><span class="hs-identifier hs-type">PubKeyContract</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span id="pubKeyContract"><span class="annot"><span class="annottext">pubKeyContract :: PaymentPubKeyHash
+-&gt; Value
+-&gt; Contract
+     w
+     s
+     e
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+</span><a href="Plutus.Contracts.PubKey.html#pubKeyContract"><span class="hs-identifier hs-var hs-var">pubKeyContract</span></a></span></span><span> </span><span id="local-6989586621680977147"><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680977147"><span class="hs-identifier hs-var">pk</span></a></span></span><span> </span><span id="local-6989586621680977146"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680977146"><span class="hs-identifier hs-var">vl</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(PubKeyError -&gt; e)
+-&gt; Contract
+     w
+     s
+     PubKeyError
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+-&gt; Contract
+     w
+     s
+     e
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">AReview e PubKeyError -&gt; PubKeyError -&gt; e
+forall b (m :: * -&gt; *) t. MonadReader b m =&gt; AReview t b -&gt; m t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">review</span></a></span><span> </span><span class="annot"><span class="annottext">AReview e PubKeyError
+forall r. AsPubKeyError r =&gt; Prism' r PubKeyError
+</span><a href="Plutus.Contracts.PubKey.html#_PubKeyError"><span class="hs-identifier hs-var">_PubKeyError</span></a></span><span>   </span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Contract
+   w
+   s
+   PubKeyError
+   (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+ -&gt; Contract
+      w
+      s
+      e
+      (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract))
+-&gt; Contract
+     w
+     s
+     PubKeyError
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+-&gt; Contract
+     w
+     s
+     e
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-75"></span><span>    </span><span id="local-6989586621680977143"><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621680977143"><span class="hs-identifier hs-var">networkId</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Params -&gt; NetworkId
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var hs-var">pNetworkId</span></a></span><span> </span><span class="annot"><span class="annottext">(Params -&gt; NetworkId)
+-&gt; Contract w s PubKeyError Params
+-&gt; Contract w s PubKeyError NetworkId
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Contract w s PubKeyError Params
+forall w (s :: Row *) e. AsContractError e =&gt; Contract w s e Params
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getParams</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680977140"><span class="annot"><span class="annottext">inst :: TypedValidator PubKeyContract
+</span><a href="#local-6989586621680977140"><span class="hs-identifier hs-var hs-var">inst</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; TypedValidator PubKeyContract
+</span><a href="Plutus.Contracts.PubKey.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680977147"><span class="hs-identifier hs-var">pk</span></a></span><span>
+</span><span id="line-77"></span><span>        </span><span id="local-6989586621680977139"><span class="annot"><span class="annottext">address :: AddressInEra BabbageEra
+</span><a href="#local-6989586621680977139"><span class="hs-identifier hs-var hs-var">address</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NetworkId
+-&gt; TypedValidator PubKeyContract -&gt; AddressInEra BabbageEra
+forall a. NetworkId -&gt; TypedValidator a -&gt; AddressInEra BabbageEra
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.validatorCardanoAddress</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621680977143"><span class="hs-identifier hs-var">networkId</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator PubKeyContract
+</span><a href="#local-6989586621680977140"><span class="hs-identifier hs-var">inst</span></a></span><span>
+</span><span id="line-78"></span><span>        </span><span id="local-6989586621680977137"><span class="annot"><span class="annottext">tx :: TxConstraints () ()
+</span><a href="#local-6989586621680977137"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; Value -&gt; TxConstraints () ()
+forall o i. o -&gt; Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustPayToTheScriptWithDatumInTx</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680977146"><span class="hs-identifier hs-var">vl</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span>    </span><span id="local-6989586621680977135"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680977135"><span class="hs-identifier hs-var">ledgerTx</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ScriptLookups PubKeyContract
+-&gt; TxConstraints
+     (RedeemerType PubKeyContract) (DatumType PubKeyContract)
+-&gt; Contract w s PubKeyError UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TypedValidator PubKeyContract -&gt; ScriptLookups PubKeyContract
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator PubKeyContract
+</span><a href="#local-6989586621680977140"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TxConstraints () ()
+TxConstraints
+  (RedeemerType PubKeyContract) (DatumType PubKeyContract)
+</span><a href="#local-6989586621680977137"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-81"></span><span>        </span><span class="annot"><span class="annottext">Contract w s PubKeyError UnbalancedTx
+-&gt; (UnbalancedTx -&gt; Contract w s PubKeyError UnbalancedTx)
+-&gt; Contract w s PubKeyError UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx -&gt; Contract w s PubKeyError UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract w s PubKeyError UnbalancedTx
+-&gt; (UnbalancedTx -&gt; Contract w s PubKeyError CardanoTx)
+-&gt; Contract w s PubKeyError CardanoTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx -&gt; Contract w s PubKeyError CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TxId -&gt; Contract w s PubKeyError ()
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+TxId -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">awaitTxConfirmed</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680977135"><span class="hs-identifier hs-var">ledgerTx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680977128"><span class="annot"><span class="annottext">refs :: [TxOutRef]
+</span><a href="#local-6989586621680977128"><span class="hs-identifier hs-var hs-var">refs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map TxOutRef TxOut -&gt; [TxOutRef]
+forall k a. Map k a -&gt; [k]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.keys</span></a></span><span>
+</span><span id="line-85"></span><span>               </span><span class="annot"><span class="annottext">(Map TxOutRef TxOut -&gt; [TxOutRef])
+-&gt; Map TxOutRef TxOut -&gt; [TxOutRef]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(TxOut -&gt; Bool) -&gt; Map TxOutRef TxOut -&gt; Map TxOutRef TxOut
+forall a k. (a -&gt; Bool) -&gt; Map k a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.filter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">AddressInEra BabbageEra -&gt; AddressInEra BabbageEra -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">(==)</span></a></span><span> </span><span class="annot"><span class="annottext">AddressInEra BabbageEra
+</span><a href="#local-6989586621680977139"><span class="hs-identifier hs-var">address</span></a></span><span> </span><span class="annot"><span class="annottext">(AddressInEra BabbageEra -&gt; Bool)
+-&gt; (TxOut -&gt; AddressInEra BabbageEra) -&gt; TxOut -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut -&gt; AddressInEra BabbageEra
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">txOutAddress</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span>               </span><span class="annot"><span class="annottext">(Map TxOutRef TxOut -&gt; Map TxOutRef TxOut)
+-&gt; Map TxOutRef TxOut -&gt; Map TxOutRef TxOut
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; Map TxOutRef TxOut
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxProducedOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680977135"><span class="hs-identifier hs-var">ledgerTx</span></a></span><span>
+</span><span id="line-87"></span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[TxOutRef]
+</span><a href="#local-6989586621680977128"><span class="hs-identifier hs-var">refs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-89"></span><span>        </span><span class="hs-special">[</span><span class="hs-special">]</span><span>                   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">AReview PubKeyError PaymentPubKeyHash
+-&gt; PaymentPubKeyHash
+-&gt; Contract
+     w
+     s
+     PubKeyError
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+forall e (m :: * -&gt; *) t x.
+MonadError e m =&gt;
+AReview e t -&gt; t -&gt; m x
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">throwing</span></a></span><span> </span><span class="annot"><span class="annottext">AReview PubKeyError PaymentPubKeyHash
+forall r. AsPubKeyError r =&gt; Prism' r PaymentPubKeyHash
+</span><a href="Plutus.Contracts.PubKey.html#_ScriptOutputMissing"><span class="hs-identifier hs-var">_ScriptOutputMissing</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680977147"><span class="hs-identifier hs-var">pk</span></a></span><span>
+</span><span id="line-90"></span><span>        </span><span class="hs-special">[</span><span id="local-6989586621680977121"><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680977121"><span class="hs-identifier hs-var">outRef</span></a></span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-91"></span><span>            </span><span class="hs-comment">-- TODO: THE FOLLOWING SHOULD BE REMOVED EVENTUALLY.</span><span>
+</span><span id="line-92"></span><span>            </span><span class="hs-comment">-- Currently, the PAB indexes information about the status of</span><span>
+</span><span id="line-93"></span><span>            </span><span class="hs-comment">-- transaction outputs. However, even if the transaction is</span><span>
+</span><span id="line-94"></span><span>            </span><span class="hs-comment">-- confirmed, it might take some time in order for the chain-index</span><span>
+</span><span id="line-95"></span><span>            </span><span class="hs-comment">-- to update it's database with the new confirmed transaction.</span><span>
+</span><span id="line-96"></span><span>            </span><span class="hs-comment">-- Ultimately, the solution is to move indexed information by the</span><span>
+</span><span id="line-97"></span><span>            </span><span class="hs-comment">-- PAB to the chain-index, so that we get a single source of truth.</span><span>
+</span><span id="line-98"></span><span>            </span><span class="hs-comment">--</span><span>
+</span><span id="line-99"></span><span>            </span><span class="hs-comment">-- The temporary solution is to use the 'awaitChainIndexSlot' call</span><span>
+</span><span id="line-100"></span><span>            </span><span class="hs-comment">-- which waits until the chain-index is up to date. Meaning, the</span><span>
+</span><span id="line-101"></span><span>            </span><span class="hs-comment">-- chain-index's synced slot should be at least as high as the</span><span>
+</span><span id="line-102"></span><span>            </span><span class="hs-comment">-- current slot.</span><span>
+</span><span id="line-103"></span><span>            </span><span class="hs-comment">--</span><span>
+</span><span id="line-104"></span><span>            </span><span class="hs-comment">-- See https://plutus-apps.readthedocs.io/en/latest/adr/0002-pab-indexing-solution-integration.html&quot;</span><span>
+</span><span id="line-105"></span><span>            </span><span class="hs-comment">-- for the full explanation.</span><span>
+</span><span id="line-106"></span><span>            </span><span class="hs-comment">--</span><span>
+</span><span id="line-107"></span><span>            </span><span class="hs-comment">-- The 'awaitChainIndexSlot' blocks the contract until the chain-index</span><span>
+</span><span id="line-108"></span><span>            </span><span class="hs-comment">-- is synced until the current slot. This is not a good solution,</span><span>
+</span><span id="line-109"></span><span>            </span><span class="hs-comment">-- as the chain-index is always some time behind the current slot.</span><span>
+</span><span id="line-110"></span><span>            </span><span id="local-6989586621680977120"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977120"><span class="hs-identifier hs-var">slot</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Contract w s PubKeyError Slot
+forall w (s :: Row *) e. AsContractError e =&gt; Contract w s e Slot
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">currentNodeClientSlot</span></a></span><span>
+</span><span id="line-111"></span><span>            </span><span class="annot"><span class="annottext">Slot -&gt; Contract w s PubKeyError ()
+forall e w (s :: Row *).
+AsContractError e =&gt;
+Slot -&gt; Contract w s e ()
+</span><a href="Plutus.Contracts.PubKey.html#awaitChainIndexSlot"><span class="hs-identifier hs-var">awaitChainIndexSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977120"><span class="hs-identifier hs-var">slot</span></a></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span>            </span><span id="local-6989586621680977117"><span class="annot"><span class="annottext">Maybe DecoratedTxOut
+</span><a href="#local-6989586621680977117"><span class="hs-identifier hs-var">ciTxOut</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; Contract w s PubKeyError (Maybe DecoratedTxOut)
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+TxOutRef -&gt; Contract w s e (Maybe DecoratedTxOut)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">unspentTxOutFromRef</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680977121"><span class="hs-identifier hs-var">outRef</span></a></span><span>
+</span><span id="line-114"></span><span>            </span><span class="annot"><span class="annottext">(TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+-&gt; Contract
+     w
+     s
+     PubKeyError
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680977121"><span class="hs-identifier hs-var">outRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Maybe DecoratedTxOut
+</span><a href="#local-6989586621680977117"><span class="hs-identifier hs-var">ciTxOut</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">TypedValidator PubKeyContract
+</span><a href="#local-6989586621680977140"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span>        </span><span class="annot"><span class="annottext">[TxOutRef]
+</span><span class="hs-identifier">_</span></span><span>                    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">AReview PubKeyError PaymentPubKeyHash
+-&gt; PaymentPubKeyHash
+-&gt; Contract
+     w
+     s
+     PubKeyError
+     (TxOutRef, Maybe DecoratedTxOut, TypedValidator PubKeyContract)
+forall e (m :: * -&gt; *) t x.
+MonadError e m =&gt;
+AReview e t -&gt; t -&gt; m x
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">throwing</span></a></span><span> </span><span class="annot"><span class="annottext">AReview PubKeyError PaymentPubKeyHash
+forall r. AsPubKeyError r =&gt; Prism' r PaymentPubKeyHash
+</span><a href="Plutus.Contracts.PubKey.html#_MultipleScriptOutputs"><span class="hs-identifier hs-var">_MultipleScriptOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680977147"><span class="hs-identifier hs-var">pk</span></a></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span class="hs-comment">-- | Temporary. Read TODO in 'pubKeyContract'.</span><span>
+</span><span id="line-118"></span><span id="local-6989586621680977266"><span id="local-6989586621680977267"><span id="local-6989586621680977268"><span class="annot"><a href="Plutus.Contracts.PubKey.html#awaitChainIndexSlot"><span class="hs-identifier hs-type">awaitChainIndexSlot</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977268"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977267"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977266"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680977268"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-119"></span><span id="awaitChainIndexSlot"><span class="annot"><span class="annottext">awaitChainIndexSlot :: Slot -&gt; Contract w s e ()
+</span><a href="Plutus.Contracts.PubKey.html#awaitChainIndexSlot"><span class="hs-identifier hs-var hs-var">awaitChainIndexSlot</span></a></span></span><span> </span><span id="local-6989586621680977115"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977115"><span class="hs-identifier hs-var">targetSlot</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-120"></span><span>    </span><span id="local-6989586621680977114"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680977114"><span class="hs-identifier hs-var">chainIndexTip</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Contract w s e Tip
+forall w (s :: Row *) e. AsContractError e =&gt; Contract w s e Tip
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getTip</span></a></span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680977112"><span class="annot"><span class="annottext">chainIndexSlot :: Slot
+</span><a href="#local-6989586621680977112"><span class="hs-identifier hs-var hs-var">chainIndexSlot</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tip -&gt; Slot
+</span><a href="#local-6989586621680977111"><span class="hs-identifier hs-var">getChainIndexSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621680977114"><span class="hs-identifier hs-var">chainIndexTip</span></a></span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977112"><span class="hs-identifier hs-var">chainIndexSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Slot -&gt; Slot -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977115"><span class="hs-identifier hs-var">targetSlot</span></a></span><span>
+</span><span id="line-123"></span><span>       </span><span class="hs-keyword">then</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-124"></span><span>           </span><span class="annot"><span class="annottext">Contract w s e Slot -&gt; Contract w s e ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract w s e Slot -&gt; Contract w s e ())
+-&gt; Contract w s e Slot -&gt; Contract w s e ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Contract w s e Slot
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+Natural -&gt; Contract w s e Slot
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">waitNSlots</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-125"></span><span>           </span><span class="annot"><span class="annottext">Slot -&gt; Contract w s e ()
+forall e w (s :: Row *).
+AsContractError e =&gt;
+Slot -&gt; Contract w s e ()
+</span><a href="Plutus.Contracts.PubKey.html#awaitChainIndexSlot"><span class="hs-identifier hs-var">awaitChainIndexSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977115"><span class="hs-identifier hs-var">targetSlot</span></a></span><span>
+</span><span id="line-126"></span><span>       </span><span class="hs-keyword">else</span><span>
+</span><span id="line-127"></span><span>           </span><span class="annot"><span class="annottext">() -&gt; Contract w s e ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-129"></span><span>    </span><span class="annot"><a href="#local-6989586621680977111"><span class="hs-identifier hs-type">getChainIndexSlot</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span>
+</span><span id="line-130"></span><span>    </span><span id="local-6989586621680977111"><span class="annot"><span class="annottext">getChainIndexSlot :: Tip -&gt; Slot
+</span><a href="#local-6989586621680977111"><span class="hs-identifier hs-var hs-var">getChainIndexSlot</span></a></span></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">TipAtGenesis</span></a></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Slot
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Slot</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-131"></span><span>    </span><span class="annot"><a href="#local-6989586621680977111"><span class="hs-identifier hs-var">getChainIndexSlot</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">Tip</span></a></span><span> </span><span id="local-6989586621680977107"><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977107"><span class="hs-identifier hs-var">slot</span></a></span></span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">BlockNumber
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Slot
+</span><a href="#local-6989586621680977107"><span class="hs-identifier hs-var">slot</span></a></span><span>
+</span><span id="line-132"></span></pre></body></html>

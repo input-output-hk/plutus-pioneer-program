@@ -1,0 +1,246 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE GADTs            #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE KindSignatures   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase       #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell  #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- | Interfacing with the wallet (for making payments)</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Trace.Effects.EmulatedWalletAPI</span><span class="hs-special">(</span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#EmulatedWalletAPI"><span class="hs-identifier">EmulatedWalletAPI</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#liftWallet"><span class="hs-identifier">liftWallet</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#payToWallet"><span class="hs-identifier">payToWallet</span></a></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#handleEmulatedWalletAPI"><span class="hs-identifier">handleEmulatedWalletAPI</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Member</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">subsume</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">type</span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator">(~&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Error</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">raiseEnd</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Log</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">LogMsg</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.TH</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">makeEffect</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/snd5q6v3qrq7cdxpn9nlwg98vvy50j53-data-default-lib-data-default-0.7.1.1-haddock-doc/share/doc/data-default/html/src"><span class="hs-identifier">Data.Default</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier">def</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Tx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TxId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">getCardanoTxId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.API.html"><span class="hs-identifier">Wallet.API</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Error.html#WalletAPIError"><span class="hs-identifier">WalletAPIError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.API.html#defaultSlotRange"><span class="hs-identifier">defaultSlotRange</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.API.html#payToAddress"><span class="hs-identifier">payToAddress</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Effects.html"><span class="hs-identifier">Wallet.Effects</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Effects.html#WalletEffect"><span class="hs-identifier">WalletEffect</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.html"><span class="hs-identifier">Wallet.Emulator</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">EM</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.LogMessages.html"><span class="hs-identifier">Wallet.Emulator.LogMessages</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.LogMessages.html#RequestHandlerLogMsg"><span class="hs-identifier">RequestHandlerLogMsg</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html"><span class="hs-identifier">Wallet.Emulator.MultiAgent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentEffect"><span class="hs-identifier">MultiAgentEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#walletAction"><span class="hs-identifier">walletAction</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html"><span class="hs-identifier">Wallet.Emulator.Wallet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier">Wallet</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">data</span><span> </span><span id="EmulatedWalletAPI"><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#EmulatedWalletAPI"><span class="hs-identifier hs-var">EmulatedWalletAPI</span></a></span></span><span> </span><span id="local-6989586621680829394"><span class="annot"><a href="#local-6989586621680829394"><span class="hs-identifier hs-type">r</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>    </span><span id="local-6989586621680829432"><span id="LiftWallet"><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#LiftWallet"><span class="hs-identifier hs-var">LiftWallet</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Effects.html#WalletEffect"><span class="hs-identifier hs-type">WalletEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.Error.html#WalletAPIError"><span class="hs-identifier hs-type">WalletAPIError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.LogMessages.html#RequestHandlerLogMsg"><span class="hs-identifier hs-type">RequestHandlerLogMsg</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><a href="#local-6989586621680829432"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#EmulatedWalletAPI"><span class="hs-identifier hs-type">EmulatedWalletAPI</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829432"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span id="liftWallet"><span id="local-6989586621680829432"><span id="local-6989586621680829434"><span class="hs-identifier">makeEffect</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">EmulatedWalletAPI</span></span></span></span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- | Make a payment from one wallet to another</span><span>
+</span><span id="line-39"></span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#payToWallet"><span class="hs-identifier hs-type">payToWallet</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680829392"><span class="annot"><a href="#local-6989586621680829392"><span class="hs-identifier hs-type">effs</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#EmulatedWalletAPI"><span class="hs-identifier hs-type">EmulatedWalletAPI</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829392"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Emulator.Wallet.html#Wallet"><span class="hs-identifier hs-type">Wallet</span></a></span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829392"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxId</span></a></span><span>
+</span><span id="line-47"></span><span id="payToWallet"><span class="annot"><span class="annottext">payToWallet :: Wallet -&gt; Wallet -&gt; Value -&gt; Eff effs TxId
+</span><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#payToWallet"><span class="hs-identifier hs-var hs-var">payToWallet</span></a></span></span><span> </span><span id="local-6989586621680829391"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829391"><span class="hs-identifier hs-var">source</span></a></span></span><span> </span><span id="local-6989586621680829390"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829390"><span class="hs-identifier hs-var">target</span></a></span></span><span> </span><span id="local-6989586621680829389"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680829389"><span class="hs-identifier hs-var">amount</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-48"></span><span>    </span><span id="local-6989586621680829388"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680829388"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Wallet
+-&gt; Eff
+     '[WalletEffect, Error WalletAPIError, LogMsg Text,
+       LogMsg RequestHandlerLogMsg]
+     CardanoTx
+-&gt; Eff effs CardanoTx
+forall a (effs :: [* -&gt; *]).
+Member EmulatedWalletAPI effs =&gt;
+Wallet
+-&gt; Eff
+     '[WalletEffect, Error WalletAPIError, LogMsg Text,
+       LogMsg RequestHandlerLogMsg]
+     a
+-&gt; Eff effs a
+</span><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#liftWallet"><span class="hs-identifier hs-var">liftWallet</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829391"><span class="hs-identifier hs-var">source</span></a></span><span>
+</span><span id="line-49"></span><span>         </span><span class="annot"><span class="annottext">(Eff
+   '[WalletEffect, Error WalletAPIError, LogMsg Text,
+     LogMsg RequestHandlerLogMsg]
+   CardanoTx
+ -&gt; Eff effs CardanoTx)
+-&gt; Eff
+     '[WalletEffect, Error WalletAPIError, LogMsg Text,
+       LogMsg RequestHandlerLogMsg]
+     CardanoTx
+-&gt; Eff effs CardanoTx
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Params
+-&gt; SlotRange
+-&gt; Value
+-&gt; Address
+-&gt; Eff
+     '[WalletEffect, Error WalletAPIError, LogMsg Text,
+       LogMsg RequestHandlerLogMsg]
+     CardanoTx
+forall (effs :: [* -&gt; *]).
+(Member WalletEffect effs, Member (Error WalletAPIError) effs,
+ Member (LogMsg Text) effs,
+ Member (LogMsg RequestHandlerLogMsg) effs) =&gt;
+Params -&gt; SlotRange -&gt; Value -&gt; Address -&gt; Eff effs CardanoTx
+</span><a href="Wallet.API.html#payToAddress"><span class="hs-identifier hs-var">payToAddress</span></a></span><span> </span><span class="annot"><span class="annottext">Params
+forall a. Default a =&gt; a
+</span><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier hs-var">def</span></a></span><span> </span><span class="annot"><span class="annottext">SlotRange
+</span><a href="Wallet.API.html#defaultSlotRange"><span class="hs-identifier hs-var">defaultSlotRange</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680829389"><span class="hs-identifier hs-var">amount</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">AddressInEra BabbageEra -&gt; Address
+forall era. AddressInEra era -&gt; Address
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ledger.toPlutusAddress</span></a></span><span> </span><span class="annot"><span class="annottext">(AddressInEra BabbageEra -&gt; Address)
+-&gt; AddressInEra BabbageEra -&gt; Address
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet -&gt; AddressInEra BabbageEra
+</span><a href="Wallet.Emulator.Wallet.html#mockWalletAddress"><span class="hs-identifier hs-var">EM.mockWalletAddress</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829390"><span class="hs-identifier hs-var">target</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><span class="annottext">TxId -&gt; Eff effs TxId
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(TxId -&gt; Eff effs TxId) -&gt; TxId -&gt; Eff effs TxId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680829388"><span class="hs-identifier hs-var">ctx</span></a></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- | Handle the 'EmulatedWalletAPI' effect using the emulator's</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--   'MultiAgent' effect.</span><span>
+</span><span id="line-54"></span><span id="local-6989586621680829385"><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#handleEmulatedWalletAPI"><span class="hs-identifier hs-type">handleEmulatedWalletAPI</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="annot"><a href="Wallet.Emulator.MultiAgent.html#MultiAgentEffect"><span class="hs-identifier hs-type">MultiAgentEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829385"><span class="hs-identifier hs-type">effs</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#EmulatedWalletAPI"><span class="hs-identifier hs-type">EmulatedWalletAPI</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680829385"><span class="hs-identifier hs-type">effs</span></a></span></span><span>
+</span><span id="line-59"></span><span id="handleEmulatedWalletAPI"><span class="annot"><span class="annottext">handleEmulatedWalletAPI :: EmulatedWalletAPI ~&gt; Eff effs
+</span><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#handleEmulatedWalletAPI"><span class="hs-identifier hs-var hs-var">handleEmulatedWalletAPI</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-60"></span><span>    </span><span class="annot"><a href="Plutus.Trace.Effects.EmulatedWalletAPI.html#LiftWallet"><span class="hs-identifier hs-type">LiftWallet</span></a></span><span> </span><span id="local-6989586621680829384"><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829384"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span id="local-6989586621680829383"><span class="annot"><span class="annottext">Eff
+  '[WalletEffect, Error WalletAPIError, LogMsg Text,
+    LogMsg RequestHandlerLogMsg]
+  x
+</span><a href="#local-6989586621680829383"><span class="hs-identifier hs-var">action</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-61"></span><span>        </span><span class="annot"><span class="annottext">Wallet -&gt; Eff EmulatedWalletEffects x -&gt; Eff effs x
+forall (effs :: [* -&gt; *]) r.
+Member MultiAgentEffect effs =&gt;
+Wallet -&gt; Eff EmulatedWalletEffects r -&gt; Eff effs r
+</span><a href="Wallet.Emulator.MultiAgent.html#walletAction"><span class="hs-identifier hs-var">walletAction</span></a></span><span> </span><span class="annot"><span class="annottext">Wallet
+</span><a href="#local-6989586621680829384"><span class="hs-identifier hs-var">w</span></a></span><span>
+</span><span id="line-62"></span><span>            </span><span class="annot"><span class="annottext">(Eff EmulatedWalletEffects x -&gt; Eff effs x)
+-&gt; Eff EmulatedWalletEffects x -&gt; Eff effs x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff (LogMsg RequestHandlerLogMsg : EmulatedWalletEffects) x
+-&gt; Eff EmulatedWalletEffects x
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+Member eff effs =&gt;
+Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">subsume</span></a></span><span>
+</span><span id="line-63"></span><span>            </span><span class="annot"><span class="annottext">(Eff (LogMsg RequestHandlerLogMsg : EmulatedWalletEffects) x
+ -&gt; Eff EmulatedWalletEffects x)
+-&gt; Eff (LogMsg RequestHandlerLogMsg : EmulatedWalletEffects) x
+-&gt; Eff EmulatedWalletEffects x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  (LogMsg Text : LogMsg RequestHandlerLogMsg : EmulatedWalletEffects)
+  x
+-&gt; Eff (LogMsg RequestHandlerLogMsg : EmulatedWalletEffects) x
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+Member eff effs =&gt;
+Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">subsume</span></a></span><span>
+</span><span id="line-64"></span><span>            </span><span class="annot"><span class="annottext">(Eff
+   (LogMsg Text : LogMsg RequestHandlerLogMsg : EmulatedWalletEffects)
+   x
+ -&gt; Eff (LogMsg RequestHandlerLogMsg : EmulatedWalletEffects) x)
+-&gt; Eff
+     (LogMsg Text : LogMsg RequestHandlerLogMsg : EmulatedWalletEffects)
+     x
+-&gt; Eff (LogMsg RequestHandlerLogMsg : EmulatedWalletEffects) x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  (Error WalletAPIError
+     : LogMsg Text : LogMsg RequestHandlerLogMsg
+     : EmulatedWalletEffects)
+  x
+-&gt; Eff
+     (LogMsg Text : LogMsg RequestHandlerLogMsg : EmulatedWalletEffects)
+     x
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+Member eff effs =&gt;
+Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">subsume</span></a></span><span>
+</span><span id="line-65"></span><span>            </span><span class="annot"><span class="annottext">(Eff
+   (Error WalletAPIError
+      : LogMsg Text : LogMsg RequestHandlerLogMsg
+      : EmulatedWalletEffects)
+   x
+ -&gt; Eff
+      (LogMsg Text : LogMsg RequestHandlerLogMsg : EmulatedWalletEffects)
+      x)
+-&gt; Eff
+     (Error WalletAPIError
+        : LogMsg Text : LogMsg RequestHandlerLogMsg
+        : EmulatedWalletEffects)
+     x
+-&gt; Eff
+     (LogMsg Text : LogMsg RequestHandlerLogMsg : EmulatedWalletEffects)
+     x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  (WalletEffect
+     : Error WalletAPIError : LogMsg Text : LogMsg RequestHandlerLogMsg
+     : EmulatedWalletEffects)
+  x
+-&gt; Eff
+     (Error WalletAPIError
+        : LogMsg Text : LogMsg RequestHandlerLogMsg
+        : EmulatedWalletEffects)
+     x
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+Member eff effs =&gt;
+Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">subsume</span></a></span><span>
+</span><span id="line-66"></span><span>            </span><span class="annot"><span class="annottext">(Eff
+   (WalletEffect
+      : Error WalletAPIError : LogMsg Text : LogMsg RequestHandlerLogMsg
+      : EmulatedWalletEffects)
+   x
+ -&gt; Eff
+      (Error WalletAPIError
+         : LogMsg Text : LogMsg RequestHandlerLogMsg
+         : EmulatedWalletEffects)
+      x)
+-&gt; Eff
+     (WalletEffect
+        : Error WalletAPIError : LogMsg Text : LogMsg RequestHandlerLogMsg
+        : EmulatedWalletEffects)
+     x
+-&gt; Eff
+     (Error WalletAPIError
+        : LogMsg Text : LogMsg RequestHandlerLogMsg
+        : EmulatedWalletEffects)
+     x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[WalletEffect, Error WalletAPIError, LogMsg Text,
+    LogMsg RequestHandlerLogMsg]
+  x
+-&gt; Eff
+     (WalletEffect
+        : Error WalletAPIError : LogMsg Text : LogMsg RequestHandlerLogMsg
+        : EmulatedWalletEffects)
+     x
+forall (effs :: [* -&gt; *]) (as :: [* -&gt; *]).
+CanWeakenEnd as effs =&gt;
+Eff as ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">raiseEnd</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[WalletEffect, Error WalletAPIError, LogMsg Text,
+    LogMsg RequestHandlerLogMsg]
+  x
+</span><a href="#local-6989586621680829383"><span class="hs-identifier hs-var">action</span></a></span><span>
+</span><span id="line-67"></span></pre></body></html>

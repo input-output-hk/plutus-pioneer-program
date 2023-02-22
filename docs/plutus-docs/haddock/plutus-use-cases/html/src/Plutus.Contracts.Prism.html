@@ -1,0 +1,535 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric      #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell    #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators      #-}</span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-comment">{-
+This module and its submodules define the Plutus part of a credential
+management dapp such as Atala PRISM / Mirror.
+
+There are two actors:
+
+* Mirror. Issues and revokes the on-chain credential tokens.
+* User. Uses credentials in transactions
+
+We have the following modules.
+
+1. .Credential: Defines the 'Credential' type and a minting policy script
+   for creating and destroying credential tokens
+2. .StateMachine: Defines the state machine script that allows Users to
+   present their credentials in transactions and Mirror to revoke/destroy
+   credentials.
+3. .STO: A simple Security Token Offering (STO) that requires a credential
+   to be presented by anyone who wants to participate. This is provided for
+   testing and demo purposes
+4. .CredentialManager: A Plutus application managing all the credentials
+   that are available to the User.
+5. .Mirror: A Plutus application that locks credentials in state machines
+   and revokes them when necessary.
+6. .Unlock: Two Plutus applications that each present a credential to unlock
+   some funds.
+
+We work with two different script hashes: The hash of the minting policy that
+mints the tokens (see 'policy'), and the hash of the state machine instance
+that locks a specific credential token for a specific user, identified by their
+public key address.
+
+-}</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Prism</span><span class="hs-special">(</span><span>
+</span><span id="line-42"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Unlock (STO)</span></span><span>
+</span><span id="line-43"></span><span>    </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier">STOSubscriber</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriberSchema"><span class="hs-identifier">STOSubscriberSchema</span></a></span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier">UnlockError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#subscribeSTO"><span class="hs-identifier">subscribeSTO</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Unlock (exchange)</span></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockExchangeSchema"><span class="hs-identifier">UnlockExchangeSchema</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#unlockExchange"><span class="hs-identifier">unlockExchange</span></a></span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Mirror app</span></span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html#MirrorSchema"><span class="hs-identifier">MirrorSchema</span></a></span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html#CredentialOwnerReference"><span class="hs-identifier">CredentialOwnerReference</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html#MirrorError"><span class="hs-identifier">MirrorError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html#mirror"><span class="hs-identifier">mirror</span></a></span><span>
+</span><span id="line-55"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Credential manager app</span></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier">Credential</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier">UserCredential</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#CredentialAuthority"><span class="hs-identifier">CredentialAuthority</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>    </span><span class="annot"><span class="hs-comment">-- * all-in-one</span></span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#Role"><span class="hs-identifier">Role</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismSchema"><span class="hs-identifier">PrismSchema</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismError"><span class="hs-identifier">PrismError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#contract"><span class="hs-identifier">contract</span></a></span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span>
+</span><span id="line-67"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html"><span class="hs-identifier">Plutus.Contracts.Prism.Credential</span></a></span><span>
+</span><span id="line-70"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html"><span class="hs-identifier">Plutus.Contracts.Prism.Mirror</span></a></span><span>
+</span><span id="line-71"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html"><span class="hs-identifier">Plutus.Contracts.Prism.StateMachine</span></a></span><span>
+</span><span id="line-72"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html"><span class="hs-identifier">Plutus.Contracts.Prism.Unlock</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="hs-comment">-- | The roles that we pass to 'contract'.</span><span>
+</span><span id="line-77"></span><span id="local-6989586621680982104"><span id="local-6989586621680982105"></span></span><span class="hs-keyword">data</span><span> </span><span id="Role"><span class="annot"><a href="Plutus.Contracts.Prism.html#Role"><span class="hs-identifier hs-var">Role</span></a></span></span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="Mirror"><span class="annot"><a href="Plutus.Contracts.Prism.html#Mirror"><span class="hs-identifier hs-var">Mirror</span></a></span></span><span> </span><span class="hs-comment">-- ^ The 'mirror' contract</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnlockSTO"><span class="annot"><a href="Plutus.Contracts.Prism.html#UnlockSTO"><span class="hs-identifier hs-var">UnlockSTO</span></a></span></span><span> </span><span class="hs-comment">-- ^ The 'subscribeSTO' contract</span><span>
+</span><span id="line-80"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnlockExchange"><span class="annot"><a href="Plutus.Contracts.Prism.html#UnlockExchange"><span class="hs-identifier hs-var">UnlockExchange</span></a></span></span><span> </span><span class="hs-comment">-- ^ The 'unlockExchange' contract</span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680982097"><span id="local-6989586621680982099"><span class="annot"><span class="annottext">Role -&gt; Role -&gt; Bool
+(Role -&gt; Role -&gt; Bool) -&gt; (Role -&gt; Role -&gt; Bool) -&gt; Eq Role
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Role -&gt; Role -&gt; Bool
+$c/= :: Role -&gt; Role -&gt; Bool
+== :: Role -&gt; Role -&gt; Bool
+$c== :: Role -&gt; Role -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. Role -&gt; Rep Role x)
+-&gt; (forall x. Rep Role x -&gt; Role) -&gt; Generic Role
+forall x. Rep Role x -&gt; Role
+forall x. Role -&gt; Rep Role x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Role x -&gt; Role
+$cfrom :: forall x. Role -&gt; Rep Role x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680982087"><span id="local-6989586621680982089"><span id="local-6989586621680982091"><span class="annot"><span class="annottext">Int -&gt; Role -&gt; ShowS
+[Role] -&gt; ShowS
+Role -&gt; String
+(Int -&gt; Role -&gt; ShowS)
+-&gt; (Role -&gt; String) -&gt; ([Role] -&gt; ShowS) -&gt; Show Role
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Role] -&gt; ShowS
+$cshowList :: [Role] -&gt; ShowS
+show :: Role -&gt; String
+$cshow :: Role -&gt; String
+showsPrec :: Int -&gt; Role -&gt; ShowS
+$cshowsPrec :: Int -&gt; Role -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680982078"><span id="local-6989586621680982080"><span id="local-6989586621680982082"><span id="local-6989586621680982084"><span class="annot"><span class="annottext">[Role] -&gt; Encoding
+[Role] -&gt; Value
+Role -&gt; Encoding
+Role -&gt; Value
+(Role -&gt; Value)
+-&gt; (Role -&gt; Encoding)
+-&gt; ([Role] -&gt; Value)
+-&gt; ([Role] -&gt; Encoding)
+-&gt; ToJSON Role
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [Role] -&gt; Encoding
+$ctoEncodingList :: [Role] -&gt; Encoding
+toJSONList :: [Role] -&gt; Value
+$ctoJSONList :: [Role] -&gt; Value
+toEncoding :: Role -&gt; Encoding
+$ctoEncoding :: Role -&gt; Encoding
+toJSON :: Role -&gt; Value
+$ctoJSON :: Role -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680982073"><span id="local-6989586621680982075"><span class="annot"><span class="annottext">Value -&gt; Parser [Role]
+Value -&gt; Parser Role
+(Value -&gt; Parser Role) -&gt; (Value -&gt; Parser [Role]) -&gt; FromJSON Role
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [Role]
+$cparseJSONList :: Value -&gt; Parser [Role]
+parseJSON :: Value -&gt; Parser Role
+$cparseJSON :: Value -&gt; Parser Role
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-keyword">type</span><span> </span><span id="PrismSchema"><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismSchema"><span class="hs-identifier hs-var">PrismSchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-85"></span><span>    </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html#MirrorSchema"><span class="hs-identifier hs-type">MirrorSchema</span></a></span><span>
+</span><span id="line-86"></span><span>    </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator hs-type">.\/</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriberSchema"><span class="hs-identifier hs-type">STOSubscriberSchema</span></a></span><span>
+</span><span id="line-87"></span><span>    </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator hs-type">.\/</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockExchangeSchema"><span class="hs-identifier hs-type">UnlockExchangeSchema</span></a></span><span>
+</span><span id="line-88"></span><span>    </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator hs-type">.\/</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;role&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#Role"><span class="hs-identifier hs-type">Role</span></a></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span id="local-6989586621680982068"><span id="local-6989586621680982069"></span></span><span class="hs-keyword">data</span><span> </span><span id="PrismError"><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismError"><span class="hs-identifier hs-var">PrismError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-91"></span><span>    </span><span id="UnlockSTOErr"><span class="annot"><a href="Plutus.Contracts.Prism.html#UnlockSTOErr"><span class="hs-identifier hs-var">UnlockSTOErr</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-type">UnlockError</span></a></span><span>
+</span><span id="line-92"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="MirrorErr"><span class="annot"><a href="Plutus.Contracts.Prism.html#MirrorErr"><span class="hs-identifier hs-var">MirrorErr</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Mirror.html#MirrorError"><span class="hs-identifier hs-type">MirrorError</span></a></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="EPError"><span class="annot"><a href="Plutus.Contracts.Prism.html#EPError"><span class="hs-identifier hs-var">EPError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnlockExchangeErr"><span class="annot"><a href="Plutus.Contracts.Prism.html#UnlockExchangeErr"><span class="hs-identifier hs-var">UnlockExchangeErr</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-type">UnlockError</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680982060"><span id="local-6989586621680982062"><span class="annot"><span class="annottext">PrismError -&gt; PrismError -&gt; Bool
+(PrismError -&gt; PrismError -&gt; Bool)
+-&gt; (PrismError -&gt; PrismError -&gt; Bool) -&gt; Eq PrismError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PrismError -&gt; PrismError -&gt; Bool
+$c/= :: PrismError -&gt; PrismError -&gt; Bool
+== :: PrismError -&gt; PrismError -&gt; Bool
+$c== :: PrismError -&gt; PrismError -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. PrismError -&gt; Rep PrismError x)
+-&gt; (forall x. Rep PrismError x -&gt; PrismError) -&gt; Generic PrismError
+forall x. Rep PrismError x -&gt; PrismError
+forall x. PrismError -&gt; Rep PrismError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep PrismError x -&gt; PrismError
+$cfrom :: forall x. PrismError -&gt; Rep PrismError x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680982052"><span id="local-6989586621680982054"><span id="local-6989586621680982056"><span class="annot"><span class="annottext">Int -&gt; PrismError -&gt; ShowS
+[PrismError] -&gt; ShowS
+PrismError -&gt; String
+(Int -&gt; PrismError -&gt; ShowS)
+-&gt; (PrismError -&gt; String)
+-&gt; ([PrismError] -&gt; ShowS)
+-&gt; Show PrismError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PrismError] -&gt; ShowS
+$cshowList :: [PrismError] -&gt; ShowS
+show :: PrismError -&gt; String
+$cshow :: PrismError -&gt; String
+showsPrec :: Int -&gt; PrismError -&gt; ShowS
+$cshowsPrec :: Int -&gt; PrismError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680982044"><span id="local-6989586621680982046"><span id="local-6989586621680982048"><span id="local-6989586621680982050"><span class="annot"><span class="annottext">[PrismError] -&gt; Encoding
+[PrismError] -&gt; Value
+PrismError -&gt; Encoding
+PrismError -&gt; Value
+(PrismError -&gt; Value)
+-&gt; (PrismError -&gt; Encoding)
+-&gt; ([PrismError] -&gt; Value)
+-&gt; ([PrismError] -&gt; Encoding)
+-&gt; ToJSON PrismError
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [PrismError] -&gt; Encoding
+$ctoEncodingList :: [PrismError] -&gt; Encoding
+toJSONList :: [PrismError] -&gt; Value
+$ctoJSONList :: [PrismError] -&gt; Value
+toEncoding :: PrismError -&gt; Encoding
+$ctoEncoding :: PrismError -&gt; Encoding
+toJSON :: PrismError -&gt; Value
+$ctoJSON :: PrismError -&gt; Value
+</span><a href="#local-6989586621680982044"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680982040"><span id="local-6989586621680982042"><span class="annot"><span class="annottext">Value -&gt; Parser [PrismError]
+Value -&gt; Parser PrismError
+(Value -&gt; Parser PrismError)
+-&gt; (Value -&gt; Parser [PrismError]) -&gt; FromJSON PrismError
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [PrismError]
+$cparseJSONList :: Value -&gt; Parser [PrismError]
+parseJSON :: Value -&gt; Parser PrismError
+$cparseJSON :: Value -&gt; Parser PrismError
+</span><a href="#local-6989586621680982040"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span id="_UnlockExchangeErr"><span id="_EPError"><span id="_MirrorErr"><span id="_UnlockSTOErr"><span id="_PrismError"><span id="local-6989586621680982026"><span id="local-6989586621680982028"><span id="local-6989586621680982030"><span id="local-6989586621680982032"><span id="local-6989586621680982034"><span id="local-6989586621680982036"><span id="local-6989586621680982037"><span id="local-6989586621680982038"><span id="local-6989586621680982039"><span id="AsPrismError"><span id="local-6989586621680982209"><span class="hs-identifier">makeClassyPrisms</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">PrismError</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680981999"><span id="local-6989586621680982001"><span id="local-6989586621680982003"><span id="local-6989586621680982005"><span id="local-6989586621680982007"><span id="local-6989586621680982009"><span id="local-6989586621680982011"><span id="local-6989586621680982013"><span id="local-6989586621680982015"><span id="local-6989586621680982017"><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismError"><span class="hs-identifier hs-type">PrismError</span></a></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621680981997"><span class="annot"><span class="annottext">_ContractError :: p ContractError (f ContractError) -&gt; p PrismError (f PrismError)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">_ContractError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">p ContractError (f ContractError) -&gt; p PrismError (f PrismError)
+forall r. AsPrismError r =&gt; Prism' r ContractError
+</span><a href="Plutus.Contracts.Prism.html#_EPError"><span class="hs-identifier hs-var">_EPError</span></a></span><span> </span><span class="annot"><span class="annottext">(p ContractError (f ContractError) -&gt; p PrismError (f PrismError))
+-&gt; (p ContractError (f ContractError)
+    -&gt; p ContractError (f ContractError))
+-&gt; p ContractError (f ContractError)
+-&gt; p PrismError (f PrismError)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">p ContractError (f ContractError)
+-&gt; p ContractError (f ContractError)
+forall r. AsContractError r =&gt; Prism' r ContractError
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">_ContractError</span></a></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- | A wrapper around the four prism contracts. This is just a workaround</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--   for the emulator, where we can only ever run a single 'Contract'. In</span><span>
+</span><span id="line-105"></span><span class="hs-comment">--   the PAB we could simply start all four contracts (credentialManager,</span><span>
+</span><span id="line-106"></span><span class="hs-comment">--   mirror, subscribeSTO, subscribeExchange) separately.</span><span>
+</span><span id="line-107"></span><span class="annot"><a href="Plutus.Contracts.Prism.html#contract"><span class="hs-identifier hs-type">contract</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismSchema"><span class="hs-identifier hs-type">PrismSchema</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.html#PrismError"><span class="hs-identifier hs-type">PrismError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span id="contract"><span class="annot"><span class="annottext">contract :: Contract () PrismSchema PrismError ()
+</span><a href="Plutus.Contracts.Prism.html#contract"><span class="hs-identifier hs-var hs-var">contract</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Promise
+  ()
+  ('R
+     '[ &quot;issue&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;revoke&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+        &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+        &quot;unlock from exchange&quot;
+        ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+  PrismError
+  ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+forall w (s :: Row *) e a. Promise w s e a -&gt; Contract w s e a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var">awaitPromise</span></a></span><span> </span><span class="annot"><span class="annottext">(Promise
+   ()
+   ('R
+      '[ &quot;issue&quot;
+         ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+         &quot;revoke&quot;
+         ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+         &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+         &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+         &quot;unlock from exchange&quot;
+         ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+   PrismError
+   ()
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;issue&quot;
+            ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+            &quot;revoke&quot;
+            ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+            &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+            &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+            &quot;unlock from exchange&quot;
+            ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+      PrismError
+      ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;role&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;role&quot;</span></span><span> </span><span class="annot"><span class="annottext">((Role
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;issue&quot;
+             ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+             &quot;revoke&quot;
+             ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+             &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+             &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+             &quot;unlock from exchange&quot;
+             ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+       PrismError
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;issue&quot;
+            ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+            &quot;revoke&quot;
+            ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+            &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+            &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+            &quot;unlock from exchange&quot;
+            ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+      PrismError
+      ())
+-&gt; (Role
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;issue&quot;
+               ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+               &quot;revoke&quot;
+               ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+               &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+               &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+               &quot;unlock from exchange&quot;
+               ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+         PrismError
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680981992"><span class="annot"><span class="annottext">Role
+</span><a href="#local-6989586621680981992"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Role
+</span><a href="#local-6989586621680981992"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-110"></span><span>        </span><span class="annot"><span class="annottext">Role
+</span><a href="Plutus.Contracts.Prism.html#Mirror"><span class="hs-identifier hs-var">Mirror</span></a></span><span>         </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(MirrorError -&gt; PrismError)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     MirrorError
+     ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">MirrorError -&gt; PrismError
+</span><a href="Plutus.Contracts.Prism.html#MirrorErr"><span class="hs-identifier hs-var">MirrorErr</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;issue&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;revoke&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+        &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+        &quot;unlock from exchange&quot;
+        ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+  MirrorError
+  ()
+forall (s :: Row *) w.
+(HasEndpoint &quot;revoke&quot; CredentialOwnerReference s,
+ HasEndpoint &quot;issue&quot; CredentialOwnerReference s) =&gt;
+Contract w s MirrorError ()
+</span><a href="Plutus.Contracts.Prism.Mirror.html#mirror"><span class="hs-identifier hs-var">mirror</span></a></span><span>
+</span><span id="line-111"></span><span>        </span><span class="annot"><span class="annottext">Role
+</span><a href="Plutus.Contracts.Prism.html#UnlockSTO"><span class="hs-identifier hs-var">UnlockSTO</span></a></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(UnlockError -&gt; PrismError)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     UnlockError
+     ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">UnlockError -&gt; PrismError
+</span><a href="Plutus.Contracts.Prism.html#UnlockSTOErr"><span class="hs-identifier hs-var">UnlockSTOErr</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;issue&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;revoke&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+        &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+        &quot;unlock from exchange&quot;
+        ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+  UnlockError
+  ()
+forall w (s :: Row *).
+HasEndpoint &quot;sto&quot; STOSubscriber s =&gt;
+Contract w s UnlockError ()
+</span><a href="Plutus.Contracts.Prism.Unlock.html#subscribeSTO"><span class="hs-identifier hs-var">subscribeSTO</span></a></span><span>
+</span><span id="line-112"></span><span>        </span><span class="annot"><span class="annottext">Role
+</span><a href="Plutus.Contracts.Prism.html#UnlockExchange"><span class="hs-identifier hs-var">UnlockExchange</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(UnlockError -&gt; PrismError)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     UnlockError
+     ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;issue&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;revoke&quot;
+           ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+           &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+           &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+           &quot;unlock from exchange&quot;
+           ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+     PrismError
+     ()
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">UnlockError -&gt; PrismError
+</span><a href="Plutus.Contracts.Prism.html#UnlockExchangeErr"><span class="hs-identifier hs-var">UnlockExchangeErr</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;issue&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;revoke&quot;
+        ':-&gt; (EndpointValue CredentialOwnerReference, ActiveEndpoint),
+        &quot;role&quot; ':-&gt; (EndpointValue Role, ActiveEndpoint),
+        &quot;sto&quot; ':-&gt; (EndpointValue STOSubscriber, ActiveEndpoint),
+        &quot;unlock from exchange&quot;
+        ':-&gt; (EndpointValue Credential, ActiveEndpoint)])
+  UnlockError
+  ()
+forall w (s :: Row *).
+HasEndpoint &quot;unlock from exchange&quot; Credential s =&gt;
+Contract w s UnlockError ()
+</span><a href="Plutus.Contracts.Prism.Unlock.html#unlockExchange"><span class="hs-identifier hs-var">unlockExchange</span></a></span><span>
+</span><span id="line-113"></span></pre></body></html>

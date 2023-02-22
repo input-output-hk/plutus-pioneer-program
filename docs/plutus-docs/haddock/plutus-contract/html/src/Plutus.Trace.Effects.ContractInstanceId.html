@@ -1,0 +1,112 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE GADTs            #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase       #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell  #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-comment">{-
+
+An effect for generating fresh contract instance IDs.
+
+-}</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Trace.Effects.ContractInstanceId</span><span class="hs-special">(</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#ContractInstanceIdEff"><span class="hs-identifier">ContractInstanceIdEff</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#nextId"><span class="hs-identifier">nextId</span></a></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Handlers</span></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#handleDeterministicIds"><span class="hs-identifier">handleDeterministicIds</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#handleRandomIds"><span class="hs-identifier">handleRandomIds</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.State</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.TH</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad.IO.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">MonadIO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">fromMaybe</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">listToMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Wallet.Types.html"><span class="hs-identifier">Wallet.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Types.html#ContractInstanceId"><span class="hs-identifier">ContractInstanceId</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Types.html#contractInstanceIDs"><span class="hs-identifier">contractInstanceIDs</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Types.html#randomID"><span class="hs-identifier">randomID</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">data</span><span> </span><span id="ContractInstanceIdEff"><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#ContractInstanceIdEff"><span class="hs-identifier hs-var">ContractInstanceIdEff</span></a></span></span><span> </span><span id="local-6989586621680821859"><span class="annot"><a href="#local-6989586621680821859"><span class="hs-identifier hs-type">r</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>    </span><span id="NextId"><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#NextId"><span class="hs-identifier hs-var">NextId</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#ContractInstanceIdEff"><span class="hs-identifier hs-type">ContractInstanceIdEff</span></a></span><span> </span><span class="annot"><a href="Wallet.Types.html#ContractInstanceId"><span class="hs-identifier hs-type">ContractInstanceId</span></a></span><span>
+</span><span id="line-31"></span><span id="local-6989586621680821857"><span id="nextId"><span class="hs-identifier">makeEffect</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">ContractInstanceIdEff</span></span></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- | Handle 'ContractInstanceIdEff' using a random number generator</span><span>
+</span><span id="line-34"></span><span id="local-6989586621680821855"><span id="local-6989586621680821856"><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#handleRandomIds"><span class="hs-identifier hs-type">handleRandomIds</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">LastMember</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821856"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821855"><span class="hs-identifier hs-type">effs</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821856"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#ContractInstanceIdEff"><span class="hs-identifier hs-type">ContractInstanceIdEff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span class="annot"><a href="#local-6989586621680821855"><span class="hs-identifier hs-type">effs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>    </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821855"><span class="hs-identifier hs-type">effs</span></a></span></span></span><span>
+</span><span id="line-38"></span><span id="handleRandomIds"><span class="annot"><span class="annottext">handleRandomIds :: Eff (ContractInstanceIdEff : effs) ~&gt; Eff effs
+</span><a href="Plutus.Trace.Effects.ContractInstanceId.html#handleRandomIds"><span class="hs-identifier hs-var hs-var">handleRandomIds</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ContractInstanceIdEff ~&gt; m)
+-&gt; Eff (ContractInstanceIdEff : effs) ~&gt; Eff effs
+forall (eff :: * -&gt; *) (m :: * -&gt; *) (effs :: [* -&gt; *]).
+(Monad m, LastMember m effs) =&gt;
+(eff ~&gt; m) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpretM</span></a></span><span> </span><span class="annot"><span class="annottext">((ContractInstanceIdEff ~&gt; m)
+ -&gt; Eff (ContractInstanceIdEff : effs) ~&gt; Eff effs)
+-&gt; (ContractInstanceIdEff ~&gt; m)
+-&gt; Eff (ContractInstanceIdEff : effs) ~&gt; Eff effs
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-39"></span><span>    </span><span class="annot"><span class="annottext">ContractInstanceIdEff x
+</span><a href="Plutus.Trace.Effects.ContractInstanceId.html#NextId"><span class="hs-identifier hs-var">NextId</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">IO ContractInstanceId -&gt; m ContractInstanceId
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">IO ContractInstanceId
+</span><a href="Wallet.Types.html#randomID"><span class="hs-identifier hs-var">randomID</span></a></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | Handle 'ContractInstanceIdEff' using the list of IDs</span><span>
+</span><span id="line-42"></span><span class="hs-comment">--   'contractInstanceIDs'.</span><span>
+</span><span id="line-43"></span><span id="local-6989586621680821852"><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#handleDeterministicIds"><span class="hs-identifier hs-type">handleDeterministicIds</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Trace.Effects.ContractInstanceId.html#ContractInstanceIdEff"><span class="hs-identifier hs-type">ContractInstanceIdEff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-glyph">:</span><span> </span><span class="annot"><a href="#local-6989586621680821852"><span class="hs-identifier hs-type">effs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680821852"><span class="hs-identifier hs-type">effs</span></a></span></span><span>
+</span><span id="line-46"></span><span id="handleDeterministicIds"><span class="annot"><span class="annottext">handleDeterministicIds :: Eff (ContractInstanceIdEff : effs) x -&gt; Eff effs x
+</span><a href="Plutus.Trace.Effects.ContractInstanceId.html#handleDeterministicIds"><span class="hs-identifier hs-var hs-var">handleDeterministicIds</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-47"></span><span>    </span><span class="annot"><span class="annottext">[ContractInstanceId]
+-&gt; Eff (State [ContractInstanceId] : effs) x -&gt; Eff effs x
+forall s (effs :: [* -&gt; *]) a.
+s -&gt; Eff (State s : effs) a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">evalState</span></a></span><span> </span><span class="annot"><span class="annottext">[ContractInstanceId]
+</span><a href="Wallet.Types.html#contractInstanceIDs"><span class="hs-identifier hs-var">contractInstanceIDs</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="annot"><span class="annottext">(Eff (State [ContractInstanceId] : effs) x -&gt; Eff effs x)
+-&gt; (Eff (ContractInstanceIdEff : effs) x
+    -&gt; Eff (State [ContractInstanceId] : effs) x)
+-&gt; Eff (ContractInstanceIdEff : effs) x
+-&gt; Eff effs x
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(ContractInstanceIdEff ~&gt; Eff (State [ContractInstanceId] : effs))
+-&gt; Eff (ContractInstanceIdEff : effs)
+   ~&gt; Eff (State [ContractInstanceId] : effs)
+forall (f :: * -&gt; *) (g :: * -&gt; *) (effs :: [* -&gt; *]).
+(f ~&gt; Eff (g : effs)) -&gt; Eff (f : effs) ~&gt; Eff (g : effs)
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">reinterpret</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Types.html#ContractInstanceId"><span class="hs-identifier hs-type">ContractInstanceId</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>        </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-50"></span><span>            </span><span class="annot"><span class="annottext">ContractInstanceIdEff x
+</span><a href="Plutus.Trace.Effects.ContractInstanceId.html#NextId"><span class="hs-identifier hs-var">NextId</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-51"></span><span>                </span><span id="local-6989586621680821848"><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621680821848"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">([x] -&gt; x) -&gt; Eff (State [ContractInstanceId] : effs) x
+forall s a (effs :: [* -&gt; *]).
+Member (State s) effs =&gt;
+(s -&gt; a) -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">gets</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">x -&gt; Maybe x -&gt; x
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Char] -&gt; x
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;handleDeterministicIds: ran out of IDs&quot;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe x -&gt; x) -&gt; ([x] -&gt; Maybe x) -&gt; [x] -&gt; x
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[x] -&gt; Maybe x
+forall a. [a] -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">listToMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>                </span><span class="annot"><span class="annottext">([ContractInstanceId] -&gt; [ContractInstanceId])
+-&gt; Eff (State [ContractInstanceId] : effs) ()
+forall s (effs :: [* -&gt; *]).
+Member (State s) effs =&gt;
+(s -&gt; s) -&gt; Eff effs ()
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">modify</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Types.html#ContractInstanceId"><span class="hs-identifier hs-type">ContractInstanceId</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; [ContractInstanceId] -&gt; [ContractInstanceId]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">drop</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>                </span><span class="annot"><span class="annottext">x -&gt; Eff (State [ContractInstanceId] : effs) x
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621680821848"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span></pre></body></html>

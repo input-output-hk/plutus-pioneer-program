@@ -1,0 +1,1081 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds            #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric        #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia          #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts     #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns       #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators        #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contract.State</span><span class="hs-special">(</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Contract state</span></span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><span class="hs-comment">-- $contractstate</span></span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Plutus.Contract.Types.html#Contract"><span class="hs-identifier">Contract</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier">State</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractRequest"><span class="hs-identifier">ContractRequest</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier">ContractResponse</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#mapE"><span class="hs-identifier">mapE</span></a></span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#mapW"><span class="hs-identifier">mapW</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#insertAndUpdateContract"><span class="hs-identifier">insertAndUpdateContract</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#initialiseContract"><span class="hs-identifier">initialiseContract</span></a></span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#mkResponse"><span class="hs-identifier">mkResponse</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Log</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">LogMessage</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Foldable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">toList</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contract.Checkpoint.html"><span class="hs-identifier">Plutus.Contract.Checkpoint</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Checkpoint.html#CheckpointKey"><span class="hs-identifier">CheckpointKey</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.Checkpoint.html#CheckpointStore"><span class="hs-identifier">CheckpointStore</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html"><span class="hs-identifier">Plutus.Contract.Effects</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Effects.html#PABReq"><span class="hs-identifier">PABReq</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html#PABResp"><span class="hs-identifier">PABResp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contract.Resumable.html"><span class="hs-identifier">Plutus.Contract.Resumable</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html"><span class="hs-identifier">Plutus.Contract.Types</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Types.html#lastLogs"><span class="hs-identifier">lastLogs</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#lastState"><span class="hs-identifier">lastState</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#logs"><span class="hs-identifier">logs</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#observableState"><span class="hs-identifier">observableState</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Prettyprinter.Extras</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Pretty</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">PrettyShow</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- $contractstate</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- Types for initialising and running instances of 'Contract's. The types and</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- functions in this module are convenient wrappers around types and functions</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- from 'Plutus.Contract.Types', exposing an interface that is suitable</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- for consumption by the PAB. In particular this means that</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- 'insertAndUpdateContract' has a single argument, and its argument &amp; return</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- types can be serialised to JSON easily.</span><span>
+</span><span id="line-43"></span><span class="hs-comment">--</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- To actually run a contract, follow this workflow:</span><span>
+</span><span id="line-45"></span><span class="hs-comment">--</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- 1. Call 'initialiseContract' to get the initial 'ContractResponse'.</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- 2. Look at the 'hooks' of this value and generate an answer to one of them.</span><span>
+</span><span id="line-48"></span><span class="hs-comment">--    This answer is a 'Response' @s@ value.</span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- 3. Call 'insertAndUpdateContract' with a 'ContractRequest' whose 'oldState'</span><span>
+</span><span id="line-50"></span><span class="hs-comment">--    field has the value of 'newState' of the previous response, and whose</span><span>
+</span><span id="line-51"></span><span class="hs-comment">--    'event' is the next answer (step 2).</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- 4. Take the new 'ContractResponse' and go back to step 2, until you get a</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--    response with no requests, or an error.</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | The state of a 'Contract', containing all responses that have been fed to</span><span>
+</span><span id="line-56"></span><span class="hs-comment">--   it, and checkpoints that it produced.</span><span>
+</span><span id="line-57"></span><span id="local-6989586621680824597"><span id="local-6989586621680824598"></span></span><span class="hs-keyword">data</span><span> </span><span id="State"><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-var">State</span></a></span></span><span> </span><span id="local-6989586621680824817"><span class="annot"><a href="#local-6989586621680824817"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824816"><span class="annot"><a href="#local-6989586621680824816"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="State"><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-var">State</span></a></span></span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="record"><span class="annot"><span class="annottext">State w e -&gt; Responses e
+</span><a href="Plutus.Contract.State.html#record"><span class="hs-identifier hs-var hs-var">record</span></a></span></span><span>          </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contract.Resumable.html#Responses"><span class="hs-identifier hs-type">Responses</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824816"><span class="hs-identifier hs-type">e</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="checkpoints"><span class="annot"><span class="annottext">State w e -&gt; CheckpointStore
+</span><a href="Plutus.Contract.State.html#checkpoints"><span class="hs-identifier hs-var hs-var">checkpoints</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contract.Checkpoint.html#CheckpointStore"><span class="hs-identifier hs-type">CheckpointStore</span></a></span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="observableState"><span class="annot"><span class="annottext">State w e -&gt; w
+</span><a href="Plutus.Contract.State.html#observableState"><span class="hs-identifier hs-var hs-var">observableState</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680824817"><span class="hs-identifier hs-type">w</span></a></span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. State w e -&gt; Rep (State w e) x)
+-&gt; (forall x. Rep (State w e) x -&gt; State w e)
+-&gt; Generic (State w e)
+forall x. Rep (State w e) x -&gt; State w e
+forall x. State w e -&gt; Rep (State w e) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall w e x. Rep (State w e) x -&gt; State w e
+forall w e x. State w e -&gt; Rep (State w e) x
+$cto :: forall w e x. Rep (State w e) x -&gt; State w e
+$cfrom :: forall w e x. State w e -&gt; Rep (State w e) x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824586"><span id="local-6989586621680824588"><span class="annot"><span class="annottext">State w e -&gt; State w e -&gt; Bool
+(State w e -&gt; State w e -&gt; Bool)
+-&gt; (State w e -&gt; State w e -&gt; Bool) -&gt; Eq (State w e)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall w e. (Eq e, Eq w) =&gt; State w e -&gt; State w e -&gt; Bool
+/= :: State w e -&gt; State w e -&gt; Bool
+$c/= :: forall w e. (Eq e, Eq w) =&gt; State w e -&gt; State w e -&gt; Bool
+== :: State w e -&gt; State w e -&gt; Bool
+$c== :: forall w e. (Eq e, Eq w) =&gt; State w e -&gt; State w e -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824579"><span id="local-6989586621680824581"><span id="local-6989586621680824583"><span class="annot"><span class="annottext">Int -&gt; State w e -&gt; ShowS
+[State w e] -&gt; ShowS
+State w e -&gt; String
+(Int -&gt; State w e -&gt; ShowS)
+-&gt; (State w e -&gt; String)
+-&gt; ([State w e] -&gt; ShowS)
+-&gt; Show (State w e)
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+forall w e. (Show e, Show w) =&gt; Int -&gt; State w e -&gt; ShowS
+forall w e. (Show e, Show w) =&gt; [State w e] -&gt; ShowS
+forall w e. (Show e, Show w) =&gt; State w e -&gt; String
+showList :: [State w e] -&gt; ShowS
+$cshowList :: forall w e. (Show e, Show w) =&gt; [State w e] -&gt; ShowS
+show :: State w e -&gt; String
+$cshow :: forall w e. (Show e, Show w) =&gt; State w e -&gt; String
+showsPrec :: Int -&gt; State w e -&gt; ShowS
+$cshowsPrec :: forall w e. (Show e, Show w) =&gt; Int -&gt; State w e -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824574"><span id="local-6989586621680824576"><span class="annot"><span class="annottext">a -&gt; State w b -&gt; State w a
+(a -&gt; b) -&gt; State w a -&gt; State w b
+(forall a b. (a -&gt; b) -&gt; State w a -&gt; State w b)
+-&gt; (forall a b. a -&gt; State w b -&gt; State w a) -&gt; Functor (State w)
+forall a b. a -&gt; State w b -&gt; State w a
+forall a b. (a -&gt; b) -&gt; State w a -&gt; State w b
+forall w a b. a -&gt; State w b -&gt; State w a
+forall w a b. (a -&gt; b) -&gt; State w a -&gt; State w b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; State w b -&gt; State w a
+$c&lt;$ :: forall w a b. a -&gt; State w b -&gt; State w a
+fmap :: (a -&gt; b) -&gt; State w a -&gt; State w b
+$cfmap :: forall w a b. (a -&gt; b) -&gt; State w a -&gt; State w b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824539"><span id="local-6989586621680824541"><span id="local-6989586621680824543"><span id="local-6989586621680824545"><span id="local-6989586621680824547"><span id="local-6989586621680824549"><span id="local-6989586621680824551"><span id="local-6989586621680824553"><span id="local-6989586621680824555"><span id="local-6989586621680824557"><span id="local-6989586621680824559"><span id="local-6989586621680824561"><span id="local-6989586621680824563"><span id="local-6989586621680824565"><span id="local-6989586621680824567"><span id="local-6989586621680824569"><span id="local-6989586621680824571"><span class="annot"><span class="annottext">State w a -&gt; Bool
+(a -&gt; m) -&gt; State w a -&gt; m
+(a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+(forall m. Monoid m =&gt; State w m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; State w a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; State w a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; State w a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; State w a -&gt; a)
+-&gt; (forall a. State w a -&gt; [a])
+-&gt; (forall a. State w a -&gt; Bool)
+-&gt; (forall a. State w a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; State w a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; State w a -&gt; a)
+-&gt; (forall a. Ord a =&gt; State w a -&gt; a)
+-&gt; (forall a. Num a =&gt; State w a -&gt; a)
+-&gt; (forall a. Num a =&gt; State w a -&gt; a)
+-&gt; Foldable (State w)
+forall a. Eq a =&gt; a -&gt; State w a -&gt; Bool
+forall a. Num a =&gt; State w a -&gt; a
+forall a. Ord a =&gt; State w a -&gt; a
+forall m. Monoid m =&gt; State w m -&gt; m
+forall a. State w a -&gt; Bool
+forall a. State w a -&gt; Int
+forall a. State w a -&gt; [a]
+forall a. (a -&gt; a -&gt; a) -&gt; State w a -&gt; a
+forall w a. Eq a =&gt; a -&gt; State w a -&gt; Bool
+forall w a. Num a =&gt; State w a -&gt; a
+forall w a. Ord a =&gt; State w a -&gt; a
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; State w a -&gt; m
+forall w m. Monoid m =&gt; State w m -&gt; m
+forall w a. State w a -&gt; Bool
+forall w a. State w a -&gt; Int
+forall w a. State w a -&gt; [a]
+forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+forall w a. (a -&gt; a -&gt; a) -&gt; State w a -&gt; a
+forall w m a. Monoid m =&gt; (a -&gt; m) -&gt; State w a -&gt; m
+forall w b a. (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b
+forall w a b. (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+forall (t :: * -&gt; *).
+(forall m. Monoid m =&gt; t m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. t a -&gt; [a])
+-&gt; (forall a. t a -&gt; Bool)
+-&gt; (forall a. t a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; t a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; Foldable t
+product :: State w a -&gt; a
+$cproduct :: forall w a. Num a =&gt; State w a -&gt; a
+sum :: State w a -&gt; a
+$csum :: forall w a. Num a =&gt; State w a -&gt; a
+minimum :: State w a -&gt; a
+$cminimum :: forall w a. Ord a =&gt; State w a -&gt; a
+maximum :: State w a -&gt; a
+$cmaximum :: forall w a. Ord a =&gt; State w a -&gt; a
+elem :: a -&gt; State w a -&gt; Bool
+$celem :: forall w a. Eq a =&gt; a -&gt; State w a -&gt; Bool
+length :: State w a -&gt; Int
+$clength :: forall w a. State w a -&gt; Int
+null :: State w a -&gt; Bool
+$cnull :: forall w a. State w a -&gt; Bool
+toList :: State w a -&gt; [a]
+$ctoList :: forall w a. State w a -&gt; [a]
+foldl1 :: (a -&gt; a -&gt; a) -&gt; State w a -&gt; a
+$cfoldl1 :: forall w a. (a -&gt; a -&gt; a) -&gt; State w a -&gt; a
+foldr1 :: (a -&gt; a -&gt; a) -&gt; State w a -&gt; a
+$cfoldr1 :: forall w a. (a -&gt; a -&gt; a) -&gt; State w a -&gt; a
+foldl' :: (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b
+$cfoldl' :: forall w b a. (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b
+foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b
+$cfoldl :: forall w b a. (b -&gt; a -&gt; b) -&gt; b -&gt; State w a -&gt; b
+foldr' :: (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+$cfoldr' :: forall w a b. (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+$cfoldr :: forall w a b. (a -&gt; b -&gt; b) -&gt; b -&gt; State w a -&gt; b
+foldMap' :: (a -&gt; m) -&gt; State w a -&gt; m
+$cfoldMap' :: forall w m a. Monoid m =&gt; (a -&gt; m) -&gt; State w a -&gt; m
+foldMap :: (a -&gt; m) -&gt; State w a -&gt; m
+$cfoldMap :: forall w m a. Monoid m =&gt; (a -&gt; m) -&gt; State w a -&gt; m
+fold :: State w m -&gt; m
+$cfold :: forall w m. Monoid m =&gt; State w m -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Foldable</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824528"><span id="local-6989586621680824530"><span id="local-6989586621680824532"><span id="local-6989586621680824534"><span class="annot"><span class="annottext">Functor (State w)
+Foldable (State w)
+Functor (State w)
+-&gt; Foldable (State w)
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; State w a -&gt; f (State w b))
+-&gt; (forall (f :: * -&gt; *) a.
+    Applicative f =&gt;
+    State w (f a) -&gt; f (State w a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; State w a -&gt; m (State w b))
+-&gt; (forall (m :: * -&gt; *) a.
+    Monad m =&gt;
+    State w (m a) -&gt; m (State w a))
+-&gt; Traversable (State w)
+(a -&gt; f b) -&gt; State w a -&gt; f (State w b)
+forall w. Functor (State w)
+forall w. Foldable (State w)
+forall w (m :: * -&gt; *) a. Monad m =&gt; State w (m a) -&gt; m (State w a)
+forall w (f :: * -&gt; *) a.
+Applicative f =&gt;
+State w (f a) -&gt; f (State w a)
+forall w (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; State w a -&gt; m (State w b)
+forall w (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; State w a -&gt; f (State w b)
+forall (t :: * -&gt; *).
+Functor t
+-&gt; Foldable t
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; t a -&gt; f (t b))
+-&gt; (forall (f :: * -&gt; *) a. Applicative f =&gt; t (f a) -&gt; f (t a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; t a -&gt; m (t b))
+-&gt; (forall (m :: * -&gt; *) a. Monad m =&gt; t (m a) -&gt; m (t a))
+-&gt; Traversable t
+forall (m :: * -&gt; *) a. Monad m =&gt; State w (m a) -&gt; m (State w a)
+forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+State w (f a) -&gt; f (State w a)
+forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; State w a -&gt; m (State w b)
+forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; State w a -&gt; f (State w b)
+sequence :: State w (m a) -&gt; m (State w a)
+$csequence :: forall w (m :: * -&gt; *) a. Monad m =&gt; State w (m a) -&gt; m (State w a)
+mapM :: (a -&gt; m b) -&gt; State w a -&gt; m (State w b)
+$cmapM :: forall w (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; State w a -&gt; m (State w b)
+sequenceA :: State w (f a) -&gt; f (State w a)
+$csequenceA :: forall w (f :: * -&gt; *) a.
+Applicative f =&gt;
+State w (f a) -&gt; f (State w a)
+traverse :: (a -&gt; f b) -&gt; State w a -&gt; f (State w b)
+$ctraverse :: forall w (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; State w a -&gt; f (State w b)
+$cp2Traversable :: forall w. Foldable (State w)
+$cp1Traversable :: forall w. Functor (State w)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Traversable</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680824519"><span id="local-6989586621680824521"><span id="local-6989586621680824523"><span id="local-6989586621680824525"><span class="annot"><span class="annottext">[State w e] -&gt; Encoding
+[State w e] -&gt; Value
+State w e -&gt; Encoding
+State w e -&gt; Value
+(State w e -&gt; Value)
+-&gt; (State w e -&gt; Encoding)
+-&gt; ([State w e] -&gt; Value)
+-&gt; ([State w e] -&gt; Encoding)
+-&gt; ToJSON (State w e)
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+forall w e. (ToJSON w, ToJSON e) =&gt; [State w e] -&gt; Encoding
+forall w e. (ToJSON w, ToJSON e) =&gt; [State w e] -&gt; Value
+forall w e. (ToJSON w, ToJSON e) =&gt; State w e -&gt; Encoding
+forall w e. (ToJSON w, ToJSON e) =&gt; State w e -&gt; Value
+toEncodingList :: [State w e] -&gt; Encoding
+$ctoEncodingList :: forall w e. (ToJSON w, ToJSON e) =&gt; [State w e] -&gt; Encoding
+toJSONList :: [State w e] -&gt; Value
+$ctoJSONList :: forall w e. (ToJSON w, ToJSON e) =&gt; [State w e] -&gt; Value
+toEncoding :: State w e -&gt; Encoding
+$ctoEncoding :: forall w e. (ToJSON w, ToJSON e) =&gt; State w e -&gt; Encoding
+toJSON :: State w e -&gt; Value
+$ctoJSON :: forall w e. (ToJSON w, ToJSON e) =&gt; State w e -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824514"><span id="local-6989586621680824516"><span class="annot"><span class="annottext">Value -&gt; Parser [State w e]
+Value -&gt; Parser (State w e)
+(Value -&gt; Parser (State w e))
+-&gt; (Value -&gt; Parser [State w e]) -&gt; FromJSON (State w e)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+forall w e. (FromJSON e, FromJSON w) =&gt; Value -&gt; Parser [State w e]
+forall w e. (FromJSON e, FromJSON w) =&gt; Value -&gt; Parser (State w e)
+parseJSONList :: Value -&gt; Parser [State w e]
+$cparseJSONList :: forall w e. (FromJSON e, FromJSON w) =&gt; Value -&gt; Parser [State w e]
+parseJSON :: Value -&gt; Parser (State w e)
+$cparseJSON :: forall w e. (FromJSON e, FromJSON w) =&gt; Value -&gt; Parser (State w e)
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680824508"><span id="local-6989586621680824510"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Bifunctor</span></a></span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-type">State</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>    </span><span id="local-6989586621680824506"><span class="annot"><span class="annottext">bimap :: (a -&gt; b) -&gt; (c -&gt; d) -&gt; State a c -&gt; State b d
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">bimap</span></a></span></span><span> </span><span id="local-6989586621680824504"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621680824504"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680824503"><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621680824503"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621680824502"><span class="annot"><span class="annottext">State a c
+</span><a href="#local-6989586621680824502"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-67"></span><span>        </span><span class="annot"><span class="annottext">State a c
+</span><a href="#local-6989586621680824502"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">record :: Responses d
+</span><a href="Plutus.Contract.State.html#record"><span class="hs-identifier hs-var">record</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(c -&gt; d) -&gt; Responses c -&gt; Responses d
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621680824503"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">State a c -&gt; Responses c
+forall w e. State w e -&gt; Responses e
+</span><a href="Plutus.Contract.State.html#record"><span class="hs-identifier hs-var hs-var">record</span></a></span><span> </span><span class="annot"><span class="annottext">State a c
+</span><a href="#local-6989586621680824502"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">observableState :: b
+</span><a href="Plutus.Contract.State.html#observableState"><span class="hs-identifier hs-var">observableState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621680824504"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">State a c -&gt; a
+forall w e. State w e -&gt; w
+</span><a href="Plutus.Contract.State.html#observableState"><span class="hs-identifier hs-var hs-var">observableState</span></a></span><span> </span><span class="annot"><span class="annottext">State a c
+</span><a href="#local-6989586621680824502"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">}</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="hs-comment">-- | A request sent to a contract instance. It contains the previous 'State' of</span><span>
+</span><span id="line-70"></span><span class="hs-comment">--   the instance, and a 'Response' to one of the requests of the instance.</span><span>
+</span><span id="line-71"></span><span id="local-6989586621680824500"><span id="local-6989586621680824501"></span></span><span class="hs-keyword">data</span><span> </span><span id="ContractRequest"><span class="annot"><a href="Plutus.Contract.State.html#ContractRequest"><span class="hs-identifier hs-var">ContractRequest</span></a></span></span><span> </span><span id="local-6989586621680824656"><span class="annot"><a href="#local-6989586621680824656"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824655"><span class="annot"><a href="#local-6989586621680824655"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ContractRequest"><span class="annot"><a href="Plutus.Contract.State.html#ContractRequest"><span class="hs-identifier hs-var">ContractRequest</span></a></span></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="oldState"><span class="annot"><span class="annottext">ContractRequest w s -&gt; State w (CheckpointKey, s)
+</span><a href="Plutus.Contract.State.html#oldState"><span class="hs-identifier hs-var hs-var">oldState</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824656"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Checkpoint.html#CheckpointKey"><span class="hs-identifier hs-type">CheckpointKey</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680824655"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="event"><span class="annot"><span class="annottext">ContractRequest w s -&gt; Response s
+</span><a href="Plutus.Contract.State.html#event"><span class="hs-identifier hs-var hs-var">event</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contract.Resumable.html#Response"><span class="hs-identifier hs-type">Response</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824655"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. ContractRequest w s -&gt; Rep (ContractRequest w s) x)
+-&gt; (forall x. Rep (ContractRequest w s) x -&gt; ContractRequest w s)
+-&gt; Generic (ContractRequest w s)
+forall x. Rep (ContractRequest w s) x -&gt; ContractRequest w s
+forall x. ContractRequest w s -&gt; Rep (ContractRequest w s) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall w s x. Rep (ContractRequest w s) x -&gt; ContractRequest w s
+forall w s x. ContractRequest w s -&gt; Rep (ContractRequest w s) x
+$cto :: forall w s x. Rep (ContractRequest w s) x -&gt; ContractRequest w s
+$cfrom :: forall w s x. ContractRequest w s -&gt; Rep (ContractRequest w s) x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824491"><span id="local-6989586621680824493"><span class="annot"><span class="annottext">ContractRequest w s -&gt; ContractRequest w s -&gt; Bool
+(ContractRequest w s -&gt; ContractRequest w s -&gt; Bool)
+-&gt; (ContractRequest w s -&gt; ContractRequest w s -&gt; Bool)
+-&gt; Eq (ContractRequest w s)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall w s.
+(Eq s, Eq w) =&gt;
+ContractRequest w s -&gt; ContractRequest w s -&gt; Bool
+/= :: ContractRequest w s -&gt; ContractRequest w s -&gt; Bool
+$c/= :: forall w s.
+(Eq s, Eq w) =&gt;
+ContractRequest w s -&gt; ContractRequest w s -&gt; Bool
+== :: ContractRequest w s -&gt; ContractRequest w s -&gt; Bool
+$c== :: forall w s.
+(Eq s, Eq w) =&gt;
+ContractRequest w s -&gt; ContractRequest w s -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824485"><span id="local-6989586621680824487"><span id="local-6989586621680824489"><span class="annot"><span class="annottext">Int -&gt; ContractRequest w s -&gt; ShowS
+[ContractRequest w s] -&gt; ShowS
+ContractRequest w s -&gt; String
+(Int -&gt; ContractRequest w s -&gt; ShowS)
+-&gt; (ContractRequest w s -&gt; String)
+-&gt; ([ContractRequest w s] -&gt; ShowS)
+-&gt; Show (ContractRequest w s)
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+forall w s. (Show s, Show w) =&gt; Int -&gt; ContractRequest w s -&gt; ShowS
+forall w s. (Show s, Show w) =&gt; [ContractRequest w s] -&gt; ShowS
+forall w s. (Show s, Show w) =&gt; ContractRequest w s -&gt; String
+showList :: [ContractRequest w s] -&gt; ShowS
+$cshowList :: forall w s. (Show s, Show w) =&gt; [ContractRequest w s] -&gt; ShowS
+show :: ContractRequest w s -&gt; String
+$cshow :: forall w s. (Show s, Show w) =&gt; ContractRequest w s -&gt; String
+showsPrec :: Int -&gt; ContractRequest w s -&gt; ShowS
+$cshowsPrec :: forall w s. (Show s, Show w) =&gt; Int -&gt; ContractRequest w s -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824481"><span id="local-6989586621680824483"><span class="annot"><span class="annottext">a -&gt; ContractRequest w b -&gt; ContractRequest w a
+(a -&gt; b) -&gt; ContractRequest w a -&gt; ContractRequest w b
+(forall a b.
+ (a -&gt; b) -&gt; ContractRequest w a -&gt; ContractRequest w b)
+-&gt; (forall a b. a -&gt; ContractRequest w b -&gt; ContractRequest w a)
+-&gt; Functor (ContractRequest w)
+forall a b. a -&gt; ContractRequest w b -&gt; ContractRequest w a
+forall a b. (a -&gt; b) -&gt; ContractRequest w a -&gt; ContractRequest w b
+forall w a b. a -&gt; ContractRequest w b -&gt; ContractRequest w a
+forall w a b.
+(a -&gt; b) -&gt; ContractRequest w a -&gt; ContractRequest w b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; ContractRequest w b -&gt; ContractRequest w a
+$c&lt;$ :: forall w a b. a -&gt; ContractRequest w b -&gt; ContractRequest w a
+fmap :: (a -&gt; b) -&gt; ContractRequest w a -&gt; ContractRequest w b
+$cfmap :: forall w a b.
+(a -&gt; b) -&gt; ContractRequest w a -&gt; ContractRequest w b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824447"><span id="local-6989586621680824449"><span id="local-6989586621680824451"><span id="local-6989586621680824453"><span id="local-6989586621680824455"><span id="local-6989586621680824457"><span id="local-6989586621680824459"><span id="local-6989586621680824461"><span id="local-6989586621680824463"><span id="local-6989586621680824465"><span id="local-6989586621680824467"><span id="local-6989586621680824469"><span id="local-6989586621680824471"><span id="local-6989586621680824473"><span id="local-6989586621680824475"><span id="local-6989586621680824477"><span id="local-6989586621680824479"><span class="annot"><span class="annottext">ContractRequest w a -&gt; Bool
+(a -&gt; m) -&gt; ContractRequest w a -&gt; m
+(a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+(forall m. Monoid m =&gt; ContractRequest w m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; ContractRequest w a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; ContractRequest w a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a)
+-&gt; (forall a. ContractRequest w a -&gt; [a])
+-&gt; (forall a. ContractRequest w a -&gt; Bool)
+-&gt; (forall a. ContractRequest w a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; ContractRequest w a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; ContractRequest w a -&gt; a)
+-&gt; (forall a. Ord a =&gt; ContractRequest w a -&gt; a)
+-&gt; (forall a. Num a =&gt; ContractRequest w a -&gt; a)
+-&gt; (forall a. Num a =&gt; ContractRequest w a -&gt; a)
+-&gt; Foldable (ContractRequest w)
+forall a. Eq a =&gt; a -&gt; ContractRequest w a -&gt; Bool
+forall a. Num a =&gt; ContractRequest w a -&gt; a
+forall a. Ord a =&gt; ContractRequest w a -&gt; a
+forall m. Monoid m =&gt; ContractRequest w m -&gt; m
+forall a. ContractRequest w a -&gt; Bool
+forall a. ContractRequest w a -&gt; Int
+forall a. ContractRequest w a -&gt; [a]
+forall a. (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a
+forall w a. Eq a =&gt; a -&gt; ContractRequest w a -&gt; Bool
+forall w a. Num a =&gt; ContractRequest w a -&gt; a
+forall w a. Ord a =&gt; ContractRequest w a -&gt; a
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; ContractRequest w a -&gt; m
+forall w m. Monoid m =&gt; ContractRequest w m -&gt; m
+forall w a. ContractRequest w a -&gt; Bool
+forall w a. ContractRequest w a -&gt; Int
+forall w a. ContractRequest w a -&gt; [a]
+forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+forall w a. (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a
+forall w m a. Monoid m =&gt; (a -&gt; m) -&gt; ContractRequest w a -&gt; m
+forall w b a. (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+forall w a b. (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+forall (t :: * -&gt; *).
+(forall m. Monoid m =&gt; t m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. t a -&gt; [a])
+-&gt; (forall a. t a -&gt; Bool)
+-&gt; (forall a. t a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; t a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; Foldable t
+product :: ContractRequest w a -&gt; a
+$cproduct :: forall w a. Num a =&gt; ContractRequest w a -&gt; a
+sum :: ContractRequest w a -&gt; a
+$csum :: forall w a. Num a =&gt; ContractRequest w a -&gt; a
+minimum :: ContractRequest w a -&gt; a
+$cminimum :: forall w a. Ord a =&gt; ContractRequest w a -&gt; a
+maximum :: ContractRequest w a -&gt; a
+$cmaximum :: forall w a. Ord a =&gt; ContractRequest w a -&gt; a
+elem :: a -&gt; ContractRequest w a -&gt; Bool
+$celem :: forall w a. Eq a =&gt; a -&gt; ContractRequest w a -&gt; Bool
+length :: ContractRequest w a -&gt; Int
+$clength :: forall w a. ContractRequest w a -&gt; Int
+null :: ContractRequest w a -&gt; Bool
+$cnull :: forall w a. ContractRequest w a -&gt; Bool
+toList :: ContractRequest w a -&gt; [a]
+$ctoList :: forall w a. ContractRequest w a -&gt; [a]
+foldl1 :: (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a
+$cfoldl1 :: forall w a. (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a
+foldr1 :: (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a
+$cfoldr1 :: forall w a. (a -&gt; a -&gt; a) -&gt; ContractRequest w a -&gt; a
+foldl' :: (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+$cfoldl' :: forall w b a. (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+$cfoldl :: forall w b a. (b -&gt; a -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+foldr' :: (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+$cfoldr' :: forall w a b. (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+$cfoldr :: forall w a b. (a -&gt; b -&gt; b) -&gt; b -&gt; ContractRequest w a -&gt; b
+foldMap' :: (a -&gt; m) -&gt; ContractRequest w a -&gt; m
+$cfoldMap' :: forall w m a. Monoid m =&gt; (a -&gt; m) -&gt; ContractRequest w a -&gt; m
+foldMap :: (a -&gt; m) -&gt; ContractRequest w a -&gt; m
+$cfoldMap :: forall w m a. Monoid m =&gt; (a -&gt; m) -&gt; ContractRequest w a -&gt; m
+fold :: ContractRequest w m -&gt; m
+$cfold :: forall w m. Monoid m =&gt; ContractRequest w m -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Foldable</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824437"><span id="local-6989586621680824439"><span id="local-6989586621680824441"><span id="local-6989586621680824443"><span class="annot"><span class="annottext">Functor (ContractRequest w)
+Foldable (ContractRequest w)
+Functor (ContractRequest w)
+-&gt; Foldable (ContractRequest w)
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; ContractRequest w a -&gt; f (ContractRequest w b))
+-&gt; (forall (f :: * -&gt; *) a.
+    Applicative f =&gt;
+    ContractRequest w (f a) -&gt; f (ContractRequest w a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; ContractRequest w a -&gt; m (ContractRequest w b))
+-&gt; (forall (m :: * -&gt; *) a.
+    Monad m =&gt;
+    ContractRequest w (m a) -&gt; m (ContractRequest w a))
+-&gt; Traversable (ContractRequest w)
+(a -&gt; f b) -&gt; ContractRequest w a -&gt; f (ContractRequest w b)
+forall w. Functor (ContractRequest w)
+forall w. Foldable (ContractRequest w)
+forall w (m :: * -&gt; *) a.
+Monad m =&gt;
+ContractRequest w (m a) -&gt; m (ContractRequest w a)
+forall w (f :: * -&gt; *) a.
+Applicative f =&gt;
+ContractRequest w (f a) -&gt; f (ContractRequest w a)
+forall w (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; ContractRequest w a -&gt; m (ContractRequest w b)
+forall w (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; ContractRequest w a -&gt; f (ContractRequest w b)
+forall (t :: * -&gt; *).
+Functor t
+-&gt; Foldable t
+-&gt; (forall (f :: * -&gt; *) a b.
+    Applicative f =&gt;
+    (a -&gt; f b) -&gt; t a -&gt; f (t b))
+-&gt; (forall (f :: * -&gt; *) a. Applicative f =&gt; t (f a) -&gt; f (t a))
+-&gt; (forall (m :: * -&gt; *) a b.
+    Monad m =&gt;
+    (a -&gt; m b) -&gt; t a -&gt; m (t b))
+-&gt; (forall (m :: * -&gt; *) a. Monad m =&gt; t (m a) -&gt; m (t a))
+-&gt; Traversable t
+forall (m :: * -&gt; *) a.
+Monad m =&gt;
+ContractRequest w (m a) -&gt; m (ContractRequest w a)
+forall (f :: * -&gt; *) a.
+Applicative f =&gt;
+ContractRequest w (f a) -&gt; f (ContractRequest w a)
+forall (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; ContractRequest w a -&gt; m (ContractRequest w b)
+forall (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; ContractRequest w a -&gt; f (ContractRequest w b)
+sequence :: ContractRequest w (m a) -&gt; m (ContractRequest w a)
+$csequence :: forall w (m :: * -&gt; *) a.
+Monad m =&gt;
+ContractRequest w (m a) -&gt; m (ContractRequest w a)
+mapM :: (a -&gt; m b) -&gt; ContractRequest w a -&gt; m (ContractRequest w b)
+$cmapM :: forall w (m :: * -&gt; *) a b.
+Monad m =&gt;
+(a -&gt; m b) -&gt; ContractRequest w a -&gt; m (ContractRequest w b)
+sequenceA :: ContractRequest w (f a) -&gt; f (ContractRequest w a)
+$csequenceA :: forall w (f :: * -&gt; *) a.
+Applicative f =&gt;
+ContractRequest w (f a) -&gt; f (ContractRequest w a)
+traverse :: (a -&gt; f b) -&gt; ContractRequest w a -&gt; f (ContractRequest w b)
+$ctraverse :: forall w (f :: * -&gt; *) a b.
+Applicative f =&gt;
+(a -&gt; f b) -&gt; ContractRequest w a -&gt; f (ContractRequest w b)
+$cp2Traversable :: forall w. Foldable (ContractRequest w)
+$cp1Traversable :: forall w. Functor (ContractRequest w)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Traversable</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680824429"><span id="local-6989586621680824431"><span id="local-6989586621680824433"><span id="local-6989586621680824435"><span class="annot"><span class="annottext">[ContractRequest w s] -&gt; Encoding
+[ContractRequest w s] -&gt; Value
+ContractRequest w s -&gt; Encoding
+ContractRequest w s -&gt; Value
+(ContractRequest w s -&gt; Value)
+-&gt; (ContractRequest w s -&gt; Encoding)
+-&gt; ([ContractRequest w s] -&gt; Value)
+-&gt; ([ContractRequest w s] -&gt; Encoding)
+-&gt; ToJSON (ContractRequest w s)
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+forall w s.
+(ToJSON s, ToJSON w) =&gt;
+[ContractRequest w s] -&gt; Encoding
+forall w s. (ToJSON s, ToJSON w) =&gt; [ContractRequest w s] -&gt; Value
+forall w s. (ToJSON s, ToJSON w) =&gt; ContractRequest w s -&gt; Encoding
+forall w s. (ToJSON s, ToJSON w) =&gt; ContractRequest w s -&gt; Value
+toEncodingList :: [ContractRequest w s] -&gt; Encoding
+$ctoEncodingList :: forall w s.
+(ToJSON s, ToJSON w) =&gt;
+[ContractRequest w s] -&gt; Encoding
+toJSONList :: [ContractRequest w s] -&gt; Value
+$ctoJSONList :: forall w s. (ToJSON s, ToJSON w) =&gt; [ContractRequest w s] -&gt; Value
+toEncoding :: ContractRequest w s -&gt; Encoding
+$ctoEncoding :: forall w s. (ToJSON s, ToJSON w) =&gt; ContractRequest w s -&gt; Encoding
+toJSON :: ContractRequest w s -&gt; Value
+$ctoJSON :: forall w s. (ToJSON s, ToJSON w) =&gt; ContractRequest w s -&gt; Value
+</span><a href="#local-6989586621680824429"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824425"><span id="local-6989586621680824427"><span class="annot"><span class="annottext">Value -&gt; Parser [ContractRequest w s]
+Value -&gt; Parser (ContractRequest w s)
+(Value -&gt; Parser (ContractRequest w s))
+-&gt; (Value -&gt; Parser [ContractRequest w s])
+-&gt; FromJSON (ContractRequest w s)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+forall w s.
+(FromJSON s, FromJSON w) =&gt;
+Value -&gt; Parser [ContractRequest w s]
+forall w s.
+(FromJSON s, FromJSON w) =&gt;
+Value -&gt; Parser (ContractRequest w s)
+parseJSONList :: Value -&gt; Parser [ContractRequest w s]
+$cparseJSONList :: forall w s.
+(FromJSON s, FromJSON w) =&gt;
+Value -&gt; Parser [ContractRequest w s]
+parseJSON :: Value -&gt; Parser (ContractRequest w s)
+$cparseJSON :: forall w s.
+(FromJSON s, FromJSON w) =&gt;
+Value -&gt; Parser (ContractRequest w s)
+</span><a href="#local-6989586621680824425"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621680824421"><span id="local-6989586621680824423"><span class="annot"><span class="annottext">[ContractRequest w s] -&gt; Doc ann
+ContractRequest w s -&gt; Doc ann
+(forall ann. ContractRequest w s -&gt; Doc ann)
+-&gt; (forall ann. [ContractRequest w s] -&gt; Doc ann)
+-&gt; Pretty (ContractRequest w s)
+forall ann. [ContractRequest w s] -&gt; Doc ann
+forall ann. ContractRequest w s -&gt; Doc ann
+forall a.
+(forall ann. a -&gt; Doc ann)
+-&gt; (forall ann. [a] -&gt; Doc ann) -&gt; Pretty a
+forall w s ann.
+(Show s, Show w) =&gt;
+[ContractRequest w s] -&gt; Doc ann
+forall w s ann. (Show s, Show w) =&gt; ContractRequest w s -&gt; Doc ann
+prettyList :: [ContractRequest w s] -&gt; Doc ann
+$cprettyList :: forall w s ann.
+(Show s, Show w) =&gt;
+[ContractRequest w s] -&gt; Doc ann
+pretty :: ContractRequest w s -&gt; Doc ann
+$cpretty :: forall w s ann. (Show s, Show w) =&gt; ContractRequest w s -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Pretty</span></a></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PrettyShow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.State.html#ContractRequest"><span class="hs-identifier hs-type">ContractRequest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824656"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824655"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | A response produced by a contract instance. It contains the new 'State',</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--   the list of endpoints that can be called, logs produced by the contract,</span><span>
+</span><span id="line-81"></span><span class="hs-comment">--   possibly an error message, and the accumulated observable state.</span><span>
+</span><span id="line-82"></span><span id="local-6989586621680824418"><span id="local-6989586621680824419"></span></span><span class="hs-keyword">data</span><span> </span><span id="ContractResponse"><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-var">ContractResponse</span></a></span></span><span> </span><span id="local-6989586621680824679"><span class="annot"><a href="#local-6989586621680824679"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824678"><span class="annot"><a href="#local-6989586621680824678"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621680824677"><span class="annot"><a href="#local-6989586621680824677"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680824676"><span class="annot"><a href="#local-6989586621680824676"><span class="hs-identifier hs-type">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ContractResponse"><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-var">ContractResponse</span></a></span></span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="newState"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; State w (CheckpointKey, s)
+</span><a href="Plutus.Contract.State.html#newState"><span class="hs-identifier hs-var hs-var">newState</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824679"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Checkpoint.html#CheckpointKey"><span class="hs-identifier hs-type">CheckpointKey</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680824677"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- ^ Serialised state of the contract (internal)</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="hooks"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; [Request h]
+</span><a href="Plutus.Contract.State.html#hooks"><span class="hs-identifier hs-var hs-var">hooks</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Plutus.Contract.Resumable.html#Request"><span class="hs-identifier hs-type">Request</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824676"><span class="hs-identifier hs-type">h</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- ^ Open requests that can be handled</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="logs"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; [LogMessage Value]
+</span><a href="Plutus.Contract.State.html#logs"><span class="hs-identifier hs-var hs-var">logs</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMessage</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- ^ Logs produced by the contract</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="lastLogs"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; [LogMessage Value]
+</span><a href="Plutus.Contract.State.html#lastLogs"><span class="hs-identifier hs-var hs-var">lastLogs</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMessage</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- ^ Logs produced in the last step</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="err"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; Maybe e
+</span><a href="Plutus.Contract.State.html#err"><span class="hs-identifier hs-var hs-var">err</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824678"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-comment">-- ^ Error that happened during contract execution</span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="lastState"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; w
+</span><a href="Plutus.Contract.State.html#lastState"><span class="hs-identifier hs-var hs-var">lastState</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680824679"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="hs-comment">-- ^ Observable state produced in the last step</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x.
+ ContractResponse w e s h -&gt; Rep (ContractResponse w e s h) x)
+-&gt; (forall x.
+    Rep (ContractResponse w e s h) x -&gt; ContractResponse w e s h)
+-&gt; Generic (ContractResponse w e s h)
+forall x.
+Rep (ContractResponse w e s h) x -&gt; ContractResponse w e s h
+forall x.
+ContractResponse w e s h -&gt; Rep (ContractResponse w e s h) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall w e s h x.
+Rep (ContractResponse w e s h) x -&gt; ContractResponse w e s h
+forall w e s h x.
+ContractResponse w e s h -&gt; Rep (ContractResponse w e s h) x
+$cto :: forall w e s h x.
+Rep (ContractResponse w e s h) x -&gt; ContractResponse w e s h
+$cfrom :: forall w e s h x.
+ContractResponse w e s h -&gt; Rep (ContractResponse w e s h) x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824405"><span id="local-6989586621680824407"><span class="annot"><span class="annottext">ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool
+(ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool)
+-&gt; (ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool)
+-&gt; Eq (ContractResponse w e s h)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall w e s h.
+(Eq s, Eq w, Eq h, Eq e) =&gt;
+ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool
+/= :: ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool
+$c/= :: forall w e s h.
+(Eq s, Eq w, Eq h, Eq e) =&gt;
+ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool
+== :: ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool
+$c== :: forall w e s h.
+(Eq s, Eq w, Eq h, Eq e) =&gt;
+ContractResponse w e s h -&gt; ContractResponse w e s h -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824399"><span id="local-6989586621680824401"><span id="local-6989586621680824403"><span class="annot"><span class="annottext">Int -&gt; ContractResponse w e s h -&gt; ShowS
+[ContractResponse w e s h] -&gt; ShowS
+ContractResponse w e s h -&gt; String
+(Int -&gt; ContractResponse w e s h -&gt; ShowS)
+-&gt; (ContractResponse w e s h -&gt; String)
+-&gt; ([ContractResponse w e s h] -&gt; ShowS)
+-&gt; Show (ContractResponse w e s h)
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+forall w e s h.
+(Show s, Show w, Show h, Show e) =&gt;
+Int -&gt; ContractResponse w e s h -&gt; ShowS
+forall w e s h.
+(Show s, Show w, Show h, Show e) =&gt;
+[ContractResponse w e s h] -&gt; ShowS
+forall w e s h.
+(Show s, Show w, Show h, Show e) =&gt;
+ContractResponse w e s h -&gt; String
+showList :: [ContractResponse w e s h] -&gt; ShowS
+$cshowList :: forall w e s h.
+(Show s, Show w, Show h, Show e) =&gt;
+[ContractResponse w e s h] -&gt; ShowS
+show :: ContractResponse w e s h -&gt; String
+$cshow :: forall w e s h.
+(Show s, Show w, Show h, Show e) =&gt;
+ContractResponse w e s h -&gt; String
+showsPrec :: Int -&gt; ContractResponse w e s h -&gt; ShowS
+$cshowsPrec :: forall w e s h.
+(Show s, Show w, Show h, Show e) =&gt;
+Int -&gt; ContractResponse w e s h -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824395"><span id="local-6989586621680824397"><span class="annot"><span class="annottext">a -&gt; ContractResponse w e s b -&gt; ContractResponse w e s a
+(a -&gt; b) -&gt; ContractResponse w e s a -&gt; ContractResponse w e s b
+(forall a b.
+ (a -&gt; b) -&gt; ContractResponse w e s a -&gt; ContractResponse w e s b)
+-&gt; (forall a b.
+    a -&gt; ContractResponse w e s b -&gt; ContractResponse w e s a)
+-&gt; Functor (ContractResponse w e s)
+forall a b.
+a -&gt; ContractResponse w e s b -&gt; ContractResponse w e s a
+forall a b.
+(a -&gt; b) -&gt; ContractResponse w e s a -&gt; ContractResponse w e s b
+forall w e s a b.
+a -&gt; ContractResponse w e s b -&gt; ContractResponse w e s a
+forall w e s a b.
+(a -&gt; b) -&gt; ContractResponse w e s a -&gt; ContractResponse w e s b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; ContractResponse w e s b -&gt; ContractResponse w e s a
+$c&lt;$ :: forall w e s a b.
+a -&gt; ContractResponse w e s b -&gt; ContractResponse w e s a
+fmap :: (a -&gt; b) -&gt; ContractResponse w e s a -&gt; ContractResponse w e s b
+$cfmap :: forall w e s a b.
+(a -&gt; b) -&gt; ContractResponse w e s a -&gt; ContractResponse w e s b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680824387"><span id="local-6989586621680824389"><span id="local-6989586621680824391"><span id="local-6989586621680824393"><span class="annot"><span class="annottext">[ContractResponse w e s h] -&gt; Encoding
+[ContractResponse w e s h] -&gt; Value
+ContractResponse w e s h -&gt; Encoding
+ContractResponse w e s h -&gt; Value
+(ContractResponse w e s h -&gt; Value)
+-&gt; (ContractResponse w e s h -&gt; Encoding)
+-&gt; ([ContractResponse w e s h] -&gt; Value)
+-&gt; ([ContractResponse w e s h] -&gt; Encoding)
+-&gt; ToJSON (ContractResponse w e s h)
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+[ContractResponse w e s h] -&gt; Encoding
+forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+[ContractResponse w e s h] -&gt; Value
+forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+ContractResponse w e s h -&gt; Encoding
+forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+ContractResponse w e s h -&gt; Value
+toEncodingList :: [ContractResponse w e s h] -&gt; Encoding
+$ctoEncodingList :: forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+[ContractResponse w e s h] -&gt; Encoding
+toJSONList :: [ContractResponse w e s h] -&gt; Value
+$ctoJSONList :: forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+[ContractResponse w e s h] -&gt; Value
+toEncoding :: ContractResponse w e s h -&gt; Encoding
+$ctoEncoding :: forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+ContractResponse w e s h -&gt; Encoding
+toJSON :: ContractResponse w e s h -&gt; Value
+$ctoJSON :: forall w e s h.
+(ToJSON e, ToJSON h, ToJSON s, ToJSON w) =&gt;
+ContractResponse w e s h -&gt; Value
+</span><a href="#local-6989586621680824387"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824383"><span id="local-6989586621680824385"><span class="annot"><span class="annottext">Value -&gt; Parser [ContractResponse w e s h]
+Value -&gt; Parser (ContractResponse w e s h)
+(Value -&gt; Parser (ContractResponse w e s h))
+-&gt; (Value -&gt; Parser [ContractResponse w e s h])
+-&gt; FromJSON (ContractResponse w e s h)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+forall w e s h.
+(FromJSON s, FromJSON w, FromJSON h, FromJSON e) =&gt;
+Value -&gt; Parser [ContractResponse w e s h]
+forall w e s h.
+(FromJSON s, FromJSON w, FromJSON h, FromJSON e) =&gt;
+Value -&gt; Parser (ContractResponse w e s h)
+parseJSONList :: Value -&gt; Parser [ContractResponse w e s h]
+$cparseJSONList :: forall w e s h.
+(FromJSON s, FromJSON w, FromJSON h, FromJSON e) =&gt;
+Value -&gt; Parser [ContractResponse w e s h]
+parseJSON :: Value -&gt; Parser (ContractResponse w e s h)
+$cparseJSON :: forall w e s h.
+(FromJSON s, FromJSON w, FromJSON h, FromJSON e) =&gt;
+Value -&gt; Parser (ContractResponse w e s h)
+</span><a href="#local-6989586621680824383"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span id="local-6989586621680824381"><span id="local-6989586621680824382"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680824376"><span id="local-6989586621680824378"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824382"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824381"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621680824375"><span class="annot"><span class="annottext">bimap :: (a -&gt; b)
+-&gt; (c -&gt; d) -&gt; ContractResponse w e a c -&gt; ContractResponse w e b d
+</span><a href="#local-6989586621680824375"><span class="hs-identifier hs-var hs-var hs-var hs-var">bimap</span></a></span></span><span> </span><span id="local-6989586621680824374"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621680824374"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680824373"><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621680824373"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span id="local-6989586621680824372"><span class="annot"><span class="annottext">c :: ContractResponse w e a c
+</span><a href="#local-6989586621680824372"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span class="hs-special">{</span><span id="local-6989586621680824371"><span class="annot"><span class="annottext">State w (CheckpointKey, a)
+newState :: State w (CheckpointKey, a)
+newState :: forall w e s h.
+ContractResponse w e s h -&gt; State w (CheckpointKey, s)
+</span><a href="#local-6989586621680824371"><span class="hs-identifier hs-var hs-var">newState</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-95"></span><span>        </span><span class="annot"><span class="annottext">(c -&gt; d) -&gt; ContractResponse w e b c -&gt; ContractResponse w e b d
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">c -&gt; d
+</span><a href="#local-6989586621680824373"><span class="hs-identifier hs-var">g</span></a></span><span> </span><span class="annot"><span class="annottext">ContractResponse w e a c
+</span><a href="#local-6989586621680824372"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">newState :: State w (CheckpointKey, b)
+</span><a href="Plutus.Contract.State.html#newState"><span class="hs-identifier hs-var">newState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((CheckpointKey, a) -&gt; (CheckpointKey, b))
+-&gt; State w (CheckpointKey, a) -&gt; State w (CheckpointKey, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(a -&gt; b) -&gt; (CheckpointKey, a) -&gt; (CheckpointKey, b)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621680824374"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">State w (CheckpointKey, a)
+</span><a href="#local-6989586621680824371"><span class="hs-identifier hs-var">newState</span></a></span><span> </span><span class="hs-special">}</span></span></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="annot"><a href="Plutus.Contract.State.html#mapE"><span class="hs-identifier hs-type">mapE</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680824370"><span class="annot"><a href="#local-6989586621680824370"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621680824369"><span class="annot"><a href="#local-6989586621680824369"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span id="local-6989586621680824368"><span class="annot"><a href="#local-6989586621680824368"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824367"><span class="annot"><a href="#local-6989586621680824367"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680824366"><span class="annot"><a href="#local-6989586621680824366"><span class="hs-identifier hs-type">h</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680824370"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680824369"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824368"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824370"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824367"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824366"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824368"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824369"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824367"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824366"><span class="hs-identifier hs-type">h</span></a></span><span>
+</span><span id="line-98"></span><span id="mapE"><span class="annot"><span class="annottext">mapE :: (e -&gt; f) -&gt; ContractResponse w e s h -&gt; ContractResponse w f s h
+</span><a href="Plutus.Contract.State.html#mapE"><span class="hs-identifier hs-var hs-var">mapE</span></a></span></span><span> </span><span id="local-6989586621680824365"><span class="annot"><span class="annottext">e -&gt; f
+</span><a href="#local-6989586621680824365"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680824364"><span class="annot"><span class="annottext">c :: ContractResponse w e s h
+</span><a href="#local-6989586621680824364"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span class="hs-special">{</span><span id="local-6989586621680824363"><span class="annot"><span class="annottext">Maybe e
+err :: Maybe e
+err :: forall w e s h. ContractResponse w e s h -&gt; Maybe e
+</span><a href="#local-6989586621680824363"><span class="hs-identifier hs-var hs-var">err</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ContractResponse w e s h
+</span><a href="#local-6989586621680824364"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">err :: Maybe f
+</span><a href="Plutus.Contract.State.html#err"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(e -&gt; f) -&gt; Maybe e -&gt; Maybe f
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">e -&gt; f
+</span><a href="#local-6989586621680824365"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe e
+</span><a href="#local-6989586621680824363"><span class="hs-identifier hs-var">err</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="annot"><a href="Plutus.Contract.State.html#mapW"><span class="hs-identifier hs-type">mapW</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680824362"><span class="annot"><a href="#local-6989586621680824362"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824361"><span class="annot"><a href="#local-6989586621680824361"><span class="hs-identifier hs-type">q</span></a></span></span><span> </span><span id="local-6989586621680824360"><span class="annot"><a href="#local-6989586621680824360"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621680824359"><span class="annot"><a href="#local-6989586621680824359"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680824358"><span class="annot"><a href="#local-6989586621680824358"><span class="hs-identifier hs-type">h</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680824362"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680824361"><span class="hs-identifier hs-type">q</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824362"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824360"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824359"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824358"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824361"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824360"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824359"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824358"><span class="hs-identifier hs-type">h</span></a></span><span>
+</span><span id="line-101"></span><span id="mapW"><span class="annot"><span class="annottext">mapW :: (w -&gt; q) -&gt; ContractResponse w e s h -&gt; ContractResponse q e s h
+</span><a href="Plutus.Contract.State.html#mapW"><span class="hs-identifier hs-var hs-var">mapW</span></a></span></span><span> </span><span id="local-6989586621680824357"><span class="annot"><span class="annottext">w -&gt; q
+</span><a href="#local-6989586621680824357"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680824356"><span class="annot"><span class="annottext">c :: ContractResponse w e s h
+</span><a href="#local-6989586621680824356"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span class="hs-special">{</span><span id="local-6989586621680824355"><span class="annot"><span class="annottext">w
+lastState :: w
+lastState :: forall w e s h. ContractResponse w e s h -&gt; w
+</span><a href="#local-6989586621680824355"><span class="hs-identifier hs-var hs-var">lastState</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824354"><span class="annot"><span class="annottext">State w (CheckpointKey, s)
+newState :: State w (CheckpointKey, s)
+newState :: forall w e s h.
+ContractResponse w e s h -&gt; State w (CheckpointKey, s)
+</span><a href="#local-6989586621680824354"><span class="hs-identifier hs-var hs-var">newState</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ContractResponse w e s h
+</span><a href="#local-6989586621680824356"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">lastState :: q
+</span><a href="Plutus.Contract.State.html#lastState"><span class="hs-identifier hs-var">lastState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">w -&gt; q
+</span><a href="#local-6989586621680824357"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824355"><span class="hs-identifier hs-var">lastState</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">newState :: State q (CheckpointKey, s)
+</span><a href="Plutus.Contract.State.html#newState"><span class="hs-identifier hs-var">newState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(w -&gt; q)
+-&gt; State w (CheckpointKey, s) -&gt; State q (CheckpointKey, s)
+forall (p :: * -&gt; * -&gt; *) a b c.
+Bifunctor p =&gt;
+(a -&gt; b) -&gt; p a c -&gt; p b c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">first</span></a></span><span> </span><span class="annot"><span class="annottext">w -&gt; q
+</span><a href="#local-6989586621680824357"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">State w (CheckpointKey, s)
+</span><a href="#local-6989586621680824354"><span class="hs-identifier hs-var">newState</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- | Run one step of the contract by restoring it to its previous state and</span><span>
+</span><span id="line-104"></span><span class="hs-comment">--   feeding it a single new 'Response' event.</span><span>
+</span><span id="line-105"></span><span class="annot"><a href="Plutus.Contract.State.html#insertAndUpdateContract"><span class="hs-identifier hs-type">insertAndUpdateContract</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680824352"><span class="annot"><a href="#local-6989586621680824352"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824351"><span class="annot"><a href="#local-6989586621680824351"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680824350"><span class="annot"><a href="#local-6989586621680824350"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621680824349"><span class="annot"><a href="#local-6989586621680824349"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824352"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#Contract"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824352"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824351"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824350"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824349"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-comment">-- ^ The 'Contract' with schema @s@ error type @e@.</span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractRequest"><span class="hs-identifier hs-type">ContractRequest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824352"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html#PABResp"><span class="hs-identifier hs-type">PABResp</span></a></span><span> </span><span class="hs-comment">-- ^  The 'ContractRequest' value with the previous state and the new event.</span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824352"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824350"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html#PABResp"><span class="hs-identifier hs-type">PABResp</span></a></span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html#PABReq"><span class="hs-identifier hs-type">PABReq</span></a></span><span>
+</span><span id="line-111"></span><span id="insertAndUpdateContract"><span class="annot"><span class="annottext">insertAndUpdateContract :: Contract w s e a
+-&gt; ContractRequest w PABResp -&gt; ContractResponse w e PABResp PABReq
+</span><a href="Plutus.Contract.State.html#insertAndUpdateContract"><span class="hs-identifier hs-var hs-var">insertAndUpdateContract</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Types.html#Contract"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span id="local-6989586621680824347"><span class="annot"><span class="annottext">Eff (ContractEffs w e) a
+</span><a href="#local-6989586621680824347"><span class="hs-identifier hs-var">con</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractRequest"><span class="hs-identifier hs-type">ContractRequest</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">oldState :: forall w s. ContractRequest w s -&gt; State w (CheckpointKey, s)
+</span><a href="Plutus.Contract.State.html#oldState"><span class="hs-identifier hs-var">oldState</span></a></span><span class="hs-glyph">=</span><span class="annot"><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span id="local-6989586621680824346"><span class="annot"><span class="annottext">Responses (CheckpointKey, PABResp)
+</span><a href="#local-6989586621680824346"><span class="hs-identifier hs-var">record</span></a></span></span><span> </span><span id="local-6989586621680824345"><span class="annot"><span class="annottext">CheckpointStore
+</span><a href="#local-6989586621680824345"><span class="hs-identifier hs-var">checkpoints</span></a></span></span><span> </span><span id="local-6989586621680824344"><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824344"><span class="hs-identifier hs-var">oldW</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824343"><span class="annot"><span class="annottext">Response PABResp
+event :: Response PABResp
+event :: forall w s. ContractRequest w s -&gt; Response s
+</span><a href="#local-6989586621680824343"><span class="hs-identifier hs-var hs-var">event</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-112"></span><span>    </span><span class="annot"><span class="annottext">w
+-&gt; ResumableResult w e PABResp PABReq a
+-&gt; ContractResponse w e PABResp PABReq
+forall w e s h a.
+Monoid w =&gt;
+w -&gt; ResumableResult w e s h a -&gt; ContractResponse w e s h
+</span><a href="Plutus.Contract.State.html#mkResponse"><span class="hs-identifier hs-var">mkResponse</span></a></span><span>
+</span><span id="line-113"></span><span>        </span><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824344"><span class="hs-identifier hs-var">oldW</span></a></span><span>
+</span><span id="line-114"></span><span>        </span><span class="annot"><span class="annottext">(ResumableResult w e PABResp PABReq a
+ -&gt; ContractResponse w e PABResp PABReq)
+-&gt; ResumableResult w e PABResp PABReq a
+-&gt; ContractResponse w e PABResp PABReq
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ResumableResult w e PABResp PABReq a
+-&gt; ResumableResult w e PABResp PABReq a
+forall w e i o a.
+ResumableResult w e i o a -&gt; ResumableResult w e i o a
+</span><a href="Plutus.Contract.Types.html#shrinkResumableResult"><span class="hs-identifier hs-var">shrinkResumableResult</span></a></span><span>
+</span><span id="line-115"></span><span>        </span><span class="annot"><span class="annottext">(ResumableResult w e PABResp PABReq a
+ -&gt; ResumableResult w e PABResp PABReq a)
+-&gt; ResumableResult w e PABResp PABReq a
+-&gt; ResumableResult w e PABResp PABReq a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff (ContractEffs w e) a
+-&gt; CheckpointStore
+-&gt; Responses (CheckpointKey, PABResp)
+-&gt; Response PABResp
+-&gt; ResumableResult w e PABResp PABReq a
+forall w e a.
+Monoid w =&gt;
+Eff (ContractEffs w e) a
+-&gt; CheckpointStore
+-&gt; Responses (CheckpointKey, PABResp)
+-&gt; Response PABResp
+-&gt; ResumableResult w e PABResp PABReq a
+</span><a href="Plutus.Contract.Types.html#insertAndUpdate"><span class="hs-identifier hs-var">insertAndUpdate</span></a></span><span> </span><span class="annot"><span class="annottext">Eff (ContractEffs w e) a
+</span><a href="#local-6989586621680824347"><span class="hs-identifier hs-var">con</span></a></span><span> </span><span class="annot"><span class="annottext">CheckpointStore
+</span><a href="#local-6989586621680824345"><span class="hs-identifier hs-var">checkpoints</span></a></span><span> </span><span class="annot"><span class="annottext">Responses (CheckpointKey, PABResp)
+</span><a href="#local-6989586621680824346"><span class="hs-identifier hs-var">record</span></a></span><span> </span><span class="annot"><span class="annottext">Response PABResp
+</span><a href="#local-6989586621680824343"><span class="hs-identifier hs-var">event</span></a></span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span class="annot"><a href="Plutus.Contract.State.html#mkResponse"><span class="hs-identifier hs-type">mkResponse</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680824653"><span class="annot"><a href="#local-6989586621680824653"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824652"><span class="annot"><a href="#local-6989586621680824652"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621680824651"><span class="annot"><a href="#local-6989586621680824651"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680824650"><span class="annot"><a href="#local-6989586621680824650"><span class="hs-identifier hs-type">h</span></a></span></span><span> </span><span id="local-6989586621680824649"><span class="annot"><a href="#local-6989586621680824649"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-118"></span><span>    </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824653"><span class="hs-identifier hs-type">w</span></a></span><span>
+</span><span id="line-119"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680824653"><span class="hs-identifier hs-type">w</span></a></span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#ResumableResult"><span class="hs-identifier hs-type">ResumableResult</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824653"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824652"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824651"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824650"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824649"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824653"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824652"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824651"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824650"><span class="hs-identifier hs-type">h</span></a></span><span>
+</span><span id="line-122"></span><span id="mkResponse"><span class="annot"><span class="annottext">mkResponse :: w -&gt; ResumableResult w e s h a -&gt; ContractResponse w e s h
+</span><a href="Plutus.Contract.State.html#mkResponse"><span class="hs-identifier hs-var hs-var">mkResponse</span></a></span></span><span> </span><span id="local-6989586621680824340"><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824340"><span class="hs-identifier hs-var">oldW</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#ResumableResult"><span class="hs-identifier hs-type">ResumableResult</span></a></span><span class="hs-special">{</span><span id="local-6989586621680824338"><span class="annot"><span class="annottext">Responses (CheckpointKey, s)
+_responses :: forall w e i o a.
+ResumableResult w e i o a -&gt; Responses (CheckpointKey, i)
+_responses :: Responses (CheckpointKey, s)
+</span><a href="Plutus.Contract.Types.html#_responses"><span class="hs-identifier hs-var hs-var">_responses</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_requests :: forall w e i o a. ResumableResult w e i o a -&gt; Requests o
+</span><a href="Plutus.Contract.Types.html#_requests"><span class="hs-identifier hs-var">_requests</span></a></span><span class="hs-glyph">=</span><span class="annot"><a href="Plutus.Contract.Resumable.html#Requests"><span class="hs-identifier hs-type">Requests</span></a></span><span class="hs-special">{</span><span id="local-6989586621680824334"><span class="annot"><span class="annottext">[Request h]
+unRequests :: forall o. Requests o -&gt; [Request o]
+unRequests :: [Request h]
+</span><a href="Plutus.Contract.Resumable.html#unRequests"><span class="hs-identifier hs-var hs-var">unRequests</span></a></span></span><span class="hs-special">}</span><span class="hs-special">,</span><span id="local-6989586621680824332"><span class="annot"><span class="annottext">CheckpointStore
+_checkpointStore :: forall w e i o a. ResumableResult w e i o a -&gt; CheckpointStore
+_checkpointStore :: CheckpointStore
+</span><a href="Plutus.Contract.Types.html#_checkpointStore"><span class="hs-identifier hs-var hs-var">_checkpointStore</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824330"><span class="annot"><span class="annottext">Seq (LogMessage Value)
+_logs :: forall w e i o a.
+ResumableResult w e i o a -&gt; Seq (LogMessage Value)
+_logs :: Seq (LogMessage Value)
+</span><a href="Plutus.Contract.Types.html#_logs"><span class="hs-identifier hs-var hs-var">_logs</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824328"><span class="annot"><span class="annottext">Seq (LogMessage Value)
+_lastLogs :: forall w e i o a.
+ResumableResult w e i o a -&gt; Seq (LogMessage Value)
+_lastLogs :: Seq (LogMessage Value)
+</span><a href="Plutus.Contract.Types.html#_lastLogs"><span class="hs-identifier hs-var hs-var">_lastLogs</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680824326"><span class="annot"><span class="annottext">Either e (Maybe a)
+_finalState :: forall w e i o a. ResumableResult w e i o a -&gt; Either e (Maybe a)
+_finalState :: Either e (Maybe a)
+</span><a href="Plutus.Contract.Types.html#_finalState"><span class="hs-identifier hs-var hs-var">_finalState</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">_lastState :: forall w e i o a. ResumableResult w e i o a -&gt; w
+</span><a href="Plutus.Contract.Types.html#_lastState"><span class="hs-identifier hs-var">_lastState</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680824323"><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824323"><span class="hs-identifier hs-var">lastState</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-123"></span><span>    </span><span class="annot"><span class="annottext">ContractResponse :: forall w e s h.
+State w (CheckpointKey, s)
+-&gt; [Request h]
+-&gt; [LogMessage Value]
+-&gt; [LogMessage Value]
+-&gt; Maybe e
+-&gt; w
+-&gt; ContractResponse w e s h
+</span><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span>
+</span><span id="line-124"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">hooks :: [Request h]
+</span><a href="Plutus.Contract.State.html#hooks"><span class="hs-identifier hs-var">hooks</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Request h]
+</span><a href="#local-6989586621680824334"><span class="hs-identifier hs-var">unRequests</span></a></span><span>
+</span><span id="line-125"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">newState :: State w (CheckpointKey, s)
+</span><a href="Plutus.Contract.State.html#newState"><span class="hs-identifier hs-var">newState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">State :: forall w e. Responses e -&gt; CheckpointStore -&gt; w -&gt; State w e
+</span><a href="Plutus.Contract.State.html#State"><span class="hs-identifier hs-type">State</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">record :: Responses (CheckpointKey, s)
+</span><a href="Plutus.Contract.State.html#record"><span class="hs-identifier hs-var">record</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Responses (CheckpointKey, s)
+</span><a href="#local-6989586621680824338"><span class="hs-identifier hs-var">_responses</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">checkpoints :: CheckpointStore
+</span><a href="Plutus.Contract.State.html#checkpoints"><span class="hs-identifier hs-var">checkpoints</span></a></span><span class="hs-glyph">=</span><span class="annot"><span class="annottext">CheckpointStore
+</span><a href="#local-6989586621680824332"><span class="hs-identifier hs-var">_checkpointStore</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">observableState :: w
+</span><a href="Plutus.Contract.State.html#observableState"><span class="hs-identifier hs-var">observableState</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824340"><span class="hs-identifier hs-var">oldW</span></a></span><span> </span><span class="annot"><span class="annottext">w -&gt; w -&gt; w
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">w
+</span><a href="#local-6989586621680824323"><span class="hs-identifier hs-var">lastState</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-126"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">logs :: [LogMessage Value]
+</span><a href="Plutus.Contract.State.html#logs"><span class="hs-identifier hs-var">logs</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Seq (LogMessage Value) -&gt; [LogMessage Value]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">toList</span></a></span><span> </span><span class="annot"><span class="annottext">Seq (LogMessage Value)
+</span><a href="#local-6989586621680824330"><span class="hs-identifier hs-var">_logs</span></a></span><span>
+</span><span id="line-127"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">lastLogs :: [LogMessage Value]
+</span><a href="Plutus.Contract.State.html#lastLogs"><span class="hs-identifier hs-var">lastLogs</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Seq (LogMessage Value) -&gt; [LogMessage Value]
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">toList</span></a></span><span> </span><span class="annot"><span class="annottext">Seq (LogMessage Value)
+</span><a href="#local-6989586621680824328"><span class="hs-identifier hs-var">_lastLogs</span></a></span><span>
+</span><span id="line-128"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">err :: Maybe e
+</span><a href="Plutus.Contract.State.html#err"><span class="hs-identifier hs-var">err</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(e -&gt; Maybe e)
+-&gt; (Maybe a -&gt; Maybe e) -&gt; Either e (Maybe a) -&gt; Maybe e
+forall a c b. (a -&gt; c) -&gt; (b -&gt; c) -&gt; Either a b -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">either</span></a></span><span> </span><span class="annot"><span class="annottext">e -&gt; Maybe e
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe e -&gt; Maybe a -&gt; Maybe e
+forall a b. a -&gt; b -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe e
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Either e (Maybe a)
+</span><a href="#local-6989586621680824326"><span class="hs-identifier hs-var">_finalState</span></a></span><span>
+</span><span id="line-129"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">w
+lastState :: w
+lastState :: w
+</span><a href="#local-6989586621680824323"><span class="hs-identifier hs-var hs-var">lastState</span></a></span><span>
+</span><span id="line-130"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span class="hs-comment">-- | The 'ContractResponse' with the initial state of the contract.</span><span>
+</span><span id="line-133"></span><span class="annot"><a href="Plutus.Contract.State.html#initialiseContract"><span class="hs-identifier hs-type">initialiseContract</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-134"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680824320"><span class="annot"><a href="#local-6989586621680824320"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680824319"><span class="annot"><a href="#local-6989586621680824319"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680824318"><span class="annot"><a href="#local-6989586621680824318"><span class="hs-identifier hs-type">e</span></a></span></span><span> </span><span id="local-6989586621680824317"><span class="annot"><a href="#local-6989586621680824317"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824320"><span class="hs-identifier hs-type">w</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-136"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.Types.html#Contract"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824320"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824319"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824318"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824317"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contract.State.html#ContractResponse"><span class="hs-identifier hs-type">ContractResponse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824320"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680824318"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html#PABResp"><span class="hs-identifier hs-type">PABResp</span></a></span><span> </span><span class="annot"><a href="Plutus.Contract.Effects.html#PABReq"><span class="hs-identifier hs-type">PABReq</span></a></span><span>
+</span><span id="line-138"></span><span id="initialiseContract"><span class="annot"><span class="annottext">initialiseContract :: Contract w s e a -&gt; ContractResponse w e PABResp PABReq
+</span><a href="Plutus.Contract.State.html#initialiseContract"><span class="hs-identifier hs-var hs-var">initialiseContract</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contract.Types.html#Contract"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span id="local-6989586621680824316"><span class="annot"><span class="annottext">Eff (ContractEffs w e) a
+</span><a href="#local-6989586621680824316"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">w
+-&gt; ResumableResult w e PABResp PABReq a
+-&gt; ContractResponse w e PABResp PABReq
+forall w e s h a.
+Monoid w =&gt;
+w -&gt; ResumableResult w e s h a -&gt; ContractResponse w e s h
+</span><a href="Plutus.Contract.State.html#mkResponse"><span class="hs-identifier hs-var">mkResponse</span></a></span><span> </span><span class="annot"><span class="annottext">w
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span> </span><span class="annot"><span class="annottext">(ResumableResult w e PABResp PABReq a
+ -&gt; ContractResponse w e PABResp PABReq)
+-&gt; ResumableResult w e PABResp PABReq a
+-&gt; ContractResponse w e PABResp PABReq
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[Response PABResp]
+-&gt; CheckpointStore
+-&gt; Eff (ContractEffs w e) a
+-&gt; ResumableResult w e PABResp PABReq a
+forall w e a.
+Monoid w =&gt;
+[Response PABResp]
+-&gt; CheckpointStore
+-&gt; Eff (ContractEffs w e) a
+-&gt; ResumableResult w e PABResp PABReq a
+</span><a href="Plutus.Contract.Types.html#runResumable"><span class="hs-identifier hs-var">runResumable</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">CheckpointStore
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span> </span><span class="annot"><span class="annottext">Eff (ContractEffs w e) a
+</span><a href="#local-6989586621680824316"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-139"></span></pre></body></html>
