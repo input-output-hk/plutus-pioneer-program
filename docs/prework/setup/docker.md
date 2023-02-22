@@ -71,6 +71,46 @@ Awesome, you have installed all the required software to use the Docker containe
 
 ## Running the PPP Docker Container
 
-Before moving forward into using the Docker container provided for this cohort of the PPP, you need to close VS Code. Next, please follow the next steps.
+Before moving forward into using the Docker container provided for this cohort of the PPP, you need to close VS Code. Next, please follow the next section where we'll guide you on finishing the set up of you local working environment.
 
-### Cloning the PPP Repository
+### Forking the PPP Repository
+
+In this section, we'll guide to fork the repository for the Plutus Pioneers Program in GitHub. A fork is a new repository that shares code and visibility settings with the original repository. It's like having a personal copy of the original repo hosted in your GitHub account. You can learn more about forks in the [Fork a repo section](https://docs.github.com/en/get-started/quickstart/fork-a-repo) at GitHub Docs.
+
+{% hint style="info" %}
+**Note that you need a GitHub account to fork the repository.** If you don't have a GitHub account, please follow [this link](https://github.com/join) to create it. If you need further assistance to create a GitHub account, please read the [Signing up for GitHub section](https://docs.github.com/en/get-started/signing-up-for-github) at GitHub Docs.
+{% endhint %}
+
+Follow the next steps to fork the PPP repository.
+
+1. Open your browser, navigate to <https://github.com/> and login into your GitHub account.
+
+2. After login into GitHub, open the PPP repository by opening this URL: <https://github.com/input-output-hk/plutus-pioneer-program>. As this guide works for the 4th. cohort of the PPP, be sure that the branch `fourth-iteration` is selected as you can see in the image below.
+
+    ![Fourth-iteration branch of the PPP repository in GitHub.](images/docker-guide-07.png)
+
+    You are free to navigate through the branches of previous cohorts, but please, be aware of using the correct branch for the 4th. cohort.
+    
+    {% hint style="info" %}
+    A **branch** is an isolated version of the main repository. Usually, branches are used to work in particular projects within a git repository. You can learn more about managing branches in GitHub in the [About branches page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches) at GitHub Docs.
+    {% endhint %}
+
+3. To fork the repository, click on the "Fork" icon in the upper right corner as you can see in the image below.
+
+    ![The PPP repository in GitHub where the fork icon is highlighted.](images/docker-guide-08.png)
+
+4. Next, you will see the "Create a new fork" page. Be sure to select an owner and set a repository name. By default, if you only have one GitHub account, you will see your username as in the "Owner" option. You can leave the "Repository name" box as is. If you only want to fork the branch of the 4th. cohort, be sure to check the box next to the "Copy the `fourth-iteration` branch only" option. Finally, click on the "Create fork" button to continue. You can see an example of these options in the image below.
+
+    ![Sample setting to fork the PPP repository.](images/docker-guide-09.png)
+
+5. Now, the PPP repo will be forked into your GitHub account. You will see a page similar to the one in the image below. The process may take a few seconds.
+
+    ![Waiting page that appears while forking a repository in GitHub.](images/docker-guide-10.png)
+
+6. After a few seconds, you'll see your fork. To corroborate that you're using your fork, note that your user name appears in the repository's name in the upper left corner. In the image below, a fork was created i by the user `jarturomora`.
+
+    ![Sample fork of the PPP repository in GitHub.](images/docker-guide-11.png)
+
+Now that you forked the repo, let's clone it into your computer.
+
+### Cloning you Fork
