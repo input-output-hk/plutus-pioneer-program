@@ -1,8 +1,17 @@
 ARG UBUNTU_VERSION=20.04
-FROM ubuntu:${UBUNTU_VERSION} as first_stage
+FROM ubuntu:${UBUNTU_VERSION} as system_deps
 ENV DEBIAN_FRONTEND=nonintercative
 RUN mkdir -p /app/src
 WORKDIR /app
+
+# system_deps args
+ARG IOHK_LIBSODIUM_GIT_REV=66f017f16633f2060db25e17c170c2afa0f2a8a1
+ARG IOKH_LIBSECP251_GIT_REV=ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+
+# haskell args
+ARG CABAL_VERSION=3.6.2.0
+ARG GHC_VERSION=8.10.7
+ARG HLS_VERSION=1.7.0.0
 
 # development dependencies
 RUN apt-get update -y && apt-get install -y \
@@ -29,12 +38,6 @@ RUN apt-get update -y && apt-get install -y \
   zlib1g-dev libreadline-dev llvm libnuma-dev \
   && rm -rf /var/lib/apt/lists/*
 
-ARG CABAL_VERSION=3.6.2.0
-ARG GHC_VERSION=8.10.7
-ARG HLS_VERSION=1.7.0.0
-ARG IOHK_LIBSODIUM_GIT_REV=66f017f16633f2060db25e17c170c2afa0f2a8a1
-ARG IOKH_LIBSECP251_GIT_REV=ac83be33d0956faf6b7f61a60ab524ef7d6a473a
-
 # install secp2561k library with prefix '/'
 RUN git clone https://github.com/bitcoin-core/secp256k1 &&\
   cd secp256k1 \
@@ -45,6 +48,16 @@ RUN git clone https://github.com/bitcoin-core/secp256k1 &&\
   make && \
   make install  && cd .. && rm -rf ./secp256k1
 
+# install nix
+# RUN curl -L -o install.sh https://nixos.org/nix/install \
+#   && bash install.sh --daemon
+
+FROM system_deps as haskell
+
+SHELL ["bash", "-lc"]
+
+#RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
+#  && niv add mlabs-haskell/plutus-simple-model -r 64dd3fee4caff9472e0dcc2e14cc587452c80e77
 
 # install libsodium from sources with prefix '/'
 RUN git clone https://github.com/input-output-hk/libsodium.git &&\
@@ -56,7 +69,6 @@ RUN git clone https://github.com/input-output-hk/libsodium.git &&\
   make && \
   make install  && cd .. && rm -rf ./libsodium
 
-
 # install ghcup
 ENV PATH=${PATH}:${HOME:-/root}/.ghcup/bin
 RUN wget --secure-protocol=TLSv1_2 \
@@ -67,36 +79,26 @@ RUN wget --secure-protocol=TLSv1_2 \
 
 RUN ghcup config set downloader Wget \
   &&  ghcup install ghc ${GHC_VERSION} \
-  &&  ghcup install cabal ${CABAL_VERSION} \
-  && ghcup set ghc ${GHC_VERSION}
+  &&  ghcup install cabal ${CABAL_VERSION}
+RUN ghcup set ghc ${GHC_VERSION}
 RUN ghcup install hls ${HLS_VERSION}
 
-# install nix and niv
-RUN curl -L -o install.sh https://nixos.org/nix/install \
-  && bash install.sh --daemon
-  
-FROM first_stage as second_stage
-SHELL ["bash", "-lc"]
-#RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
-#  && niv add mlabs-haskell/plutus-simple-model -r 64dd3fee4caff9472e0dcc2e14cc587452c80e77
+ENV PATH=${PATH}:${HOME:-/root}/.cabal/bin
+#RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
+RUN cabal update
+
+FROM haskell as cardano_node
 
 # install cardano-node binaries
 RUN wget https://update-cardano-mainnet.iohk.io/cardano-node-releases/cardano-node-1.35.5-linux.tar.gz \
   && tar -xf cardano-node-1.35.5-linux.tar.gz -C /usr/bin \
   && cardano-cli --version
 
+# node socket
 RUN echo "export CARDANO_NODE_SOCKET_PATH=/ipc/node.socket" >> ~/.bashrc
-
-# install kuber
-RUN git clone https://github.com/dQuadrant/kuber \
-  && cd kuber \
-  && cabal update \
-  && cd server \
-  && cabal install
-
-RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
-
 RUN mkdir -p ${HOME:-/root}/node-config
+
+# Download cardano-node config
 RUN mkdir -p /ipc
 
 RUN  wget https://book.world.dev.cardano.org/environments/preview/config.json \
@@ -108,11 +110,20 @@ RUN  wget https://book.world.dev.cardano.org/environments/preview/config.json \
   && wget https://book.world.dev.cardano.org/environments/preview/shelley-genesis.json \
   && mv ./*.json ${HOME:-/root}/node-config/
 
-ARG CARDANO_NODE_SOCKET_PATH=/ipc/node.socket
-
+# start-node alias
 RUN echo "alias start-node='cardano-node run \
 	     --config ${HOME:-/root}/node-config/config.json \
 	     --topology ${HOME:-/root}/node-config/topology.json \
 	     --database-path ${HOME:-/root}/preview-db \
 	     --socket-path /ipc/node.socket'" >> ~/.bashrc
+
+FROM cardano_node as kuber
+
+# install kuber
+RUN git clone https://github.com/dQuadrant/kuber \
+  && cd kuber \
+  && cabal update \
+  && cd server \
+  && cabal build \
+  && cabal install
 
