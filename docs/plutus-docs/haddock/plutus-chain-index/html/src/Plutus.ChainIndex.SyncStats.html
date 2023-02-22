@@ -1,0 +1,605 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds           #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass      #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies  #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts    #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE GADTs               #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase          #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.ChainIndex.SyncStats</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Tracing</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ToObject</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Member</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">LogMsg</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">logInfo</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">Data.Time.Units</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">Second</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">fromMicroseconds</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Data.Time.Units.Extra</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Slot</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Slot</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.ChainIndex</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">PointAtGenesis</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">tipAsPoint</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.ChainIndex</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CI</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html"><span class="hs-identifier">Plutus.ChainIndex.Lib</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#ChainSyncEvent"><span class="hs-identifier">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#Resume"><span class="hs-identifier">Resume</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollBackward"><span class="hs-identifier">RollBackward</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollForward"><span class="hs-identifier">RollForward</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">Pretty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">pretty</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">comma</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier">viaShow</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator">(&lt;+&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">System.Clock</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">TimeSpec</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">toNanoSecs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Text.Printf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">printf</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span id="local-6989586621679436945"><span id="local-6989586621679436946"></span></span><span class="hs-keyword">data</span><span> </span><span id="SyncStats"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SyncStats"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="syncStatsAppliedBlocks"><span class="annot"><span class="annottext">SyncStats -&gt; Integer
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncStatsAppliedBlocks"><span class="hs-identifier hs-var hs-var">syncStatsAppliedBlocks</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-comment">-- ^ Number of applied blocks</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="syncStatsAppliedRollbacks"><span class="annot"><span class="annottext">SyncStats -&gt; Integer
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncStatsAppliedRollbacks"><span class="hs-identifier hs-var hs-var">syncStatsAppliedRollbacks</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-comment">-- ^ Number of rollbacks</span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="syncStatsChainSyncPoint"><span class="annot"><span class="annottext">SyncStats -&gt; Point
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncStatsChainSyncPoint"><span class="hs-identifier hs-var hs-var">syncStatsChainSyncPoint</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-comment">-- ^ Chain index syncing tip</span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="syncStatsNodePoint"><span class="annot"><span class="annottext">SyncStats -&gt; Point
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncStatsNodePoint"><span class="hs-identifier hs-var hs-var">syncStatsNodePoint</span></a></span></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-comment">-- ^ Current tip of the node</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-33"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679436936"><span id="local-6989586621679436938"><span class="annot"><span class="annottext">SyncStats -&gt; SyncStats -&gt; Bool
+(SyncStats -&gt; SyncStats -&gt; Bool)
+-&gt; (SyncStats -&gt; SyncStats -&gt; Bool) -&gt; Eq SyncStats
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SyncStats -&gt; SyncStats -&gt; Bool
+$c/= :: SyncStats -&gt; SyncStats -&gt; Bool
+== :: SyncStats -&gt; SyncStats -&gt; Bool
+$c== :: SyncStats -&gt; SyncStats -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436929"><span id="local-6989586621679436931"><span id="local-6989586621679436933"><span class="annot"><span class="annottext">Int -&gt; SyncStats -&gt; ShowS
+[SyncStats] -&gt; ShowS
+SyncStats -&gt; String
+(Int -&gt; SyncStats -&gt; ShowS)
+-&gt; (SyncStats -&gt; String)
+-&gt; ([SyncStats] -&gt; ShowS)
+-&gt; Show SyncStats
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SyncStats] -&gt; ShowS
+$cshowList :: [SyncStats] -&gt; ShowS
+show :: SyncStats -&gt; String
+$cshow :: SyncStats -&gt; String
+showsPrec :: Int -&gt; SyncStats -&gt; ShowS
+$cshowsPrec :: Int -&gt; SyncStats -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. SyncStats -&gt; Rep SyncStats x)
+-&gt; (forall x. Rep SyncStats x -&gt; SyncStats) -&gt; Generic SyncStats
+forall x. Rep SyncStats x -&gt; SyncStats
+forall x. SyncStats -&gt; Rep SyncStats x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SyncStats x -&gt; SyncStats
+$cfrom :: forall x. SyncStats -&gt; Rep SyncStats x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679436921"><span id="local-6989586621679436923"><span class="annot"><span class="annottext">Value -&gt; Parser [SyncStats]
+Value -&gt; Parser SyncStats
+(Value -&gt; Parser SyncStats)
+-&gt; (Value -&gt; Parser [SyncStats]) -&gt; FromJSON SyncStats
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [SyncStats]
+$cparseJSONList :: Value -&gt; Parser [SyncStats]
+parseJSON :: Value -&gt; Parser SyncStats
+$cparseJSON :: Value -&gt; Parser SyncStats
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436912"><span id="local-6989586621679436914"><span id="local-6989586621679436916"><span id="local-6989586621679436918"><span class="annot"><span class="annottext">[SyncStats] -&gt; Encoding
+[SyncStats] -&gt; Value
+SyncStats -&gt; Encoding
+SyncStats -&gt; Value
+(SyncStats -&gt; Value)
+-&gt; (SyncStats -&gt; Encoding)
+-&gt; ([SyncStats] -&gt; Value)
+-&gt; ([SyncStats] -&gt; Encoding)
+-&gt; ToJSON SyncStats
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [SyncStats] -&gt; Encoding
+$ctoEncodingList :: [SyncStats] -&gt; Encoding
+toJSONList :: [SyncStats] -&gt; Value
+$ctoJSONList :: [SyncStats] -&gt; Value
+toEncoding :: SyncStats -&gt; Encoding
+$ctoEncoding :: SyncStats -&gt; Encoding
+toJSON :: SyncStats -&gt; Value
+$ctoJSON :: SyncStats -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436907"><span id="local-6989586621679436909"><span class="annot"><span class="annottext">TracingVerbosity -&gt; SyncStats -&gt; Object
+SyncStats -&gt; Object -&gt; Text
+(TracingVerbosity -&gt; SyncStats -&gt; Object)
+-&gt; (SyncStats -&gt; Object -&gt; Text) -&gt; ToObject SyncStats
+forall a.
+(TracingVerbosity -&gt; a -&gt; Object)
+-&gt; (a -&gt; Object -&gt; Text) -&gt; ToObject a
+textTransformer :: SyncStats -&gt; Object -&gt; Text
+$ctextTransformer :: SyncStats -&gt; Object -&gt; Text
+toObject :: TracingVerbosity -&gt; SyncStats -&gt; Object
+$ctoObject :: TracingVerbosity -&gt; SyncStats -&gt; Object
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">ToObject</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679436901"><span id="local-6989586621679436903"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-37"></span><span>    </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span> </span><span id="local-6989586621679436899"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436899"><span class="hs-identifier hs-var">n1</span></a></span></span><span> </span><span id="local-6989586621679436898"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436898"><span class="hs-identifier hs-var">m1</span></a></span></span><span> </span><span id="local-6989586621679436897"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436897"><span class="hs-identifier hs-var">ct1</span></a></span></span><span> </span><span id="local-6989586621679436896"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436896"><span class="hs-identifier hs-var">nt1</span></a></span></span><span> </span><span id="local-6989586621679436895"><span class="annot"><span class="annottext">&lt;&gt; :: SyncStats -&gt; SyncStats -&gt; SyncStats
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span> </span><span id="local-6989586621679436894"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436894"><span class="hs-identifier hs-var">n2</span></a></span></span><span> </span><span id="local-6989586621679436893"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436893"><span class="hs-identifier hs-var">m2</span></a></span></span><span> </span><span id="local-6989586621679436892"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436892"><span class="hs-identifier hs-var">ct2</span></a></span></span><span> </span><span id="local-6989586621679436891"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436891"><span class="hs-identifier hs-var">nt2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-38"></span><span>        </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Point -&gt; Point -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436899"><span class="hs-identifier hs-var">n1</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436894"><span class="hs-identifier hs-var">n2</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436898"><span class="hs-identifier hs-var">m1</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436893"><span class="hs-identifier hs-var">m2</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436897"><span class="hs-identifier hs-var">ct1</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point -&gt; Point
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436892"><span class="hs-identifier hs-var">ct2</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436896"><span class="hs-identifier hs-var">nt1</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point -&gt; Point
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436891"><span class="hs-identifier hs-var">nt2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679436884"><span id="local-6989586621679436886"><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-41"></span><span>    </span><span id="local-6989586621679436882"><span class="annot"><span class="annottext">mempty :: SyncStats
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Point -&gt; Point -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Point
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span id="local-6989586621679436880"><span id="local-6989586621679436881"></span></span><span class="hs-keyword">data</span><span> </span><span id="SyncLog"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-var">SyncLog</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SyncLog"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-var">SyncLog</span></a></span></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="syncStateSyncLog"><span class="annot"><span class="annottext">SyncLog -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncStateSyncLog"><span class="hs-identifier hs-var hs-var">syncStateSyncLog</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span><span> </span><span class="hs-comment">-- ^ State of the syncing</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="syncStatsSyncLog"><span class="annot"><span class="annottext">SyncLog -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncStatsSyncLog"><span class="hs-identifier hs-var hs-var">syncStatsSyncLog</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span> </span><span class="hs-comment">-- ^ Stats of the syncing</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="syncPeriodSyncLog"><span class="annot"><span class="annottext">SyncLog -&gt; Second
+</span><a href="Plutus.ChainIndex.SyncStats.html#syncPeriodSyncLog"><span class="hs-identifier hs-var hs-var">syncPeriodSyncLog</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">Second</span></a></span><span> </span><span class="hs-comment">-- ^ Period in seconds used to accumulate log events</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679436872"><span id="local-6989586621679436874"><span class="annot"><span class="annottext">SyncLog -&gt; SyncLog -&gt; Bool
+(SyncLog -&gt; SyncLog -&gt; Bool)
+-&gt; (SyncLog -&gt; SyncLog -&gt; Bool) -&gt; Eq SyncLog
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SyncLog -&gt; SyncLog -&gt; Bool
+$c/= :: SyncLog -&gt; SyncLog -&gt; Bool
+== :: SyncLog -&gt; SyncLog -&gt; Bool
+$c== :: SyncLog -&gt; SyncLog -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436866"><span id="local-6989586621679436868"><span id="local-6989586621679436870"><span class="annot"><span class="annottext">Int -&gt; SyncLog -&gt; ShowS
+[SyncLog] -&gt; ShowS
+SyncLog -&gt; String
+(Int -&gt; SyncLog -&gt; ShowS)
+-&gt; (SyncLog -&gt; String) -&gt; ([SyncLog] -&gt; ShowS) -&gt; Show SyncLog
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SyncLog] -&gt; ShowS
+$cshowList :: [SyncLog] -&gt; ShowS
+show :: SyncLog -&gt; String
+$cshow :: SyncLog -&gt; String
+showsPrec :: Int -&gt; SyncLog -&gt; ShowS
+$cshowsPrec :: Int -&gt; SyncLog -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. SyncLog -&gt; Rep SyncLog x)
+-&gt; (forall x. Rep SyncLog x -&gt; SyncLog) -&gt; Generic SyncLog
+forall x. Rep SyncLog x -&gt; SyncLog
+forall x. SyncLog -&gt; Rep SyncLog x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SyncLog x -&gt; SyncLog
+$cfrom :: forall x. SyncLog -&gt; Rep SyncLog x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679436860"><span id="local-6989586621679436862"><span class="annot"><span class="annottext">Value -&gt; Parser [SyncLog]
+Value -&gt; Parser SyncLog
+(Value -&gt; Parser SyncLog)
+-&gt; (Value -&gt; Parser [SyncLog]) -&gt; FromJSON SyncLog
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [SyncLog]
+$cparseJSONList :: Value -&gt; Parser [SyncLog]
+parseJSON :: Value -&gt; Parser SyncLog
+$cparseJSON :: Value -&gt; Parser SyncLog
+</span><a href="#local-6989586621679436860"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436852"><span id="local-6989586621679436854"><span id="local-6989586621679436856"><span id="local-6989586621679436858"><span class="annot"><span class="annottext">[SyncLog] -&gt; Encoding
+[SyncLog] -&gt; Value
+SyncLog -&gt; Encoding
+SyncLog -&gt; Value
+(SyncLog -&gt; Value)
+-&gt; (SyncLog -&gt; Encoding)
+-&gt; ([SyncLog] -&gt; Value)
+-&gt; ([SyncLog] -&gt; Encoding)
+-&gt; ToJSON SyncLog
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [SyncLog] -&gt; Encoding
+$ctoEncodingList :: [SyncLog] -&gt; Encoding
+toJSONList :: [SyncLog] -&gt; Value
+$ctoJSONList :: [SyncLog] -&gt; Value
+toEncoding :: SyncLog -&gt; Encoding
+$ctoEncoding :: SyncLog -&gt; Encoding
+toJSON :: SyncLog -&gt; Value
+$ctoJSON :: SyncLog -&gt; Value
+</span><a href="#local-6989586621679436852"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436848"><span id="local-6989586621679436850"><span class="annot"><span class="annottext">TracingVerbosity -&gt; SyncLog -&gt; Object
+SyncLog -&gt; Object -&gt; Text
+(TracingVerbosity -&gt; SyncLog -&gt; Object)
+-&gt; (SyncLog -&gt; Object -&gt; Text) -&gt; ToObject SyncLog
+forall a.
+(TracingVerbosity -&gt; a -&gt; Object)
+-&gt; (a -&gt; Object -&gt; Text) -&gt; ToObject a
+textTransformer :: SyncLog -&gt; Object -&gt; Text
+$ctextTransformer :: SyncLog -&gt; Object -&gt; Text
+toObject :: TracingVerbosity -&gt; SyncLog -&gt; Object
+$ctoObject :: TracingVerbosity -&gt; SyncLog -&gt; Object
+</span><a href="#local-6989586621679436848"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">ToObject</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679436845"><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-type">Pretty</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-type">SyncLog</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-52"></span><span>  </span><span id="local-6989586621679436843"><span class="annot"><span class="annottext">pretty :: SyncLog -&gt; Doc ann
+</span><a href="#local-6989586621679436843"><span class="hs-identifier hs-var hs-var hs-var hs-var">pretty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-53"></span><span>    </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-type">SyncLog</span></a></span><span> </span><span id="local-6989586621679436842"><span class="annot"><span class="annottext">SyncState
+</span><a href="#local-6989586621679436842"><span class="hs-identifier hs-var">syncState</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span> </span><span id="local-6989586621679436841"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436841"><span class="hs-identifier hs-var">numRollForward</span></a></span></span><span> </span><span id="local-6989586621679436840"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436840"><span class="hs-identifier hs-var">numRollBackwards</span></a></span></span><span> </span><span id="local-6989586621679436839"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436839"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span></span><span> </span><span class="annot"><span class="annottext">Point
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679436838"><span class="annot"><span class="annottext">Second
+</span><a href="#local-6989586621679436838"><span class="hs-identifier hs-var">period</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679436837"><span class="annot"><span class="annottext">currentTipMsg :: SyncState -&gt; Doc ann
+</span><a href="#local-6989586621679436837"><span class="hs-identifier hs-var hs-var">currentTipMsg</span></a></span></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#NotSyncing"><span class="hs-identifier hs-var">NotSyncing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;&quot;</span></span><span>
+</span><span id="line-55"></span><span>            </span><span class="annot"><a href="#local-6989586621679436837"><span class="hs-identifier hs-var">currentTipMsg</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><span class="hs-identifier">_</span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;Current tip is&quot;</span></span><span> </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; Doc ann
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436839"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span><span>
+</span><span id="line-56"></span><span>         </span><span class="hs-keyword">in</span><span>
+</span><span id="line-57"></span><span>            </span><span class="annot"><span class="annottext">SyncState -&gt; Doc ann
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="#local-6989586621679436842"><span class="hs-identifier hs-var">syncState</span></a></span><span>
+</span><span id="line-58"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;Processed&quot;</span></span><span>
+</span><span id="line-59"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Doc ann
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436841"><span class="hs-identifier hs-var">numRollForward</span></a></span><span>
+</span><span id="line-60"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;blocks&quot;</span></span><span>
+</span><span id="line-61"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+forall ann. Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">comma</span></a></span><span>
+</span><span id="line-62"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Doc ann
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436840"><span class="hs-identifier hs-var">numRollBackwards</span></a></span><span>
+</span><span id="line-63"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;rollbacks in the last&quot;</span></span><span>
+</span><span id="line-64"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Second -&gt; Doc ann
+forall a ann. Show a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">viaShow</span></a></span><span> </span><span class="annot"><span class="annottext">Second
+</span><a href="#local-6989586621679436838"><span class="hs-identifier hs-var">period</span></a></span><span>
+</span><span id="line-65"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;.&quot;</span></span><span>
+</span><span id="line-66"></span><span>                </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState -&gt; Doc ann
+</span><a href="#local-6989586621679436837"><span class="hs-identifier hs-var">currentTipMsg</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="#local-6989586621679436842"><span class="hs-identifier hs-var">syncState</span></a></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span id="local-6989586621679436834"><span id="local-6989586621679436835"></span></span><span class="hs-keyword">data</span><span> </span><span id="SyncState"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-var">SyncState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Synced"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#Synced"><span class="hs-identifier hs-var">Synced</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="Syncing"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#Syncing"><span class="hs-identifier hs-var">Syncing</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Double</span></a></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="NotSyncing"><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#NotSyncing"><span class="hs-identifier hs-var">NotSyncing</span></a></span></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679436828"><span id="local-6989586621679436830"><span class="annot"><span class="annottext">SyncState -&gt; SyncState -&gt; Bool
+(SyncState -&gt; SyncState -&gt; Bool)
+-&gt; (SyncState -&gt; SyncState -&gt; Bool) -&gt; Eq SyncState
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SyncState -&gt; SyncState -&gt; Bool
+$c/= :: SyncState -&gt; SyncState -&gt; Bool
+== :: SyncState -&gt; SyncState -&gt; Bool
+$c== :: SyncState -&gt; SyncState -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436822"><span id="local-6989586621679436824"><span id="local-6989586621679436826"><span class="annot"><span class="annottext">Int -&gt; SyncState -&gt; ShowS
+[SyncState] -&gt; ShowS
+SyncState -&gt; String
+(Int -&gt; SyncState -&gt; ShowS)
+-&gt; (SyncState -&gt; String)
+-&gt; ([SyncState] -&gt; ShowS)
+-&gt; Show SyncState
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SyncState] -&gt; ShowS
+$cshowList :: [SyncState] -&gt; ShowS
+show :: SyncState -&gt; String
+$cshow :: SyncState -&gt; String
+showsPrec :: Int -&gt; SyncState -&gt; ShowS
+$cshowsPrec :: Int -&gt; SyncState -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. SyncState -&gt; Rep SyncState x)
+-&gt; (forall x. Rep SyncState x -&gt; SyncState) -&gt; Generic SyncState
+forall x. Rep SyncState x -&gt; SyncState
+forall x. SyncState -&gt; Rep SyncState x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SyncState x -&gt; SyncState
+$cfrom :: forall x. SyncState -&gt; Rep SyncState x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679436816"><span id="local-6989586621679436818"><span class="annot"><span class="annottext">Value -&gt; Parser [SyncState]
+Value -&gt; Parser SyncState
+(Value -&gt; Parser SyncState)
+-&gt; (Value -&gt; Parser [SyncState]) -&gt; FromJSON SyncState
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [SyncState]
+$cparseJSONList :: Value -&gt; Parser [SyncState]
+parseJSON :: Value -&gt; Parser SyncState
+$cparseJSON :: Value -&gt; Parser SyncState
+</span><a href="#local-6989586621679436816"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436808"><span id="local-6989586621679436810"><span id="local-6989586621679436812"><span id="local-6989586621679436814"><span class="annot"><span class="annottext">[SyncState] -&gt; Encoding
+[SyncState] -&gt; Value
+SyncState -&gt; Encoding
+SyncState -&gt; Value
+(SyncState -&gt; Value)
+-&gt; (SyncState -&gt; Encoding)
+-&gt; ([SyncState] -&gt; Value)
+-&gt; ([SyncState] -&gt; Encoding)
+-&gt; ToJSON SyncState
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [SyncState] -&gt; Encoding
+$ctoEncodingList :: [SyncState] -&gt; Encoding
+toJSONList :: [SyncState] -&gt; Value
+$ctoJSONList :: [SyncState] -&gt; Value
+toEncoding :: SyncState -&gt; Encoding
+$ctoEncoding :: SyncState -&gt; Encoding
+toJSON :: SyncState -&gt; Value
+$ctoJSON :: SyncState -&gt; Value
+</span><a href="#local-6989586621679436808"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679436804"><span id="local-6989586621679436806"><span class="annot"><span class="annottext">TracingVerbosity -&gt; SyncState -&gt; Object
+SyncState -&gt; Object -&gt; Text
+(TracingVerbosity -&gt; SyncState -&gt; Object)
+-&gt; (SyncState -&gt; Object -&gt; Text) -&gt; ToObject SyncState
+forall a.
+(TracingVerbosity -&gt; a -&gt; Object)
+-&gt; (a -&gt; Object -&gt; Text) -&gt; ToObject a
+textTransformer :: SyncState -&gt; Object -&gt; Text
+$ctextTransformer :: SyncState -&gt; Object -&gt; Text
+toObject :: TracingVerbosity -&gt; SyncState -&gt; Object
+$ctoObject :: TracingVerbosity -&gt; SyncState -&gt; Object
+</span><a href="#local-6989586621679436804"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">ToObject</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSynced"><span class="hs-identifier hs-type">isSyncStateSynced</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-73"></span><span id="isSyncStateSynced"><span class="annot"><span class="annottext">isSyncStateSynced :: SyncState -&gt; Bool
+</span><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSynced"><span class="hs-identifier hs-var hs-var">isSyncStateSynced</span></a></span></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#Synced"><span class="hs-identifier hs-var">Synced</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-74"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSynced"><span class="hs-identifier hs-var">isSyncStateSynced</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><span class="hs-identifier">_</span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateNotSyncing"><span class="hs-identifier hs-type">isSyncStateNotSyncing</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-77"></span><span id="isSyncStateNotSyncing"><span class="annot"><span class="annottext">isSyncStateNotSyncing :: SyncState -&gt; Bool
+</span><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateNotSyncing"><span class="hs-identifier hs-var hs-var">isSyncStateNotSyncing</span></a></span></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#NotSyncing"><span class="hs-identifier hs-var">NotSyncing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-78"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateNotSyncing"><span class="hs-identifier hs-var">isSyncStateNotSyncing</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><span class="hs-identifier">_</span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSyncing"><span class="hs-identifier hs-type">isSyncStateSyncing</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-81"></span><span id="isSyncStateSyncing"><span class="annot"><span class="annottext">isSyncStateSyncing :: SyncState -&gt; Bool
+</span><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSyncing"><span class="hs-identifier hs-var hs-var">isSyncStateSyncing</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#Syncing"><span class="hs-identifier hs-type">Syncing</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-82"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSyncing"><span class="hs-identifier hs-var">isSyncStateSyncing</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><span class="hs-identifier">_</span></span><span>           </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679436798"><span class="annot"><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-type">Pretty</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-85"></span><span>  </span><span id="local-6989586621679436797"><span class="annot"><span class="annottext">pretty :: SyncState -&gt; Doc ann
+</span><a href="#local-6989586621679436797"><span class="hs-identifier hs-var hs-var hs-var hs-var">pretty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-86"></span><span>    </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#Synced"><span class="hs-identifier hs-var">Synced</span></a></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;Still in sync.&quot;</span></span><span>
+</span><span id="line-87"></span><span>    </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#Syncing"><span class="hs-identifier hs-type">Syncing</span></a></span><span> </span><span id="local-6989586621679436796"><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679436796"><span class="hs-identifier hs-var">pct</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;Syncing (&quot;</span></span><span> </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Doc ann
+forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../file:///nix/store/sbv9pqjhqdwa0bq7cll6wmzgwjf0al3r-prettyprinter-lib-prettyprinter-1.7.1-haddock-doc/share/doc/prettyprinter/html/src"><span class="hs-identifier hs-var">pretty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; Double -&gt; String
+forall r. PrintfType r =&gt; String -&gt; r
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">printf</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;%.2f&quot;</span></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679436796"><span class="hs-identifier hs-var">pct</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Doc ann -&gt; Doc ann -&gt; Doc ann
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;%).&quot;</span></span><span>
+</span><span id="line-88"></span><span>    </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#NotSyncing"><span class="hs-identifier hs-var">NotSyncing</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;Not syncing.&quot;</span></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- | Log syncing summary.</span><span>
+</span><span id="line-91"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#logProgress"><span class="hs-identifier hs-type">logProgress</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679436794"><span class="annot"><a href="#local-6989586621679436794"><span class="hs-identifier hs-type">effs</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Member</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-type">SyncLog</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621679436794"><span class="hs-identifier hs-type">effs</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#ChainSyncEvent"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-type">TimeSpec</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679436794"><span class="hs-identifier hs-type">effs</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span id="logProgress"><span class="annot"><span class="annottext">logProgress :: [ChainSyncEvent] -&gt; TimeSpec -&gt; Eff effs ()
+</span><a href="Plutus.ChainIndex.SyncStats.html#logProgress"><span class="hs-identifier hs-var hs-var">logProgress</span></a></span></span><span> </span><span id="local-6989586621679436793"><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679436793"><span class="hs-identifier hs-var">events</span></a></span></span><span> </span><span id="local-6989586621679436792"><span class="annot"><span class="annottext">TimeSpec
+</span><a href="#local-6989586621679436792"><span class="hs-identifier hs-var">period</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679436791"><span class="annot"><span class="annottext">syncStats :: SyncStats
+</span><a href="#local-6989586621679436791"><span class="hs-identifier hs-var hs-var">syncStats</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(SyncStats -&gt; SyncStats -&gt; SyncStats)
+-&gt; SyncStats -&gt; [SyncStats] -&gt; SyncStats
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldl</span></a></span><span> </span><span class="annot"><span class="annottext">SyncStats -&gt; SyncStats -&gt; SyncStats
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span> </span><span class="annot"><span class="annottext">SyncStats
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span> </span><span class="annot"><span class="annottext">([SyncStats] -&gt; SyncStats) -&gt; [SyncStats] -&gt; SyncStats
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(ChainSyncEvent -&gt; SyncStats) -&gt; [ChainSyncEvent] -&gt; [SyncStats]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#convertEventToSyncStats"><span class="hs-identifier hs-var">convertEventToSyncStats</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679436793"><span class="hs-identifier hs-var">events</span></a></span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679436788"><span class="annot"><span class="annottext">syncState :: SyncState
+</span><a href="#local-6989586621679436788"><span class="hs-identifier hs-var hs-var">syncState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SyncStats -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#getSyncStateFromStats"><span class="hs-identifier hs-var">getSyncStateFromStats</span></a></span><span> </span><span class="annot"><span class="annottext">SyncStats
+</span><a href="#local-6989586621679436791"><span class="hs-identifier hs-var">syncStats</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679436786"><span class="annot"><span class="annottext">syncLog :: SyncLog
+</span><a href="#local-6989586621679436786"><span class="hs-identifier hs-var hs-var">syncLog</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SyncState -&gt; SyncStats -&gt; Second -&gt; SyncLog
+</span><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-var">SyncLog</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="#local-6989586621679436788"><span class="hs-identifier hs-var">syncState</span></a></span><span> </span><span class="annot"><span class="annottext">SyncStats
+</span><a href="#local-6989586621679436791"><span class="hs-identifier hs-var">syncStats</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Second
+forall a. TimeUnit a =&gt; Integer -&gt; a
+</span><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-var">fromMicroseconds</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Second) -&gt; Integer -&gt; Second
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TimeSpec -&gt; Integer
+</span><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">toNanoSecs</span></a></span><span> </span><span class="annot"><span class="annottext">TimeSpec
+</span><a href="#local-6989586621679436792"><span class="hs-identifier hs-var">period</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">`div`</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1000</span></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="#local-6989586621679436788"><span class="hs-identifier hs-var">syncState</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-97"></span><span>      </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#NotSyncing"><span class="hs-identifier hs-var">NotSyncing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; Eff effs ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- logWarn syncLog</span><span>
+</span><span id="line-98"></span><span>      </span><span class="annot"><span class="annottext">SyncState
+</span><span class="hs-identifier">_</span></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SyncLog -&gt; Eff effs ()
+forall a (effs :: [* -&gt; *]).
+Member (LogMsg a) effs =&gt;
+a -&gt; Eff effs ()
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">logInfo</span></a></span><span> </span><span class="annot"><span class="annottext">SyncLog
+</span><a href="#local-6989586621679436786"><span class="hs-identifier hs-var">syncLog</span></a></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="hs-comment">-- | Get the 'SyncState' for a 'SyncState'.</span><span>
+</span><span id="line-101"></span><span class="hs-comment">--</span><span>
+</span><span id="line-102"></span><span class="hs-comment">-- TODO: The syncing percentage is valid when the node is already fully synced.</span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- But when the node and chain-index are started at the same time, the syncing</span><span>
+</span><span id="line-104"></span><span class="hs-comment">-- percentage is not a valid number considering the actual tip of the node.</span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- Find a better way to calculate this percentage.</span><span>
+</span><span id="line-106"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#getSyncStateFromStats"><span class="hs-identifier hs-type">getSyncStateFromStats</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span><span>
+</span><span id="line-107"></span><span id="getSyncStateFromStats"><span class="annot"><span class="annottext">getSyncStateFromStats :: SyncStats -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#getSyncStateFromStats"><span class="hs-identifier hs-var hs-var">getSyncStateFromStats</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679436784"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436784"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span></span><span> </span><span id="local-6989586621679436783"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436783"><span class="hs-identifier hs-var">nodePoint</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-108"></span><span>    </span><span class="annot"><span class="annottext">Point -&gt; Point -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#getSyncState"><span class="hs-identifier hs-var">getSyncState</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436784"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436783"><span class="hs-identifier hs-var">nodePoint</span></a></span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#getSyncState"><span class="hs-identifier hs-type">getSyncState</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncState"><span class="hs-identifier hs-type">SyncState</span></a></span><span>
+</span><span id="line-111"></span><span id="getSyncState"><span class="annot"><span class="annottext">getSyncState :: Point -&gt; Point -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#getSyncState"><span class="hs-identifier hs-var hs-var">getSyncState</span></a></span></span><span> </span><span id="local-6989586621679436781"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436781"><span class="hs-identifier hs-var">chainIndexSyncPoint</span></a></span></span><span> </span><span id="local-6989586621679436780"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436780"><span class="hs-identifier hs-var">nodePoint</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436781"><span class="hs-identifier hs-var">chainIndexSyncPoint</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436780"><span class="hs-identifier hs-var">nodePoint</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-113"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">PointAtGenesis</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#NotSyncing"><span class="hs-identifier hs-var">NotSyncing</span></a></span><span>
+</span><span id="line-114"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">CI.PointAtGenesis</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="annot"><span class="annottext">Slot
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Double -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#Syncing"><span class="hs-identifier hs-var">Syncing</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-115"></span><span>        </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span id="local-6989586621679436778"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436778"><span class="hs-identifier hs-var">chainSyncSlot</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span id="local-6989586621679436777"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436777"><span class="hs-identifier hs-var">nodeSlot</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span>
+</span><span id="line-116"></span><span>          </span><span class="hs-comment">-- TODO: MAGIC number here. Is there a better number?</span><span>
+</span><span id="line-117"></span><span>          </span><span class="hs-comment">-- 100 represents the number of slots before the</span><span>
+</span><span id="line-118"></span><span>          </span><span class="hs-comment">-- node where we consider the chain-index to be synced.</span><span>
+</span><span id="line-119"></span><span>          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436777"><span class="hs-identifier hs-var">nodeSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436778"><span class="hs-identifier hs-var">chainSyncSlot</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">100</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#Synced"><span class="hs-identifier hs-var">Synced</span></a></span><span>
+</span><span id="line-120"></span><span>        </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span id="local-6989586621679436775"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436775"><span class="hs-identifier hs-var">chainSyncSlot</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Slot</span></a></span><span> </span><span id="local-6989586621679436774"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436774"><span class="hs-identifier hs-var">nodeSlot</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">BlockId
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-121"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679436773"><span class="annot"><span class="annottext">pct :: Double
+</span><a href="#local-6989586621679436773"><span class="hs-identifier hs-var hs-var">pct</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">100</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Double</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Double
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436775"><span class="hs-identifier hs-var">chainSyncSlot</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Fractional a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">/</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Double
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621679436774"><span class="hs-identifier hs-var">nodeSlot</span></a></span><span>
+</span><span id="line-122"></span><span>             </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Double -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#Syncing"><span class="hs-identifier hs-var">Syncing</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679436773"><span class="hs-identifier hs-var">pct</span></a></span><span>
+</span><span id="line-123"></span><span>
+</span><span id="line-124"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#convertEventToSyncStats"><span class="hs-identifier hs-type">convertEventToSyncStats</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#ChainSyncEvent"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-type">SyncStats</span></a></span><span>
+</span><span id="line-125"></span><span id="convertEventToSyncStats"><span class="annot"><span class="annottext">convertEventToSyncStats :: ChainSyncEvent -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#convertEventToSyncStats"><span class="hs-identifier hs-var hs-var">convertEventToSyncStats</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollForward"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Block</span></a></span><span> </span><span id="local-6989586621679436769"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679436769"><span class="hs-identifier hs-var">chainSyncTip</span></a></span></span><span> </span><span class="annot"><span class="annottext">[(ChainIndexTx, TxProcessOption)]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679436768"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679436768"><span class="hs-identifier hs-var">nodeTip</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-126"></span><span>    </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Point -&gt; Point -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tip -&gt; Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">tipAsPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679436769"><span class="hs-identifier hs-var">chainSyncTip</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tip -&gt; Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">tipAsPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679436768"><span class="hs-identifier hs-var">nodeTip</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#convertEventToSyncStats"><span class="hs-identifier hs-var">convertEventToSyncStats</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollBackward"><span class="hs-identifier hs-type">RollBackward</span></a></span><span> </span><span id="local-6989586621679436767"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436767"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span></span><span> </span><span id="local-6989586621679436766"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679436766"><span class="hs-identifier hs-var">nodeTip</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-128"></span><span>    </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Point -&gt; Point -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436767"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tip -&gt; Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">tipAsPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679436766"><span class="hs-identifier hs-var">nodeTip</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-129"></span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#convertEventToSyncStats"><span class="hs-identifier hs-var">convertEventToSyncStats</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#Resume"><span class="hs-identifier hs-type">Resume</span></a></span><span> </span><span id="local-6989586621679436765"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436765"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-130"></span><span>    </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Point -&gt; Point -&gt; SyncStats
+</span><a href="Plutus.ChainIndex.SyncStats.html#SyncStats"><span class="hs-identifier hs-var">SyncStats</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679436765"><span class="hs-identifier hs-var">chainSyncPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-131"></span></pre></body></html>

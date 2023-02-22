@@ -1,0 +1,655 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies    #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts      #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances     #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE GADTs                 #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns        #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE QuantifiedConstraints #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes            #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances  #-}</span><span>
+</span><span id="line-10"></span><span class="hs-comment">{-
+
+Pagination allows to return a subset of results through pages. Once the first
+page was requested, we can request the next ones until we get empty results.
+
+There are multiple strategies for implementation pagination, such as Offset
+Pagination and Seek Pagination. Offset Pagination is the easiest to implement
+and use. However, it is not performant for large offset values and it is not
+consistent if new items are inserted in the database while we are querying.
+For these reasons, we decided to use Seek Pagination which doesn't suffer from
+those drawbacks. Seek Pagination works as follows. For a given page request, we
+need to provide the number of items per page and last element we queried (can
+be Nothing). We suppose the elements are ordered in ascending order.
+
+Here's a simple illustrative example:
+
+* Suppose we have the following items in the database [1..100].
+* We first request the 50 first items.
+* We obtain the first page containing [1..50].
+* To request the next page, we request 50 items after the last item of the
+  previous page (which is 50).
+* We obtain the second page containing [51..100].
+* Since we don't know this was the last page, we would request the next 50
+  items after the last item (which is 100).
+* We obtain a page with no elements, thus we don't need to query for more pages.
+-}</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Monad.Freer.Extras.Pagination</span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier">PageQuery</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#Page"><span class="hs-identifier">Page</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier">PageSize</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#pageOf"><span class="hs-identifier">pageOf</span></a></span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">guard</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/snd5q6v3qrq7cdxpn9nlwg98vvy50j53-data-default-lib-data-default-0.7.1.1-haddock-doc/share/doc/data-default/html/src"><span class="hs-identifier">Data.Default</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier">Default</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List.NonEmpty</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">isJust</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">listToMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/vpm50j3dwjzfg00shy71mwawvv796qgi-openapi3-lib-openapi3-3.2.3-haddock-doc/share/doc/openapi3/html/src"><span class="hs-identifier">Data.OpenApi</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">OpenApi</span></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Set</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Set</span></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Numeric.Natural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Natural</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- | Query parameters for pagination.</span><span>
+</span><span id="line-55"></span><span id="local-6989586621679259945"><span id="local-6989586621679259946"></span></span><span class="hs-keyword">data</span><span> </span><span id="PageQuery"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-var">PageQuery</span></a></span></span><span> </span><span id="local-6989586621679260001"><span class="annot"><a href="#local-6989586621679260001"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PageQuery"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-var">PageQuery</span></a></span></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="pageQuerySize"><span class="annot"><span class="annottext">PageQuery a -&gt; PageSize
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#pageQuerySize"><span class="hs-identifier hs-var hs-var">pageQuerySize</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-type">PageSize</span></a></span><span> </span><span class="hs-comment">-- ^ Number of items per page.</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="pageQueryLastItem"><span class="annot"><span class="annottext">PageQuery a -&gt; Maybe a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#pageQueryLastItem"><span class="hs-identifier hs-var hs-var">pageQueryLastItem</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679260001"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-comment">-- ^ Last item of the queried page.</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259938"><span id="local-6989586621679259940"><span class="annot"><span class="annottext">PageQuery a -&gt; PageQuery a -&gt; Bool
+(PageQuery a -&gt; PageQuery a -&gt; Bool)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; Bool) -&gt; Eq (PageQuery a)
+forall a. Eq a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PageQuery a -&gt; PageQuery a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+== :: PageQuery a -&gt; PageQuery a -&gt; Bool
+$c== :: forall a. Eq a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259922"><span id="local-6989586621679259924"><span id="local-6989586621679259926"><span id="local-6989586621679259928"><span id="local-6989586621679259930"><span id="local-6989586621679259932"><span id="local-6989586621679259934"><span class="annot"><span class="annottext">Eq (PageQuery a)
+Eq (PageQuery a)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; Ordering)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; Bool)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; Bool)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; Bool)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; Bool)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; PageQuery a)
+-&gt; (PageQuery a -&gt; PageQuery a -&gt; PageQuery a)
+-&gt; Ord (PageQuery a)
+PageQuery a -&gt; PageQuery a -&gt; Bool
+PageQuery a -&gt; PageQuery a -&gt; Ordering
+PageQuery a -&gt; PageQuery a -&gt; PageQuery a
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall a. Ord a =&gt; Eq (PageQuery a)
+forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Ordering
+forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; PageQuery a
+min :: PageQuery a -&gt; PageQuery a -&gt; PageQuery a
+$cmin :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; PageQuery a
+max :: PageQuery a -&gt; PageQuery a -&gt; PageQuery a
+$cmax :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; PageQuery a
+&gt;= :: PageQuery a -&gt; PageQuery a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+&gt; :: PageQuery a -&gt; PageQuery a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+&lt;= :: PageQuery a -&gt; PageQuery a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+&lt; :: PageQuery a -&gt; PageQuery a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Bool
+compare :: PageQuery a -&gt; PageQuery a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; PageQuery a -&gt; PageQuery a -&gt; Ordering
+$cp1Ord :: forall a. Ord a =&gt; Eq (PageQuery a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259915"><span id="local-6989586621679259917"><span id="local-6989586621679259919"><span class="annot"><span class="annottext">Int -&gt; PageQuery a -&gt; ShowS
+[PageQuery a] -&gt; ShowS
+PageQuery a -&gt; String
+(Int -&gt; PageQuery a -&gt; ShowS)
+-&gt; (PageQuery a -&gt; String)
+-&gt; ([PageQuery a] -&gt; ShowS)
+-&gt; Show (PageQuery a)
+forall a. Show a =&gt; Int -&gt; PageQuery a -&gt; ShowS
+forall a. Show a =&gt; [PageQuery a] -&gt; ShowS
+forall a. Show a =&gt; PageQuery a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PageQuery a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [PageQuery a] -&gt; ShowS
+show :: PageQuery a -&gt; String
+$cshow :: forall a. Show a =&gt; PageQuery a -&gt; String
+showsPrec :: Int -&gt; PageQuery a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; PageQuery a -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. PageQuery a -&gt; Rep (PageQuery a) x)
+-&gt; (forall x. Rep (PageQuery a) x -&gt; PageQuery a)
+-&gt; Generic (PageQuery a)
+forall x. Rep (PageQuery a) x -&gt; PageQuery a
+forall x. PageQuery a -&gt; Rep (PageQuery a) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (PageQuery a) x -&gt; PageQuery a
+forall a x. PageQuery a -&gt; Rep (PageQuery a) x
+$cto :: forall a x. Rep (PageQuery a) x -&gt; PageQuery a
+$cfrom :: forall a x. PageQuery a -&gt; Rep (PageQuery a) x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259907"><span id="local-6989586621679259909"><span class="annot"><span class="annottext">a -&gt; PageQuery b -&gt; PageQuery a
+(a -&gt; b) -&gt; PageQuery a -&gt; PageQuery b
+(forall a b. (a -&gt; b) -&gt; PageQuery a -&gt; PageQuery b)
+-&gt; (forall a b. a -&gt; PageQuery b -&gt; PageQuery a)
+-&gt; Functor PageQuery
+forall a b. a -&gt; PageQuery b -&gt; PageQuery a
+forall a b. (a -&gt; b) -&gt; PageQuery a -&gt; PageQuery b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; PageQuery b -&gt; PageQuery a
+$c&lt;$ :: forall a b. a -&gt; PageQuery b -&gt; PageQuery a
+fmap :: (a -&gt; b) -&gt; PageQuery a -&gt; PageQuery b
+$cfmap :: forall a b. (a -&gt; b) -&gt; PageQuery a -&gt; PageQuery b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259898"><span id="local-6989586621679259900"><span id="local-6989586621679259902"><span id="local-6989586621679259904"><span class="annot"><span class="annottext">[PageQuery a] -&gt; Encoding
+[PageQuery a] -&gt; Value
+PageQuery a -&gt; Encoding
+PageQuery a -&gt; Value
+(PageQuery a -&gt; Value)
+-&gt; (PageQuery a -&gt; Encoding)
+-&gt; ([PageQuery a] -&gt; Value)
+-&gt; ([PageQuery a] -&gt; Encoding)
+-&gt; ToJSON (PageQuery a)
+forall a. ToJSON a =&gt; [PageQuery a] -&gt; Encoding
+forall a. ToJSON a =&gt; [PageQuery a] -&gt; Value
+forall a. ToJSON a =&gt; PageQuery a -&gt; Encoding
+forall a. ToJSON a =&gt; PageQuery a -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [PageQuery a] -&gt; Encoding
+$ctoEncodingList :: forall a. ToJSON a =&gt; [PageQuery a] -&gt; Encoding
+toJSONList :: [PageQuery a] -&gt; Value
+$ctoJSONList :: forall a. ToJSON a =&gt; [PageQuery a] -&gt; Value
+toEncoding :: PageQuery a -&gt; Encoding
+$ctoEncoding :: forall a. ToJSON a =&gt; PageQuery a -&gt; Encoding
+toJSON :: PageQuery a -&gt; Value
+$ctoJSON :: forall a. ToJSON a =&gt; PageQuery a -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259893"><span id="local-6989586621679259895"><span class="annot"><span class="annottext">Value -&gt; Parser [PageQuery a]
+Value -&gt; Parser (PageQuery a)
+(Value -&gt; Parser (PageQuery a))
+-&gt; (Value -&gt; Parser [PageQuery a]) -&gt; FromJSON (PageQuery a)
+forall a. FromJSON a =&gt; Value -&gt; Parser [PageQuery a]
+forall a. FromJSON a =&gt; Value -&gt; Parser (PageQuery a)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [PageQuery a]
+$cparseJSONList :: forall a. FromJSON a =&gt; Value -&gt; Parser [PageQuery a]
+parseJSON :: Value -&gt; Parser (PageQuery a)
+$cparseJSON :: forall a. FromJSON a =&gt; Value -&gt; Parser (PageQuery a)
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259889"><span class="annot"><span class="annottext">Typeable (PageQuery a)
+Typeable (PageQuery a)
+-&gt; (Proxy (PageQuery a)
+    -&gt; Declare (Definitions Schema) NamedSchema)
+-&gt; ToSchema (PageQuery a)
+Proxy (PageQuery a) -&gt; Declare (Definitions Schema) NamedSchema
+forall a.
+Typeable a
+-&gt; (Proxy a -&gt; Declare (Definitions Schema) NamedSchema)
+-&gt; ToSchema a
+forall a. ToSchema a =&gt; Typeable (PageQuery a)
+forall a.
+ToSchema a =&gt;
+Proxy (PageQuery a) -&gt; Declare (Definitions Schema) NamedSchema
+declareNamedSchema :: Proxy (PageQuery a) -&gt; Declare (Definitions Schema) NamedSchema
+$cdeclareNamedSchema :: forall a.
+ToSchema a =&gt;
+Proxy (PageQuery a) -&gt; Declare (Definitions Schema) NamedSchema
+$cp1ToSchema :: forall a. ToSchema a =&gt; Typeable (PageQuery a)
+</span><a href="../file:///nix/store/vpm50j3dwjzfg00shy71mwawvv796qgi-openapi3-lib-openapi3-3.2.3-haddock-doc/share/doc/openapi3/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">OpenApi.ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span id="local-6989586621679259887"><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier hs-type">Default</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-type">PageQuery</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259887"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>  </span><span id="local-6989586621679259884"><span class="annot"><span class="annottext">def :: PageQuery a
+</span><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">def</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PageSize -&gt; Maybe a -&gt; PageQuery a
+forall a. PageSize -&gt; Maybe a -&gt; PageQuery a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-var">PageQuery</span></a></span><span> </span><span class="annot"><span class="annottext">PageSize
+forall a. Default a =&gt; a
+</span><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier hs-var">def</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span id="local-6989586621679259881"><span id="local-6989586621679259882"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="PageSize"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-var">PageSize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PageSize"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-var">PageSize</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="getPageSize"><span class="annot"><span class="annottext">PageSize -&gt; Natural
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#getPageSize"><span class="hs-identifier hs-var hs-var">getPageSize</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Natural</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259875"><span id="local-6989586621679259877"><span class="annot"><span class="annottext">PageSize -&gt; PageSize -&gt; Bool
+(PageSize -&gt; PageSize -&gt; Bool)
+-&gt; (PageSize -&gt; PageSize -&gt; Bool) -&gt; Eq PageSize
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PageSize -&gt; PageSize -&gt; Bool
+$c/= :: PageSize -&gt; PageSize -&gt; Bool
+== :: PageSize -&gt; PageSize -&gt; Bool
+$c== :: PageSize -&gt; PageSize -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259860"><span id="local-6989586621679259862"><span id="local-6989586621679259864"><span id="local-6989586621679259866"><span id="local-6989586621679259868"><span id="local-6989586621679259870"><span id="local-6989586621679259872"><span class="annot"><span class="annottext">Eq PageSize
+Eq PageSize
+-&gt; (PageSize -&gt; PageSize -&gt; Ordering)
+-&gt; (PageSize -&gt; PageSize -&gt; Bool)
+-&gt; (PageSize -&gt; PageSize -&gt; Bool)
+-&gt; (PageSize -&gt; PageSize -&gt; Bool)
+-&gt; (PageSize -&gt; PageSize -&gt; Bool)
+-&gt; (PageSize -&gt; PageSize -&gt; PageSize)
+-&gt; (PageSize -&gt; PageSize -&gt; PageSize)
+-&gt; Ord PageSize
+PageSize -&gt; PageSize -&gt; Bool
+PageSize -&gt; PageSize -&gt; Ordering
+PageSize -&gt; PageSize -&gt; PageSize
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: PageSize -&gt; PageSize -&gt; PageSize
+$cmin :: PageSize -&gt; PageSize -&gt; PageSize
+max :: PageSize -&gt; PageSize -&gt; PageSize
+$cmax :: PageSize -&gt; PageSize -&gt; PageSize
+&gt;= :: PageSize -&gt; PageSize -&gt; Bool
+$c&gt;= :: PageSize -&gt; PageSize -&gt; Bool
+&gt; :: PageSize -&gt; PageSize -&gt; Bool
+$c&gt; :: PageSize -&gt; PageSize -&gt; Bool
+&lt;= :: PageSize -&gt; PageSize -&gt; Bool
+$c&lt;= :: PageSize -&gt; PageSize -&gt; Bool
+&lt; :: PageSize -&gt; PageSize -&gt; Bool
+$c&lt; :: PageSize -&gt; PageSize -&gt; Bool
+compare :: PageSize -&gt; PageSize -&gt; Ordering
+$ccompare :: PageSize -&gt; PageSize -&gt; Ordering
+$cp1Ord :: Eq PageSize
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259854"><span id="local-6989586621679259856"><span id="local-6989586621679259858"><span class="annot"><span class="annottext">Int -&gt; PageSize -&gt; ShowS
+[PageSize] -&gt; ShowS
+PageSize -&gt; String
+(Int -&gt; PageSize -&gt; ShowS)
+-&gt; (PageSize -&gt; String) -&gt; ([PageSize] -&gt; ShowS) -&gt; Show PageSize
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PageSize] -&gt; ShowS
+$cshowList :: [PageSize] -&gt; ShowS
+show :: PageSize -&gt; String
+$cshow :: PageSize -&gt; String
+showsPrec :: Int -&gt; PageSize -&gt; ShowS
+$cshowsPrec :: Int -&gt; PageSize -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. PageSize -&gt; Rep PageSize x)
+-&gt; (forall x. Rep PageSize x -&gt; PageSize) -&gt; Generic PageSize
+forall x. Rep PageSize x -&gt; PageSize
+forall x. PageSize -&gt; Rep PageSize x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep PageSize x -&gt; PageSize
+$cfrom :: forall x. PageSize -&gt; Rep PageSize x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259844"><span id="local-6989586621679259846"><span id="local-6989586621679259848"><span id="local-6989586621679259850"><span class="annot"><span class="annottext">[PageSize] -&gt; Encoding
+[PageSize] -&gt; Value
+PageSize -&gt; Encoding
+PageSize -&gt; Value
+(PageSize -&gt; Value)
+-&gt; (PageSize -&gt; Encoding)
+-&gt; ([PageSize] -&gt; Value)
+-&gt; ([PageSize] -&gt; Encoding)
+-&gt; ToJSON PageSize
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [PageSize] -&gt; Encoding
+$ctoEncodingList :: [PageSize] -&gt; Encoding
+toJSONList :: [PageSize] -&gt; Value
+$ctoJSONList :: [PageSize] -&gt; Value
+toEncoding :: PageSize -&gt; Encoding
+$ctoEncoding :: PageSize -&gt; Encoding
+toJSON :: PageSize -&gt; Value
+$ctoJSON :: PageSize -&gt; Value
+</span><a href="#local-6989586621679259844"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259840"><span id="local-6989586621679259842"><span class="annot"><span class="annottext">Value -&gt; Parser [PageSize]
+Value -&gt; Parser PageSize
+(Value -&gt; Parser PageSize)
+-&gt; (Value -&gt; Parser [PageSize]) -&gt; FromJSON PageSize
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [PageSize]
+$cparseJSONList :: Value -&gt; Parser [PageSize]
+parseJSON :: Value -&gt; Parser PageSize
+$cparseJSON :: Value -&gt; Parser PageSize
+</span><a href="#local-6989586621679259840"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259837"><span class="annot"><span class="annottext">Typeable PageSize
+Typeable PageSize
+-&gt; (Proxy PageSize -&gt; Declare (Definitions Schema) NamedSchema)
+-&gt; ToSchema PageSize
+Proxy PageSize -&gt; Declare (Definitions Schema) NamedSchema
+forall a.
+Typeable a
+-&gt; (Proxy a -&gt; Declare (Definitions Schema) NamedSchema)
+-&gt; ToSchema a
+declareNamedSchema :: Proxy PageSize -&gt; Declare (Definitions Schema) NamedSchema
+$cdeclareNamedSchema :: Proxy PageSize -&gt; Declare (Definitions Schema) NamedSchema
+$cp1ToSchema :: Typeable PageSize
+</span><a href="#local-6989586621679259837"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var">OpenApi.ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259823"><span id="local-6989586621679259825"><span id="local-6989586621679259827"><span id="local-6989586621679259829"><span id="local-6989586621679259831"><span id="local-6989586621679259833"><span id="local-6989586621679259835"><span class="annot"><span class="annottext">Integer -&gt; PageSize
+PageSize -&gt; PageSize
+PageSize -&gt; PageSize -&gt; PageSize
+(PageSize -&gt; PageSize -&gt; PageSize)
+-&gt; (PageSize -&gt; PageSize -&gt; PageSize)
+-&gt; (PageSize -&gt; PageSize -&gt; PageSize)
+-&gt; (PageSize -&gt; PageSize)
+-&gt; (PageSize -&gt; PageSize)
+-&gt; (PageSize -&gt; PageSize)
+-&gt; (Integer -&gt; PageSize)
+-&gt; Num PageSize
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+fromInteger :: Integer -&gt; PageSize
+$cfromInteger :: Integer -&gt; PageSize
+signum :: PageSize -&gt; PageSize
+$csignum :: PageSize -&gt; PageSize
+abs :: PageSize -&gt; PageSize
+$cabs :: PageSize -&gt; PageSize
+negate :: PageSize -&gt; PageSize
+$cnegate :: PageSize -&gt; PageSize
+* :: PageSize -&gt; PageSize -&gt; PageSize
+$c* :: PageSize -&gt; PageSize -&gt; PageSize
+- :: PageSize -&gt; PageSize -&gt; PageSize
+$c- :: PageSize -&gt; PageSize -&gt; PageSize
++ :: PageSize -&gt; PageSize -&gt; PageSize
+$c+ :: PageSize -&gt; PageSize -&gt; PageSize
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></a></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/ibwdmf5kswrsjw9gmzksnspzzk6vivp5-data-default-class-lib-data-default-class-0.1.2.0-haddock-doc/share/doc/data-default-class/html/src"><span class="hs-identifier hs-type">Default</span></a></span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-type">PageSize</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-71"></span><span>    </span><span id="local-6989586621679259820"><span class="annot"><span class="annottext">def :: PageSize
+</span><a href="#local-6989586621679259820"><span class="hs-identifier hs-var hs-var hs-var hs-var">def</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; PageSize
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-var">PageSize</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><span class="hs-number">50</span></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | Part of a collection.</span><span>
+</span><span id="line-74"></span><span id="local-6989586621679259818"><span id="local-6989586621679259819"></span></span><span class="hs-keyword">data</span><span> </span><span id="Page"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#Page"><span class="hs-identifier hs-var">Page</span></a></span></span><span> </span><span id="local-6989586621679259952"><span class="annot"><a href="#local-6989586621679259952"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Page"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#Page"><span class="hs-identifier hs-var">Page</span></a></span></span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-special">{</span><span> </span><span id="currentPageQuery"><span class="annot"><span class="annottext">Page a -&gt; PageQuery a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#currentPageQuery"><span class="hs-identifier hs-var hs-var">currentPageQuery</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-type">PageQuery</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259952"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-comment">-- ^ The 'PageQuery' which was used to request this 'Page'.</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="nextPageQuery"><span class="annot"><span class="annottext">Page a -&gt; Maybe (PageQuery a)
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#nextPageQuery"><span class="hs-identifier hs-var hs-var">nextPageQuery</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-type">PageQuery</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259952"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-comment">-- ^ The 'PageQuery' to use to request the next 'Page'. Nothing if we requested the last page.</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-special">,</span><span> </span><span id="pageItems"><span class="annot"><span class="annottext">Page a -&gt; [a]
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#pageItems"><span class="hs-identifier hs-var hs-var">pageItems</span></a></span></span><span>        </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621679259952"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-80"></span><span>    </span><span class="hs-comment">-- ^ Items in the current 'Page'.</span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259810"><span id="local-6989586621679259812"><span class="annot"><span class="annottext">Page a -&gt; Page a -&gt; Bool
+(Page a -&gt; Page a -&gt; Bool)
+-&gt; (Page a -&gt; Page a -&gt; Bool) -&gt; Eq (Page a)
+forall a. Eq a =&gt; Page a -&gt; Page a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Page a -&gt; Page a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; Page a -&gt; Page a -&gt; Bool
+== :: Page a -&gt; Page a -&gt; Bool
+$c== :: forall a. Eq a =&gt; Page a -&gt; Page a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259795"><span id="local-6989586621679259797"><span id="local-6989586621679259799"><span id="local-6989586621679259801"><span id="local-6989586621679259803"><span id="local-6989586621679259805"><span id="local-6989586621679259807"><span class="annot"><span class="annottext">Eq (Page a)
+Eq (Page a)
+-&gt; (Page a -&gt; Page a -&gt; Ordering)
+-&gt; (Page a -&gt; Page a -&gt; Bool)
+-&gt; (Page a -&gt; Page a -&gt; Bool)
+-&gt; (Page a -&gt; Page a -&gt; Bool)
+-&gt; (Page a -&gt; Page a -&gt; Bool)
+-&gt; (Page a -&gt; Page a -&gt; Page a)
+-&gt; (Page a -&gt; Page a -&gt; Page a)
+-&gt; Ord (Page a)
+Page a -&gt; Page a -&gt; Bool
+Page a -&gt; Page a -&gt; Ordering
+Page a -&gt; Page a -&gt; Page a
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall a. Ord a =&gt; Eq (Page a)
+forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Bool
+forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Ordering
+forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Page a
+min :: Page a -&gt; Page a -&gt; Page a
+$cmin :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Page a
+max :: Page a -&gt; Page a -&gt; Page a
+$cmax :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Page a
+&gt;= :: Page a -&gt; Page a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Bool
+&gt; :: Page a -&gt; Page a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Bool
+&lt;= :: Page a -&gt; Page a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Bool
+&lt; :: Page a -&gt; Page a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Bool
+compare :: Page a -&gt; Page a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; Page a -&gt; Page a -&gt; Ordering
+$cp1Ord :: forall a. Ord a =&gt; Eq (Page a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259789"><span id="local-6989586621679259791"><span id="local-6989586621679259793"><span class="annot"><span class="annottext">Int -&gt; Page a -&gt; ShowS
+[Page a] -&gt; ShowS
+Page a -&gt; String
+(Int -&gt; Page a -&gt; ShowS)
+-&gt; (Page a -&gt; String) -&gt; ([Page a] -&gt; ShowS) -&gt; Show (Page a)
+forall a. Show a =&gt; Int -&gt; Page a -&gt; ShowS
+forall a. Show a =&gt; [Page a] -&gt; ShowS
+forall a. Show a =&gt; Page a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Page a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [Page a] -&gt; ShowS
+show :: Page a -&gt; String
+$cshow :: forall a. Show a =&gt; Page a -&gt; String
+showsPrec :: Int -&gt; Page a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; Page a -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. Page a -&gt; Rep (Page a) x)
+-&gt; (forall x. Rep (Page a) x -&gt; Page a) -&gt; Generic (Page a)
+forall x. Rep (Page a) x -&gt; Page a
+forall x. Page a -&gt; Rep (Page a) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (Page a) x -&gt; Page a
+forall a x. Page a -&gt; Rep (Page a) x
+$cto :: forall a x. Rep (Page a) x -&gt; Page a
+$cfrom :: forall a x. Page a -&gt; Rep (Page a) x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259783"><span id="local-6989586621679259785"><span class="annot"><span class="annottext">a -&gt; Page b -&gt; Page a
+(a -&gt; b) -&gt; Page a -&gt; Page b
+(forall a b. (a -&gt; b) -&gt; Page a -&gt; Page b)
+-&gt; (forall a b. a -&gt; Page b -&gt; Page a) -&gt; Functor Page
+forall a b. a -&gt; Page b -&gt; Page a
+forall a b. (a -&gt; b) -&gt; Page a -&gt; Page b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; Page b -&gt; Page a
+$c&lt;$ :: forall a b. a -&gt; Page b -&gt; Page a
+fmap :: (a -&gt; b) -&gt; Page a -&gt; Page b
+$cfmap :: forall a b. (a -&gt; b) -&gt; Page a -&gt; Page b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679259775"><span id="local-6989586621679259777"><span id="local-6989586621679259779"><span id="local-6989586621679259781"><span class="annot"><span class="annottext">[Page a] -&gt; Encoding
+[Page a] -&gt; Value
+Page a -&gt; Encoding
+Page a -&gt; Value
+(Page a -&gt; Value)
+-&gt; (Page a -&gt; Encoding)
+-&gt; ([Page a] -&gt; Value)
+-&gt; ([Page a] -&gt; Encoding)
+-&gt; ToJSON (Page a)
+forall a. ToJSON a =&gt; [Page a] -&gt; Encoding
+forall a. ToJSON a =&gt; [Page a] -&gt; Value
+forall a. ToJSON a =&gt; Page a -&gt; Encoding
+forall a. ToJSON a =&gt; Page a -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [Page a] -&gt; Encoding
+$ctoEncodingList :: forall a. ToJSON a =&gt; [Page a] -&gt; Encoding
+toJSONList :: [Page a] -&gt; Value
+$ctoJSONList :: forall a. ToJSON a =&gt; [Page a] -&gt; Value
+toEncoding :: Page a -&gt; Encoding
+$ctoEncoding :: forall a. ToJSON a =&gt; Page a -&gt; Encoding
+toJSON :: Page a -&gt; Value
+$ctoJSON :: forall a. ToJSON a =&gt; Page a -&gt; Value
+</span><a href="#local-6989586621679259775"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259771"><span id="local-6989586621679259773"><span class="annot"><span class="annottext">Value -&gt; Parser [Page a]
+Value -&gt; Parser (Page a)
+(Value -&gt; Parser (Page a))
+-&gt; (Value -&gt; Parser [Page a]) -&gt; FromJSON (Page a)
+forall a. FromJSON a =&gt; Value -&gt; Parser [Page a]
+forall a. FromJSON a =&gt; Value -&gt; Parser (Page a)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [Page a]
+$cparseJSONList :: forall a. FromJSON a =&gt; Value -&gt; Parser [Page a]
+parseJSON :: Value -&gt; Parser (Page a)
+$cparseJSON :: forall a. FromJSON a =&gt; Value -&gt; Parser (Page a)
+</span><a href="#local-6989586621679259771"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span id="local-6989586621679259767"><span id="local-6989586621679259770"><span class="hs-keyword">deriving</span><span> </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../file:///nix/store/vpm50j3dwjzfg00shy71mwawvv796qgi-openapi3-lib-openapi3-3.2.3-haddock-doc/share/doc/openapi3/html/src"><span class="hs-identifier hs-type">OpenApi.ToSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259770"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/vpm50j3dwjzfg00shy71mwawvv796qgi-openapi3-lib-openapi3-3.2.3-haddock-doc/share/doc/openapi3/html/src"><span class="hs-identifier hs-type">OpenApi.ToSchema</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#Page"><span class="hs-identifier hs-type">Page</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259770"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- | Given a 'Set', request the 'Page' with the given 'PageQuery'.</span><span>
+</span><span id="line-88"></span><span id="local-6989586621679259766"><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#pageOf"><span class="hs-identifier hs-type">pageOf</span></a></span><span>
+</span><span id="line-89"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Eq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259766"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-type">PageQuery</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259766"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-comment">-- ^ Pagination query parameters.</span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259766"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#Page"><span class="hs-identifier hs-type">Page</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679259766"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-93"></span><span id="pageOf"><span class="annot"><span class="annottext">pageOf :: PageQuery a -&gt; Set a -&gt; Page a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#pageOf"><span class="hs-identifier hs-var hs-var">pageOf</span></a></span></span><span> </span><span id="local-6989586621679259765"><span class="annot"><span class="annottext">pageQuery :: PageQuery a
+</span><a href="#local-6989586621679259765"><span class="hs-identifier hs-var">pageQuery</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-type">PageQuery</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">pageQuerySize :: forall a. PageQuery a -&gt; PageSize
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#pageQuerySize"><span class="hs-identifier hs-var">pageQuerySize</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-type">PageSize</span></a></span><span> </span><span id="local-6989586621679259764"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679259764"><span class="hs-identifier hs-var">ps</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679259763"><span class="annot"><span class="annottext">Maybe a
+pageQueryLastItem :: Maybe a
+pageQueryLastItem :: forall a. PageQuery a -&gt; Maybe a
+</span><a href="#local-6989586621679259763"><span class="hs-identifier hs-var hs-var">pageQueryLastItem</span></a></span></span><span> </span><span class="hs-special">}</span><span> </span><span id="local-6989586621679259762"><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679259762"><span class="hs-identifier hs-var">items</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679259761"><span class="annot"><span class="annottext">ps' :: Int
+</span><a href="#local-6989586621679259761"><span class="hs-identifier hs-var hs-var">ps'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679259764"><span class="hs-identifier hs-var">ps</span></a></span><span>
+</span><span id="line-95"></span><span>        </span><span class="hs-comment">-- The extract the @PageSize + 1@ next elements after the last query</span><span>
+</span><span id="line-96"></span><span>        </span><span class="hs-comment">-- element. The @+1@ allows to now if there is a next page or not.</span><span>
+</span><span id="line-97"></span><span>        </span><span id="local-6989586621679259760"><span class="annot"><span class="annottext">pageItems :: [a]
+</span><a href="#local-6989586621679259760"><span class="hs-identifier hs-var hs-var">pageItems</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679259763"><span class="hs-identifier hs-var">pageQueryLastItem</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-98"></span><span>                      </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [a] -&gt; [a]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">take</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679259761"><span class="hs-identifier hs-var">ps'</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; [a] -&gt; [a]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Set a -&gt; [a]
+forall a. Set a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.toList</span></a></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679259762"><span class="hs-identifier hs-var">items</span></a></span><span>
+</span><span id="line-99"></span><span>                      </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679259756"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679259756"><span class="hs-identifier hs-var">i</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [a] -&gt; [a]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">take</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679259761"><span class="hs-identifier hs-var">ps'</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; [a] -&gt; [a]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [a] -&gt; [a]
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">drop</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; [a] -&gt; [a]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Bool) -&gt; [a] -&gt; [a]
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">dropWhile</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">(/=)</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679259756"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([a] -&gt; [a]) -&gt; [a] -&gt; [a]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Set a -&gt; [a]
+forall a. Set a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.toList</span></a></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679259762"><span class="hs-identifier hs-var">items</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span>        </span><span id="local-6989586621679259752"><span class="annot"><span class="annottext">nextLastItem :: Maybe a
+</span><a href="#local-6989586621679259752"><span class="hs-identifier hs-var hs-var">nextLastItem</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Maybe ()
+forall (f :: * -&gt; *). Alternative f =&gt; Bool -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">guard</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Set a -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">length</span></a></span><span> </span><span class="annot"><span class="annottext">Set a
+</span><a href="#local-6989586621679259762"><span class="hs-identifier hs-var">items</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-operator hs-var">&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679259764"><span class="hs-identifier hs-var">ps</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>                 </span><span class="annot"><span class="annottext">Maybe () -&gt; Maybe (NonEmpty a) -&gt; Maybe (NonEmpty a)
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; m b -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">[a] -&gt; Maybe (NonEmpty a)
+forall a. [a] -&gt; Maybe (NonEmpty a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">L.nonEmpty</span></a></span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679259760"><span class="hs-identifier hs-var">pageItems</span></a></span><span>
+</span><span id="line-103"></span><span>                 </span><span class="annot"><span class="annottext">Maybe (NonEmpty a) -&gt; (NonEmpty a -&gt; Maybe a) -&gt; Maybe a
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">[a] -&gt; Maybe a
+forall a. [a] -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">listToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">([a] -&gt; Maybe a) -&gt; (NonEmpty a -&gt; [a]) -&gt; NonEmpty a -&gt; Maybe a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty a -&gt; [a]
+forall a. NonEmpty a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">L.tail</span></a></span><span> </span><span class="annot"><span class="annottext">(NonEmpty a -&gt; [a])
+-&gt; (NonEmpty a -&gt; NonEmpty a) -&gt; NonEmpty a -&gt; [a]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty a -&gt; NonEmpty a
+forall a. NonEmpty a -&gt; NonEmpty a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">L.reverse</span></a></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Page :: forall a. PageQuery a -&gt; Maybe (PageQuery a) -&gt; [a] -&gt; Page a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#Page"><span class="hs-identifier hs-type">Page</span></a></span><span>
+</span><span id="line-105"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">currentPageQuery :: PageQuery a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#currentPageQuery"><span class="hs-identifier hs-var">currentPageQuery</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PageQuery a
+</span><a href="#local-6989586621679259765"><span class="hs-identifier hs-var">pageQuery</span></a></span><span>
+</span><span id="line-106"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">nextPageQuery :: Maybe (PageQuery a)
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#nextPageQuery"><span class="hs-identifier hs-var">nextPageQuery</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; PageQuery a) -&gt; Maybe a -&gt; Maybe (PageQuery a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PageSize -&gt; Maybe a -&gt; PageQuery a
+forall a. PageSize -&gt; Maybe a -&gt; PageQuery a
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#PageQuery"><span class="hs-identifier hs-var">PageQuery</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Natural -&gt; PageSize
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#PageSize"><span class="hs-identifier hs-var">PageSize</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679259764"><span class="hs-identifier hs-var">ps</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe a -&gt; PageQuery a) -&gt; (a -&gt; Maybe a) -&gt; a -&gt; PageQuery a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; Maybe a
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679259752"><span class="hs-identifier hs-var">nextLastItem</span></a></span><span>
+</span><span id="line-107"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">pageItems :: [a]
+</span><a href="Control.Monad.Freer.Extras.Pagination.html#pageItems"><span class="hs-identifier hs-var">pageItems</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Maybe a -&gt; Bool
+forall a. Maybe a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">isJust</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679259752"><span class="hs-identifier hs-var">nextLastItem</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">[a] -&gt; [a]
+forall a. [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">init</span></a></span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679259760"><span class="hs-identifier hs-var">pageItems</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679259760"><span class="hs-identifier hs-var">pageItems</span></a></span><span>
+</span><span id="line-108"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span></pre></body></html>

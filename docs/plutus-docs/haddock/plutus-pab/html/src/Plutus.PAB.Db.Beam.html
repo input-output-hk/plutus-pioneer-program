@@ -1,0 +1,631 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE ExplicitNamespaces #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes         #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators      #-}</span><span>
+</span><span id="line-6"></span><span class="hs-comment">{-
+
+Interface to beam ecosystem used by the PAB to store contracts.
+
+-}</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.PAB.Db.Beam</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Beam.html#runBeamStoreAction"><span class="hs-identifier">runBeamStoreAction</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Trace</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Trace</span></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">interpret</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">reinterpret</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">runM</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">subsume</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">type</span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator">(~&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Delay.html"><span class="hs-identifier">Control.Monad.Freer.Delay</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Freer.Delay.html#DelayEffect"><span class="hs-identifier">DelayEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Delay.html#handleDelayEffect"><span class="hs-identifier">handleDelayEffect</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Error</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">handleError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">runError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">throwError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">LogMsg</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">mapLog</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Beam</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">BeamError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Beam.Effects</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">BeamEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">handleBeam</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Beam.Postgres</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Postgres</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">runBeam</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Beam.Sqlite</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Sqlite</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">runBeam</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Modify</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Modify</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Reader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Reader</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">runReader</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/zxq0h870rlfkadlbglxsnlfqnd0xfp5v-resource-pool-lib-resource-pool-0.3.1.0-haddock-doc/share/doc/resource-pool/html/src"><span class="hs-identifier">Data.Pool</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/zxq0h870rlfkadlbglxsnlfqnd0xfp5v-resource-pool-lib-resource-pool-0.3.1.0-haddock-doc/share/doc/resource-pool/html/src"><span class="hs-identifier">Pool</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Typeable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Typeable</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/zcypz0848b3j11jnm1gmvcmaky0psf13-beam-postgres-lib-beam-postgres-0.5.2.1-haddock-doc/share/doc/beam-postgres/html/src"><span class="hs-identifier">Database.Beam.Postgres</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/zcypz0848b3j11jnm1gmvcmaky0psf13-beam-postgres-lib-beam-postgres-0.5.2.1-haddock-doc/share/doc/beam-postgres/html/src"><span class="hs-identifier">Postgres</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/c2ys4mf3ij618ysqljn71b9gp0j0imn5-beam-sqlite-lib-beam-sqlite-0.5.1.2-haddock-doc/share/doc/beam-sqlite/html/src"><span class="hs-identifier">Database.Beam.Sqlite</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/c2ys4mf3ij618ysqljn71b9gp0j0imn5-beam-sqlite-lib-beam-sqlite-0.5.1.2-haddock-doc/share/doc/beam-sqlite/html/src"><span class="hs-identifier">Sqlite</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Db.Beam.ContractStore.html"><span class="hs-identifier">Plutus.PAB.Db.Beam.ContractStore</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Db.Beam.ContractStore.html#handleContractStore"><span class="hs-identifier">handleContractStore</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html"><span class="hs-identifier">Plutus.PAB.Effects.Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractStore"><span class="hs-identifier">ContractStore</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html"><span class="hs-identifier">Plutus.PAB.Effects.Contract.Builtin</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier">Builtin</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#HasDefinitions"><span class="hs-identifier">HasDefinitions</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Monitoring.Monitoring.html"><span class="hs-identifier">Plutus.PAB.Monitoring.Monitoring</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">convertLog</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">handleLogMsgTrace</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html"><span class="hs-identifier">Plutus.PAB.Monitoring.PABLogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABLogMsg"><span class="hs-identifier">PABLogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABMultiAgentMsg"><span class="hs-identifier">PABMultiAgentMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html"><span class="hs-identifier">Plutus.PAB.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Types.html#DBConnection"><span class="hs-identifier">DBConnection</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier">PABError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- | Run the ContractStore and ContractDefinitionStore effects on the</span><span>
+</span><span id="line-37"></span><span class="hs-comment">--   configured database.</span><span>
+</span><span id="line-38"></span><span class="annot"><a href="Plutus.PAB.Db.Beam.html#runBeamStoreAction"><span class="hs-identifier hs-type">runBeamStoreAction</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680391618"><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680391617"><span class="annot"><a href="#local-6989586621680391617"><span class="hs-identifier hs-type">b</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-type">FromJSON</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#HasDefinitions"><span class="hs-identifier hs-type">HasDefinitions</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#DBConnection"><span class="hs-identifier hs-type">DBConnection</span></a></span><span> </span><span class="hs-comment">--Pool Postgres.Connection</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABLogMsg"><span class="hs-identifier hs-type">PABLogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractStore"><span class="hs-identifier hs-type">ContractStore</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABMultiAgentMsg"><span class="hs-identifier hs-type">PABMultiAgentMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391618"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Delay.html#DelayEffect"><span class="hs-identifier hs-type">DelayEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><a href="#local-6989586621680391617"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier hs-type">PABError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391617"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span id="runBeamStoreAction"><span class="annot"><span class="annottext">runBeamStoreAction :: DBConnection
+-&gt; Trace IO (PABLogMsg (Builtin a))
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+</span><a href="Plutus.PAB.Db.Beam.html#runBeamStoreAction"><span class="hs-identifier hs-var hs-var">runBeamStoreAction</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Types.html#PostgresPool"><span class="hs-identifier hs-type">PostgresPool</span></a></span><span> </span><span id="local-6989586621680391615"><span class="annot"><span class="annottext">Pool Connection
+</span><a href="#local-6989586621680391615"><span class="hs-identifier hs-var">pool</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680391614"><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391614"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><span class="annottext">Pool Connection
+-&gt; Trace IO (PABLogMsg (Builtin a))
+-&gt; (BeamEffect Postgres
+    ~&gt; Eff
+         '[Reader (Pool Connection), Error BeamError, Error PABError, IO])
+-&gt; (ContractStore (Builtin a)
+    ~&gt; Eff
+         '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+           BeamEffect Postgres, Reader (Pool Connection), Error BeamError,
+           Error PABError, IO])
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+forall p dbt a b.
+Pool p
+-&gt; Trace IO (PABLogMsg (Builtin a))
+-&gt; (BeamEffect dbt
+    ~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO])
+-&gt; (ContractStore (Builtin a)
+    ~&gt; Eff
+         '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+           BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+           IO])
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+</span><a href="Plutus.PAB.Db.Beam.html#run"><span class="hs-identifier hs-var">run</span></a></span><span> </span><span class="annot"><span class="annottext">Pool Connection
+</span><a href="#local-6989586621680391615"><span class="hs-identifier hs-var">pool</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391614"><span class="hs-identifier hs-var">trace</span></a></span><span>
+</span><span id="line-51"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Trace IO BeamLog
+ -&gt; Pg
+    ~&gt; Eff
+         '[Reader (Pool Connection), Error BeamError, Error PABError, IO])
+-&gt; Trace IO BeamLog
+-&gt; BeamEffect Postgres
+   ~&gt; Eff
+        '[Reader (Pool Connection), Error BeamError, Error PABError, IO]
+forall dbt (dbM :: * -&gt; *) (effs :: [* -&gt; *]).
+(BeamSqlBackend dbt, MonadBeam dbt dbM,
+ BeamHasInsertOnConflict dbt) =&gt;
+(Trace IO BeamLog -&gt; dbM ~&gt; Eff effs)
+-&gt; Trace IO BeamLog -&gt; BeamEffect dbt ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">handleBeam</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO BeamLog
+-&gt; Pg
+   ~&gt; Eff
+        '[Reader (Pool Connection), Error BeamError, Error PABError, IO]
+forall (effs :: [* -&gt; *]).
+(LastMember IO effs, Member (Reader (Pool Connection)) effs) =&gt;
+Trace IO BeamLog -&gt; Pg ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">Postgres.runBeam</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(BeamLog -&gt; PABLogMsg (Builtin a))
+-&gt; Trace IO (PABLogMsg (Builtin a)) -&gt; Trace IO BeamLog
+forall a b (m :: * -&gt; *). (a -&gt; b) -&gt; Trace m b -&gt; Trace m a
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">convertLog</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PABMultiAgentMsg (Builtin a) -&gt; PABLogMsg (Builtin a)
+forall t. PABMultiAgentMsg t -&gt; PABLogMsg t
+</span><a href="Plutus.PAB.Monitoring.PABLogMsg.html#SMultiAgent"><span class="hs-identifier hs-var">SMultiAgent</span></a></span><span> </span><span class="annot"><span class="annottext">(PABMultiAgentMsg (Builtin a) -&gt; PABLogMsg (Builtin a))
+-&gt; (BeamLog -&gt; PABMultiAgentMsg (Builtin a))
+-&gt; BeamLog
+-&gt; PABLogMsg (Builtin a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">BeamLog -&gt; PABMultiAgentMsg (Builtin a)
+forall t. BeamLog -&gt; PABMultiAgentMsg t
+</span><a href="Plutus.PAB.Monitoring.PABLogMsg.html#BeamLogItem"><span class="hs-identifier hs-var">BeamLogItem</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391614"><span class="hs-identifier hs-var">trace</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a (effs :: [* -&gt; *]).
+(FromBackendRow Postgres Text, FromBackendRow Postgres Bool,
+ FromBackendRow Postgres SqlNull,
+ HasSqlValueSyntax (Synt Postgres) (Maybe Text),
+ HasSqlValueSyntax (Synt Postgres) Text,
+ HasSqlValueSyntax (Synt Postgres) Bool,
+ HasSqlEqualityCheck Postgres Text,
+ HasSqlEqualityCheck Postgres Bool, HasQBuilder Postgres,
+ Member (BeamEffect Postgres) effs, Member (Error PABError) effs,
+ Member (LogMsg (PABMultiAgentMsg (Builtin a))) effs, ToJSON a,
+ FromJSON a, HasDefinitions a, Typeable a) =&gt;
+ContractStore (Builtin a) ~&gt; Eff effs
+forall dbt a (effs :: [* -&gt; *]).
+(FromBackendRow dbt Text, FromBackendRow dbt Bool,
+ FromBackendRow dbt SqlNull,
+ HasSqlValueSyntax (Synt dbt) (Maybe Text),
+ HasSqlValueSyntax (Synt dbt) Text,
+ HasSqlValueSyntax (Synt dbt) Bool, HasSqlEqualityCheck dbt Text,
+ HasSqlEqualityCheck dbt Bool, HasQBuilder dbt,
+ Member (BeamEffect dbt) effs, Member (Error PABError) effs,
+ Member (LogMsg (PABMultiAgentMsg (Builtin a))) effs, ToJSON a,
+ FromJSON a, HasDefinitions a, Typeable a) =&gt;
+ContractStore (Builtin a) ~&gt; Eff effs
+</span><a href="Plutus.PAB.Db.Beam.ContractStore.html#handleContractStore"><span class="hs-identifier hs-var">handleContractStore</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/zcypz0848b3j11jnm1gmvcmaky0psf13-beam-postgres-lib-beam-postgres-0.5.2.1-haddock-doc/share/doc/beam-postgres/html/src"><span class="hs-identifier hs-type">Postgres</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Plutus.PAB.Db.Beam.html#runBeamStoreAction"><span class="hs-identifier hs-var">runBeamStoreAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Types.html#SqlitePool"><span class="hs-identifier hs-type">SqlitePool</span></a></span><span> </span><span id="local-6989586621680391608"><span class="annot"><span class="annottext">Pool Connection
+</span><a href="#local-6989586621680391608"><span class="hs-identifier hs-var">pool</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680391607"><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391607"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-54"></span><span>    </span><span class="annot"><span class="annottext">Pool Connection
+-&gt; Trace IO (PABLogMsg (Builtin a))
+-&gt; (BeamEffect Sqlite
+    ~&gt; Eff
+         '[Reader (Pool Connection), Error BeamError, Error PABError, IO])
+-&gt; (ContractStore (Builtin a)
+    ~&gt; Eff
+         '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+           BeamEffect Sqlite, Reader (Pool Connection), Error BeamError,
+           Error PABError, IO])
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+forall p dbt a b.
+Pool p
+-&gt; Trace IO (PABLogMsg (Builtin a))
+-&gt; (BeamEffect dbt
+    ~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO])
+-&gt; (ContractStore (Builtin a)
+    ~&gt; Eff
+         '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+           BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+           IO])
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+</span><a href="Plutus.PAB.Db.Beam.html#run"><span class="hs-identifier hs-var">run</span></a></span><span> </span><span class="annot"><span class="annottext">Pool Connection
+</span><a href="#local-6989586621680391608"><span class="hs-identifier hs-var">pool</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391607"><span class="hs-identifier hs-var">trace</span></a></span><span>
+</span><span id="line-55"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Trace IO BeamLog
+ -&gt; SqliteM
+    ~&gt; Eff
+         '[Reader (Pool Connection), Error BeamError, Error PABError, IO])
+-&gt; Trace IO BeamLog
+-&gt; BeamEffect Sqlite
+   ~&gt; Eff
+        '[Reader (Pool Connection), Error BeamError, Error PABError, IO]
+forall dbt (dbM :: * -&gt; *) (effs :: [* -&gt; *]).
+(BeamSqlBackend dbt, MonadBeam dbt dbM,
+ BeamHasInsertOnConflict dbt) =&gt;
+(Trace IO BeamLog -&gt; dbM ~&gt; Eff effs)
+-&gt; Trace IO BeamLog -&gt; BeamEffect dbt ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">handleBeam</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO BeamLog
+-&gt; SqliteM
+   ~&gt; Eff
+        '[Reader (Pool Connection), Error BeamError, Error PABError, IO]
+forall (effs :: [* -&gt; *]).
+(LastMember IO effs, Member (Reader (Pool Connection)) effs) =&gt;
+Trace IO BeamLog -&gt; SqliteM ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">Sqlite.runBeam</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(BeamLog -&gt; PABLogMsg (Builtin a))
+-&gt; Trace IO (PABLogMsg (Builtin a)) -&gt; Trace IO BeamLog
+forall a b (m :: * -&gt; *). (a -&gt; b) -&gt; Trace m b -&gt; Trace m a
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">convertLog</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PABMultiAgentMsg (Builtin a) -&gt; PABLogMsg (Builtin a)
+forall t. PABMultiAgentMsg t -&gt; PABLogMsg t
+</span><a href="Plutus.PAB.Monitoring.PABLogMsg.html#SMultiAgent"><span class="hs-identifier hs-var">SMultiAgent</span></a></span><span> </span><span class="annot"><span class="annottext">(PABMultiAgentMsg (Builtin a) -&gt; PABLogMsg (Builtin a))
+-&gt; (BeamLog -&gt; PABMultiAgentMsg (Builtin a))
+-&gt; BeamLog
+-&gt; PABLogMsg (Builtin a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">BeamLog -&gt; PABMultiAgentMsg (Builtin a)
+forall t. BeamLog -&gt; PABMultiAgentMsg t
+</span><a href="Plutus.PAB.Monitoring.PABLogMsg.html#BeamLogItem"><span class="hs-identifier hs-var">BeamLogItem</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391607"><span class="hs-identifier hs-var">trace</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a (effs :: [* -&gt; *]).
+(FromBackendRow Sqlite Text, FromBackendRow Sqlite Bool,
+ FromBackendRow Sqlite SqlNull,
+ HasSqlValueSyntax (Synt Sqlite) (Maybe Text),
+ HasSqlValueSyntax (Synt Sqlite) Text,
+ HasSqlValueSyntax (Synt Sqlite) Bool,
+ HasSqlEqualityCheck Sqlite Text, HasSqlEqualityCheck Sqlite Bool,
+ HasQBuilder Sqlite, Member (BeamEffect Sqlite) effs,
+ Member (Error PABError) effs,
+ Member (LogMsg (PABMultiAgentMsg (Builtin a))) effs, ToJSON a,
+ FromJSON a, HasDefinitions a, Typeable a) =&gt;
+ContractStore (Builtin a) ~&gt; Eff effs
+forall dbt a (effs :: [* -&gt; *]).
+(FromBackendRow dbt Text, FromBackendRow dbt Bool,
+ FromBackendRow dbt SqlNull,
+ HasSqlValueSyntax (Synt dbt) (Maybe Text),
+ HasSqlValueSyntax (Synt dbt) Text,
+ HasSqlValueSyntax (Synt dbt) Bool, HasSqlEqualityCheck dbt Text,
+ HasSqlEqualityCheck dbt Bool, HasQBuilder dbt,
+ Member (BeamEffect dbt) effs, Member (Error PABError) effs,
+ Member (LogMsg (PABMultiAgentMsg (Builtin a))) effs, ToJSON a,
+ FromJSON a, HasDefinitions a, Typeable a) =&gt;
+ContractStore (Builtin a) ~&gt; Eff effs
+</span><a href="Plutus.PAB.Db.Beam.ContractStore.html#handleContractStore"><span class="hs-identifier hs-var">handleContractStore</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/c2ys4mf3ij618ysqljn71b9gp0j0imn5-beam-sqlite-lib-beam-sqlite-0.5.1.2-haddock-doc/share/doc/beam-sqlite/html/src"><span class="hs-identifier hs-type">Sqlite</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Plutus.PAB.Db.Beam.html#run"><span class="hs-identifier hs-type">run</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680391721"><span class="annot"><a href="#local-6989586621680391721"><span class="hs-identifier hs-type">p</span></a></span></span><span> </span><span id="local-6989586621680391719"><span class="annot"><a href="#local-6989586621680391719"><span class="hs-identifier hs-type">dbt</span></a></span></span><span> </span><span id="local-6989586621680391720"><span class="annot"><a href="#local-6989586621680391720"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680391718"><span class="annot"><a href="#local-6989586621680391718"><span class="hs-identifier hs-type">b</span></a></span></span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-operator">.</span><span>  </span><span class="annot"><a href="../file:///nix/store/zxq0h870rlfkadlbglxsnlfqnd0xfp5v-resource-pool-lib-resource-pool-0.3.1.0-haddock-doc/share/doc/resource-pool/html/src"><span class="hs-identifier hs-type">Pool</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391721"><span class="hs-identifier hs-type">p</span></a></span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABLogMsg"><span class="hs-identifier hs-type">PABLogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391720"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">BeamEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391719"><span class="hs-identifier hs-type">dbt</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Reader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/zxq0h870rlfkadlbglxsnlfqnd0xfp5v-resource-pool-lib-resource-pool-0.3.1.0-haddock-doc/share/doc/resource-pool/html/src"><span class="hs-identifier hs-type">Pool</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391721"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">BeamError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier hs-type">PABError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractStore"><span class="hs-identifier hs-type">ContractStore</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391720"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABMultiAgentMsg"><span class="hs-identifier hs-type">PABMultiAgentMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391720"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Delay.html#DelayEffect"><span class="hs-identifier hs-type">DelayEffect</span></a></span><span>
+</span><span id="line-64"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span>
+</span><span id="line-65"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">BeamEffect</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391719"><span class="hs-identifier hs-type">dbt</span></a></span><span>
+</span><span id="line-66"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Reader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/zxq0h870rlfkadlbglxsnlfqnd0xfp5v-resource-pool-lib-resource-pool-0.3.1.0-haddock-doc/share/doc/resource-pool/html/src"><span class="hs-identifier hs-type">Pool</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391721"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">BeamError</span></a></span><span>
+</span><span id="line-68"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier hs-type">PABError</span></a></span><span>
+</span><span id="line-69"></span><span>                                          </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span>
+</span><span id="line-70"></span><span>                                          </span><span class="hs-special">]</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.html#ContractStore"><span class="hs-identifier hs-type">ContractStore</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391720"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-type">LogMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Monitoring.PABLogMsg.html#PABMultiAgentMsg"><span class="hs-identifier hs-type">PABMultiAgentMsg</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.PAB.Effects.Contract.Builtin.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391720"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Freer.Delay.html#DelayEffect"><span class="hs-identifier hs-type">DelayEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><a href="#local-6989586621680391718"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="Plutus.PAB.Types.html#PABError"><span class="hs-identifier hs-type">PABError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391718"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span id="run"><span class="annot"><span class="annottext">run :: Pool p
+-&gt; Trace IO (PABLogMsg (Builtin a))
+-&gt; (BeamEffect dbt
+    ~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO])
+-&gt; (ContractStore (Builtin a)
+    ~&gt; Eff
+         '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+           BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+           IO])
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+</span><a href="Plutus.PAB.Db.Beam.html#run"><span class="hs-identifier hs-var hs-var">run</span></a></span></span><span> </span><span id="local-6989586621680391606"><span class="annot"><span class="annottext">Pool p
+</span><a href="#local-6989586621680391606"><span class="hs-identifier hs-var">pool</span></a></span></span><span> </span><span id="local-6989586621680391605"><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391605"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span id="local-6989586621680391604"><span class="annot"><span class="annottext">BeamEffect dbt
+~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO]
+</span><a href="#local-6989586621680391604"><span class="hs-identifier hs-var">hBeam</span></a></span></span><span> </span><span id="local-6989586621680391603"><span class="annot"><span class="annottext">ContractStore (Builtin a)
+~&gt; Eff
+     '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+       BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+       IO]
+</span><a href="#local-6989586621680391603"><span class="hs-identifier hs-var">hContractStore</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-74"></span><span>    </span><span class="annot"><span class="annottext">Eff '[IO] (Either PABError b) -&gt; IO (Either PABError b)
+forall (m :: * -&gt; *) a. Monad m =&gt; Eff '[m] a -&gt; m a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">runM</span></a></span><span>
+</span><span id="line-75"></span><span>    </span><span class="annot"><span class="annottext">(Eff '[IO] (Either PABError b) -&gt; IO (Either PABError b))
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff '[IO] (Either PABError b))
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; IO (Either PABError b)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Eff '[Error PABError, IO] b -&gt; Eff '[IO] (Either PABError b)
+forall e (effs :: [* -&gt; *]) a.
+Eff (Error e : effs) a -&gt; Eff effs (Either e a)
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">runError</span></a></span><span>
+</span><span id="line-76"></span><span>    </span><span class="annot"><span class="annottext">(Eff '[Error PABError, IO] b -&gt; Eff '[IO] (Either PABError b))
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff '[Error PABError, IO] b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff '[IO] (Either PABError b)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff '[Error BeamError, Error PABError, IO] b
+ -&gt; (BeamError -&gt; Eff '[Error PABError, IO] b)
+ -&gt; Eff '[Error PABError, IO] b)
+-&gt; (BeamError -&gt; Eff '[Error PABError, IO] b)
+-&gt; Eff '[Error BeamError, Error PABError, IO] b
+-&gt; Eff '[Error PABError, IO] b
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">Eff '[Error BeamError, Error PABError, IO] b
+-&gt; (BeamError -&gt; Eff '[Error PABError, IO] b)
+-&gt; Eff '[Error PABError, IO] b
+forall e (effs :: [* -&gt; *]) a.
+Eff (Error e : effs) a -&gt; (e -&gt; Eff effs a) -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">handleError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PABError -&gt; Eff '[Error PABError, IO] b
+forall e (effs :: [* -&gt; *]) a.
+Member (Error e) effs =&gt;
+e -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span> </span><span class="annot"><span class="annottext">(PABError -&gt; Eff '[Error PABError, IO] b)
+-&gt; (BeamError -&gt; PABError)
+-&gt; BeamError
+-&gt; Eff '[Error PABError, IO] b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">BeamError -&gt; PABError
+</span><a href="Plutus.PAB.Types.html#BeamEffectError"><span class="hs-identifier hs-var">BeamEffectError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>    </span><span class="annot"><span class="annottext">(Eff '[Error BeamError, Error PABError, IO] b
+ -&gt; Eff '[Error PABError, IO] b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff '[Error BeamError, Error PABError, IO] b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff '[Error PABError, IO] b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Pool p
+-&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO] b
+-&gt; Eff '[Error BeamError, Error PABError, IO] b
+forall r (effs :: [* -&gt; *]) a.
+r -&gt; Eff (Reader r : effs) a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">runReader</span></a></span><span> </span><span class="annot"><span class="annottext">Pool p
+</span><a href="#local-6989586621680391606"><span class="hs-identifier hs-var">pool</span></a></span><span>
+</span><span id="line-78"></span><span>    </span><span class="annot"><span class="annottext">(Eff '[Reader (Pool p), Error BeamError, Error PABError, IO] b
+ -&gt; Eff '[Error BeamError, Error PABError, IO] b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO] b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff '[Error BeamError, Error PABError, IO] b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(BeamEffect dbt
+ ~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO])
+-&gt; Eff
+     '[BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+       IO]
+   ~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO]
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+(eff ~&gt; Eff effs) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpret</span></a></span><span> </span><span class="annot"><span class="annottext">BeamEffect dbt
+~&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO]
+</span><a href="#local-6989586621680391604"><span class="hs-identifier hs-var">hBeam</span></a></span><span>
+</span><span id="line-79"></span><span>    </span><span class="annot"><span class="annottext">(Eff
+   '[BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+     IO]
+   b
+ -&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO] b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff
+         '[BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+           IO]
+         b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff '[Reader (Pool p), Error BeamError, Error PABError, IO] b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+Member IO effs =&gt;
+Eff (IO : effs) ~&gt; Eff effs
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+Member eff effs =&gt;
+Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">subsume</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span>
+</span><span id="line-80"></span><span>    </span><span class="annot"><span class="annottext">(Eff
+   '[IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+     Error PABError, IO]
+   b
+ -&gt; Eff
+      '[BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+        IO]
+      b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff
+         '[IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+           Error PABError, IO]
+         b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff
+     '[BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+       IO]
+     b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+    Error BeamError, Error PABError, IO]
+  b
+-&gt; Eff
+     '[IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+       Error PABError, IO]
+     b
+forall (effs :: [* -&gt; *]) (m :: * -&gt; *).
+(LastMember m effs, MonadIO m) =&gt;
+Eff (DelayEffect : effs) ~&gt; Eff effs
+</span><a href="Control.Monad.Freer.Delay.html#handleDelayEffect"><span class="hs-identifier hs-var">handleDelayEffect</span></a></span><span>
+</span><span id="line-81"></span><span>    </span><span class="annot"><span class="annottext">(Eff
+   '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+     Error BeamError, Error PABError, IO]
+   b
+ -&gt; Eff
+      '[IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+        Error PABError, IO]
+      b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff
+         '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+           Error BeamError, Error PABError, IO]
+         b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff
+     '[IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+       Error PABError, IO]
+     b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(LogMsg (PABLogMsg (Builtin a))
+ ~&gt; Eff
+      '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+        Error BeamError, Error PABError, IO])
+-&gt; Eff
+     '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+       Reader (Pool p), Error BeamError, Error PABError, IO]
+   ~&gt; Eff
+        '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+          Error BeamError, Error PABError, IO]
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+(eff ~&gt; Eff effs) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpret</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+-&gt; LogMsg (PABLogMsg (Builtin a))
+   ~&gt; Eff
+        '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+          Error BeamError, Error PABError, IO]
+forall a (m :: * -&gt; *) (effs :: [* -&gt; *]).
+(LastMember m effs, MonadIO m) =&gt;
+Trace m a -&gt; LogMsg a ~&gt; Eff effs
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">handleLogMsgTrace</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO (PABLogMsg (Builtin a))
+</span><a href="#local-6989586621680391605"><span class="hs-identifier hs-var">trace</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>    </span><span class="annot"><span class="annottext">(Eff
+   '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+     Reader (Pool p), Error BeamError, Error PABError, IO]
+   b
+ -&gt; Eff
+      '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+        Error BeamError, Error PABError, IO]
+      b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff
+         '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+           Reader (Pool p), Error BeamError, Error PABError, IO]
+         b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff
+     '[DelayEffect, IO, BeamEffect dbt, Reader (Pool p),
+       Error BeamError, Error PABError, IO]
+     b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(LogMsg (PABMultiAgentMsg (Builtin a))
+ ~&gt; Eff
+      '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+        Reader (Pool p), Error BeamError, Error PABError, IO])
+-&gt; Eff
+     '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+       BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+       IO]
+   ~&gt; Eff
+        '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+          Reader (Pool p), Error BeamError, Error PABError, IO]
+forall (f :: * -&gt; *) (g :: * -&gt; *) (effs :: [* -&gt; *]).
+(f ~&gt; Eff (g : effs)) -&gt; Eff (f : effs) ~&gt; Eff (g : effs)
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">reinterpret</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(PABMultiAgentMsg (Builtin a) -&gt; PABLogMsg (Builtin a))
+-&gt; LogMsg (PABMultiAgentMsg (Builtin a))
+   ~&gt; Eff
+        '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+          Reader (Pool p), Error BeamError, Error PABError, IO]
+forall a b (effs :: [* -&gt; *]).
+Member (LogMsg b) effs =&gt;
+(a -&gt; b) -&gt; LogMsg a ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">mapLog</span></a></span><span> </span><span class="annot"><span class="annottext">PABMultiAgentMsg (Builtin a) -&gt; PABLogMsg (Builtin a)
+forall t. PABMultiAgentMsg t -&gt; PABLogMsg t
+</span><a href="Plutus.PAB.Monitoring.PABLogMsg.html#SMultiAgent"><span class="hs-identifier hs-var">SMultiAgent</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="annottext">(Eff
+   '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+     BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+     IO]
+   b
+ -&gt; Eff
+      '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+        Reader (Pool p), Error BeamError, Error PABError, IO]
+      b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff
+         '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+           BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+           IO]
+         b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff
+     '[LogMsg (PABLogMsg (Builtin a)), DelayEffect, IO, BeamEffect dbt,
+       Reader (Pool p), Error BeamError, Error PABError, IO]
+     b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">(ContractStore (Builtin a)
+ ~&gt; Eff
+      '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+        BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+        IO])
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+       Error PABError, IO]
+   ~&gt; Eff
+        '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+          BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+          IO]
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+(eff ~&gt; Eff effs) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpret</span></a></span><span> </span><span class="annot"><span class="annottext">ContractStore (Builtin a)
+~&gt; Eff
+     '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+       BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+       IO]
+</span><a href="#local-6989586621680391603"><span class="hs-identifier hs-var">hContractStore</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="annot"><span class="annottext">(Eff
+   '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+     DelayEffect, IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+     Error PABError, IO]
+   b
+ -&gt; Eff
+      '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+        BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+        IO]
+      b)
+-&gt; (Eff
+      '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+        DelayEffect, IO]
+      b
+    -&gt; Eff
+         '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+           DelayEffect, IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+           Error PABError, IO]
+         b)
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO]
+     b
+-&gt; Eff
+     '[LogMsg (PABMultiAgentMsg (Builtin a)), DelayEffect, IO,
+       BeamEffect dbt, Reader (Pool p), Error BeamError, Error PABError,
+       IO]
+     b
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+    DelayEffect, IO]
+  b
+-&gt; Eff
+     '[ContractStore (Builtin a), LogMsg (PABMultiAgentMsg (Builtin a)),
+       DelayEffect, IO, BeamEffect dbt, Reader (Pool p), Error BeamError,
+       Error PABError, IO]
+     b
+forall (effs :: [* -&gt; *]) (as :: [* -&gt; *]).
+CanWeakenEnd as effs =&gt;
+Eff as ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">Modify.raiseEnd</span></a></span><span>
+</span><span id="line-85"></span></pre></body></html>

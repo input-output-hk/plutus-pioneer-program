@@ -1,0 +1,224 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric      #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts   #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE MonoLocalBinds     #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns     #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell    #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators      #-}</span><span>
+</span><span id="line-11"></span><span class="hs-comment">{-
+
+This module defines an STO that allocates coins to anyone who
+
+* Presents a specific credential token (one that has been issued by a specific
+  credential authority with a specific name) and
+* Pays 1 Lovelace to a predefined public key address for every coin minted
+
+The supply (number of tokens created) of the STO is unlimited. This is done so
+that we do not need a state machine and can participate in the STO with a single
+transaction. In a more realistic setting we would also need constraints on the
+validity range of the minting transaction.
+
+-}</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Prism.STO</span><span class="hs-special">(</span><span>
+</span><span id="line-26"></span><span>    </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier">STOData</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#policy"><span class="hs-identifier">policy</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#coins"><span class="hs-identifier">coins</span></a></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ada</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Lovelace</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">fromValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Address</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">PaymentPubKeyHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">unPaymentPubKeyHash</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TokenName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Value</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Plutus.Script.Utils.Typed</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Plutus.Script.Utils.V1.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Api</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">ScriptContext</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">ScriptPurpose</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Contexts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><a href="../file:///nix/store/060c917ifnxxqp0dw4bnd10flh56ficy-validation-selective-lib-validation-selective-0.1.0.2-haddock-doc/share/doc/validation-selective/html/src"><span class="hs-identifier">Validation</span></a></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span id="local-6989586621680977020"><span id="local-6989586621680977021"></span></span><span class="hs-keyword">data</span><span> </span><span id="STOData"><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-var">STOData</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-47"></span><span>    </span><span id="STOData"><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-var">STOData</span></a></span></span><span>
+</span><span id="line-48"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="stoIssuer"><span class="annot"><span class="annottext">STOData -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Prism.STO.html#stoIssuer"><span class="hs-identifier hs-var hs-var">stoIssuer</span></a></span></span><span>          </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-49"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="stoTokenName"><span class="annot"><span class="annottext">STOData -&gt; TokenName
+</span><a href="Plutus.Contracts.Prism.STO.html#stoTokenName"><span class="hs-identifier hs-var hs-var">stoTokenName</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span>
+</span><span id="line-50"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="stoCredentialToken"><span class="annot"><span class="annottext">STOData -&gt; Value
+</span><a href="Plutus.Contracts.Prism.STO.html#stoCredentialToken"><span class="hs-identifier hs-var hs-var">stoCredentialToken</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-51"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. STOData -&gt; Rep STOData x)
+-&gt; (forall x. Rep STOData x -&gt; STOData) -&gt; Generic STOData
+forall x. Rep STOData x -&gt; STOData
+forall x. STOData -&gt; Rep STOData x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep STOData x -&gt; STOData
+$cfrom :: forall x. STOData -&gt; Rep STOData x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680977009"><span id="local-6989586621680977011"><span class="annot"><span class="annottext">STOData -&gt; STOData -&gt; Bool
+(STOData -&gt; STOData -&gt; Bool)
+-&gt; (STOData -&gt; STOData -&gt; Bool) -&gt; Eq STOData
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: STOData -&gt; STOData -&gt; Bool
+$c/= :: STOData -&gt; STOData -&gt; Bool
+== :: STOData -&gt; STOData -&gt; Bool
+$c== :: STOData -&gt; STOData -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680977002"><span id="local-6989586621680977004"><span id="local-6989586621680977006"><span class="annot"><span class="annottext">Int -&gt; STOData -&gt; ShowS
+[STOData] -&gt; ShowS
+STOData -&gt; String
+(Int -&gt; STOData -&gt; ShowS)
+-&gt; (STOData -&gt; String) -&gt; ([STOData] -&gt; ShowS) -&gt; Show STOData
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [STOData] -&gt; ShowS
+$cshowList :: [STOData] -&gt; ShowS
+show :: STOData -&gt; String
+$cshow :: STOData -&gt; String
+showsPrec :: Int -&gt; STOData -&gt; ShowS
+$cshowsPrec :: Int -&gt; STOData -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680976993"><span id="local-6989586621680976995"><span id="local-6989586621680976997"><span id="local-6989586621680976999"><span class="annot"><span class="annottext">[STOData] -&gt; Encoding
+[STOData] -&gt; Value
+STOData -&gt; Encoding
+STOData -&gt; Value
+(STOData -&gt; Value)
+-&gt; (STOData -&gt; Encoding)
+-&gt; ([STOData] -&gt; Value)
+-&gt; ([STOData] -&gt; Encoding)
+-&gt; ToJSON STOData
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [STOData] -&gt; Encoding
+$ctoEncodingList :: [STOData] -&gt; Encoding
+toJSONList :: [STOData] -&gt; Value
+$ctoJSONList :: [STOData] -&gt; Value
+toEncoding :: STOData -&gt; Encoding
+$ctoEncoding :: STOData -&gt; Encoding
+toJSON :: STOData -&gt; Value
+$ctoJSON :: STOData -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680976988"><span id="local-6989586621680976990"><span class="annot"><span class="annottext">Value -&gt; Parser [STOData]
+Value -&gt; Parser STOData
+(Value -&gt; Parser STOData)
+-&gt; (Value -&gt; Parser [STOData]) -&gt; FromJSON STOData
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [STOData]
+$cparseJSONList :: Value -&gt; Parser [STOData]
+parseJSON :: Value -&gt; Parser STOData
+$cparseJSON :: Value -&gt; Parser STOData
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#validateSTO"><span class="hs-pragma hs-type">validateSTO</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-56"></span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#validateSTO"><span class="hs-identifier hs-type">validateSTO</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-type">STOData</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptContext</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-57"></span><span id="validateSTO"><span class="annot"><span class="annottext">validateSTO :: STOData -&gt; () -&gt; ScriptContext -&gt; Bool
+</span><a href="Plutus.Contracts.Prism.STO.html#validateSTO"><span class="hs-identifier hs-var hs-var">validateSTO</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-type">STOData</span></a></span><span class="hs-special">{</span><span id="local-6989586621680976985"><span class="annot"><span class="annottext">PaymentPubKeyHash
+stoIssuer :: PaymentPubKeyHash
+stoIssuer :: STOData -&gt; PaymentPubKeyHash
+</span><a href="#local-6989586621680976985"><span class="hs-identifier hs-var hs-var">stoIssuer</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621680976984"><span class="annot"><span class="annottext">Value
+stoCredentialToken :: Value
+stoCredentialToken :: STOData -&gt; Value
+</span><a href="#local-6989586621680976984"><span class="hs-identifier hs-var hs-var">stoCredentialToken</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621680976983"><span class="annot"><span class="annottext">TokenName
+stoTokenName :: TokenName
+stoTokenName :: STOData -&gt; TokenName
+</span><a href="#local-6989586621680976983"><span class="hs-identifier hs-var hs-var">stoTokenName</span></a></span></span><span class="hs-special">}</span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptContext</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">scriptContextTxInfo :: ScriptContext -&gt; TxInfo
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">scriptContextTxInfo</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680976980"><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680976980"><span class="hs-identifier hs-var">txInfo</span></a></span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">scriptContextPurpose :: ScriptContext -&gt; ScriptPurpose
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">scriptContextPurpose</span></a></span><span class="hs-glyph">=</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Minting</span></a></span><span> </span><span id="local-6989586621680976977"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680976977"><span class="hs-identifier hs-var">ownHash</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680976976"><span class="annot"><span class="annottext">tokenOK :: Bool
+</span><a href="#local-6989586621680976976"><span class="hs-identifier hs-var hs-var">tokenOK</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680976984"><span class="hs-identifier hs-var">stoCredentialToken</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Value -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-operator hs-var">`Value.leq`</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; Value
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Validation.valueSpent</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680976980"><span class="hs-identifier hs-var">txInfo</span></a></span><span>
+</span><span id="line-59"></span><span>        </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Lovelace</span></a></span><span> </span><span id="local-6989586621680976973"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680976973"><span class="hs-identifier hs-var">paidToIssuer</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value -&gt; Ada
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">fromValue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxInfo -&gt; PubKeyHash -&gt; Value
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Validation.valuePaidTo</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680976980"><span class="hs-identifier hs-var">txInfo</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; PubKeyHash
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var hs-var">unPaymentPubKeyHash</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680976985"><span class="hs-identifier hs-var">stoIssuer</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>        </span><span id="local-6989586621680976971"><span class="annot"><span class="annottext">mintOK :: Bool
+</span><a href="#local-6989586621680976971"><span class="hs-identifier hs-var hs-var">mintOK</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-61"></span><span>            </span><span class="hs-comment">-- Note that this doesn't prevent any tokens with a name other than</span><span>
+</span><span id="line-62"></span><span>            </span><span class="hs-comment">-- 'stoTokenName' from being minted</span><span>
+</span><span id="line-63"></span><span>            </span><span class="annot"><span class="annottext">Value -&gt; CurrencySymbol -&gt; TokenName -&gt; Integer
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Value.valueOf</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxInfo -&gt; Value
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">Validation.txInfoMint</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680976980"><span class="hs-identifier hs-var">txInfo</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680976977"><span class="hs-identifier hs-var">ownHash</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680976983"><span class="hs-identifier hs-var">stoTokenName</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680976973"><span class="hs-identifier hs-var">paidToIssuer</span></a></span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621680976976"><span class="hs-identifier hs-var">tokenOK</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621680976971"><span class="hs-identifier hs-var">mintOK</span></a></span><span>
+</span><span id="line-65"></span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#validateSTO"><span class="hs-identifier hs-var">validateSTO</span></a></span><span> </span><span class="annot"><span class="annottext">STOData
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ScriptContext
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; Bool
+forall a. () -&gt; a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#policy"><span class="hs-identifier hs-type">policy</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-type">STOData</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Scripts.MintingPolicy</span></a></span><span>
+</span><span id="line-68"></span><span id="policy"><span class="annot"><span class="annottext">policy :: STOData -&gt; MintingPolicy
+</span><a href="Plutus.Contracts.Prism.STO.html#policy"><span class="hs-identifier hs-var hs-var">policy</span></a></span></span><span> </span><span id="local-6989586621680976965"><span class="annot"><span class="annottext">STOData
+</span><a href="#local-6989586621680976965"><span class="hs-identifier hs-var">stoData</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ()) -&gt; MintingPolicy
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Scripts.mkMintingPolicyScript</span></a></span><span> </span><span class="annot"><span class="annottext">(CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ()) -&gt; MintingPolicy)
+-&gt; CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ()) -&gt; MintingPolicy
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">c</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Scripts.mkUntypedMintingPolicy</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">validateSTO</span><span> </span><span class="hs-identifier">c</span><span class="hs-special">)</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CompiledCode (STOData -&gt; BuiltinData -&gt; BuiltinData -&gt; ())
+-&gt; CompiledCodeIn DefaultUni DefaultFun STOData
+-&gt; CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ())
+forall (uni :: * -&gt; *) fun a b.
+(Closed uni, Everywhere uni Flat, Flat fun,
+ Everywhere uni PrettyConst, GShow uni, Pretty fun) =&gt;
+CompiledCodeIn uni fun (a -&gt; b)
+-&gt; CompiledCodeIn uni fun a -&gt; CompiledCodeIn uni fun b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">`PlutusTx.applyCode`</span></a></span><span> </span><span class="annot"><span class="annottext">STOData -&gt; CompiledCodeIn DefaultUni DefaultFun STOData
+forall (uni :: * -&gt; *) a fun.
+(Lift uni a, Throwable uni fun, Typecheckable uni fun) =&gt;
+a -&gt; CompiledCodeIn uni fun a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">PlutusTx.liftCode</span></a></span><span> </span><span class="annot"><span class="annottext">STOData
+</span><a href="#local-6989586621680976965"><span class="hs-identifier hs-var">stoData</span></a></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- | A 'Value' of a number of coins issued in the STO</span><span>
+</span><span id="line-72"></span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#coins"><span class="hs-identifier hs-type">coins</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-type">STOData</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-73"></span><span id="coins"><span class="annot"><span class="annottext">coins :: STOData -&gt; Integer -&gt; Value
+</span><a href="Plutus.Contracts.Prism.STO.html#coins"><span class="hs-identifier hs-var hs-var">coins</span></a></span></span><span> </span><span id="local-6989586621680976957"><span class="annot"><span class="annottext">d :: STOData
+</span><a href="#local-6989586621680976957"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-type">STOData</span></a></span><span class="hs-special">{</span><span id="local-6989586621680976956"><span class="annot"><span class="annottext">TokenName
+stoTokenName :: TokenName
+stoTokenName :: STOData -&gt; TokenName
+</span><a href="#local-6989586621680976956"><span class="hs-identifier hs-var hs-var">stoTokenName</span></a></span></span><span class="hs-special">}</span><span> </span><span id="local-6989586621680976955"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680976955"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680976954"><span class="annot"><span class="annottext">sym :: CurrencySymbol
+</span><a href="#local-6989586621680976954"><span class="hs-identifier hs-var hs-var">sym</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MintingPolicyHash -&gt; CurrencySymbol
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Value.mpsSymbol</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">MintingPolicy -&gt; MintingPolicyHash
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mintingPolicyHash</span></a></span><span> </span><span class="annot"><span class="annottext">(MintingPolicy -&gt; MintingPolicyHash)
+-&gt; MintingPolicy -&gt; MintingPolicyHash
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">STOData -&gt; MintingPolicy
+</span><a href="Plutus.Contracts.Prism.STO.html#policy"><span class="hs-identifier hs-var">policy</span></a></span><span> </span><span class="annot"><span class="annottext">STOData
+</span><a href="#local-6989586621680976957"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; TokenName -&gt; Integer -&gt; Value
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Value.singleton</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680976954"><span class="hs-identifier hs-var">sym</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680976956"><span class="hs-identifier hs-var">stoTokenName</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680976955"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span id="local-6989586621680976947"><span id="local-6989586621680976949"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">STOData</span></span></span><span>
+</span><span id="line-78"></span><span id="local-6989586621680976937"><span id="local-6989586621680976939"><span id="local-6989586621680976941"><span class="hs-identifier">PlutusTx.unstableMakeIsData</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">STOData</span></span></span></span><span>
+</span><span id="line-79"></span></pre></body></html>

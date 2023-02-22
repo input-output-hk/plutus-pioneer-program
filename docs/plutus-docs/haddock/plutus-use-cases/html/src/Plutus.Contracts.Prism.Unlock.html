@@ -1,0 +1,772 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns     #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude  #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell    #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies       #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators      #-}</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- | Two sample that unlock some funds by presenting the credentials.</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--   * 'subscribeSTO' uses the credential to participate in an STO</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--   * 'unlockExchange' uses the credential to take ownership of funds that</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--     were locked by an exchange.</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Prism.Unlock</span><span class="hs-special">(</span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><span class="hs-comment">-- * STO</span></span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier">STOSubscriber</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriberSchema"><span class="hs-identifier">STOSubscriberSchema</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#subscribeSTO"><span class="hs-identifier">subscribeSTO</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Exchange</span></span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockExchangeSchema"><span class="hs-identifier">UnlockExchangeSchema</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#unlockExchange"><span class="hs-identifier">unlockExchange</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Errors etc.</span></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier">UnlockError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">makeClassyPrisms</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">forever</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ada</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Address</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">PaymentPubKeyHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">ScriptLookups</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">SomeLookupsAndConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">TxConstraints</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Tx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">getCardanoTxId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TokenName</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract.StateMachine</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">InvalidTransition</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">SMContractError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">StateMachine</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">StateMachineTransition</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract.StateMachine</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">SM</span></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html"><span class="hs-identifier">Plutus.Contracts.Prism.Credential</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier">Credential</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html"><span class="hs-identifier">Plutus.Contracts.Prism.Credential</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Credential</span></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html"><span class="hs-identifier">Plutus.Contracts.Prism.STO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier">STOData</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.STO.html"><span class="hs-identifier">Plutus.Contracts.Prism.STO</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">STO</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html"><span class="hs-identifier">Plutus.Contracts.Prism.StateMachine</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier">IDAction</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#PresentCredential"><span class="hs-identifier">PresentCredential</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier">IDState</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier">UserCredential</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html"><span class="hs-identifier">Plutus.Contracts.Prism.StateMachine</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">StateMachine</span></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.TokenAccount.html"><span class="hs-identifier">Plutus.Contracts.TokenAccount</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.TokenAccount.html#TokenAccountError"><span class="hs-identifier">TokenAccountError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.Contracts.TokenAccount.html"><span class="hs-identifier">Plutus.Contracts.TokenAccount</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">TokenAccount</span></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">Schema</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">ToSchema</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span id="local-6989586621680981328"><span id="local-6989586621680981329"></span></span><span class="hs-keyword">data</span><span> </span><span id="STOSubscriber"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier hs-var">STOSubscriber</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-52"></span><span>    </span><span id="STOSubscriber"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier hs-var">STOSubscriber</span></a></span></span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="wCredential"><span class="annot"><span class="annottext">STOSubscriber -&gt; Credential
+</span><a href="Plutus.Contracts.Prism.Unlock.html#wCredential"><span class="hs-identifier hs-var hs-var">wCredential</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier hs-type">Credential</span></a></span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="wSTOIssuer"><span class="annot"><span class="annottext">STOSubscriber -&gt; PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Prism.Unlock.html#wSTOIssuer"><span class="hs-identifier hs-var hs-var">wSTOIssuer</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span>
+</span><span id="line-55"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="wSTOTokenName"><span class="annot"><span class="annottext">STOSubscriber -&gt; TokenName
+</span><a href="Plutus.Contracts.Prism.Unlock.html#wSTOTokenName"><span class="hs-identifier hs-var hs-var">wSTOTokenName</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span>
+</span><span id="line-56"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="wSTOAmount"><span class="annot"><span class="annottext">STOSubscriber -&gt; Integer
+</span><a href="Plutus.Contracts.Prism.Unlock.html#wSTOAmount"><span class="hs-identifier hs-var hs-var">wSTOAmount</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-57"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. STOSubscriber -&gt; Rep STOSubscriber x)
+-&gt; (forall x. Rep STOSubscriber x -&gt; STOSubscriber)
+-&gt; Generic STOSubscriber
+forall x. Rep STOSubscriber x -&gt; STOSubscriber
+forall x. STOSubscriber -&gt; Rep STOSubscriber x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep STOSubscriber x -&gt; STOSubscriber
+$cfrom :: forall x. STOSubscriber -&gt; Rep STOSubscriber x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981316"><span id="local-6989586621680981318"><span class="annot"><span class="annottext">STOSubscriber -&gt; STOSubscriber -&gt; Bool
+(STOSubscriber -&gt; STOSubscriber -&gt; Bool)
+-&gt; (STOSubscriber -&gt; STOSubscriber -&gt; Bool) -&gt; Eq STOSubscriber
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: STOSubscriber -&gt; STOSubscriber -&gt; Bool
+$c/= :: STOSubscriber -&gt; STOSubscriber -&gt; Bool
+== :: STOSubscriber -&gt; STOSubscriber -&gt; Bool
+$c== :: STOSubscriber -&gt; STOSubscriber -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981309"><span id="local-6989586621680981311"><span id="local-6989586621680981313"><span class="annot"><span class="annottext">Int -&gt; STOSubscriber -&gt; ShowS
+[STOSubscriber] -&gt; ShowS
+STOSubscriber -&gt; String
+(Int -&gt; STOSubscriber -&gt; ShowS)
+-&gt; (STOSubscriber -&gt; String)
+-&gt; ([STOSubscriber] -&gt; ShowS)
+-&gt; Show STOSubscriber
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [STOSubscriber] -&gt; ShowS
+$cshowList :: [STOSubscriber] -&gt; ShowS
+show :: STOSubscriber -&gt; String
+$cshow :: STOSubscriber -&gt; String
+showsPrec :: Int -&gt; STOSubscriber -&gt; ShowS
+$cshowsPrec :: Int -&gt; STOSubscriber -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680981300"><span id="local-6989586621680981302"><span id="local-6989586621680981304"><span id="local-6989586621680981306"><span class="annot"><span class="annottext">[STOSubscriber] -&gt; Encoding
+[STOSubscriber] -&gt; Value
+STOSubscriber -&gt; Encoding
+STOSubscriber -&gt; Value
+(STOSubscriber -&gt; Value)
+-&gt; (STOSubscriber -&gt; Encoding)
+-&gt; ([STOSubscriber] -&gt; Value)
+-&gt; ([STOSubscriber] -&gt; Encoding)
+-&gt; ToJSON STOSubscriber
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [STOSubscriber] -&gt; Encoding
+$ctoEncodingList :: [STOSubscriber] -&gt; Encoding
+toJSONList :: [STOSubscriber] -&gt; Value
+$ctoJSONList :: [STOSubscriber] -&gt; Value
+toEncoding :: STOSubscriber -&gt; Encoding
+$ctoEncoding :: STOSubscriber -&gt; Encoding
+toJSON :: STOSubscriber -&gt; Value
+$ctoJSON :: STOSubscriber -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981295"><span id="local-6989586621680981297"><span class="annot"><span class="annottext">Value -&gt; Parser [STOSubscriber]
+Value -&gt; Parser STOSubscriber
+(Value -&gt; Parser STOSubscriber)
+-&gt; (Value -&gt; Parser [STOSubscriber]) -&gt; FromJSON STOSubscriber
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [STOSubscriber]
+$cparseJSONList :: Value -&gt; Parser [STOSubscriber]
+parseJSON :: Value -&gt; Parser STOSubscriber
+$cparseJSON :: Value -&gt; Parser STOSubscriber
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981292"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema STOSubscriber
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="../../../../playground-common/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">type</span><span> </span><span id="STOSubscriberSchema"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriberSchema"><span class="hs-identifier hs-var">STOSubscriberSchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;sto&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier hs-type">STOSubscriber</span></a></span><span>
+</span><span id="line-62"></span><span>
+</span><span id="line-63"></span><span class="hs-comment">-- | Obtain a token from the credential manager app,</span><span>
+</span><span id="line-64"></span><span class="hs-comment">--   then participate in the STO</span><span>
+</span><span id="line-65"></span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#subscribeSTO"><span class="hs-identifier hs-type">subscribeSTO</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680981289"><span class="annot"><a href="#local-6989586621680981289"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680981288"><span class="annot"><a href="#local-6989586621680981288"><span class="hs-identifier hs-type">s</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">HasEndpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;sto&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier hs-type">STOSubscriber</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981288"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981289"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981288"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-type">UnlockError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span id="subscribeSTO"><span class="annot"><span class="annottext">subscribeSTO :: Contract w s UnlockError ()
+</span><a href="Plutus.Contracts.Prism.Unlock.html#subscribeSTO"><span class="hs-identifier hs-var hs-var">subscribeSTO</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Contract w s UnlockError () -&gt; Contract w s UnlockError ()
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forever</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract w s UnlockError () -&gt; Contract w s UnlockError ())
+-&gt; Contract w s UnlockError () -&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(UnlockError -&gt; Contract w s UnlockError ())
+-&gt; Contract w s UnlockError () -&gt; Contract w s UnlockError ()
+forall w (s :: Row *) e e' a.
+(e -&gt; Contract w s e' a) -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">handleError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Contract w s UnlockError ()
+-&gt; UnlockError -&gt; Contract w s UnlockError ()
+forall a b. a -&gt; b -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract w s UnlockError ()
+ -&gt; UnlockError -&gt; Contract w s UnlockError ())
+-&gt; Contract w s UnlockError ()
+-&gt; UnlockError
+-&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">() -&gt; Contract w s UnlockError ()
+forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Contract w s UnlockError () -&gt; Contract w s UnlockError ())
+-&gt; Contract w s UnlockError () -&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Promise w s UnlockError () -&gt; Contract w s UnlockError ()
+forall w (s :: Row *) e a. Promise w s e a -&gt; Contract w s e a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var">awaitPromise</span></a></span><span> </span><span class="annot"><span class="annottext">(Promise w s UnlockError () -&gt; Contract w s UnlockError ())
+-&gt; Promise w s UnlockError () -&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;sto&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;sto&quot;</span></span><span> </span><span class="annot"><span class="annottext">((STOSubscriber -&gt; Contract w s UnlockError ())
+ -&gt; Promise w s UnlockError ())
+-&gt; (STOSubscriber -&gt; Contract w s UnlockError ())
+-&gt; Promise w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#STOSubscriber"><span class="hs-identifier hs-type">STOSubscriber</span></a></span><span class="hs-special">{</span><span id="local-6989586621680981283"><span class="annot"><span class="annottext">Credential
+wCredential :: Credential
+wCredential :: STOSubscriber -&gt; Credential
+</span><a href="#local-6989586621680981283"><span class="hs-identifier hs-var hs-var">wCredential</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981282"><span class="annot"><span class="annottext">PaymentPubKeyHash
+wSTOIssuer :: PaymentPubKeyHash
+wSTOIssuer :: STOSubscriber -&gt; PaymentPubKeyHash
+</span><a href="#local-6989586621680981282"><span class="hs-identifier hs-var hs-var">wSTOIssuer</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981281"><span class="annot"><span class="annottext">TokenName
+wSTOTokenName :: TokenName
+wSTOTokenName :: STOSubscriber -&gt; TokenName
+</span><a href="#local-6989586621680981281"><span class="hs-identifier hs-var hs-var">wSTOTokenName</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981280"><span class="annot"><span class="annottext">Integer
+wSTOAmount :: Integer
+wSTOAmount :: STOSubscriber -&gt; Integer
+</span><a href="#local-6989586621680981280"><span class="hs-identifier hs-var hs-var">wSTOAmount</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-71"></span><span>        </span><span class="hs-special">(</span><span id="local-6989586621680981279"><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981279"><span class="hs-identifier hs-var">credConstraints</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981278"><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981278"><span class="hs-identifier hs-var">credLookups</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Credential
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+forall w (s :: Row *).
+Credential
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+</span><a href="Plutus.Contracts.Prism.Unlock.html#obtainCredentialTokenData"><span class="hs-identifier hs-var">obtainCredentialTokenData</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981283"><span class="hs-identifier hs-var">wCredential</span></a></span><span>
+</span><span id="line-72"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680981276"><span class="annot"><span class="annottext">stoData :: STOData
+</span><a href="#local-6989586621680981276"><span class="hs-identifier hs-var hs-var">stoData</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-73"></span><span>                </span><span class="annot"><span class="annottext">STOData :: PaymentPubKeyHash -&gt; TokenName -&gt; Value -&gt; STOData
+</span><a href="Plutus.Contracts.Prism.STO.html#STOData"><span class="hs-identifier hs-type">STOData</span></a></span><span>
+</span><span id="line-74"></span><span>                    </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">stoIssuer :: PaymentPubKeyHash
+</span><a href="Plutus.Contracts.Prism.STO.html#stoIssuer"><span class="hs-identifier hs-var">stoIssuer</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680981282"><span class="hs-identifier hs-var">wSTOIssuer</span></a></span><span>
+</span><span id="line-75"></span><span>                    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">stoTokenName :: TokenName
+</span><a href="Plutus.Contracts.Prism.STO.html#stoTokenName"><span class="hs-identifier hs-var">stoTokenName</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680981281"><span class="hs-identifier hs-var">wSTOTokenName</span></a></span><span>
+</span><span id="line-76"></span><span>                    </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">stoCredentialToken :: Value
+</span><a href="Plutus.Contracts.Prism.STO.html#stoCredentialToken"><span class="hs-identifier hs-var">stoCredentialToken</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Credential -&gt; Value
+</span><a href="Plutus.Contracts.Prism.Credential.html#token"><span class="hs-identifier hs-var">Credential.token</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981283"><span class="hs-identifier hs-var">wCredential</span></a></span><span>
+</span><span id="line-77"></span><span>                    </span><span class="hs-special">}</span><span>
+</span><span id="line-78"></span><span>            </span><span id="local-6989586621680981270"><span class="annot"><span class="annottext">stoCoins :: Value
+</span><a href="#local-6989586621680981270"><span class="hs-identifier hs-var hs-var">stoCoins</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">STOData -&gt; Integer -&gt; Value
+</span><a href="Plutus.Contracts.Prism.STO.html#coins"><span class="hs-identifier hs-var">STO.coins</span></a></span><span> </span><span class="annot"><span class="annottext">STOData
+</span><a href="#local-6989586621680981276"><span class="hs-identifier hs-var">stoData</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680981280"><span class="hs-identifier hs-var">wSTOAmount</span></a></span><span>
+</span><span id="line-79"></span><span>            </span><span id="local-6989586621680981268"><span class="annot"><span class="annottext">constraints :: TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981268"><span class="hs-identifier hs-var hs-var">constraints</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-80"></span><span>                </span><span class="annot"><span class="annottext">Value -&gt; TxConstraints IDAction IDState
+forall i o. Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustMintValue</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680981270"><span class="hs-identifier hs-var">stoCoins</span></a></span><span>
+</span><span id="line-81"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+-&gt; TxConstraints IDAction IDState -&gt; TxConstraints IDAction IDState
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; Value -&gt; TxConstraints IDAction IDState
+forall i o. PaymentPubKeyHash -&gt; Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustPayToPubKey</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash
+</span><a href="#local-6989586621680981282"><span class="hs-identifier hs-var">wSTOIssuer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.lovelaceValueOf</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680981280"><span class="hs-identifier hs-var">wSTOAmount</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+-&gt; TxConstraints IDAction IDState -&gt; TxConstraints IDAction IDState
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981279"><span class="hs-identifier hs-var">credConstraints</span></a></span><span>
+</span><span id="line-83"></span><span>            </span><span id="local-6989586621680981264"><span class="annot"><span class="annottext">lookups :: ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981264"><span class="hs-identifier hs-var hs-var">lookups</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-84"></span><span>                </span><span class="annot"><span class="annottext">MintingPolicy -&gt; ScriptLookups (StateMachine IDState IDAction)
+forall a. MintingPolicy -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.plutusV1MintingPolicy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">STOData -&gt; MintingPolicy
+</span><a href="Plutus.Contracts.Prism.STO.html#policy"><span class="hs-identifier hs-var">STO.policy</span></a></span><span> </span><span class="annot"><span class="annottext">STOData
+</span><a href="#local-6989586621680981276"><span class="hs-identifier hs-var">stoData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>                </span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+-&gt; ScriptLookups (StateMachine IDState IDAction)
+-&gt; ScriptLookups (StateMachine IDState IDAction)
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981278"><span class="hs-identifier hs-var">credLookups</span></a></span><span>
+</span><span id="line-86"></span><span>        </span><span class="annot"><span class="annottext">(ContractError -&gt; UnlockError)
+-&gt; Contract w s ContractError () -&gt; Contract w s UnlockError ()
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">ContractError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawTxError"><span class="hs-identifier hs-var">WithdrawTxError</span></a></span><span>
+</span><span id="line-87"></span><span>            </span><span class="annot"><span class="annottext">(Contract w s ContractError () -&gt; Contract w s UnlockError ())
+-&gt; Contract w s ContractError () -&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+-&gt; TxConstraints
+     (RedeemerType (StateMachine IDState IDAction))
+     (DatumType (StateMachine IDState IDAction))
+-&gt; Contract w s ContractError CardanoTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitTxConstraintsWith</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981264"><span class="hs-identifier hs-var">lookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints
+  (RedeemerType (StateMachine IDState IDAction))
+  (DatumType (StateMachine IDState IDAction))
+TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981268"><span class="hs-identifier hs-var">constraints</span></a></span><span> </span><span class="annot"><span class="annottext">Contract w s ContractError CardanoTx
+-&gt; (CardanoTx -&gt; Contract w s ContractError ())
+-&gt; Contract w s ContractError ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">TxId -&gt; Contract w s ContractError ()
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+TxId -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">awaitTxConfirmed</span></a></span><span> </span><span class="annot"><span class="annottext">(TxId -&gt; Contract w s ContractError ())
+-&gt; (CardanoTx -&gt; TxId)
+-&gt; CardanoTx
+-&gt; Contract w s ContractError ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="hs-keyword">type</span><span> </span><span id="UnlockExchangeSchema"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockExchangeSchema"><span class="hs-identifier hs-var">UnlockExchangeSchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;unlock from exchange&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier hs-type">Credential</span></a></span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="hs-comment">-- | Obtain a token from the credential manager app,</span><span>
+</span><span id="line-92"></span><span class="hs-comment">--   then use it to unlock funds that were locked by an exchange.</span><span>
+</span><span id="line-93"></span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#unlockExchange"><span class="hs-identifier hs-type">unlockExchange</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680981256"><span class="annot"><a href="#local-6989586621680981256"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680981255"><span class="annot"><a href="#local-6989586621680981255"><span class="hs-identifier hs-type">s</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">HasEndpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;unlock from exchange&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier hs-type">Credential</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981255"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981256"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981255"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-type">UnlockError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span id="unlockExchange"><span class="annot"><span class="annottext">unlockExchange :: Contract w s UnlockError ()
+</span><a href="Plutus.Contracts.Prism.Unlock.html#unlockExchange"><span class="hs-identifier hs-var hs-var">unlockExchange</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Promise w s UnlockError () -&gt; Contract w s UnlockError ()
+forall w (s :: Row *) e a. Promise w s e a -&gt; Contract w s e a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var">awaitPromise</span></a></span><span> </span><span class="annot"><span class="annottext">(Promise w s UnlockError () -&gt; Contract w s UnlockError ())
+-&gt; Promise w s UnlockError () -&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;unlock from exchange&quot; a s, AsContractError e,
+ FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;unlock from exchange&quot;</span></span><span> </span><span class="annot"><span class="annottext">((Credential -&gt; Contract w s UnlockError ())
+ -&gt; Promise w s UnlockError ())
+-&gt; (Credential -&gt; Contract w s UnlockError ())
+-&gt; Promise w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680981254"><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981254"><span class="hs-identifier hs-var">credential</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-98"></span><span>    </span><span id="local-6989586621680981253"><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621680981253"><span class="hs-identifier hs-var">ownAddr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(ContractError -&gt; UnlockError)
+-&gt; Contract w s ContractError CardanoAddress
+-&gt; Contract w s UnlockError CardanoAddress
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">ContractError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawPkError"><span class="hs-identifier hs-var">WithdrawPkError</span></a></span><span> </span><span class="annot"><span class="annottext">Contract w s ContractError CardanoAddress
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+Contract w s e CardanoAddress
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">ownAddress</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621680981250"><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981250"><span class="hs-identifier hs-var">credConstraints</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981249"><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981249"><span class="hs-identifier hs-var">credLookups</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Credential
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+forall w (s :: Row *).
+Credential
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+</span><a href="Plutus.Contracts.Prism.Unlock.html#obtainCredentialTokenData"><span class="hs-identifier hs-var">obtainCredentialTokenData</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981254"><span class="hs-identifier hs-var">credential</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621680981248"><span class="annot"><span class="annottext">TxConstraints () ()
+</span><a href="#local-6989586621680981248"><span class="hs-identifier hs-var">accConstraints</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981247"><span class="annot"><span class="annottext">ScriptLookups TokenAccount
+</span><a href="#local-6989586621680981247"><span class="hs-identifier hs-var">accLookups</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-101"></span><span>        </span><span class="annot"><span class="annottext">(TokenAccountError -&gt; UnlockError)
+-&gt; Contract
+     w
+     s
+     TokenAccountError
+     (TxConstraints () (), ScriptLookups TokenAccount)
+-&gt; Contract
+     w s UnlockError (TxConstraints () (), ScriptLookups TokenAccount)
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">TokenAccountError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#UnlockExchangeTokenAccError"><span class="hs-identifier hs-var">UnlockExchangeTokenAccError</span></a></span><span>
+</span><span id="line-102"></span><span>        </span><span class="annot"><span class="annottext">(Contract
+   w
+   s
+   TokenAccountError
+   (TxConstraints () (), ScriptLookups TokenAccount)
+ -&gt; Contract
+      w s UnlockError (TxConstraints () (), ScriptLookups TokenAccount))
+-&gt; Contract
+     w
+     s
+     TokenAccountError
+     (TxConstraints () (), ScriptLookups TokenAccount)
+-&gt; Contract
+     w s UnlockError (TxConstraints () (), ScriptLookups TokenAccount)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Account
+-&gt; CardanoAddress
+-&gt; Contract
+     w
+     s
+     TokenAccountError
+     (TxConstraints () (), ScriptLookups TokenAccount)
+forall w (s :: Row *) e.
+AsTokenAccountError e =&gt;
+Account
+-&gt; CardanoAddress
+-&gt; Contract w s e (TxConstraints () (), ScriptLookups TokenAccount)
+</span><a href="Plutus.Contracts.TokenAccount.html#redeemTx"><span class="hs-identifier hs-var">TokenAccount.redeemTx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Credential -&gt; Account
+</span><a href="Plutus.Contracts.Prism.Credential.html#tokenAccount"><span class="hs-identifier hs-var">Credential.tokenAccount</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981254"><span class="hs-identifier hs-var">credential</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621680981253"><span class="hs-identifier hs-var">ownAddr</span></a></span><span>
+</span><span id="line-103"></span><span>    </span><span id="local-6989586621680981243"><span class="annot"><span class="annottext">Params
+</span><a href="#local-6989586621680981243"><span class="hs-identifier hs-var">params</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Contract w s UnlockError Params
+forall w (s :: Row *) e. AsContractError e =&gt; Contract w s e Params
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getParams</span></a></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Params
+-&gt; [SomeLookupsAndConstraints] -&gt; Either MkTxError UnbalancedTx
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mkSomeTx</span></a></span><span> </span><span class="annot"><span class="annottext">Params
+</span><a href="#local-6989586621680981243"><span class="hs-identifier hs-var">params</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+-&gt; TxConstraints
+     (RedeemerType (StateMachine IDState IDAction))
+     (DatumType (StateMachine IDState IDAction))
+-&gt; SomeLookupsAndConstraints
+forall a.
+(FromData (DatumType a), ToData (DatumType a),
+ ToData (RedeemerType a)) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; SomeLookupsAndConstraints
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">SomeLookupsAndConstraints</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981249"><span class="hs-identifier hs-var">credLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints
+  (RedeemerType (StateMachine IDState IDAction))
+  (DatumType (StateMachine IDState IDAction))
+TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981250"><span class="hs-identifier hs-var">credConstraints</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ScriptLookups TokenAccount
+-&gt; TxConstraints
+     (RedeemerType TokenAccount) (DatumType TokenAccount)
+-&gt; SomeLookupsAndConstraints
+forall a.
+(FromData (DatumType a), ToData (DatumType a),
+ ToData (RedeemerType a)) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; SomeLookupsAndConstraints
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">SomeLookupsAndConstraints</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups TokenAccount
+</span><a href="#local-6989586621680981247"><span class="hs-identifier hs-var">accLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints () ()
+TxConstraints (RedeemerType TokenAccount) (DatumType TokenAccount)
+</span><a href="#local-6989586621680981248"><span class="hs-identifier hs-var">accConstraints</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-105"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621680981239"><span class="annot"><span class="annottext">MkTxError
+</span><a href="#local-6989586621680981239"><span class="hs-identifier hs-var">mkTxErr</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UnlockError -&gt; Contract w s UnlockError ()
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">MkTxError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#UnlockMkTxError"><span class="hs-identifier hs-var">UnlockMkTxError</span></a></span><span> </span><span class="annot"><span class="annottext">MkTxError
+</span><a href="#local-6989586621680981239"><span class="hs-identifier hs-var">mkTxErr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621680981236"><span class="annot"><span class="annottext">UnbalancedTx
+</span><a href="#local-6989586621680981236"><span class="hs-identifier hs-var">utx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(ContractError -&gt; UnlockError)
+-&gt; Contract w s ContractError () -&gt; Contract w s UnlockError ()
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">ContractError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawTxError"><span class="hs-identifier hs-var">WithdrawTxError</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract w s ContractError () -&gt; Contract w s UnlockError ())
+-&gt; Contract w s ContractError () -&gt; Contract w s UnlockError ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-107"></span><span>            </span><span id="local-6989586621680981235"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680981235"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">UnbalancedTx -&gt; Contract w s ContractError CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+</span><a href="#local-6989586621680981236"><span class="hs-identifier hs-var">utx</span></a></span><span>
+</span><span id="line-108"></span><span>            </span><span class="annot"><span class="annottext">TxId -&gt; Contract w s ContractError ()
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+TxId -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">awaitTxConfirmed</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680981235"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span class="hs-comment">-- | Get the constraints and script lookups that are needed to construct a</span><span>
+</span><span id="line-111"></span><span class="hs-comment">--   transaction that presents the 'Credential'</span><span>
+</span><span id="line-112"></span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#obtainCredentialTokenData"><span class="hs-identifier hs-type">obtainCredentialTokenData</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680981496"><span class="annot"><a href="#local-6989586621680981496"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680981495"><span class="annot"><a href="#local-6989586621680981495"><span class="hs-identifier hs-type">s</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-113"></span><span>    </span><span class="annot"><a href="Plutus.Contracts.Prism.Credential.html#Credential"><span class="hs-identifier hs-type">Credential</span></a></span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981496"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680981495"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-type">UnlockError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">TxConstraints</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">ScriptLookups</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachine</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-115"></span><span id="obtainCredentialTokenData"><span class="annot"><span class="annottext">obtainCredentialTokenData :: Credential
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+</span><a href="Plutus.Contracts.Prism.Unlock.html#obtainCredentialTokenData"><span class="hs-identifier hs-var hs-var">obtainCredentialTokenData</span></a></span></span><span> </span><span id="local-6989586621680981233"><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981233"><span class="hs-identifier hs-var">credential</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-116"></span><span>    </span><span class="hs-comment">-- credentialManager &lt;- mapError WithdrawEndpointError $ endpoint @&quot;credential manager&quot;</span><span>
+</span><span id="line-117"></span><span>    </span><span id="local-6989586621680981232"><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680981232"><span class="hs-identifier hs-var">userCredential</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(ContractError -&gt; UnlockError)
+-&gt; Contract w s ContractError UserCredential
+-&gt; Contract w s UnlockError UserCredential
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">ContractError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawPkError"><span class="hs-identifier hs-var">WithdrawPkError</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract w s ContractError UserCredential
+ -&gt; Contract w s UnlockError UserCredential)
+-&gt; Contract w s ContractError UserCredential
+-&gt; Contract w s UnlockError UserCredential
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-118"></span><span>        </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; Credential -&gt; Value -&gt; UserCredential
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#UserCredential"><span class="hs-identifier hs-var">UserCredential</span></a></span><span>
+</span><span id="line-119"></span><span>            </span><span class="annot"><span class="annottext">(PaymentPubKeyHash -&gt; Credential -&gt; Value -&gt; UserCredential)
+-&gt; Contract w s ContractError PaymentPubKeyHash
+-&gt; Contract
+     w s ContractError (Credential -&gt; Value -&gt; UserCredential)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Contract w s ContractError PaymentPubKeyHash
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+Contract w s e PaymentPubKeyHash
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">ownFirstPaymentPubKeyHash</span></a></span><span>
+</span><span id="line-120"></span><span>            </span><span class="annot"><span class="annottext">Contract w s ContractError (Credential -&gt; Value -&gt; UserCredential)
+-&gt; Contract w s ContractError Credential
+-&gt; Contract w s ContractError (Value -&gt; UserCredential)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Credential -&gt; Contract w s ContractError Credential
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981233"><span class="hs-identifier hs-var">credential</span></a></span><span>
+</span><span id="line-121"></span><span>            </span><span class="annot"><span class="annottext">Contract w s ContractError (Value -&gt; UserCredential)
+-&gt; Contract w s ContractError Value
+-&gt; Contract w s ContractError UserCredential
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Contract w s ContractError Value
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Credential -&gt; Value
+</span><a href="Plutus.Contracts.Prism.Credential.html#token"><span class="hs-identifier hs-var">Credential.token</span></a></span><span> </span><span class="annot"><span class="annottext">Credential
+</span><a href="#local-6989586621680981233"><span class="hs-identifier hs-var">credential</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-comment">-- Calls the 'PresentCredential' step on the state machine instance and returns the constraints</span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-comment">-- needed to construct a transaction that presents the token.</span><span>
+</span><span id="line-125"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680981228"><span class="annot"><span class="annottext">theClient :: StateMachineClient IDState IDAction
+</span><a href="#local-6989586621680981228"><span class="hs-identifier hs-var hs-var">theClient</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator (StateMachine IDState IDAction)
+-&gt; UserCredential -&gt; StateMachineClient IDState IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#machineClient"><span class="hs-identifier hs-var">StateMachine.machineClient</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UserCredential -&gt; TypedValidator (StateMachine IDState IDAction)
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#typedValidator"><span class="hs-identifier hs-var">StateMachine.typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680981232"><span class="hs-identifier hs-var">userCredential</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">UserCredential
+</span><a href="#local-6989586621680981232"><span class="hs-identifier hs-var">userCredential</span></a></span><span>
+</span><span id="line-126"></span><span>    </span><span id="local-6989586621680981225"><span class="annot"><span class="annottext">Either
+  (InvalidTransition IDState IDAction)
+  (StateMachineTransition IDState IDAction)
+</span><a href="#local-6989586621680981225"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(SMContractError -&gt; UnlockError)
+-&gt; Contract
+     w
+     s
+     SMContractError
+     (Either
+        (InvalidTransition IDState IDAction)
+        (StateMachineTransition IDState IDAction))
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (Either
+        (InvalidTransition IDState IDAction)
+        (StateMachineTransition IDState IDAction))
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="annot"><span class="annottext">SMContractError -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#GetCredentialStateMachineError"><span class="hs-identifier hs-var">GetCredentialStateMachineError</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract
+   w
+   s
+   SMContractError
+   (Either
+      (InvalidTransition IDState IDAction)
+      (StateMachineTransition IDState IDAction))
+ -&gt; Contract
+      w
+      s
+      UnlockError
+      (Either
+         (InvalidTransition IDState IDAction)
+         (StateMachineTransition IDState IDAction)))
+-&gt; Contract
+     w
+     s
+     SMContractError
+     (Either
+        (InvalidTransition IDState IDAction)
+        (StateMachineTransition IDState IDAction))
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (Either
+        (InvalidTransition IDState IDAction)
+        (StateMachineTransition IDState IDAction))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">StateMachineClient IDState IDAction
+-&gt; IDAction
+-&gt; Contract
+     w
+     s
+     SMContractError
+     (Either
+        (InvalidTransition IDState IDAction)
+        (StateMachineTransition IDState IDAction))
+forall w e state (schema :: Row *) input.
+(AsSMContractError e, FromData state, ToData state) =&gt;
+StateMachineClient state input
+-&gt; input
+-&gt; Contract
+     w
+     schema
+     e
+     (Either
+        (InvalidTransition state input)
+        (StateMachineTransition state input))
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">SM.mkStep</span></a></span><span> </span><span class="annot"><span class="annottext">StateMachineClient IDState IDAction
+</span><a href="#local-6989586621680981228"><span class="hs-identifier hs-var">theClient</span></a></span><span> </span><span class="annot"><span class="annottext">IDAction
+</span><a href="Plutus.Contracts.Prism.StateMachine.html#PresentCredential"><span class="hs-identifier hs-var">PresentCredential</span></a></span><span>
+</span><span id="line-127"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either
+  (InvalidTransition IDState IDAction)
+  (StateMachineTransition IDState IDAction)
+</span><a href="#local-6989586621680981225"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-128"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621680981222"><span class="annot"><span class="annottext">InvalidTransition IDState IDAction
+</span><a href="#local-6989586621680981222"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UnlockError
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span> </span><span class="annot"><span class="annottext">(UnlockError
+ -&gt; Contract
+      w
+      s
+      UnlockError
+      (TxConstraints IDAction IDState,
+       ScriptLookups (StateMachine IDState IDAction)))
+-&gt; UnlockError
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">InvalidTransition IDState IDAction -&gt; UnlockError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#GetCredentialTransitionError"><span class="hs-identifier hs-var">GetCredentialTransitionError</span></a></span><span> </span><span class="annot"><span class="annottext">InvalidTransition IDState IDAction
+</span><a href="#local-6989586621680981222"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-129"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">StateMachineTransition</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">smtConstraints :: forall state input.
+StateMachineTransition state input -&gt; TxConstraints input state
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">smtConstraints</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680981218"><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981218"><span class="hs-identifier hs-var">cons</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">smtLookups :: forall state input.
+StateMachineTransition state input
+-&gt; ScriptLookups (StateMachine state input)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">smtLookups</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680981216"><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981216"><span class="hs-identifier hs-var">lookups</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-130"></span><span>            </span><span class="annot"><span class="annottext">(TxConstraints IDAction IDState,
+ ScriptLookups (StateMachine IDState IDAction))
+-&gt; Contract
+     w
+     s
+     UnlockError
+     (TxConstraints IDAction IDState,
+      ScriptLookups (StateMachine IDState IDAction))
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxConstraints IDAction IDState
+</span><a href="#local-6989586621680981218"><span class="hs-identifier hs-var">cons</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ScriptLookups (StateMachine IDState IDAction)
+</span><a href="#local-6989586621680981216"><span class="hs-identifier hs-var">lookups</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span class="hs-comment">---</span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- logs / error</span><span>
+</span><span id="line-134"></span><span class="hs-comment">---</span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span id="local-6989586621680981214"><span id="local-6989586621680981215"></span></span><span class="hs-keyword">data</span><span> </span><span id="UnlockError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-var">UnlockError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-137"></span><span>    </span><span id="WithdrawEndpointError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawEndpointError"><span class="hs-identifier hs-var">WithdrawEndpointError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="WithdrawTxError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawTxError"><span class="hs-identifier hs-var">WithdrawTxError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span>
+</span><span id="line-139"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="WithdrawPkError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#WithdrawPkError"><span class="hs-identifier hs-var">WithdrawPkError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="GetCredentialStateMachineError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#GetCredentialStateMachineError"><span class="hs-identifier hs-var">GetCredentialStateMachineError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">SMContractError</span></a></span><span>
+</span><span id="line-141"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="GetCredentialTransitionError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#GetCredentialTransitionError"><span class="hs-identifier hs-var">GetCredentialTransitionError</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">InvalidTransition</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDState"><span class="hs-identifier hs-type">IDState</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.StateMachine.html#IDAction"><span class="hs-identifier hs-type">IDAction</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-142"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnlockExchangeTokenAccError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockExchangeTokenAccError"><span class="hs-identifier hs-var">UnlockExchangeTokenAccError</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.TokenAccount.html#TokenAccountError"><span class="hs-identifier hs-type">TokenAccountError</span></a></span><span>
+</span><span id="line-143"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="UnlockMkTxError"><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockMkTxError"><span class="hs-identifier hs-var">UnlockMkTxError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-type">Constraints.MkTxError</span></a></span><span>
+</span><span id="line-144"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. UnlockError -&gt; Rep UnlockError x)
+-&gt; (forall x. Rep UnlockError x -&gt; UnlockError)
+-&gt; Generic UnlockError
+forall x. Rep UnlockError x -&gt; UnlockError
+forall x. UnlockError -&gt; Rep UnlockError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep UnlockError x -&gt; UnlockError
+$cfrom :: forall x. UnlockError -&gt; Rep UnlockError x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981207"><span id="local-6989586621680981209"><span class="annot"><span class="annottext">UnlockError -&gt; UnlockError -&gt; Bool
+(UnlockError -&gt; UnlockError -&gt; Bool)
+-&gt; (UnlockError -&gt; UnlockError -&gt; Bool) -&gt; Eq UnlockError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UnlockError -&gt; UnlockError -&gt; Bool
+$c/= :: UnlockError -&gt; UnlockError -&gt; Bool
+== :: UnlockError -&gt; UnlockError -&gt; Bool
+$c== :: UnlockError -&gt; UnlockError -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981201"><span id="local-6989586621680981203"><span id="local-6989586621680981205"><span class="annot"><span class="annottext">Int -&gt; UnlockError -&gt; ShowS
+[UnlockError] -&gt; ShowS
+UnlockError -&gt; String
+(Int -&gt; UnlockError -&gt; ShowS)
+-&gt; (UnlockError -&gt; String)
+-&gt; ([UnlockError] -&gt; ShowS)
+-&gt; Show UnlockError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UnlockError] -&gt; ShowS
+$cshowList :: [UnlockError] -&gt; ShowS
+show :: UnlockError -&gt; String
+$cshow :: UnlockError -&gt; String
+showsPrec :: Int -&gt; UnlockError -&gt; ShowS
+$cshowsPrec :: Int -&gt; UnlockError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-145"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680981193"><span id="local-6989586621680981195"><span id="local-6989586621680981197"><span id="local-6989586621680981199"><span class="annot"><span class="annottext">[UnlockError] -&gt; Encoding
+[UnlockError] -&gt; Value
+UnlockError -&gt; Encoding
+UnlockError -&gt; Value
+(UnlockError -&gt; Value)
+-&gt; (UnlockError -&gt; Encoding)
+-&gt; ([UnlockError] -&gt; Value)
+-&gt; ([UnlockError] -&gt; Encoding)
+-&gt; ToJSON UnlockError
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [UnlockError] -&gt; Encoding
+$ctoEncodingList :: [UnlockError] -&gt; Encoding
+toJSONList :: [UnlockError] -&gt; Value
+$ctoJSONList :: [UnlockError] -&gt; Value
+toEncoding :: UnlockError -&gt; Encoding
+$ctoEncoding :: UnlockError -&gt; Encoding
+toJSON :: UnlockError -&gt; Value
+$ctoJSON :: UnlockError -&gt; Value
+</span><a href="#local-6989586621680981193"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680981189"><span id="local-6989586621680981191"><span class="annot"><span class="annottext">Value -&gt; Parser [UnlockError]
+Value -&gt; Parser UnlockError
+(Value -&gt; Parser UnlockError)
+-&gt; (Value -&gt; Parser [UnlockError]) -&gt; FromJSON UnlockError
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [UnlockError]
+$cparseJSONList :: Value -&gt; Parser [UnlockError]
+parseJSON :: Value -&gt; Parser UnlockError
+$cparseJSON :: Value -&gt; Parser UnlockError
+</span><a href="#local-6989586621680981189"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span id="_UnlockMkTxError"><span id="_UnlockExchangeTokenAccError"><span id="_GetCredentialTransitionError"><span id="_GetCredentialStateMachineError"><span id="_WithdrawPkError"><span id="_WithdrawTxError"><span id="_WithdrawEndpointError"><span id="_UnlockError"><span id="local-6989586621680981166"><span id="local-6989586621680981168"><span id="local-6989586621680981170"><span id="local-6989586621680981172"><span id="local-6989586621680981174"><span id="local-6989586621680981176"><span id="local-6989586621680981178"><span id="local-6989586621680981180"><span id="local-6989586621680981182"><span id="local-6989586621680981183"><span id="local-6989586621680981184"><span id="local-6989586621680981185"><span id="local-6989586621680981186"><span id="local-6989586621680981187"><span id="local-6989586621680981188"><span id="AsUnlockError"><span id="local-6989586621680981401"><span class="hs-identifier">makeClassyPrisms</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">UnlockError</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-148"></span><span>
+</span><span id="line-149"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680981136"><span id="local-6989586621680981138"><span id="local-6989586621680981140"><span id="local-6989586621680981142"><span id="local-6989586621680981144"><span id="local-6989586621680981146"><span id="local-6989586621680981148"><span id="local-6989586621680981150"><span id="local-6989586621680981152"><span id="local-6989586621680981154"><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Prism.Unlock.html#UnlockError"><span class="hs-identifier hs-type">UnlockError</span></a></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-150"></span><span>    </span><span id="local-6989586621680981134"><span class="annot"><span class="annottext">_ContractError :: p ContractError (f ContractError) -&gt; p UnlockError (f UnlockError)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">_ContractError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">p ContractError (f ContractError) -&gt; p UnlockError (f UnlockError)
+forall r. AsUnlockError r =&gt; Prism' r ContractError
+</span><a href="Plutus.Contracts.Prism.Unlock.html#_WithdrawEndpointError"><span class="hs-identifier hs-var">_WithdrawEndpointError</span></a></span><span> </span><span class="annot"><span class="annottext">(p ContractError (f ContractError)
+ -&gt; p UnlockError (f UnlockError))
+-&gt; (p ContractError (f ContractError)
+    -&gt; p ContractError (f ContractError))
+-&gt; p ContractError (f ContractError)
+-&gt; p UnlockError (f UnlockError)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">p ContractError (f ContractError)
+-&gt; p ContractError (f ContractError)
+forall r. AsContractError r =&gt; Prism' r ContractError
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">_ContractError</span></a></span><span>
+</span><span id="line-151"></span></pre></body></html>

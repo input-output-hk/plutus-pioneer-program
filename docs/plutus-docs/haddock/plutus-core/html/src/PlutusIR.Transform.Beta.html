@@ -1,0 +1,306 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE LambdaCase   #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns #-}</span><span>
+</span><span id="line-3"></span><span class="hs-comment">{-|
+A simple beta-reduction pass.
+-}</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusIR.Transform.Beta</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-7"></span><span>  </span><span class="annot"><a href="PlutusIR.Transform.Beta.html#beta"><span class="hs-identifier">beta</span></a></span><span>
+</span><span id="line-8"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.html"><span class="hs-identifier">PlutusIR</span></a></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html"><span class="hs-identifier">PlutusIR.Core.Type</span></a></span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens.Setter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator">(%~)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Function</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator">(&amp;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List.NonEmpty</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">NE</span></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-comment">{- Note [Beta for types]
+We can do beta on type abstractions too, turning them into type-lets. We don't do that because
+a) It can lead to us inlining types too much, which can slow down compilation a lot.
+b) It's currently unsound: https://input-output.atlassian.net/browse/SCP-2570.
+
+We should fix both of these in due course, though.
+-}</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-comment">{- Note [Multi-beta]
+Consider two examples where applying beta should be helpful.
+
+1: [(\x . [(\y . t) b]) a]
+2: [[(\x . (\y . t)) a] b]
+
+(1) is the typical &quot;let-binding&quot; pattern: each binding corresponds to an immediately-applied lambda.
+(2) is the typical &quot;function application&quot; pattern: a multi-argument function applied to multiple arguments.
+
+In both cases we would like to produce something like
+
+let
+  x = a
+  y = b
+in t
+
+However, if we naively do a bottom-up pattern-matching transformation on the AST
+to look for immediately-applied lambda abstractions then we will get the following:
+
+1:
+  [(\x . [(\y . t) b]) a]
+  --&gt;
+  [(\x . let y = b in t) a]
+  -&gt;
+  let x = a in let y = b in t
+
+2:
+  [[(\x . (\y . t)) a] b]
+  --&gt;
+  [(let x = a in (\y . t)) b]
+
+Now, if we later lift the let out, then we will be able to see that we can transform (2) further.
+But that means that a) we'd have to do the expensive let-floating pass in every iteration of the simplifier, and
+b) we can only inline one function argument per iteration of the  simplifier, so for a function of
+arity N we *must* do at least N passes.
+
+This isn't great, so the solution is to recognize case (2) properly and handle all the arguments in one go.
+That will also match cases like (1) just fine, since it's just made up of unary function applications.
+
+That does mean that we need to do a manual traversal rather than doing standard bottom-up processing.
+-}</span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="hs-comment">{-| Extract the list of bindings from a term, a bit like a &quot;multi-beta&quot; reduction.
+
+Some examples will help:
+
+[(\x . t) a] -&gt; Just ([x |-&gt; a], t)
+
+[[[(\x . (\y . (\z . t))) a] b] c] -&gt; Just ([x |-&gt; a, y |-&gt; b, z |-&gt; c]) t)
+
+[[(\x . t) a] b] -&gt; Nothing
+
+When we decide that we want to do beta for types, we will need to extend this to handle type instantiations too.
+-}</span><span>
+</span><span id="line-79"></span><span id="local-6989586621680969249"><span id="local-6989586621680969250"><span id="local-6989586621680969251"><span id="local-6989586621680969252"><span id="local-6989586621680969253"><span class="annot"><a href="PlutusIR.Transform.Beta.html#extractBindings"><span class="hs-identifier hs-type">extractBindings</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969253"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969252"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969251"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969250"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969249"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">NE.NonEmpty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969253"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969252"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969251"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969250"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969249"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969253"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969252"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969251"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969250"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969249"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span>
+</span><span id="line-80"></span><span id="extractBindings"><span class="annot"><span class="annottext">extractBindings :: Term tyname name uni fun a
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun a),
+      Term tyname name uni fun a)
+</span><a href="PlutusIR.Transform.Beta.html#extractBindings"><span class="hs-identifier hs-var hs-var">extractBindings</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Term tyname name uni fun a]
+-&gt; Term tyname name uni fun a
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun a),
+      Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun ann.
+[Term tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+</span><a href="#local-6989586621680969214"><span class="hs-identifier hs-var">collectArgs</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-81"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-82"></span><span>      </span><span id="local-6989586621680969214"><span class="annot"><span class="annottext">collectArgs :: [Term tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+</span><a href="#local-6989586621680969214"><span class="hs-identifier hs-var hs-var">collectArgs</span></a></span></span><span> </span><span id="local-6989586621680969213"><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><a href="#local-6989586621680969213"><span class="hs-identifier hs-var">argStack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Apply"><span class="hs-identifier hs-type">Apply</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680969211"><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969211"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680969210"><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969210"><span class="hs-identifier hs-var">arg</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+</span><a href="#local-6989586621680969214"><span class="hs-identifier hs-var">collectArgs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969210"><span class="hs-identifier hs-var">arg</span></a></span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+-&gt; [Term tyname name uni fun ann] -&gt; [Term tyname name uni fun ann]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-glyph hs-var">:</span></a></span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><a href="#local-6989586621680969213"><span class="hs-identifier hs-var">argStack</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969211"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-83"></span><span>      </span><span class="annot"><a href="#local-6989586621680969214"><span class="hs-identifier hs-var">collectArgs</span></a></span><span> </span><span id="local-6989586621680969209"><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><a href="#local-6989586621680969209"><span class="hs-identifier hs-var">argStack</span></a></span></span><span> </span><span id="local-6989586621680969208"><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969208"><span class="hs-identifier hs-var">t</span></a></span></span><span>               </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+-&gt; [Binding tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+forall tyname name (uni :: * -&gt; *) fun ann fun.
+[Term tyname name uni fun ann]
+-&gt; [Binding tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+</span><a href="#local-6989586621680969207"><span class="hs-identifier hs-var">matchArgs</span></a></span><span> </span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><a href="#local-6989586621680969209"><span class="hs-identifier hs-var">argStack</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969208"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-84"></span><span>      </span><span id="local-6989586621680969207"><span class="annot"><span class="annottext">matchArgs :: [Term tyname name uni fun ann]
+-&gt; [Binding tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+</span><a href="#local-6989586621680969207"><span class="hs-identifier hs-var hs-var">matchArgs</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680969206"><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969206"><span class="hs-identifier hs-var">arg</span></a></span></span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621680969205"><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><a href="#local-6989586621680969205"><span class="hs-identifier hs-var">rest</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680969204"><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+</span><a href="#local-6989586621680969204"><span class="hs-identifier hs-var">acc</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#LamAbs"><span class="hs-identifier hs-type">LamAbs</span></a></span><span> </span><span id="local-6989586621680969202"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680969202"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621680969201"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680969201"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621680969200"><span class="annot"><span class="annottext">Type tyname uni ann
+</span><a href="#local-6989586621680969200"><span class="hs-identifier hs-var">ty</span></a></span></span><span> </span><span id="local-6989586621680969199"><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969199"><span class="hs-identifier hs-var">body</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+-&gt; [Binding tyname name uni fun ann]
+-&gt; Term tyname name uni fun ann
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+</span><a href="#local-6989586621680969207"><span class="hs-identifier hs-var">matchArgs</span></a></span><span> </span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><a href="#local-6989586621680969205"><span class="hs-identifier hs-var">rest</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ann
+-&gt; Strictness
+-&gt; VarDecl tyname name uni fun ann
+-&gt; Term tyname name uni fun ann
+-&gt; Binding tyname name uni fun ann
+forall tyname name (uni :: * -&gt; *) fun a.
+a
+-&gt; Strictness
+-&gt; VarDecl tyname name uni fun a
+-&gt; Term tyname name uni fun a
+-&gt; Binding tyname name uni fun a
+</span><a href="PlutusIR.Core.Type.html#TermBind"><span class="hs-identifier hs-var">TermBind</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680969202"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Strictness
+</span><a href="PlutusIR.Core.Type.html#Strict"><span class="hs-identifier hs-var">Strict</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ann
+-&gt; name -&gt; Type tyname uni ann -&gt; VarDecl tyname name uni fun ann
+forall k tyname name (uni :: * -&gt; *) (fun :: k) ann.
+ann
+-&gt; name -&gt; Type tyname uni ann -&gt; VarDecl tyname name uni fun ann
+</span><a href="PlutusCore.Core.Type.html#VarDecl"><span class="hs-identifier hs-var">VarDecl</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680969202"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680969201"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Type tyname uni ann
+</span><a href="#local-6989586621680969200"><span class="hs-identifier hs-var">ty</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969206"><span class="hs-identifier hs-var">arg</span></a></span><span class="annot"><span class="annottext">Binding tyname name uni fun ann
+-&gt; [Binding tyname name uni fun ann]
+-&gt; [Binding tyname name uni fun ann]
+forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-glyph hs-var">:</span></a></span><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+</span><a href="#local-6989586621680969204"><span class="hs-identifier hs-var">acc</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969199"><span class="hs-identifier hs-var">body</span></a></span><span>
+</span><span id="line-85"></span><span>      </span><span class="annot"><a href="#local-6989586621680969207"><span class="hs-identifier hs-var">matchArgs</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>         </span><span id="local-6989586621680969195"><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+</span><a href="#local-6989586621680969195"><span class="hs-identifier hs-var">acc</span></a></span></span><span> </span><span id="local-6989586621680969194"><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969194"><span class="hs-identifier hs-var">t</span></a></span></span><span>                    </span><span class="hs-glyph">=</span><span>
+</span><span id="line-86"></span><span>          </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+-&gt; Maybe (NonEmpty (Binding tyname name uni fun ann))
+forall a. [a] -&gt; Maybe (NonEmpty a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">NE.nonEmpty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+-&gt; [Binding tyname name uni fun ann]
+forall a. [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">reverse</span></a></span><span> </span><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+</span><a href="#local-6989586621680969195"><span class="hs-identifier hs-var">acc</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-87"></span><span>              </span><span class="annot"><span class="annottext">Maybe (NonEmpty (Binding tyname name uni fun ann))
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe
+  (NonEmpty (Binding tyname name uni fun ann),
+   Term tyname name uni fun ann)
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-88"></span><span>              </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621680969191"><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun ann)
+</span><a href="#local-6989586621680969191"><span class="hs-identifier hs-var">acc'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(NonEmpty (Binding tyname name uni fun ann),
+ Term tyname name uni fun ann)
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun ann),
+      Term tyname name uni fun ann)
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun ann)
+</span><a href="#local-6989586621680969191"><span class="hs-identifier hs-var">acc'</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><a href="#local-6989586621680969194"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span>      </span><span class="annot"><a href="#local-6989586621680969207"><span class="hs-identifier hs-var">matchArgs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><span class="hs-identifier">_</span></span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-glyph hs-type">:</span></a></span><span class="annot"><span class="annottext">[Term tyname name uni fun ann]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span>      </span><span class="annot"><span class="annottext">[Binding tyname name uni fun ann]
+</span><span class="hs-identifier">_</span></span><span>   </span><span class="annot"><span class="annottext">Term tyname name uni fun ann
+</span><span class="hs-identifier">_</span></span><span>                    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe
+  (NonEmpty (Binding tyname name uni fun ann),
+   Term tyname name uni fun ann)
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="hs-comment">{-|
+Recursively apply the beta transformation on the code, both for the terms
+
+@
+    (\ (x : A). M) N
+    ==&gt;
+    let x : A = N in M
+@
+
+and types
+
+@
+    (/\ a. \(x : a) . x) {A}
+    ==&gt;
+    let a : * = A in
+    (\ (x : A). x)
+@
+
+-}</span><span>
+</span><span id="line-110"></span><span id="local-6989586621680969233"><span id="local-6989586621680969234"><span id="local-6989586621680969235"><span id="local-6989586621680969236"><span id="local-6989586621680969237"><span class="annot"><a href="PlutusIR.Transform.Beta.html#beta"><span class="hs-identifier hs-type">beta</span></a></span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969237"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969236"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969235"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969234"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969233"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969237"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969236"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969235"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969234"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680969233"><span class="hs-identifier hs-type">a</span></a></span></span></span></span></span></span><span>
+</span><span id="line-113"></span><span id="beta"><span class="annot"><span class="annottext">beta :: Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Beta.html#beta"><span class="hs-identifier hs-var hs-var">beta</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-comment">-- See Note [Multi-beta]</span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-comment">-- This maybe isn't the best annotation for this term, but it will do.</span><span>
+</span><span id="line-116"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Term tyname name uni fun a
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun a),
+      Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Term tyname name uni fun a
+-&gt; Maybe
+     (NonEmpty (Binding tyname name uni fun a),
+      Term tyname name uni fun a)
+</span><a href="PlutusIR.Transform.Beta.html#extractBindings"><span class="hs-identifier hs-var">extractBindings</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680969190"><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680969190"><span class="hs-identifier hs-var">bs</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680969189"><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969189"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a
+-&gt; Recursivity
+-&gt; NonEmpty (Binding tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall tyname name (uni :: * -&gt; *) fun a.
+a
+-&gt; Recursivity
+-&gt; NonEmpty (Binding tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Core.Type.html#Let"><span class="hs-identifier hs-var">Let</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Term tyname name uni fun a -&gt; a
+forall tyname name (uni :: * -&gt; *) fun a.
+Term tyname name uni fun a -&gt; a
+</span><a href="PlutusIR.Core.Type.html#termAnn"><span class="hs-identifier hs-var">termAnn</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969189"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#NonRec"><span class="hs-identifier hs-var">NonRec</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680969190"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Term tyname name uni fun a -&gt; Term tyname name uni fun a
+forall tyname name (uni :: * -&gt; *) fun a.
+Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Beta.html#beta"><span class="hs-identifier hs-var">beta</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969189"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-117"></span><span>    </span><span id="local-6989586621680969185"><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969185"><span class="hs-identifier hs-var">t</span></a></span></span><span>                                 </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680969185"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">(Term tyname name uni fun a
+ -&gt; Identity (Term tyname name uni fun a))
+-&gt; Term tyname name uni fun a
+-&gt; Identity (Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal'
+  (Term tyname name uni fun a) (Term tyname name uni fun a)
+</span><a href="PlutusIR.Core.Plated.html#termSubterms"><span class="hs-identifier hs-var">termSubterms</span></a></span><span> </span><span class="annot"><span class="annottext">((Term tyname name uni fun a
+  -&gt; Identity (Term tyname name uni fun a))
+ -&gt; Term tyname name uni fun a
+ -&gt; Identity (Term tyname name uni fun a))
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall s t a b. ASetter s t a b -&gt; (a -&gt; b) -&gt; s -&gt; t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">%~</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a -&gt; Term tyname name uni fun a
+forall tyname name (uni :: * -&gt; *) fun a.
+Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.Beta.html#beta"><span class="hs-identifier hs-var">beta</span></a></span><span>
+</span><span id="line-118"></span></pre></body></html>

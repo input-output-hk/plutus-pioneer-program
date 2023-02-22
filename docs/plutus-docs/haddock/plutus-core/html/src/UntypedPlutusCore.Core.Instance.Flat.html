@@ -1,0 +1,731 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds            #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances    #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE KindSignatures       #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase           #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns       #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators        #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-warn-orphans #-}</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">UntypedPlutusCore.Core.Instance.Flat</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html"><span class="hs-identifier">UntypedPlutusCore.Core.Type</span></a></span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Flat.html"><span class="hs-identifier">PlutusCore.Flat</span></a></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.html"><span class="hs-identifier">PlutusCore.Pretty</span></a></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Word</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Word8</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier">Flat</span></a></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier">Flat.Decoder</span></a></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier">Flat.Encoder</span></a></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Universe.html"><span class="hs-identifier">Universe</span></a></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-comment">{-
+The definitions in this file rely on some Flat instances defined for typed plutus core.
+You can find those in PlutusCore.Flat.
+-}</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-comment">{- Note [Stable encoding of PLC]
+READ THIS BEFORE TOUCHING ANYTHING IN THIS FILE
+
+We need the encoding of PLC on the blockchain to be *extremely* stable. It *must not* change
+arbitrarily, otherwise we'll be unable to read back old transactions and validate them.
+
+Consequently we don't use the derivable instances of `Flat` for the PLC types that go
+on the chain.
+
+However, the instances in this file *are* constrained by instances for names, type names,
+and annotations. What's to stop the instances for *those* changing, thus changing
+the overall encoding on the chain?
+
+The answer is that what goes on the chain is *always* a `Program TyName Name ()`. The instances
+for `TyName` and `Name` are nailed down here, and the instance for `()` is standard.
+
+However, having this flexibility allows us to encode e.g. PLC with substantial annotations
+(like position information) in situation where the stability is *not* critical, such as
+for testing.
+-}</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">{- Note [Encoding/decoding constructor tags using Flat]
+Flat saves space when compared to CBOR by allowing tags to use the minimum
+number of bits required for their encoding.
+
+This requires specialised encode/decode functions for each constructor
+that encodes a different number of possibilities. Here is a list of the
+tags and their used/available encoding possibilities.
+
+| Data type       | Function          | Used | Available |
+|-----------------|-------------------|------|-----------|
+| Terms           | encodeTerm        | 8    | 16        |
+
+For format stability we are manually assigning the tag values to the
+constructors (and we do not use a generic algorithm that may change this order).
+
+All encodings use the function `safeEncodeBits :: NumBits -&gt; Word8 -&gt; Encoding`, which encodes
+at most 8 bits of data, and the first argument specifies how many bits from the 8
+available are actually used. This function also checks the size of the `Word8`
+argument at runtime.
+
+Flat uses an extra function in its class definition called `size`. Since we want
+to reserve some space for future data constructors and we don't want to have the
+sizes desynchronised from the encoding and decoding functions we have manual
+implementations for them (if they have any constructors reserved for future use).
+
+By default, Flat does not use any space to serialise `()`.
+-}</span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span class="hs-comment">{- Note [Deserialization size limits]
+In order to prevent people encoding copyright or otherwise illegal data on the chain, we would like to
+restrict the amount of data that can be controlled in an unrestricted fashion by the user. Fortunately,
+most of the encoding does no allow much leeway for a user to control its content (when accounting for the
+structure of the format itself). The main thing to worry about is bytestrings, but even there, the flat
+encoding of bytestrings is a a sequence of 255-byte chunks. This is okay, since user-controlled data will
+be broken up by the chunk metadata.
+-}</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- | Using 4 bits to encode term tags.</span><span>
+</span><span id="line-87"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#termTagWidth"><span class="hs-identifier hs-type">termTagWidth</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">NumBits</span></a></span><span>
+</span><span id="line-88"></span><span id="termTagWidth"><span class="annot"><span class="annottext">termTagWidth :: NumBits
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#termTagWidth"><span class="hs-identifier hs-var hs-var">termTagWidth</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NumBits
+</span><span class="hs-number">4</span></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-type">encodeTermTag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span>
+</span><span id="line-91"></span><span id="encodeTermTag"><span class="annot"><span class="annottext">encodeTermTag :: Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var hs-var">encodeTermTag</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; Word8 -&gt; Encoding
+</span><a href="PlutusCore.Flat.html#safeEncodeBits"><span class="hs-identifier hs-var">safeEncodeBits</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#termTagWidth"><span class="hs-identifier hs-var">termTagWidth</span></a></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTermTag"><span class="hs-identifier hs-type">decodeTermTag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Word8</span></a></span><span>
+</span><span id="line-94"></span><span id="decodeTermTag"><span class="annot"><span class="annottext">decodeTermTag :: Get Word8
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTermTag"><span class="hs-identifier hs-var hs-var">decodeTermTag</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; Get Word8
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">dBEBits8</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#termTagWidth"><span class="hs-identifier hs-var">termTagWidth</span></a></span><span>
+</span><span id="line-95"></span><span>
+</span><span id="line-96"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-type">encodeTerm</span></a></span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680963201"><span class="annot"><a href="#local-6989586621680963201"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680963204"><span class="annot"><a href="#local-6989586621680963204"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680963200"><span class="annot"><a href="#local-6989586621680963200"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680963199"><span class="annot"><a href="#local-6989586621680963199"><span class="hs-identifier hs-type">ann</span></a></span></span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Universe.Core.html#Closed"><span class="hs-identifier hs-type">Closed</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963204"><span class="hs-identifier hs-type">uni</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680963204"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="Universe.Core.html#Everywhere"><span class="hs-operator hs-type">`Everywhere`</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.Plc.html#PrettyPlc"><span class="hs-identifier hs-type">PrettyPlc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963201"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963204"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963200"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963199"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963200"><span class="hs-identifier hs-type">fun</span></a></span><span>
+</span><span id="line-102"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963199"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963201"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-type">Binder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963201"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963201"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963204"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963200"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963199"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span>
+</span><span id="line-108"></span><span id="encodeTerm"><span class="annot"><span class="annottext">encodeTerm :: Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var hs-var">encodeTerm</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-109"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Var"><span class="hs-identifier hs-type">Var</span></a></span><span>      </span><span id="local-6989586621680963123"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963123"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963122"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963122"><span class="hs-identifier hs-var">n</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963123"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963122"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-110"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Delay"><span class="hs-identifier hs-type">Delay</span></a></span><span>    </span><span id="local-6989586621680963119"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963119"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963118"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963118"><span class="hs-identifier hs-var">t</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963119"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var">encodeTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963118"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-111"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#LamAbs"><span class="hs-identifier hs-type">LamAbs</span></a></span><span>   </span><span id="local-6989586621680963116"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963116"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963115"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963115"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621680963114"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963114"><span class="hs-identifier hs-var">t</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">2</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963116"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Binder name -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">name -&gt; Binder name
+forall name. name -&gt; Binder name
+</span><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-var">Binder</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963115"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var">encodeTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963114"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-112"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Apply"><span class="hs-identifier hs-type">Apply</span></a></span><span>    </span><span id="local-6989586621680963111"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963111"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963110"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963110"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621680963109"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963109"><span class="hs-identifier hs-var">t'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">3</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963111"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var">encodeTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963110"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var">encodeTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963109"><span class="hs-identifier hs-var">t'</span></a></span><span>
+</span><span id="line-113"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Constant"><span class="hs-identifier hs-type">Constant</span></a></span><span> </span><span id="local-6989586621680963107"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963107"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963106"><span class="annot"><span class="annottext">Some (ValueOf uni)
+</span><a href="#local-6989586621680963106"><span class="hs-identifier hs-var">c</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">4</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963107"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Some (ValueOf uni) -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">Some (ValueOf uni)
+</span><a href="#local-6989586621680963106"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-114"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Force"><span class="hs-identifier hs-type">Force</span></a></span><span>    </span><span id="local-6989586621680963104"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963104"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963103"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963103"><span class="hs-identifier hs-var">t</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">5</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963104"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var">encodeTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963103"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-115"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Error"><span class="hs-identifier hs-type">Error</span></a></span><span>    </span><span id="local-6989586621680963101"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963101"><span class="hs-identifier hs-var">ann</span></a></span></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">6</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963101"><span class="hs-identifier hs-var">ann</span></a></span><span>
+</span><span id="line-116"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span>  </span><span id="local-6989586621680963099"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963099"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963098"><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963098"><span class="hs-identifier hs-var">bn</span></a></span></span><span>   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTermTag"><span class="hs-identifier hs-var">encodeTermTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">7</span></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963099"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">fun -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963098"><span class="hs-identifier hs-var">bn</span></a></span><span>
+</span><span id="line-117"></span><span>
+</span><span id="line-118"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTerm"><span class="hs-identifier hs-type">decodeTerm</span></a></span><span>
+</span><span id="line-119"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680963147"><span class="annot"><a href="#local-6989586621680963147"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680963148"><span class="annot"><a href="#local-6989586621680963148"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680963146"><span class="annot"><a href="#local-6989586621680963146"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680963145"><span class="annot"><a href="#local-6989586621680963145"><span class="hs-identifier hs-type">ann</span></a></span></span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Universe.Core.html#Closed"><span class="hs-identifier hs-type">Closed</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963148"><span class="hs-identifier hs-type">uni</span></a></span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680963148"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="Universe.Core.html#Everywhere"><span class="hs-operator hs-type">`Everywhere`</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.Plc.html#PrettyPlc"><span class="hs-identifier hs-type">PrettyPlc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963147"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963148"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963146"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963145"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963146"><span class="hs-identifier hs-type">fun</span></a></span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963145"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-125"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963147"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-126"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-type">Binder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963147"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680963146"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-129"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963147"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963148"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963146"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963145"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-130"></span><span id="decodeTerm"><span class="annot"><span class="annottext">decodeTerm :: (fun -&gt; Bool) -&gt; Get (Term name uni fun ann)
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTerm"><span class="hs-identifier hs-var hs-var">decodeTerm</span></a></span></span><span> </span><span id="local-6989586621680963096"><span class="annot"><span class="annottext">fun -&gt; Bool
+</span><a href="#local-6989586621680963096"><span class="hs-identifier hs-var">builtinPred</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-131"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-132"></span><span>        </span><span id="local-6989586621680963095"><span class="annot"><span class="annottext">go :: Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">(Word8 -&gt; Get (Term name uni fun ann))
+-&gt; Get Word8 -&gt; Get (Term name uni fun ann)
+forall (m :: * -&gt; *) a b. Monad m =&gt; (a -&gt; m b) -&gt; m a -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">=&lt;&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get Word8
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTermTag"><span class="hs-identifier hs-var">decodeTermTag</span></a></span><span>
+</span><span id="line-133"></span><span>        </span><span id="local-6989586621680963094"><span class="annot"><span class="annottext">handleTerm :: Word8 -&gt; Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963094"><span class="hs-identifier hs-var hs-var">handleTerm</span></a></span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; name -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann -&gt; name -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Var"><span class="hs-identifier hs-var">Var</span></a></span><span>      </span><span class="annot"><span class="annottext">(ann -&gt; name -&gt; Term name uni fun ann)
+-&gt; Get ann -&gt; Get (name -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get (name -&gt; Term name uni fun ann)
+-&gt; Get name -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get name
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-134"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; Term name uni fun ann -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann -&gt; Term name uni fun ann -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Delay"><span class="hs-identifier hs-var">Delay</span></a></span><span>    </span><span class="annot"><span class="annottext">(ann -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get ann -&gt; Get (Term name uni fun ann -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get (Term name uni fun ann) -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-135"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">2</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; name -&gt; Term name uni fun ann -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann -&gt; name -&gt; Term name uni fun ann -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#LamAbs"><span class="hs-identifier hs-var">LamAbs</span></a></span><span>   </span><span class="annot"><span class="annottext">(ann -&gt; name -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get ann
+-&gt; Get (name -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get (name -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get name -&gt; Get (Term name uni fun ann -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Binder name -&gt; name
+forall name. Binder name -&gt; name
+</span><a href="PlutusCore.Core.Type.html#unBinder"><span class="hs-identifier hs-var hs-var">unBinder</span></a></span><span> </span><span class="annot"><span class="annottext">(Binder name -&gt; name) -&gt; Get (Binder name) -&gt; Get name
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Binder name)
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get (Term name uni fun ann) -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-136"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">3</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann
+-&gt; Term name uni fun ann
+-&gt; Term name uni fun ann
+-&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann
+-&gt; Term name uni fun ann
+-&gt; Term name uni fun ann
+-&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Apply"><span class="hs-identifier hs-var">Apply</span></a></span><span>    </span><span class="annot"><span class="annottext">(ann
+ -&gt; Term name uni fun ann
+ -&gt; Term name uni fun ann
+ -&gt; Term name uni fun ann)
+-&gt; Get ann
+-&gt; Get
+     (Term name uni fun ann
+      -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get
+  (Term name uni fun ann
+   -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get (Term name uni fun ann)
+-&gt; Get (Term name uni fun ann -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get (Term name uni fun ann) -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-137"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">4</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; Some (ValueOf uni) -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann -&gt; Some (ValueOf uni) -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Constant"><span class="hs-identifier hs-var">Constant</span></a></span><span> </span><span class="annot"><span class="annottext">(ann -&gt; Some (ValueOf uni) -&gt; Term name uni fun ann)
+-&gt; Get ann -&gt; Get (Some (ValueOf uni) -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Some (ValueOf uni) -&gt; Term name uni fun ann)
+-&gt; Get (Some (ValueOf uni)) -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Some (ValueOf uni))
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-138"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">5</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; Term name uni fun ann -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann -&gt; Term name uni fun ann -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Force"><span class="hs-identifier hs-var">Force</span></a></span><span>    </span><span class="annot"><span class="annottext">(ann -&gt; Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get ann -&gt; Get (Term name uni fun ann -&gt; Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann -&gt; Term name uni fun ann)
+-&gt; Get (Term name uni fun ann) -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963095"><span class="hs-identifier hs-var">go</span></a></span><span>
+</span><span id="line-139"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">6</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann. ann -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Error"><span class="hs-identifier hs-var">Error</span></a></span><span>    </span><span class="annot"><span class="annottext">(ann -&gt; Term name uni fun ann)
+-&gt; Get ann -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-140"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">7</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-141"></span><span>            </span><span id="local-6989586621680963089"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963089"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-142"></span><span>            </span><span id="local-6989586621680963088"><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963088"><span class="hs-identifier hs-var">fun</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Get fun
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-143"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span class="annot"><a href="#local-6989586621680963087"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963147"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963148"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963146"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963145"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-144"></span><span>                </span><span id="local-6989586621680963087"><span class="annot"><span class="annottext">t :: Term name uni fun ann
+</span><a href="#local-6989586621680963087"><span class="hs-identifier hs-var hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; fun -&gt; Term name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann -&gt; fun -&gt; Term name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Builtin"><span class="hs-identifier hs-var">Builtin</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963089"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963088"><span class="hs-identifier hs-var">fun</span></a></span><span>
+</span><span id="line-145"></span><span>            </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">fun -&gt; Bool
+</span><a href="#local-6989586621680963096"><span class="hs-identifier hs-var">builtinPred</span></a></span><span> </span><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963088"><span class="hs-identifier hs-var">fun</span></a></span><span>
+</span><span id="line-146"></span><span>            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Get (Term name uni fun ann)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963087"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-147"></span><span>            </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">String -&gt; Get (Term name uni fun ann)
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fail</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Get (Term name uni fun ann))
+-&gt; String -&gt; Get (Term name uni fun ann)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Forbidden builtin function: &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">Doc Any -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Doc Any
+forall a ann. PrettyPlc a =&gt; a -&gt; Doc ann
+</span><a href="PlutusCore.Pretty.Default.html#prettyPlcDef"><span class="hs-identifier hs-var">prettyPlcDef</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963087"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-148"></span><span>        </span><span class="annot"><a href="#local-6989586621680963094"><span class="hs-identifier hs-var">handleTerm</span></a></span><span> </span><span id="local-6989586621680963084"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680963084"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Get (Term name uni fun ann)
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fail</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Get (Term name uni fun ann))
+-&gt; String -&gt; Get (Term name uni fun ann)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Unknown term constructor tag: &quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680963084"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#sizeTerm"><span class="hs-identifier hs-type">sizeTerm</span></a></span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680963137"><span class="annot"><a href="#local-6989586621680963137"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680963138"><span class="annot"><a href="#local-6989586621680963138"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680963136"><span class="annot"><a href="#local-6989586621680963136"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680963135"><span class="annot"><a href="#local-6989586621680963135"><span class="hs-identifier hs-type">ann</span></a></span></span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Universe.Core.html#Closed"><span class="hs-identifier hs-type">Closed</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963138"><span class="hs-identifier hs-type">uni</span></a></span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680963138"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="Universe.Core.html#Everywhere"><span class="hs-operator hs-type">`Everywhere`</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.Plc.html#PrettyPlc"><span class="hs-identifier hs-type">PrettyPlc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963137"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963138"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963136"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963135"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963136"><span class="hs-identifier hs-type">fun</span></a></span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963135"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963137"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-type">Binder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963137"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-160"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963137"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963138"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963136"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963135"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-161"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">NumBits</span></a></span><span>
+</span><span id="line-162"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">NumBits</span></a></span><span>
+</span><span id="line-163"></span><span id="sizeTerm"><span class="annot"><span class="annottext">sizeTerm :: Term name uni fun ann -&gt; NumBits -&gt; NumBits
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#sizeTerm"><span class="hs-identifier hs-var hs-var">sizeTerm</span></a></span></span><span> </span><span id="local-6989586621680963082"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963082"><span class="hs-identifier hs-var">tm</span></a></span></span><span> </span><span id="local-6989586621680963081"><span class="annot"><span class="annottext">NumBits
+</span><a href="#local-6989586621680963081"><span class="hs-identifier hs-var">sz</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NumBits
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#termTagWidth"><span class="hs-identifier hs-var">termTagWidth</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits
+</span><a href="#local-6989586621680963081"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963082"><span class="hs-identifier hs-var">tm</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-164"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Var"><span class="hs-identifier hs-type">Var</span></a></span><span>      </span><span id="local-6989586621680963079"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963079"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963078"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963078"><span class="hs-identifier hs-var">n</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963079"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963078"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-165"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Delay"><span class="hs-identifier hs-type">Delay</span></a></span><span>    </span><span id="local-6989586621680963076"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963076"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963075"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963075"><span class="hs-identifier hs-var">t</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963076"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963075"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-166"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#LamAbs"><span class="hs-identifier hs-type">LamAbs</span></a></span><span>   </span><span id="local-6989586621680963074"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963074"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963073"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963073"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621680963072"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963072"><span class="hs-identifier hs-var">t</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963074"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">name -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680963073"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963072"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-167"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Apply"><span class="hs-identifier hs-type">Apply</span></a></span><span>    </span><span id="local-6989586621680963071"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963071"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963070"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963070"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621680963069"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963069"><span class="hs-identifier hs-var">t'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963071"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963070"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963069"><span class="hs-identifier hs-var">t'</span></a></span><span>
+</span><span id="line-168"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Constant"><span class="hs-identifier hs-type">Constant</span></a></span><span> </span><span id="local-6989586621680963068"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963068"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963067"><span class="annot"><span class="annottext">Some (ValueOf uni)
+</span><a href="#local-6989586621680963067"><span class="hs-identifier hs-var">c</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963068"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Some (ValueOf uni) -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Some (ValueOf uni)
+</span><a href="#local-6989586621680963067"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-169"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Force"><span class="hs-identifier hs-type">Force</span></a></span><span>    </span><span id="local-6989586621680963066"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963066"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963065"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963065"><span class="hs-identifier hs-var">t</span></a></span></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963066"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963065"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-170"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Error"><span class="hs-identifier hs-type">Error</span></a></span><span>    </span><span id="local-6989586621680963064"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963064"><span class="hs-identifier hs-var">ann</span></a></span></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963064"><span class="hs-identifier hs-var">ann</span></a></span><span>
+</span><span id="line-171"></span><span>    </span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Builtin"><span class="hs-identifier hs-type">Builtin</span></a></span><span>  </span><span id="local-6989586621680963063"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963063"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963062"><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963062"><span class="hs-identifier hs-var">bn</span></a></span></span><span>   </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963063"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">fun -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">fun
+</span><a href="#local-6989586621680963062"><span class="hs-identifier hs-var">bn</span></a></span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span class="annot"><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeProgram"><span class="hs-identifier hs-type">decodeProgram</span></a></span><span>
+</span><span id="line-174"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680963060"><span class="annot"><a href="#local-6989586621680963060"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680963059"><span class="annot"><a href="#local-6989586621680963059"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680963058"><span class="annot"><a href="#local-6989586621680963058"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680963057"><span class="annot"><a href="#local-6989586621680963057"><span class="hs-identifier hs-type">ann</span></a></span></span><span>
+</span><span id="line-175"></span><span>    </span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Universe.Core.html#Closed"><span class="hs-identifier hs-type">Closed</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963059"><span class="hs-identifier hs-type">uni</span></a></span><span>
+</span><span id="line-176"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680963059"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="Universe.Core.html#Everywhere"><span class="hs-operator hs-type">`Everywhere`</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span>
+</span><span id="line-177"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.Plc.html#PrettyPlc"><span class="hs-identifier hs-type">PrettyPlc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963060"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963059"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963058"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963057"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-178"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963058"><span class="hs-identifier hs-type">fun</span></a></span><span>
+</span><span id="line-179"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963057"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-180"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963060"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-181"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-type">Binder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963060"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-182"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-183"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680963058"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-184"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-type">Program</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963060"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963059"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963058"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963057"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span><span id="decodeProgram"><span class="annot"><span class="annottext">decodeProgram :: (fun -&gt; Bool) -&gt; Get (Program name uni fun ann)
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeProgram"><span class="hs-identifier hs-var hs-var">decodeProgram</span></a></span></span><span> </span><span id="local-6989586621680963056"><span class="annot"><span class="annottext">fun -&gt; Bool
+</span><a href="#local-6989586621680963056"><span class="hs-identifier hs-var">builtinPred</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann
+-&gt; Version ann -&gt; Term name uni fun ann -&gt; Program name uni fun ann
+forall name (uni :: * -&gt; *) fun ann.
+ann
+-&gt; Version ann -&gt; Term name uni fun ann -&gt; Program name uni fun ann
+</span><a href="UntypedPlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-var">Program</span></a></span><span> </span><span class="annot"><span class="annottext">(ann
+ -&gt; Version ann
+ -&gt; Term name uni fun ann
+ -&gt; Program name uni fun ann)
+-&gt; Get ann
+-&gt; Get
+     (Version ann -&gt; Term name uni fun ann -&gt; Program name uni fun ann)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get ann
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get
+  (Version ann -&gt; Term name uni fun ann -&gt; Program name uni fun ann)
+-&gt; Get (Version ann)
+-&gt; Get (Term name uni fun ann -&gt; Program name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Version ann)
+forall a. Flat a =&gt; Get a
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">decode</span></a></span><span> </span><span class="annot"><span class="annottext">Get (Term name uni fun ann -&gt; Program name uni fun ann)
+-&gt; Get (Term name uni fun ann) -&gt; Get (Program name uni fun ann)
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(fun -&gt; Bool) -&gt; Get (Term name uni fun ann)
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+(fun -&gt; Bool) -&gt; Get (Term name uni fun ann)
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTerm"><span class="hs-identifier hs-var">decodeTerm</span></a></span><span> </span><span class="annot"><span class="annottext">fun -&gt; Bool
+</span><a href="#local-6989586621680963056"><span class="hs-identifier hs-var">builtinPred</span></a></span><span>
+</span><span id="line-186"></span><span>
+</span><span id="line-187"></span><span class="hs-comment">{- Note [Deserialization on the chain]
+As discussed in Note [Deserialization size limits], we want to limit how big constants are when deserializing.
+But the 'Flat' instances for plain terms and programs provided here don't do that: they implement unrestricted deserialization.
+
+In practice we use a specialized decoder for the on-chain decoding which calls 'decodeProgram' directly.
+Possibly we should remove these instances in future and only have instances for newtypes that clearly communicate
+the expected behaviour.
+-}</span><span>
+</span><span id="line-195"></span><span>
+</span><span id="line-196"></span><span id="local-6989586621680963051"><span id="local-6989586621680963052"><span id="local-6989586621680963053"><span id="local-6989586621680963054"><span class="hs-keyword">instance</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Universe.Core.html#Closed"><span class="hs-identifier hs-type">Closed</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963054"><span class="hs-identifier hs-type">uni</span></a></span><span>
+</span><span id="line-197"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680963054"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="Universe.Core.html#Everywhere"><span class="hs-operator hs-type">`Everywhere`</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span>
+</span><span id="line-198"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.Plc.html#PrettyPlc"><span class="hs-identifier hs-type">PrettyPlc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963053"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963054"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963052"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963051"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963052"><span class="hs-identifier hs-type">fun</span></a></span><span>
+</span><span id="line-200"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963051"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-201"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963053"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-202"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-type">Binder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963053"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-203"></span><span>         </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963053"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963054"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963052"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963051"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-204"></span><span>    </span><span id="local-6989586621680963046"><span class="annot"><span class="annottext">encode :: Term name uni fun ann -&gt; Encoding
+</span><a href="#local-6989586621680963046"><span class="hs-identifier hs-var hs-var hs-var hs-var">encode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; Encoding
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#encodeTerm"><span class="hs-identifier hs-var">encodeTerm</span></a></span><span>
+</span><span id="line-205"></span><span>    </span><span id="local-6989586621680963045"><span class="annot"><span class="annottext">decode :: Get (Term name uni fun ann)
+</span><a href="#local-6989586621680963045"><span class="hs-identifier hs-var hs-var hs-var hs-var">decode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(fun -&gt; Bool) -&gt; Get (Term name uni fun ann)
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+(fun -&gt; Bool) -&gt; Get (Term name uni fun ann)
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#decodeTerm"><span class="hs-identifier hs-var">decodeTerm</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; fun -&gt; Bool
+forall a b. a -&gt; b -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var">True</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-206"></span><span>    </span><span id="local-6989586621680963043"><span class="annot"><span class="annottext">size :: Term name uni fun ann -&gt; NumBits -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits -&gt; NumBits
+forall name (uni :: * -&gt; *) fun ann.
+(Closed uni, Everywhere uni Flat,
+ PrettyPlc (Term name uni fun ann), Flat fun, Flat ann, Flat name,
+ Flat (Binder name)) =&gt;
+Term name uni fun ann -&gt; NumBits -&gt; NumBits
+</span><a href="UntypedPlutusCore.Core.Instance.Flat.html#sizeTerm"><span class="hs-identifier hs-var">sizeTerm</span></a></span></span></span></span></span><span>
+</span><span id="line-207"></span><span>
+</span><span id="line-208"></span><span class="hs-comment">-- This instance could probably be derived, but better to write it explicitly ourselves so we have control!</span><span>
+</span><span id="line-209"></span><span id="local-6989586621680963038"><span id="local-6989586621680963039"><span id="local-6989586621680963040"><span id="local-6989586621680963041"><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680963035"><span class="hs-special">(</span><span> </span><span class="annot"><a href="Universe.Core.html#Closed"><span class="hs-identifier hs-type">Closed</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963041"><span class="hs-identifier hs-type">uni</span></a></span><span>
+</span><span id="line-210"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680963041"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="Universe.Core.html#Everywhere"><span class="hs-operator hs-type">`Everywhere`</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span>
+</span><span id="line-211"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.Plc.html#PrettyPlc"><span class="hs-identifier hs-type">PrettyPlc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963040"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963041"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963039"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963038"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-212"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963039"><span class="hs-identifier hs-type">fun</span></a></span><span>
+</span><span id="line-213"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963038"><span class="hs-identifier hs-type">ann</span></a></span><span>
+</span><span id="line-214"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963040"><span class="hs-identifier hs-type">name</span></a></span><span>
+</span><span id="line-215"></span><span>         </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#Binder"><span class="hs-identifier hs-type">Binder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963040"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-216"></span><span>         </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-type">Program</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963040"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963041"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963039"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680963038"><span class="hs-identifier hs-type">ann</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-217"></span><span>    </span><span id="local-6989586621680963033"><span class="annot"><span class="annottext">encode :: Program name uni fun ann -&gt; Encoding
+</span><a href="#local-6989586621680963033"><span class="hs-identifier hs-var hs-var hs-var hs-var">encode</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-type">Program</span></a></span><span> </span><span id="local-6989586621680963032"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963032"><span class="hs-identifier hs-var">ann</span></a></span></span><span> </span><span id="local-6989586621680963031"><span class="annot"><span class="annottext">Version ann
+</span><a href="#local-6989586621680963031"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span id="local-6989586621680963030"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963030"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963032"><span class="hs-identifier hs-var">ann</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Version ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">Version ann
+</span><a href="#local-6989586621680963031"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Encoding -&gt; Encoding
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; Encoding
+forall a. Flat a =&gt; a -&gt; Encoding
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">encode</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963030"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-218"></span><span>
+</span><span id="line-219"></span><span>    </span><span id="local-6989586621680963029"><span class="annot"><span class="annottext">size :: Program name uni fun ann -&gt; NumBits -&gt; NumBits
+</span><a href="#local-6989586621680963029"><span class="hs-identifier hs-var hs-var hs-var hs-var">size</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="UntypedPlutusCore.Core.Type.html#Program"><span class="hs-identifier hs-type">Program</span></a></span><span> </span><span id="local-6989586621680963028"><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963028"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621680963027"><span class="annot"><span class="annottext">Version ann
+</span><a href="#local-6989586621680963027"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span id="local-6989586621680963026"><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963026"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680963025"><span class="annot"><span class="annottext">NumBits
+</span><a href="#local-6989586621680963025"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">NumBits
+</span><a href="#local-6989586621680963025"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">ann
+</span><a href="#local-6989586621680963028"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Version ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Version ann
+</span><a href="#local-6989586621680963027"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">NumBits -&gt; NumBits -&gt; NumBits
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann -&gt; NumBits
+forall a. Flat a =&gt; a -&gt; NumBits
+</span><a href="../file:///nix/store/l2763nw25zyli3m7w5pr63kyimdyiaw6-flat-lib-flat-0.4.4.0.0.0.0.2-haddock-doc/share/doc/flat/html/src"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">Term name uni fun ann
+</span><a href="#local-6989586621680963026"><span class="hs-identifier hs-var">t</span></a></span></span></span></span></span><span>
+</span><span id="line-220"></span></pre></body></html>
