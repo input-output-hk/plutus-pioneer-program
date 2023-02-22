@@ -154,3 +154,5 @@ RUN git clone https://github.com/input-output-hk/plutus-pioneer-program \
   && cd plutus-pioneer-program/code \
   && cabal update \
   && cabal build all
+
+RUN echo "alias serve-docs='python3 -m http.server -d /workspaces/plutus-pioneer-program/docs/plutus-docs'" >> ~/.bashrc
