@@ -1,0 +1,685 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE MonoLocalBinds     #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns     #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude  #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings  #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell    #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications   #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators      #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE ViewPatterns       #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- | Implements a custom currency with a minting policy that allows</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--   the minting of a fixed amount of units.</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.Currency</span><span class="hs-special">(</span><span>
+</span><span id="line-17"></span><span>      </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier">OneShotCurrency</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencySchema"><span class="hs-identifier">CurrencySchema</span></a></span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencyError"><span class="hs-identifier">CurrencyError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#AsCurrencyError"><span class="hs-identifier">AsCurrencyError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#curPolicy"><span class="hs-identifier">curPolicy</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Actions etc</span></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#mintContract"><span class="hs-identifier">mintContract</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#mintedValue"><span class="hs-identifier">mintedValue</span></a></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#currencySymbol"><span class="hs-identifier">currencySymbol</span></a></span><span>
+</span><span id="line-26"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Simple minting policy currency</span></span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#SimpleMPS"><span class="hs-identifier">SimpleMPS</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#mintCurrency"><span class="hs-identifier">mintCurrency</span></a></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Last</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Contexts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.AssocMap</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">AssocMap</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">Monoid</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">CardanoAddress</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">CurrencySymbol</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TxId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TxOutRef</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">getCardanoTxId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Scripts</span></a></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">TokenName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Value</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Value</span></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Contract</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract.Wallet</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">getUnspentOutput</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier">Plutus.Script.Utils.V1.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PV1</span></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">Schema</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../playground-common/html/src"><span class="hs-identifier">ToSchema</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-comment">{- HLINT ignore &quot;Use uncurry&quot; -}</span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- | A currency that can be created exactly once</span><span>
+</span><span id="line-57"></span><span id="local-6989586621680972686"><span id="local-6989586621680972687"></span></span><span class="hs-keyword">data</span><span> </span><span id="OneShotCurrency"><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-var">OneShotCurrency</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="OneShotCurrency"><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-var">OneShotCurrency</span></a></span></span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="curRefTransactionOutput"><span class="annot"><span class="annottext">OneShotCurrency -&gt; (TxId, Integer)
+</span><a href="Plutus.Contracts.Currency.html#curRefTransactionOutput"><span class="hs-identifier hs-var hs-var">curRefTransactionOutput</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxId</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-comment">-- ^ Transaction input that must be spent when</span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-comment">--   the currency is minted.</span><span>
+</span><span id="line-61"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="curAmounts"><span class="annot"><span class="annottext">OneShotCurrency -&gt; Map TokenName Integer
+</span><a href="Plutus.Contracts.Currency.html#curAmounts"><span class="hs-identifier hs-var hs-var">curAmounts</span></a></span></span><span>              </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">AssocMap.Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-comment">-- ^ How many units of each 'TokenName' are to</span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-comment">--   be minted.</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall x. OneShotCurrency -&gt; Rep OneShotCurrency x)
+-&gt; (forall x. Rep OneShotCurrency x -&gt; OneShotCurrency)
+-&gt; Generic OneShotCurrency
+forall x. Rep OneShotCurrency x -&gt; OneShotCurrency
+forall x. OneShotCurrency -&gt; Rep OneShotCurrency x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep OneShotCurrency x -&gt; OneShotCurrency
+$cfrom :: forall x. OneShotCurrency -&gt; Rep OneShotCurrency x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972674"><span id="local-6989586621680972676"><span id="local-6989586621680972678"><span class="annot"><span class="annottext">Int -&gt; OneShotCurrency -&gt; ShowS
+[OneShotCurrency] -&gt; ShowS
+OneShotCurrency -&gt; String
+(Int -&gt; OneShotCurrency -&gt; ShowS)
+-&gt; (OneShotCurrency -&gt; String)
+-&gt; ([OneShotCurrency] -&gt; ShowS)
+-&gt; Show OneShotCurrency
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [OneShotCurrency] -&gt; ShowS
+$cshowList :: [OneShotCurrency] -&gt; ShowS
+show :: OneShotCurrency -&gt; String
+$cshow :: OneShotCurrency -&gt; String
+showsPrec :: Int -&gt; OneShotCurrency -&gt; ShowS
+$cshowsPrec :: Int -&gt; OneShotCurrency -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972669"><span id="local-6989586621680972671"><span class="annot"><span class="annottext">OneShotCurrency -&gt; OneShotCurrency -&gt; Bool
+(OneShotCurrency -&gt; OneShotCurrency -&gt; Bool)
+-&gt; (OneShotCurrency -&gt; OneShotCurrency -&gt; Bool)
+-&gt; Eq OneShotCurrency
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: OneShotCurrency -&gt; OneShotCurrency -&gt; Bool
+$c/= :: OneShotCurrency -&gt; OneShotCurrency -&gt; Bool
+== :: OneShotCurrency -&gt; OneShotCurrency -&gt; Bool
+$c== :: OneShotCurrency -&gt; OneShotCurrency -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972660"><span id="local-6989586621680972662"><span id="local-6989586621680972664"><span id="local-6989586621680972666"><span class="annot"><span class="annottext">[OneShotCurrency] -&gt; Encoding
+[OneShotCurrency] -&gt; Value
+OneShotCurrency -&gt; Encoding
+OneShotCurrency -&gt; Value
+(OneShotCurrency -&gt; Value)
+-&gt; (OneShotCurrency -&gt; Encoding)
+-&gt; ([OneShotCurrency] -&gt; Value)
+-&gt; ([OneShotCurrency] -&gt; Encoding)
+-&gt; ToJSON OneShotCurrency
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [OneShotCurrency] -&gt; Encoding
+$ctoEncodingList :: [OneShotCurrency] -&gt; Encoding
+toJSONList :: [OneShotCurrency] -&gt; Value
+$ctoJSONList :: [OneShotCurrency] -&gt; Value
+toEncoding :: OneShotCurrency -&gt; Encoding
+$ctoEncoding :: OneShotCurrency -&gt; Encoding
+toJSON :: OneShotCurrency -&gt; Value
+$ctoJSON :: OneShotCurrency -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972655"><span id="local-6989586621680972657"><span class="annot"><span class="annottext">Value -&gt; Parser [OneShotCurrency]
+Value -&gt; Parser OneShotCurrency
+(Value -&gt; Parser OneShotCurrency)
+-&gt; (Value -&gt; Parser [OneShotCurrency]) -&gt; FromJSON OneShotCurrency
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [OneShotCurrency]
+$cparseJSONList :: Value -&gt; Parser [OneShotCurrency]
+parseJSON :: Value -&gt; Parser OneShotCurrency
+$cparseJSON :: Value -&gt; Parser OneShotCurrency
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span id="local-6989586621680972650"><span id="local-6989586621680972652"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">OneShotCurrency</span></span></span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#currencyValue"><span class="hs-identifier hs-type">currencyValue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">CurrencySymbol</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-71"></span><span id="currencyValue"><span class="annot"><span class="annottext">currencyValue :: CurrencySymbol -&gt; OneShotCurrency -&gt; Value
+</span><a href="Plutus.Contracts.Currency.html#currencyValue"><span class="hs-identifier hs-var hs-var">currencyValue</span></a></span></span><span> </span><span id="local-6989586621680972644"><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680972644"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">curAmounts :: OneShotCurrency -&gt; Map TokenName Integer
+</span><a href="Plutus.Contracts.Currency.html#curAmounts"><span class="hs-identifier hs-var">curAmounts</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="local-6989586621680972643"><span class="annot"><span class="annottext">Map TokenName Integer
+</span><a href="#local-6989586621680972643"><span class="hs-identifier hs-var">amts</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-keyword">let</span><span>
+</span><span id="line-73"></span><span>        </span><span id="local-6989586621680972642"><span class="annot"><span class="annottext">values :: [Value]
+</span><a href="#local-6989586621680972642"><span class="hs-identifier hs-var hs-var">values</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((TokenName, Integer) -&gt; Value)
+-&gt; [(TokenName, Integer)] -&gt; [Value]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680972640"><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680972640"><span class="hs-identifier hs-var">tn</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972639"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972639"><span class="hs-identifier hs-var">i</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; TokenName -&gt; Integer -&gt; Value
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">Value.singleton</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680972644"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680972640"><span class="hs-identifier hs-var">tn</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972639"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map TokenName Integer -&gt; [(TokenName, Integer)]
+forall k v. Map k v -&gt; [(k, v)]
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">AssocMap.toList</span></a></span><span> </span><span class="annot"><span class="annottext">Map TokenName Integer
+</span><a href="#local-6989586621680972643"><span class="hs-identifier hs-var">amts</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">[Value] -&gt; Value
+forall (t :: * -&gt; *) m. (Foldable t, Monoid m) =&gt; t m -&gt; m
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">fold</span></a></span><span> </span><span class="annot"><span class="annottext">[Value]
+</span><a href="#local-6989586621680972642"><span class="hs-identifier hs-var">values</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#mkCurrency"><span class="hs-identifier hs-type">mkCurrency</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span>
+</span><span id="line-77"></span><span id="mkCurrency"><span class="annot"><span class="annottext">mkCurrency :: TxOutRef -&gt; [(TokenName, Integer)] -&gt; OneShotCurrency
+</span><a href="Plutus.Contracts.Currency.html#mkCurrency"><span class="hs-identifier hs-var hs-var">mkCurrency</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span id="local-6989586621680972633"><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972633"><span class="hs-identifier hs-var">h</span></a></span></span><span> </span><span id="local-6989586621680972632"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972632"><span class="hs-identifier hs-var">i</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621680972631"><span class="annot"><span class="annottext">[(TokenName, Integer)]
+</span><a href="#local-6989586621680972631"><span class="hs-identifier hs-var">amts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-78"></span><span>    </span><span class="annot"><span class="annottext">OneShotCurrency :: (TxId, Integer) -&gt; Map TokenName Integer -&gt; OneShotCurrency
+</span><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span>
+</span><span id="line-79"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">curRefTransactionOutput :: (TxId, Integer)
+</span><a href="Plutus.Contracts.Currency.html#curRefTransactionOutput"><span class="hs-identifier hs-var">curRefTransactionOutput</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972633"><span class="hs-identifier hs-var">h</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972632"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>        </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">curAmounts :: Map TokenName Integer
+</span><a href="Plutus.Contracts.Currency.html#curAmounts"><span class="hs-identifier hs-var">curAmounts</span></a></span><span>              </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(TokenName, Integer)] -&gt; Map TokenName Integer
+forall k v. [(k, v)] -&gt; Map k v
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">AssocMap.fromList</span></a></span><span> </span><span class="annot"><span class="annottext">[(TokenName, Integer)]
+</span><a href="#local-6989586621680972631"><span class="hs-identifier hs-var">amts</span></a></span><span>
+</span><span id="line-81"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#checkPolicy"><span class="hs-identifier hs-type">checkPolicy</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">V.ScriptContext</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-84"></span><span id="checkPolicy"><span class="annot"><span class="annottext">checkPolicy :: OneShotCurrency -&gt; () -&gt; ScriptContext -&gt; Bool
+</span><a href="Plutus.Contracts.Currency.html#checkPolicy"><span class="hs-identifier hs-var hs-var">checkPolicy</span></a></span></span><span> </span><span id="local-6989586621680972628"><span class="annot"><span class="annottext">c :: OneShotCurrency
+</span><a href="#local-6989586621680972628"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972627"><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972627"><span class="hs-identifier hs-var">refHash</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972626"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972626"><span class="hs-identifier hs-var">refIdx</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Map TokenName Integer
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680972625"><span class="annot"><span class="annottext">ctx :: ScriptContext
+</span><a href="#local-6989586621680972625"><span class="hs-identifier hs-var">ctx</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">V.ScriptContext</span></a></span><span class="hs-special">{</span><span class="annot"><span class="annottext">scriptContextTxInfo :: ScriptContext -&gt; TxInfo
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">V.scriptContextTxInfo</span></a></span><span class="hs-glyph">=</span><span id="local-6989586621680972622"><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972622"><span class="hs-identifier hs-var">txinfo</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-keyword">let</span><span>
+</span><span id="line-86"></span><span>        </span><span class="hs-comment">-- see note [Obtaining the currency symbol]</span><span>
+</span><span id="line-87"></span><span>        </span><span id="local-6989586621680972621"><span class="annot"><span class="annottext">ownSymbol :: CurrencySymbol
+</span><a href="#local-6989586621680972621"><span class="hs-identifier hs-var hs-var">ownSymbol</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ScriptContext -&gt; CurrencySymbol
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">V.ownCurrencySymbol</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptContext
+</span><a href="#local-6989586621680972625"><span class="hs-identifier hs-var">ctx</span></a></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span>        </span><span id="local-6989586621680972619"><span class="annot"><span class="annottext">minted :: Value
+</span><a href="#local-6989586621680972619"><span class="hs-identifier hs-var hs-var">minted</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; Value
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">V.txInfoMint</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972622"><span class="hs-identifier hs-var">txinfo</span></a></span><span>
+</span><span id="line-90"></span><span>        </span><span id="local-6989586621680972617"><span class="annot"><span class="annottext">expected :: Value
+</span><a href="#local-6989586621680972617"><span class="hs-identifier hs-var hs-var">expected</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; OneShotCurrency -&gt; Value
+</span><a href="Plutus.Contracts.Currency.html#currencyValue"><span class="hs-identifier hs-var">currencyValue</span></a></span><span> </span><span class="annot"><span class="annottext">CurrencySymbol
+</span><a href="#local-6989586621680972621"><span class="hs-identifier hs-var">ownSymbol</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972628"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span>        </span><span class="hs-comment">-- True if the pending transaction mints the amount of</span><span>
+</span><span id="line-93"></span><span>        </span><span class="hs-comment">-- currency that we expect</span><span>
+</span><span id="line-94"></span><span>        </span><span id="local-6989586621680972616"><span class="annot"><span class="annottext">mintOK :: Bool
+</span><a href="#local-6989586621680972616"><span class="hs-identifier hs-var hs-var">mintOK</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-95"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972615"><span class="annot"><span class="annottext">v :: Bool
+</span><a href="#local-6989586621680972615"><span class="hs-identifier hs-var hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680972617"><span class="hs-identifier hs-var">expected</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Value -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680972619"><span class="hs-identifier hs-var">minted</span></a></span><span>
+</span><span id="line-96"></span><span>            </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;C0&quot;</span></span><span> </span><span class="hs-comment">{-&quot;Value minted different from expected&quot;-}</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621680972615"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span>        </span><span class="hs-comment">-- True if the pending transaction spends the output</span><span>
+</span><span id="line-99"></span><span>        </span><span class="hs-comment">-- identified by @(refHash, refIdx)@</span><span>
+</span><span id="line-100"></span><span>        </span><span id="local-6989586621680972612"><span class="annot"><span class="annottext">txOutputSpent :: Bool
+</span><a href="#local-6989586621680972612"><span class="hs-identifier hs-var hs-var">txOutputSpent</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-101"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972611"><span class="annot"><span class="annottext">v :: Bool
+</span><a href="#local-6989586621680972611"><span class="hs-identifier hs-var hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxInfo -&gt; TxId -&gt; Integer -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">V.spendsOutput</span></a></span><span> </span><span class="annot"><span class="annottext">TxInfo
+</span><a href="#local-6989586621680972622"><span class="hs-identifier hs-var">txinfo</span></a></span><span> </span><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680972627"><span class="hs-identifier hs-var">refHash</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972626"><span class="hs-identifier hs-var">refIdx</span></a></span><span>
+</span><span id="line-102"></span><span>            </span><span class="hs-keyword">in</span><span>  </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;C1&quot;</span></span><span> </span><span class="hs-comment">{-&quot;Pending transaction does not spend the designated transaction output&quot;-}</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621680972611"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621680972616"><span class="hs-identifier hs-var">mintOK</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621680972612"><span class="hs-identifier hs-var">txOutputSpent</span></a></span><span>
+</span><span id="line-105"></span><span>
+</span><span id="line-106"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#curPolicy"><span class="hs-identifier hs-type">curPolicy</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">MintingPolicy</span></a></span><span>
+</span><span id="line-107"></span><span id="curPolicy"><span class="annot"><span class="annottext">curPolicy :: OneShotCurrency -&gt; MintingPolicy
+</span><a href="Plutus.Contracts.Currency.html#curPolicy"><span class="hs-identifier hs-var hs-var">curPolicy</span></a></span></span><span> </span><span id="local-6989586621680972608"><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972608"><span class="hs-identifier hs-var">cur</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ()) -&gt; MintingPolicy
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">mkMintingPolicyScript</span></a></span><span> </span><span class="annot"><span class="annottext">(CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ()) -&gt; MintingPolicy)
+-&gt; CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ()) -&gt; MintingPolicy
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-glyph">\</span><span class="hs-identifier">c</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-identifier">Scripts.mkUntypedMintingPolicy</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">checkPolicy</span><span> </span><span class="hs-identifier">c</span><span class="hs-special">)</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span><span>        </span><span class="annot"><span class="annottext">CompiledCode (OneShotCurrency -&gt; BuiltinData -&gt; BuiltinData -&gt; ())
+-&gt; CompiledCodeIn DefaultUni DefaultFun OneShotCurrency
+-&gt; CompiledCode (BuiltinData -&gt; BuiltinData -&gt; ())
+forall (uni :: * -&gt; *) fun a b.
+(Closed uni, Everywhere uni Flat, Flat fun,
+ Everywhere uni PrettyConst, GShow uni, Pretty fun) =&gt;
+CompiledCodeIn uni fun (a -&gt; b)
+-&gt; CompiledCodeIn uni fun a -&gt; CompiledCodeIn uni fun b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">`PlutusTx.applyCode`</span></a></span><span>
+</span><span id="line-110"></span><span>            </span><span class="annot"><span class="annottext">OneShotCurrency
+-&gt; CompiledCodeIn DefaultUni DefaultFun OneShotCurrency
+forall (uni :: * -&gt; *) a fun.
+(Lift uni a, Throwable uni fun, Typecheckable uni fun) =&gt;
+a -&gt; CompiledCodeIn uni fun a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">PlutusTx.liftCode</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972608"><span class="hs-identifier hs-var">cur</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">{- note [Obtaining the currency symbol]
+
+The currency symbol is the address (hash) of the validator. That is why
+we can use 'Ledger.scriptAddress' here to get the symbol  in off-chain code,
+for example in 'mintedValue'.
+
+Inside the validator script (on-chain) we can't use 'Ledger.scriptAddress',
+because at that point we don't know the hash of the script yet. That
+is why we use 'V.ownCurrencySymbol', which obtains the hash from the
+'PolicyCtx' value.
+
+-}</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | The 'Value' minted by the 'OneShotCurrency' contract</span><span>
+</span><span id="line-126"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#mintedValue"><span class="hs-identifier hs-type">mintedValue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span>
+</span><span id="line-127"></span><span id="mintedValue"><span class="annot"><span class="annottext">mintedValue :: OneShotCurrency -&gt; Value
+</span><a href="Plutus.Contracts.Currency.html#mintedValue"><span class="hs-identifier hs-var hs-var">mintedValue</span></a></span></span><span> </span><span id="local-6989586621680972600"><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972600"><span class="hs-identifier hs-var">cur</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CurrencySymbol -&gt; OneShotCurrency -&gt; Value
+</span><a href="Plutus.Contracts.Currency.html#currencyValue"><span class="hs-identifier hs-var">currencyValue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OneShotCurrency -&gt; CurrencySymbol
+</span><a href="Plutus.Contracts.Currency.html#currencySymbol"><span class="hs-identifier hs-var">currencySymbol</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972600"><span class="hs-identifier hs-var">cur</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972600"><span class="hs-identifier hs-var">cur</span></a></span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#currencySymbol"><span class="hs-identifier hs-type">currencySymbol</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">CurrencySymbol</span></a></span><span>
+</span><span id="line-130"></span><span id="currencySymbol"><span class="annot"><span class="annottext">currencySymbol :: OneShotCurrency -&gt; CurrencySymbol
+</span><a href="Plutus.Contracts.Currency.html#currencySymbol"><span class="hs-identifier hs-var hs-var">currencySymbol</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MintingPolicy -&gt; CurrencySymbol
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">PV1.scriptCurrencySymbol</span></a></span><span> </span><span class="annot"><span class="annottext">(MintingPolicy -&gt; CurrencySymbol)
+-&gt; (OneShotCurrency -&gt; MintingPolicy)
+-&gt; OneShotCurrency
+-&gt; CurrencySymbol
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency -&gt; MintingPolicy
+</span><a href="Plutus.Contracts.Currency.html#curPolicy"><span class="hs-identifier hs-var">curPolicy</span></a></span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span id="local-6989586621680972596"><span id="local-6989586621680972597"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="CurrencyError"><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencyError"><span class="hs-identifier hs-var">CurrencyError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-133"></span><span>    </span><span id="CurContractError"><span class="annot"><a href="Plutus.Contracts.Currency.html#CurContractError"><span class="hs-identifier hs-var">CurContractError</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">ContractError</span></a></span><span>
+</span><span id="line-134"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972591"><span id="local-6989586621680972593"><span class="annot"><span class="annottext">CurrencyError -&gt; CurrencyError -&gt; Bool
+(CurrencyError -&gt; CurrencyError -&gt; Bool)
+-&gt; (CurrencyError -&gt; CurrencyError -&gt; Bool) -&gt; Eq CurrencyError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CurrencyError -&gt; CurrencyError -&gt; Bool
+$c/= :: CurrencyError -&gt; CurrencyError -&gt; Bool
+== :: CurrencyError -&gt; CurrencyError -&gt; Bool
+$c== :: CurrencyError -&gt; CurrencyError -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972585"><span id="local-6989586621680972587"><span id="local-6989586621680972589"><span class="annot"><span class="annottext">Int -&gt; CurrencyError -&gt; ShowS
+[CurrencyError] -&gt; ShowS
+CurrencyError -&gt; String
+(Int -&gt; CurrencyError -&gt; ShowS)
+-&gt; (CurrencyError -&gt; String)
+-&gt; ([CurrencyError] -&gt; ShowS)
+-&gt; Show CurrencyError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CurrencyError] -&gt; ShowS
+$cshowList :: [CurrencyError] -&gt; ShowS
+show :: CurrencyError -&gt; String
+$cshow :: CurrencyError -&gt; String
+showsPrec :: Int -&gt; CurrencyError -&gt; ShowS
+$cshowsPrec :: Int -&gt; CurrencyError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. CurrencyError -&gt; Rep CurrencyError x)
+-&gt; (forall x. Rep CurrencyError x -&gt; CurrencyError)
+-&gt; Generic CurrencyError
+forall x. Rep CurrencyError x -&gt; CurrencyError
+forall x. CurrencyError -&gt; Rep CurrencyError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep CurrencyError x -&gt; CurrencyError
+$cfrom :: forall x. CurrencyError -&gt; Rep CurrencyError x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972575"><span id="local-6989586621680972577"><span id="local-6989586621680972579"><span id="local-6989586621680972581"><span class="annot"><span class="annottext">[CurrencyError] -&gt; Encoding
+[CurrencyError] -&gt; Value
+CurrencyError -&gt; Encoding
+CurrencyError -&gt; Value
+(CurrencyError -&gt; Value)
+-&gt; (CurrencyError -&gt; Encoding)
+-&gt; ([CurrencyError] -&gt; Value)
+-&gt; ([CurrencyError] -&gt; Encoding)
+-&gt; ToJSON CurrencyError
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [CurrencyError] -&gt; Encoding
+$ctoEncodingList :: [CurrencyError] -&gt; Encoding
+toJSONList :: [CurrencyError] -&gt; Value
+$ctoJSONList :: [CurrencyError] -&gt; Value
+toEncoding :: CurrencyError -&gt; Encoding
+$ctoEncoding :: CurrencyError -&gt; Encoding
+toJSON :: CurrencyError -&gt; Value
+$ctoJSON :: CurrencyError -&gt; Value
+</span><a href="#local-6989586621680972575"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972571"><span id="local-6989586621680972573"><span class="annot"><span class="annottext">Value -&gt; Parser [CurrencyError]
+Value -&gt; Parser CurrencyError
+(Value -&gt; Parser CurrencyError)
+-&gt; (Value -&gt; Parser [CurrencyError]) -&gt; FromJSON CurrencyError
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [CurrencyError]
+$cparseJSONList :: Value -&gt; Parser [CurrencyError]
+parseJSON :: Value -&gt; Parser CurrencyError
+$cparseJSON :: Value -&gt; Parser CurrencyError
+</span><a href="#local-6989586621680972571"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span id="_CurContractError"><span id="_CurrencyError"><span id="local-6989586621680972566"><span id="local-6989586621680972568"><span id="local-6989586621680972570"><span id="AsCurrencyError"><span id="local-6989586621680972817"><span class="hs-identifier">makeClassyPrisms</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">CurrencyError</span></span></span></span></span></span></span></span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680972542"><span id="local-6989586621680972544"><span id="local-6989586621680972546"><span id="local-6989586621680972548"><span id="local-6989586621680972550"><span id="local-6989586621680972552"><span id="local-6989586621680972554"><span id="local-6989586621680972556"><span id="local-6989586621680972558"><span id="local-6989586621680972560"><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencyError"><span class="hs-identifier hs-type">CurrencyError</span></a></span></span></span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621680972540"><span class="annot"><span class="annottext">_ContractError :: p ContractError (f ContractError)
+-&gt; p CurrencyError (f CurrencyError)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">_ContractError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">p ContractError (f ContractError)
+-&gt; p CurrencyError (f CurrencyError)
+forall r. AsCurrencyError r =&gt; Prism' r ContractError
+</span><a href="Plutus.Contracts.Currency.html#_CurContractError"><span class="hs-identifier hs-var">_CurContractError</span></a></span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span class="hs-comment">-- | @mint [(n1, c1), ..., (n_k, c_k)]@ creates a new currency with</span><span>
+</span><span id="line-143"></span><span class="hs-comment">--   @k@ token names, minting @c_i@ units of each token @n_i@.</span><span>
+</span><span id="line-144"></span><span class="hs-comment">--   If @k == 0@ then no value is minted. A one-shot minting policy</span><span>
+</span><span id="line-145"></span><span class="hs-comment">--   script is used to ensure that no more units of the currency can</span><span>
+</span><span id="line-146"></span><span class="hs-comment">--   be minted afterwards.</span><span>
+</span><span id="line-147"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#mintContract"><span class="hs-identifier hs-type">mintContract</span></a></span><span>
+</span><span id="line-148"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680972702"><span class="annot"><a href="#local-6989586621680972702"><span class="hs-identifier hs-type">w</span></a></span></span><span> </span><span id="local-6989586621680972701"><span class="annot"><a href="#local-6989586621680972701"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span id="local-6989586621680972703"><span class="annot"><a href="#local-6989586621680972703"><span class="hs-identifier hs-type">e</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-149"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#AsCurrencyError"><span class="hs-identifier hs-type">AsCurrencyError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972703"><span class="hs-identifier hs-type">e</span></a></span><span>
+</span><span id="line-150"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">CardanoAddress</span></a></span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972702"><span class="hs-identifier hs-type">w</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972701"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972703"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span>
+</span><span id="line-154"></span><span id="mintContract"><span class="annot"><span class="annottext">mintContract :: CardanoAddress
+-&gt; [(TokenName, Integer)] -&gt; Contract w s e OneShotCurrency
+</span><a href="Plutus.Contracts.Currency.html#mintContract"><span class="hs-identifier hs-var hs-var">mintContract</span></a></span></span><span> </span><span id="local-6989586621680972538"><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621680972538"><span class="hs-identifier hs-var">addr</span></a></span></span><span> </span><span id="local-6989586621680972537"><span class="annot"><span class="annottext">[(TokenName, Integer)]
+</span><a href="#local-6989586621680972537"><span class="hs-identifier hs-var">amounts</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(CurrencyError -&gt; e)
+-&gt; Contract w s CurrencyError OneShotCurrency
+-&gt; Contract w s e OneShotCurrency
+forall w (s :: Row *) e e' a.
+(e -&gt; e') -&gt; Contract w s e a -&gt; Contract w s e' a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mapError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">AReview e CurrencyError -&gt; CurrencyError -&gt; e
+forall b (m :: * -&gt; *) t. MonadReader b m =&gt; AReview t b -&gt; m t
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">review</span></a></span><span> </span><span class="annot"><span class="annottext">AReview e CurrencyError
+forall r. AsCurrencyError r =&gt; Prism' r CurrencyError
+</span><a href="Plutus.Contracts.Currency.html#_CurrencyError"><span class="hs-identifier hs-var">_CurrencyError</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Contract w s CurrencyError OneShotCurrency
+ -&gt; Contract w s e OneShotCurrency)
+-&gt; Contract w s CurrencyError OneShotCurrency
+-&gt; Contract w s e OneShotCurrency
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-155"></span><span>    </span><span id="local-6989586621680972534"><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680972534"><span class="hs-identifier hs-var">txOutRef</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Contract w s CurrencyError TxOutRef
+forall e w (s :: Row *).
+AsContractError e =&gt;
+Contract w s e TxOutRef
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getUnspentOutput</span></a></span><span>
+</span><span id="line-156"></span><span>    </span><span id="local-6989586621680972533"><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972533"><span class="hs-identifier hs-var">utxos</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+-&gt; Contract w s CurrencyError (Map TxOutRef DecoratedTxOut)
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+CardanoAddress -&gt; Contract w s e (Map TxOutRef DecoratedTxOut)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">utxosAt</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621680972538"><span class="hs-identifier hs-var">addr</span></a></span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972531"><span class="annot"><span class="annottext">theCurrency :: OneShotCurrency
+</span><a href="#local-6989586621680972531"><span class="hs-identifier hs-var hs-var">theCurrency</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; [(TokenName, Integer)] -&gt; OneShotCurrency
+</span><a href="Plutus.Contracts.Currency.html#mkCurrency"><span class="hs-identifier hs-var">mkCurrency</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680972534"><span class="hs-identifier hs-var">txOutRef</span></a></span><span> </span><span class="annot"><span class="annottext">[(TokenName, Integer)]
+</span><a href="#local-6989586621680972537"><span class="hs-identifier hs-var">amounts</span></a></span><span>
+</span><span id="line-158"></span><span>        </span><span id="local-6989586621680972530"><span class="annot"><span class="annottext">curVali :: MintingPolicy
+</span><a href="#local-6989586621680972530"><span class="hs-identifier hs-var hs-var">curVali</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OneShotCurrency -&gt; MintingPolicy
+</span><a href="Plutus.Contracts.Currency.html#curPolicy"><span class="hs-identifier hs-var">curPolicy</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972531"><span class="hs-identifier hs-var">theCurrency</span></a></span><span>
+</span><span id="line-159"></span><span>        </span><span id="local-6989586621680972529"><span class="annot"><span class="annottext">lookups :: ScriptLookups Any
+</span><a href="#local-6989586621680972529"><span class="hs-identifier hs-var hs-var">lookups</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MintingPolicy -&gt; ScriptLookups Any
+forall a. MintingPolicy -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.plutusV1MintingPolicy</span></a></span><span> </span><span class="annot"><span class="annottext">MintingPolicy
+</span><a href="#local-6989586621680972530"><span class="hs-identifier hs-var">curVali</span></a></span><span>
+</span><span id="line-160"></span><span>                        </span><span class="annot"><span class="annottext">ScriptLookups Any -&gt; ScriptLookups Any -&gt; ScriptLookups Any
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut -&gt; ScriptLookups Any
+forall a. Map TxOutRef DecoratedTxOut -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680972533"><span class="hs-identifier hs-var">utxos</span></a></span><span>
+</span><span id="line-161"></span><span>        </span><span id="local-6989586621680972526"><span class="annot"><span class="annottext">mintTx :: TxConstraints BuiltinData BuiltinData
+</span><a href="#local-6989586621680972526"><span class="hs-identifier hs-var hs-var">mintTx</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; TxConstraints BuiltinData BuiltinData
+forall i o. TxOutRef -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustSpendPubKeyOutput</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680972534"><span class="hs-identifier hs-var">txOutRef</span></a></span><span>
+</span><span id="line-162"></span><span>                        </span><span class="annot"><span class="annottext">TxConstraints BuiltinData BuiltinData
+-&gt; TxConstraints BuiltinData BuiltinData
+-&gt; TxConstraints BuiltinData BuiltinData
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; TxConstraints BuiltinData BuiltinData
+forall i o. Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustMintValue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OneShotCurrency -&gt; Value
+</span><a href="Plutus.Contracts.Currency.html#mintedValue"><span class="hs-identifier hs-var">mintedValue</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972531"><span class="hs-identifier hs-var">theCurrency</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span>    </span><span id="local-6989586621680972523"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680972523"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ScriptLookups Any
+-&gt; TxConstraints (RedeemerType Any) (DatumType Any)
+-&gt; Contract w s CurrencyError CardanoTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitTxConstraintsWith</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.Any</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups Any
+</span><a href="#local-6989586621680972529"><span class="hs-identifier hs-var">lookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints (RedeemerType Any) (DatumType Any)
+TxConstraints BuiltinData BuiltinData
+</span><a href="#local-6989586621680972526"><span class="hs-identifier hs-var">mintTx</span></a></span><span>
+</span><span id="line-164"></span><span>    </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TxId -&gt; Contract w s CurrencyError ()
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+TxId -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">awaitTxConfirmed</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680972523"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-165"></span><span>    </span><span class="annot"><span class="annottext">OneShotCurrency -&gt; Contract w s CurrencyError OneShotCurrency
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972531"><span class="hs-identifier hs-var">theCurrency</span></a></span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- | Minting policy for a currency that has a fixed amount of tokens issued</span><span>
+</span><span id="line-168"></span><span class="hs-comment">--   in one transaction</span><span>
+</span><span id="line-169"></span><span id="local-6989586621680972518"><span id="local-6989586621680972519"></span></span><span class="hs-keyword">data</span><span> </span><span id="SimpleMPS"><span class="annot"><a href="Plutus.Contracts.Currency.html#SimpleMPS"><span class="hs-identifier hs-var">SimpleMPS</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-170"></span><span>    </span><span id="SimpleMPS"><span class="annot"><a href="Plutus.Contracts.Currency.html#SimpleMPS"><span class="hs-identifier hs-var">SimpleMPS</span></a></span></span><span>
+</span><span id="line-171"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="tokenName"><span class="annot"><span class="annottext">SimpleMPS -&gt; TokenName
+</span><a href="Plutus.Contracts.Currency.html#tokenName"><span class="hs-identifier hs-var hs-var">tokenName</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TokenName</span></a></span><span>
+</span><span id="line-172"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="amount"><span class="annot"><span class="annottext">SimpleMPS -&gt; Integer
+</span><a href="Plutus.Contracts.Currency.html#amount"><span class="hs-identifier hs-var hs-var">amount</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-173"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-174"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972511"><span id="local-6989586621680972513"><span class="annot"><span class="annottext">SimpleMPS -&gt; SimpleMPS -&gt; Bool
+(SimpleMPS -&gt; SimpleMPS -&gt; Bool)
+-&gt; (SimpleMPS -&gt; SimpleMPS -&gt; Bool) -&gt; Eq SimpleMPS
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SimpleMPS -&gt; SimpleMPS -&gt; Bool
+$c/= :: SimpleMPS -&gt; SimpleMPS -&gt; Bool
+== :: SimpleMPS -&gt; SimpleMPS -&gt; Bool
+$c== :: SimpleMPS -&gt; SimpleMPS -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972505"><span id="local-6989586621680972507"><span id="local-6989586621680972509"><span class="annot"><span class="annottext">Int -&gt; SimpleMPS -&gt; ShowS
+[SimpleMPS] -&gt; ShowS
+SimpleMPS -&gt; String
+(Int -&gt; SimpleMPS -&gt; ShowS)
+-&gt; (SimpleMPS -&gt; String)
+-&gt; ([SimpleMPS] -&gt; ShowS)
+-&gt; Show SimpleMPS
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SimpleMPS] -&gt; ShowS
+$cshowList :: [SimpleMPS] -&gt; ShowS
+show :: SimpleMPS -&gt; String
+$cshow :: SimpleMPS -&gt; String
+showsPrec :: Int -&gt; SimpleMPS -&gt; ShowS
+$cshowsPrec :: Int -&gt; SimpleMPS -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Haskell.Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. SimpleMPS -&gt; Rep SimpleMPS x)
+-&gt; (forall x. Rep SimpleMPS x -&gt; SimpleMPS) -&gt; Generic SimpleMPS
+forall x. Rep SimpleMPS x -&gt; SimpleMPS
+forall x. SimpleMPS -&gt; Rep SimpleMPS x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SimpleMPS x -&gt; SimpleMPS
+$cfrom :: forall x. SimpleMPS -&gt; Rep SimpleMPS x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-175"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680972499"><span id="local-6989586621680972501"><span class="annot"><span class="annottext">Value -&gt; Parser [SimpleMPS]
+Value -&gt; Parser SimpleMPS
+(Value -&gt; Parser SimpleMPS)
+-&gt; (Value -&gt; Parser [SimpleMPS]) -&gt; FromJSON SimpleMPS
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [SimpleMPS]
+$cparseJSONList :: Value -&gt; Parser [SimpleMPS]
+parseJSON :: Value -&gt; Parser SimpleMPS
+$cparseJSON :: Value -&gt; Parser SimpleMPS
+</span><a href="#local-6989586621680972499"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972491"><span id="local-6989586621680972493"><span id="local-6989586621680972495"><span id="local-6989586621680972497"><span class="annot"><span class="annottext">[SimpleMPS] -&gt; Encoding
+[SimpleMPS] -&gt; Value
+SimpleMPS -&gt; Encoding
+SimpleMPS -&gt; Value
+(SimpleMPS -&gt; Value)
+-&gt; (SimpleMPS -&gt; Encoding)
+-&gt; ([SimpleMPS] -&gt; Value)
+-&gt; ([SimpleMPS] -&gt; Encoding)
+-&gt; ToJSON SimpleMPS
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [SimpleMPS] -&gt; Encoding
+$ctoEncodingList :: [SimpleMPS] -&gt; Encoding
+toJSONList :: [SimpleMPS] -&gt; Value
+$ctoJSONList :: [SimpleMPS] -&gt; Value
+toEncoding :: SimpleMPS -&gt; Encoding
+$ctoEncoding :: SimpleMPS -&gt; Encoding
+toJSON :: SimpleMPS -&gt; Value
+$ctoJSON :: SimpleMPS -&gt; Value
+</span><a href="#local-6989586621680972491"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972489"><span class="annot"><span class="annottext">FormSchema
+FormSchema -&gt; ToSchema SimpleMPS
+forall a. FormSchema -&gt; ToSchema a
+toSchema :: FormSchema
+$ctoSchema :: FormSchema
+</span><a href="../../../../playground-common/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">ToSchema</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-176"></span><span>
+</span><span id="line-177"></span><span class="hs-keyword">type</span><span> </span><span id="CurrencySchema"><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencySchema"><span class="hs-identifier hs-var">CurrencySchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-178"></span><span>        </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;Create native token&quot;</span></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#SimpleMPS"><span class="hs-identifier hs-type">SimpleMPS</span></a></span><span>
+</span><span id="line-179"></span><span>
+</span><span id="line-180"></span><span class="hs-comment">-- | Use 'mintContract' to create the currency specified by a 'SimpleMPS'</span><span>
+</span><span id="line-181"></span><span class="annot"><a href="Plutus.Contracts.Currency.html#mintCurrency"><span class="hs-identifier hs-type">mintCurrency</span></a></span><span>
+</span><span id="line-182"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Last</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencySchema"><span class="hs-identifier hs-type">CurrencySchema</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#CurrencyError"><span class="hs-identifier hs-type">CurrencyError</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.Currency.html#OneShotCurrency"><span class="hs-identifier hs-type">OneShotCurrency</span></a></span><span>
+</span><span id="line-183"></span><span id="mintCurrency"><span class="annot"><span class="annottext">mintCurrency :: Promise
+  (Maybe (Last OneShotCurrency))
+  CurrencySchema
+  CurrencyError
+  OneShotCurrency
+</span><a href="Plutus.Contracts.Currency.html#mintCurrency"><span class="hs-identifier hs-var hs-var">mintCurrency</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;Create native token&quot; a s, AsContractError e,
+ FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;Create native token&quot;</span></span><span> </span><span class="annot"><span class="annottext">((SimpleMPS
+  -&gt; Contract
+       (Maybe (Last OneShotCurrency))
+       ('R
+          '[ &quot;Create native token&quot;
+             ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+       CurrencyError
+       OneShotCurrency)
+ -&gt; Promise
+      (Maybe (Last OneShotCurrency))
+      ('R
+         '[ &quot;Create native token&quot;
+            ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+      CurrencyError
+      OneShotCurrency)
+-&gt; (SimpleMPS
+    -&gt; Contract
+         (Maybe (Last OneShotCurrency))
+         ('R
+            '[ &quot;Create native token&quot;
+               ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+         CurrencyError
+         OneShotCurrency)
+-&gt; Promise
+     (Maybe (Last OneShotCurrency))
+     ('R
+        '[ &quot;Create native token&quot;
+           ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+     CurrencyError
+     OneShotCurrency
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><a href="Plutus.Contracts.Currency.html#SimpleMPS"><span class="hs-identifier hs-type">SimpleMPS</span></a></span><span class="hs-special">{</span><span id="local-6989586621680972485"><span class="annot"><span class="annottext">TokenName
+tokenName :: TokenName
+tokenName :: SimpleMPS -&gt; TokenName
+</span><a href="#local-6989586621680972485"><span class="hs-identifier hs-var hs-var">tokenName</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680972484"><span class="annot"><span class="annottext">Integer
+amount :: Integer
+amount :: SimpleMPS -&gt; Integer
+</span><a href="#local-6989586621680972484"><span class="hs-identifier hs-var hs-var">amount</span></a></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-184"></span><span>    </span><span id="local-6989586621680972483"><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621680972483"><span class="hs-identifier hs-var">ownAddr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Contract
+  (Maybe (Last OneShotCurrency))
+  ('R
+     '[ &quot;Create native token&quot;
+        ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+  CurrencyError
+  CardanoAddress
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+Contract w s e CardanoAddress
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">ownAddress</span></a></span><span>
+</span><span id="line-185"></span><span>    </span><span id="local-6989586621680972481"><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972481"><span class="hs-identifier hs-var">cur</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+-&gt; [(TokenName, Integer)]
+-&gt; Contract
+     (Maybe (Last OneShotCurrency))
+     ('R
+        '[ &quot;Create native token&quot;
+           ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+     CurrencyError
+     OneShotCurrency
+forall w (s :: Row *) e.
+AsCurrencyError e =&gt;
+CardanoAddress
+-&gt; [(TokenName, Integer)] -&gt; Contract w s e OneShotCurrency
+</span><a href="Plutus.Contracts.Currency.html#mintContract"><span class="hs-identifier hs-var">mintContract</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+</span><a href="#local-6989586621680972483"><span class="hs-identifier hs-var">ownAddr</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">TokenName
+</span><a href="#local-6989586621680972485"><span class="hs-identifier hs-var">tokenName</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680972484"><span class="hs-identifier hs-var">amount</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-186"></span><span>    </span><span class="annot"><span class="annottext">Maybe (Last OneShotCurrency)
+-&gt; Contract
+     (Maybe (Last OneShotCurrency))
+     ('R
+        '[ &quot;Create native token&quot;
+           ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+     CurrencyError
+     ()
+forall w (s :: Row *) e. w -&gt; Contract w s e ()
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">tell</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Last OneShotCurrency -&gt; Maybe (Last OneShotCurrency)
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OneShotCurrency -&gt; Last OneShotCurrency
+forall a. a -&gt; Last a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Last</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972481"><span class="hs-identifier hs-var">cur</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span>    </span><span class="annot"><span class="annottext">OneShotCurrency
+-&gt; Contract
+     (Maybe (Last OneShotCurrency))
+     ('R
+        '[ &quot;Create native token&quot;
+           ':-&gt; (EndpointValue SimpleMPS, ActiveEndpoint)])
+     CurrencyError
+     OneShotCurrency
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">OneShotCurrency
+</span><a href="#local-6989586621680972481"><span class="hs-identifier hs-var">cur</span></a></span><span>
+</span><span id="line-188"></span></pre></body></html>

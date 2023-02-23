@@ -1,0 +1,886 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass             #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveFunctor              #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric              #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies         #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts           #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings          #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards            #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables        #-}</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Language.Haskell.Interpreter</span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#runghc"><span class="hs-identifier">runghc</span></a></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier">CompilationError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterError"><span class="hs-identifier">InterpreterError</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#SourceCode"><span class="hs-identifier">SourceCode</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#avoidUnsafe"><span class="hs-identifier">avoidUnsafe</span></a></span><span>
+</span><span id="line-17"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#Warning"><span class="hs-identifier">Warning</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterResult"><span class="hs-identifier">InterpreterResult</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#parseErrorText"><span class="hs-identifier">parseErrorText</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">unless</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">Control.Monad.Catch</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">MonadCatch</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier">MonadMask</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier">Control.Monad.Error.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier">MonadError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier">throwError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad.IO.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">MonadIO</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">liftIO</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">Control.Monad.Trans.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">lift</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">Control.Monad.Trans.State</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">StateT</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">evalStateT</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">get</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier">put</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/ndym3i5f1brfc2p8gl7xlxxvdlii09kc-newtype-generics-lib-newtype-generics-0.6.2-haddock-doc/share/doc/newtype-generics/html/src"><span class="hs-identifier">Control.Newtype.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/ndym3i5f1brfc2p8gl7xlxxvdlii09kc-newtype-generics-lib-newtype-generics-0.6.2-haddock-doc/share/doc/newtype-generics/html/src"><span class="hs-identifier">Newtype</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/ndym3i5f1brfc2p8gl7xlxxvdlii09kc-newtype-generics-lib-newtype-generics-0.6.2-haddock-doc/share/doc/newtype-generics/html/src"><span class="hs-identifier">Control.Newtype.Generics</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Newtype</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/h457g4x9frx3vb5md06c1ks7wi2hkriq-time-out-lib-time-out-0.2-haddock-doc/share/doc/time-out/html/src"><span class="hs-identifier">Control.Timeout</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/h457g4x9frx3vb5md06c1ks7wi2hkriq-time-out-lib-time-out-0.2-haddock-doc/share/doc/time-out/html/src"><span class="hs-identifier">timeout</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">second</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">fromMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text.Internal.Search</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">Data.Time.Units</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier">TimeUnit</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">System.Environment</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">lookupEnv</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">System.Exit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">ExitCode</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">ExitSuccess</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">System.IO.Error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">tryIOError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lrjyi1qsn92kapwcckwhqsqwkgqwp0dm-process-lib-process-1.6.13.2-haddock-doc/share/doc/process/html/src"><span class="hs-identifier">System.Process</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/lrjyi1qsn92kapwcckwhqsqwkgqwp0dm-process-lib-process-1.6.13.2-haddock-doc/share/doc/process/html/src"><span class="hs-identifier">readProcessWithExitCode</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Text.Read</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">readMaybe</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span id="local-6989586621679738036"><span id="local-6989586621679738037"></span></span><span class="hs-keyword">data</span><span> </span><span id="CompilationError"><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier hs-var">CompilationError</span></a></span></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="RawError"><span class="annot"><a href="Language.Haskell.Interpreter.html#RawError"><span class="hs-identifier hs-var">RawError</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="CompilationError"><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier hs-var">CompilationError</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="filename"><span class="annot"><span class="annottext">CompilationError -&gt; Text
+</span><a href="Language.Haskell.Interpreter.html#filename"><span class="hs-identifier hs-var hs-var">filename</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span>
+</span><span id="line-48"></span><span>                       </span><span class="hs-special">,</span><span> </span><span id="row"><span class="annot"><span class="annottext">CompilationError -&gt; Int
+</span><a href="Language.Haskell.Interpreter.html#row"><span class="hs-identifier hs-var hs-var">row</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-49"></span><span>                       </span><span class="hs-special">,</span><span> </span><span id="column"><span class="annot"><span class="annottext">CompilationError -&gt; Int
+</span><a href="Language.Haskell.Interpreter.html#column"><span class="hs-identifier hs-var hs-var">column</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-50"></span><span>                       </span><span class="hs-special">,</span><span> </span><span id="text"><span class="annot"><span class="annottext">CompilationError -&gt; [Text]
+</span><a href="Language.Haskell.Interpreter.html#text"><span class="hs-identifier hs-var hs-var">text</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">[</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679738024"><span id="local-6989586621679738026"><span id="local-6989586621679738028"><span class="annot"><span class="annottext">Int -&gt; CompilationError -&gt; ShowS
+[CompilationError] -&gt; ShowS
+CompilationError -&gt; String
+(Int -&gt; CompilationError -&gt; ShowS)
+-&gt; (CompilationError -&gt; String)
+-&gt; ([CompilationError] -&gt; ShowS)
+-&gt; Show CompilationError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CompilationError] -&gt; ShowS
+$cshowList :: [CompilationError] -&gt; ShowS
+show :: CompilationError -&gt; String
+$cshow :: CompilationError -&gt; String
+showsPrec :: Int -&gt; CompilationError -&gt; ShowS
+$cshowsPrec :: Int -&gt; CompilationError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679738019"><span id="local-6989586621679738021"><span class="annot"><span class="annottext">CompilationError -&gt; CompilationError -&gt; Bool
+(CompilationError -&gt; CompilationError -&gt; Bool)
+-&gt; (CompilationError -&gt; CompilationError -&gt; Bool)
+-&gt; Eq CompilationError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CompilationError -&gt; CompilationError -&gt; Bool
+$c/= :: CompilationError -&gt; CompilationError -&gt; Bool
+== :: CompilationError -&gt; CompilationError -&gt; Bool
+$c== :: CompilationError -&gt; CompilationError -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. CompilationError -&gt; Rep CompilationError x)
+-&gt; (forall x. Rep CompilationError x -&gt; CompilationError)
+-&gt; Generic CompilationError
+forall x. Rep CompilationError x -&gt; CompilationError
+forall x. CompilationError -&gt; Rep CompilationError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep CompilationError x -&gt; CompilationError
+$cfrom :: forall x. CompilationError -&gt; Rep CompilationError x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679738007"><span id="local-6989586621679738009"><span id="local-6989586621679738011"><span id="local-6989586621679738013"><span class="annot"><span class="annottext">[CompilationError] -&gt; Encoding
+[CompilationError] -&gt; Value
+CompilationError -&gt; Encoding
+CompilationError -&gt; Value
+(CompilationError -&gt; Value)
+-&gt; (CompilationError -&gt; Encoding)
+-&gt; ([CompilationError] -&gt; Value)
+-&gt; ([CompilationError] -&gt; Encoding)
+-&gt; ToJSON CompilationError
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [CompilationError] -&gt; Encoding
+$ctoEncodingList :: [CompilationError] -&gt; Encoding
+toJSONList :: [CompilationError] -&gt; Value
+$ctoJSONList :: [CompilationError] -&gt; Value
+toEncoding :: CompilationError -&gt; Encoding
+$ctoEncoding :: CompilationError -&gt; Encoding
+toJSON :: CompilationError -&gt; Value
+$ctoJSON :: CompilationError -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679738002"><span id="local-6989586621679738004"><span class="annot"><span class="annottext">Value -&gt; Parser [CompilationError]
+Value -&gt; Parser CompilationError
+(Value -&gt; Parser CompilationError)
+-&gt; (Value -&gt; Parser [CompilationError])
+-&gt; FromJSON CompilationError
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [CompilationError]
+$cparseJSONList :: Value -&gt; Parser [CompilationError]
+parseJSON :: Value -&gt; Parser CompilationError
+$cparseJSON :: Value -&gt; Parser CompilationError
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span id="local-6989586621679737999"><span id="local-6989586621679738000"></span></span><span class="hs-keyword">data</span><span> </span><span id="InterpreterError"><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterError"><span class="hs-identifier hs-var">InterpreterError</span></a></span></span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="CompilationErrors"><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationErrors"><span class="hs-identifier hs-var">CompilationErrors</span></a></span></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier hs-type">CompilationError</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="TimeoutError"><span class="annot"><a href="Language.Haskell.Interpreter.html#TimeoutError"><span class="hs-identifier hs-var">TimeoutError</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737991"><span id="local-6989586621679737993"><span id="local-6989586621679737995"><span class="annot"><span class="annottext">Int -&gt; InterpreterError -&gt; ShowS
+[InterpreterError] -&gt; ShowS
+InterpreterError -&gt; String
+(Int -&gt; InterpreterError -&gt; ShowS)
+-&gt; (InterpreterError -&gt; String)
+-&gt; ([InterpreterError] -&gt; ShowS)
+-&gt; Show InterpreterError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [InterpreterError] -&gt; ShowS
+$cshowList :: [InterpreterError] -&gt; ShowS
+show :: InterpreterError -&gt; String
+$cshow :: InterpreterError -&gt; String
+showsPrec :: Int -&gt; InterpreterError -&gt; ShowS
+$cshowsPrec :: Int -&gt; InterpreterError -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737987"><span id="local-6989586621679737989"><span class="annot"><span class="annottext">InterpreterError -&gt; InterpreterError -&gt; Bool
+(InterpreterError -&gt; InterpreterError -&gt; Bool)
+-&gt; (InterpreterError -&gt; InterpreterError -&gt; Bool)
+-&gt; Eq InterpreterError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: InterpreterError -&gt; InterpreterError -&gt; Bool
+$c/= :: InterpreterError -&gt; InterpreterError -&gt; Bool
+== :: InterpreterError -&gt; InterpreterError -&gt; Bool
+$c== :: InterpreterError -&gt; InterpreterError -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. InterpreterError -&gt; Rep InterpreterError x)
+-&gt; (forall x. Rep InterpreterError x -&gt; InterpreterError)
+-&gt; Generic InterpreterError
+forall x. Rep InterpreterError x -&gt; InterpreterError
+forall x. InterpreterError -&gt; Rep InterpreterError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep InterpreterError x -&gt; InterpreterError
+$cfrom :: forall x. InterpreterError -&gt; Rep InterpreterError x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737977"><span id="local-6989586621679737979"><span id="local-6989586621679737981"><span id="local-6989586621679737983"><span class="annot"><span class="annottext">[InterpreterError] -&gt; Encoding
+[InterpreterError] -&gt; Value
+InterpreterError -&gt; Encoding
+InterpreterError -&gt; Value
+(InterpreterError -&gt; Value)
+-&gt; (InterpreterError -&gt; Encoding)
+-&gt; ([InterpreterError] -&gt; Value)
+-&gt; ([InterpreterError] -&gt; Encoding)
+-&gt; ToJSON InterpreterError
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [InterpreterError] -&gt; Encoding
+$ctoEncodingList :: [InterpreterError] -&gt; Encoding
+toJSONList :: [InterpreterError] -&gt; Value
+$ctoJSONList :: [InterpreterError] -&gt; Value
+toEncoding :: InterpreterError -&gt; Encoding
+$ctoEncoding :: InterpreterError -&gt; Encoding
+toJSON :: InterpreterError -&gt; Value
+$ctoJSON :: InterpreterError -&gt; Value
+</span><a href="#local-6989586621679737977"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737973"><span id="local-6989586621679737975"><span class="annot"><span class="annottext">Value -&gt; Parser [InterpreterError]
+Value -&gt; Parser InterpreterError
+(Value -&gt; Parser InterpreterError)
+-&gt; (Value -&gt; Parser [InterpreterError])
+-&gt; FromJSON InterpreterError
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [InterpreterError]
+$cparseJSONList :: Value -&gt; Parser [InterpreterError]
+parseJSON :: Value -&gt; Parser InterpreterError
+$cparseJSON :: Value -&gt; Parser InterpreterError
+</span><a href="#local-6989586621679737973"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span id="local-6989586621679737971"><span id="local-6989586621679737972"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="SourceCode"><span class="annot"><a href="Language.Haskell.Interpreter.html#SourceCode"><span class="hs-identifier hs-var">SourceCode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SourceCode"><span class="annot"><a href="Language.Haskell.Interpreter.html#SourceCode"><span class="hs-identifier hs-var">SourceCode</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span>
+</span><span id="line-61"></span><span>   </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737964"><span id="local-6989586621679737966"><span id="local-6989586621679737968"><span class="annot"><span class="annottext">Int -&gt; SourceCode -&gt; ShowS
+[SourceCode] -&gt; ShowS
+SourceCode -&gt; String
+(Int -&gt; SourceCode -&gt; ShowS)
+-&gt; (SourceCode -&gt; String)
+-&gt; ([SourceCode] -&gt; ShowS)
+-&gt; Show SourceCode
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SourceCode] -&gt; ShowS
+$cshowList :: [SourceCode] -&gt; ShowS
+show :: SourceCode -&gt; String
+$cshow :: SourceCode -&gt; String
+showsPrec :: Int -&gt; SourceCode -&gt; ShowS
+$cshowsPrec :: Int -&gt; SourceCode -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737960"><span id="local-6989586621679737962"><span class="annot"><span class="annottext">SourceCode -&gt; SourceCode -&gt; Bool
+(SourceCode -&gt; SourceCode -&gt; Bool)
+-&gt; (SourceCode -&gt; SourceCode -&gt; Bool) -&gt; Eq SourceCode
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SourceCode -&gt; SourceCode -&gt; Bool
+$c/= :: SourceCode -&gt; SourceCode -&gt; Bool
+== :: SourceCode -&gt; SourceCode -&gt; Bool
+$c== :: SourceCode -&gt; SourceCode -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. SourceCode -&gt; Rep SourceCode x)
+-&gt; (forall x. Rep SourceCode x -&gt; SourceCode) -&gt; Generic SourceCode
+forall x. Rep SourceCode x -&gt; SourceCode
+forall x. SourceCode -&gt; Rep SourceCode x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep SourceCode x -&gt; SourceCode
+$cfrom :: forall x. SourceCode -&gt; Rep SourceCode x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span>   </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737950"><span id="local-6989586621679737952"><span id="local-6989586621679737954"><span id="local-6989586621679737956"><span class="annot"><span class="annottext">[SourceCode] -&gt; Encoding
+[SourceCode] -&gt; Value
+SourceCode -&gt; Encoding
+SourceCode -&gt; Value
+(SourceCode -&gt; Value)
+-&gt; (SourceCode -&gt; Encoding)
+-&gt; ([SourceCode] -&gt; Value)
+-&gt; ([SourceCode] -&gt; Encoding)
+-&gt; ToJSON SourceCode
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [SourceCode] -&gt; Encoding
+$ctoEncodingList :: [SourceCode] -&gt; Encoding
+toJSONList :: [SourceCode] -&gt; Value
+$ctoJSONList :: [SourceCode] -&gt; Value
+toEncoding :: SourceCode -&gt; Encoding
+$ctoEncoding :: SourceCode -&gt; Encoding
+toJSON :: SourceCode -&gt; Value
+$ctoJSON :: SourceCode -&gt; Value
+</span><a href="#local-6989586621679737950"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737946"><span id="local-6989586621679737948"><span class="annot"><span class="annottext">Value -&gt; Parser [SourceCode]
+Value -&gt; Parser SourceCode
+(Value -&gt; Parser SourceCode)
+-&gt; (Value -&gt; Parser [SourceCode]) -&gt; FromJSON SourceCode
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [SourceCode]
+$cparseJSONList :: Value -&gt; Parser [SourceCode]
+parseJSON :: Value -&gt; Parser SourceCode
+$cparseJSON :: Value -&gt; Parser SourceCode
+</span><a href="#local-6989586621679737946"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>   </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737942"><span id="local-6989586621679737944"><span class="annot"><span class="annottext">O SourceCode -&gt; SourceCode
+SourceCode -&gt; O SourceCode
+(O SourceCode -&gt; SourceCode)
+-&gt; (SourceCode -&gt; O SourceCode) -&gt; Newtype SourceCode
+forall n. (O n -&gt; n) -&gt; (n -&gt; O n) -&gt; Newtype n
+unpack :: SourceCode -&gt; O SourceCode
+$cunpack :: SourceCode -&gt; O SourceCode
+pack :: O SourceCode -&gt; SourceCode
+$cpack :: O SourceCode -&gt; SourceCode
+</span><a href="../file:///nix/store/ndym3i5f1brfc2p8gl7xlxxvdlii09kc-newtype-generics-lib-newtype-generics-0.6.2-haddock-doc/share/doc/newtype-generics/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Newtype</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span id="local-6989586621679737939"><span id="local-6989586621679737940"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="Warning"><span class="annot"><a href="Language.Haskell.Interpreter.html#Warning"><span class="hs-identifier hs-var">Warning</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Warning"><span class="annot"><a href="Language.Haskell.Interpreter.html#Warning"><span class="hs-identifier hs-var">Warning</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737934"><span id="local-6989586621679737936"><span class="annot"><span class="annottext">Warning -&gt; Warning -&gt; Bool
+(Warning -&gt; Warning -&gt; Bool)
+-&gt; (Warning -&gt; Warning -&gt; Bool) -&gt; Eq Warning
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Warning -&gt; Warning -&gt; Bool
+$c/= :: Warning -&gt; Warning -&gt; Bool
+== :: Warning -&gt; Warning -&gt; Bool
+$c== :: Warning -&gt; Warning -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737928"><span id="local-6989586621679737930"><span id="local-6989586621679737932"><span class="annot"><span class="annottext">Int -&gt; Warning -&gt; ShowS
+[Warning] -&gt; ShowS
+Warning -&gt; String
+(Int -&gt; Warning -&gt; ShowS)
+-&gt; (Warning -&gt; String) -&gt; ([Warning] -&gt; ShowS) -&gt; Show Warning
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Warning] -&gt; ShowS
+$cshowList :: [Warning] -&gt; ShowS
+show :: Warning -&gt; String
+$cshow :: Warning -&gt; String
+showsPrec :: Int -&gt; Warning -&gt; ShowS
+$cshowsPrec :: Int -&gt; Warning -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. Warning -&gt; Rep Warning x)
+-&gt; (forall x. Rep Warning x -&gt; Warning) -&gt; Generic Warning
+forall x. Rep Warning x -&gt; Warning
+forall x. Warning -&gt; Rep Warning x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Warning x -&gt; Warning
+$cfrom :: forall x. Warning -&gt; Rep Warning x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737918"><span id="local-6989586621679737920"><span id="local-6989586621679737922"><span id="local-6989586621679737924"><span class="annot"><span class="annottext">[Warning] -&gt; Encoding
+[Warning] -&gt; Value
+Warning -&gt; Encoding
+Warning -&gt; Value
+(Warning -&gt; Value)
+-&gt; (Warning -&gt; Encoding)
+-&gt; ([Warning] -&gt; Value)
+-&gt; ([Warning] -&gt; Encoding)
+-&gt; ToJSON Warning
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [Warning] -&gt; Encoding
+$ctoEncodingList :: [Warning] -&gt; Encoding
+toJSONList :: [Warning] -&gt; Value
+$ctoJSONList :: [Warning] -&gt; Value
+toEncoding :: Warning -&gt; Encoding
+$ctoEncoding :: Warning -&gt; Encoding
+toJSON :: Warning -&gt; Value
+$ctoJSON :: Warning -&gt; Value
+</span><a href="#local-6989586621679737918"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737914"><span id="local-6989586621679737916"><span class="annot"><span class="annottext">Value -&gt; Parser [Warning]
+Value -&gt; Parser Warning
+(Value -&gt; Parser Warning)
+-&gt; (Value -&gt; Parser [Warning]) -&gt; FromJSON Warning
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [Warning]
+$cparseJSONList :: Value -&gt; Parser [Warning]
+parseJSON :: Value -&gt; Parser Warning
+$cparseJSON :: Value -&gt; Parser Warning
+</span><a href="#local-6989586621679737914"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span id="local-6989586621679737912"><span id="local-6989586621679737913"></span></span><span class="hs-keyword">data</span><span> </span><span id="InterpreterResult"><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterResult"><span class="hs-identifier hs-var">InterpreterResult</span></a></span></span><span> </span><span id="local-6989586621679738114"><span class="annot"><a href="#local-6989586621679738114"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="InterpreterResult"><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterResult"><span class="hs-identifier hs-var">InterpreterResult</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="warnings"><span class="annot"><span class="annottext">InterpreterResult a -&gt; [Warning]
+</span><a href="Language.Haskell.Interpreter.html#warnings"><span class="hs-identifier hs-var hs-var">warnings</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Language.Haskell.Interpreter.html#Warning"><span class="hs-identifier hs-type">Warning</span></a></span><span class="hs-special">]</span><span class="hs-special">,</span><span> </span><span id="result"><span class="annot"><span class="annottext">InterpreterResult a -&gt; a
+</span><a href="Language.Haskell.Interpreter.html#result"><span class="hs-identifier hs-var hs-var">result</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679738114"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737905"><span id="local-6989586621679737907"><span class="annot"><span class="annottext">InterpreterResult a -&gt; InterpreterResult a -&gt; Bool
+(InterpreterResult a -&gt; InterpreterResult a -&gt; Bool)
+-&gt; (InterpreterResult a -&gt; InterpreterResult a -&gt; Bool)
+-&gt; Eq (InterpreterResult a)
+forall a.
+Eq a =&gt;
+InterpreterResult a -&gt; InterpreterResult a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: InterpreterResult a -&gt; InterpreterResult a -&gt; Bool
+$c/= :: forall a.
+Eq a =&gt;
+InterpreterResult a -&gt; InterpreterResult a -&gt; Bool
+== :: InterpreterResult a -&gt; InterpreterResult a -&gt; Bool
+$c== :: forall a.
+Eq a =&gt;
+InterpreterResult a -&gt; InterpreterResult a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737899"><span id="local-6989586621679737901"><span id="local-6989586621679737903"><span class="annot"><span class="annottext">Int -&gt; InterpreterResult a -&gt; ShowS
+[InterpreterResult a] -&gt; ShowS
+InterpreterResult a -&gt; String
+(Int -&gt; InterpreterResult a -&gt; ShowS)
+-&gt; (InterpreterResult a -&gt; String)
+-&gt; ([InterpreterResult a] -&gt; ShowS)
+-&gt; Show (InterpreterResult a)
+forall a. Show a =&gt; Int -&gt; InterpreterResult a -&gt; ShowS
+forall a. Show a =&gt; [InterpreterResult a] -&gt; ShowS
+forall a. Show a =&gt; InterpreterResult a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [InterpreterResult a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [InterpreterResult a] -&gt; ShowS
+show :: InterpreterResult a -&gt; String
+$cshow :: forall a. Show a =&gt; InterpreterResult a -&gt; String
+showsPrec :: Int -&gt; InterpreterResult a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; InterpreterResult a -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. InterpreterResult a -&gt; Rep (InterpreterResult a) x)
+-&gt; (forall x. Rep (InterpreterResult a) x -&gt; InterpreterResult a)
+-&gt; Generic (InterpreterResult a)
+forall x. Rep (InterpreterResult a) x -&gt; InterpreterResult a
+forall x. InterpreterResult a -&gt; Rep (InterpreterResult a) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (InterpreterResult a) x -&gt; InterpreterResult a
+forall a x. InterpreterResult a -&gt; Rep (InterpreterResult a) x
+$cto :: forall a x. Rep (InterpreterResult a) x -&gt; InterpreterResult a
+$cfrom :: forall a x. InterpreterResult a -&gt; Rep (InterpreterResult a) x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737893"><span id="local-6989586621679737895"><span class="annot"><span class="annottext">a -&gt; InterpreterResult b -&gt; InterpreterResult a
+(a -&gt; b) -&gt; InterpreterResult a -&gt; InterpreterResult b
+(forall a b.
+ (a -&gt; b) -&gt; InterpreterResult a -&gt; InterpreterResult b)
+-&gt; (forall a b. a -&gt; InterpreterResult b -&gt; InterpreterResult a)
+-&gt; Functor InterpreterResult
+forall a b. a -&gt; InterpreterResult b -&gt; InterpreterResult a
+forall a b. (a -&gt; b) -&gt; InterpreterResult a -&gt; InterpreterResult b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: a -&gt; InterpreterResult b -&gt; InterpreterResult a
+$c&lt;$ :: forall a b. a -&gt; InterpreterResult b -&gt; InterpreterResult a
+fmap :: (a -&gt; b) -&gt; InterpreterResult a -&gt; InterpreterResult b
+$cfmap :: forall a b. (a -&gt; b) -&gt; InterpreterResult a -&gt; InterpreterResult b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679737884"><span id="local-6989586621679737886"><span id="local-6989586621679737888"><span id="local-6989586621679737890"><span class="annot"><span class="annottext">[InterpreterResult a] -&gt; Encoding
+[InterpreterResult a] -&gt; Value
+InterpreterResult a -&gt; Encoding
+InterpreterResult a -&gt; Value
+(InterpreterResult a -&gt; Value)
+-&gt; (InterpreterResult a -&gt; Encoding)
+-&gt; ([InterpreterResult a] -&gt; Value)
+-&gt; ([InterpreterResult a] -&gt; Encoding)
+-&gt; ToJSON (InterpreterResult a)
+forall a. ToJSON a =&gt; [InterpreterResult a] -&gt; Encoding
+forall a. ToJSON a =&gt; [InterpreterResult a] -&gt; Value
+forall a. ToJSON a =&gt; InterpreterResult a -&gt; Encoding
+forall a. ToJSON a =&gt; InterpreterResult a -&gt; Value
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [InterpreterResult a] -&gt; Encoding
+$ctoEncodingList :: forall a. ToJSON a =&gt; [InterpreterResult a] -&gt; Encoding
+toJSONList :: [InterpreterResult a] -&gt; Value
+$ctoJSONList :: forall a. ToJSON a =&gt; [InterpreterResult a] -&gt; Value
+toEncoding :: InterpreterResult a -&gt; Encoding
+$ctoEncoding :: forall a. ToJSON a =&gt; InterpreterResult a -&gt; Encoding
+toJSON :: InterpreterResult a -&gt; Value
+$ctoJSON :: forall a. ToJSON a =&gt; InterpreterResult a -&gt; Value
+</span><a href="#local-6989586621679737884"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737880"><span id="local-6989586621679737882"><span class="annot"><span class="annottext">Value -&gt; Parser [InterpreterResult a]
+Value -&gt; Parser (InterpreterResult a)
+(Value -&gt; Parser (InterpreterResult a))
+-&gt; (Value -&gt; Parser [InterpreterResult a])
+-&gt; FromJSON (InterpreterResult a)
+forall a. FromJSON a =&gt; Value -&gt; Parser [InterpreterResult a]
+forall a. FromJSON a =&gt; Value -&gt; Parser (InterpreterResult a)
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [InterpreterResult a]
+$cparseJSONList :: forall a. FromJSON a =&gt; Value -&gt; Parser [InterpreterResult a]
+parseJSON :: Value -&gt; Parser (InterpreterResult a)
+$cparseJSON :: forall a. FromJSON a =&gt; Value -&gt; Parser (InterpreterResult a)
+</span><a href="#local-6989586621679737880"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | spawn an external process to runghc a file</span><span>
+</span><span id="line-74"></span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span class="hs-comment">--   If you set the environmental varaiable GHC_BIN_DIR</span><span>
+</span><span id="line-76"></span><span class="hs-comment">--   then the executable runghc in that path will be used.</span><span>
+</span><span id="line-77"></span><span class="hs-comment">--   This is useful if you want to your file to be run with some packages</span><span>
+</span><span id="line-78"></span><span class="hs-comment">--   available, you can create a wrapper runghc that includes these</span><span>
+</span><span id="line-79"></span><span class="hs-comment">--</span><span>
+</span><span id="line-80"></span><span class="hs-comment">--   Any errors are converted to InterpreterError</span><span>
+</span><span id="line-81"></span><span id="local-6989586621679737878"><span id="local-6989586621679737879"><span class="annot"><a href="Language.Haskell.Interpreter.html#runghc"><span class="hs-identifier hs-type">runghc</span></a></span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Show</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679737879"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">TimeUnit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679737879"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679737878"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-type">MonadError</span></a></span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterError"><span class="hs-identifier hs-type">InterpreterError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679737878"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier hs-type">MonadMask</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679737878"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679737879"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679737878"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterResult"><span class="hs-identifier hs-type">InterpreterResult</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-87"></span><span id="runghc"><span class="annot"><span class="annottext">runghc :: t -&gt; [String] -&gt; String -&gt; m (InterpreterResult String)
+</span><a href="Language.Haskell.Interpreter.html#runghc"><span class="hs-identifier hs-var hs-var">runghc</span></a></span></span><span> </span><span id="local-6989586621679737876"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679737876"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621679737875"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679737875"><span class="hs-identifier hs-var">runghcOpts</span></a></span></span><span> </span><span id="local-6989586621679737874"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737874"><span class="hs-identifier hs-var">file</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-88"></span><span>    </span><span id="local-6989586621679737873"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737873"><span class="hs-identifier hs-var">bin</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO String -&gt; m String
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">IO String
+</span><a href="Language.Haskell.Interpreter.html#lookupRunghc"><span class="hs-identifier hs-var">lookupRunghc</span></a></span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679737871"><span class="annot"><span class="annottext">ExitCode
+</span><a href="#local-6989586621679737871"><span class="hs-identifier hs-var">exitCode</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737870"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737870"><span class="hs-identifier hs-var">stdout</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737869"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737869"><span class="hs-identifier hs-var">stderr</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String -&gt; t -&gt; [String] -&gt; String -&gt; m (ExitCode, String, String)
+forall t (m :: * -&gt; *).
+(Show t, TimeUnit t, MonadIO m, MonadError InterpreterError m,
+ MonadMask m) =&gt;
+String -&gt; t -&gt; [String] -&gt; String -&gt; m (ExitCode, String, String)
+</span><a href="Language.Haskell.Interpreter.html#runProcess"><span class="hs-identifier hs-var">runProcess</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737873"><span class="hs-identifier hs-var">bin</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679737876"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679737875"><span class="hs-identifier hs-var">runghcOpts</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737874"><span class="hs-identifier hs-var">file</span></a></span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ExitCode
+</span><a href="#local-6989586621679737871"><span class="hs-identifier hs-var">exitCode</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-91"></span><span>        </span><span class="annot"><span class="annottext">ExitCode
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">ExitSuccess</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InterpreterResult String -&gt; m (InterpreterResult String)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(InterpreterResult String -&gt; m (InterpreterResult String))
+-&gt; InterpreterResult String -&gt; m (InterpreterResult String)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[Warning] -&gt; String -&gt; InterpreterResult String
+forall a. [Warning] -&gt; a -&gt; InterpreterResult a
+</span><a href="Language.Haskell.Interpreter.html#InterpreterResult"><span class="hs-identifier hs-var">InterpreterResult</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737870"><span class="hs-identifier hs-var">stdout</span></a></span><span>
+</span><span id="line-92"></span><span>        </span><span class="annot"><span class="annottext">ExitCode
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-93"></span><span>            </span><span class="annot"><span class="annottext">InterpreterError -&gt; m (InterpreterResult String)
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span>
+</span><span id="line-94"></span><span>                </span><span class="annot"><span class="annottext">(InterpreterError -&gt; m (InterpreterResult String))
+-&gt; (String -&gt; InterpreterError)
+-&gt; String
+-&gt; m (InterpreterResult String)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[CompilationError] -&gt; InterpreterError
+</span><a href="Language.Haskell.Interpreter.html#CompilationErrors"><span class="hs-identifier hs-var">CompilationErrors</span></a></span><span>
+</span><span id="line-95"></span><span>                </span><span class="annot"><span class="annottext">([CompilationError] -&gt; InterpreterError)
+-&gt; (String -&gt; [CompilationError]) -&gt; String -&gt; InterpreterError
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; [CompilationError]
+</span><a href="Language.Haskell.Interpreter.html#parseErrorsText"><span class="hs-identifier hs-var">parseErrorsText</span></a></span><span>
+</span><span id="line-96"></span><span>                </span><span class="annot"><span class="annottext">(Text -&gt; [CompilationError])
+-&gt; (String -&gt; Text) -&gt; String -&gt; [CompilationError]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span>
+</span><span id="line-97"></span><span>                </span><span class="annot"><span class="annottext">(String -&gt; m (InterpreterResult String))
+-&gt; String -&gt; m (InterpreterResult String)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737870"><span class="hs-identifier hs-var">stdout</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737869"><span class="hs-identifier hs-var">stderr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span id="local-6989586621679738122"><span id="local-6989586621679738124"><span class="annot"><a href="Language.Haskell.Interpreter.html#runProcess"><span class="hs-identifier hs-type">runProcess</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Show</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738124"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/kl898zkdm5m32sjwzs943dbppi7c8pg6-time-units-lib-time-units-1.0.0-haddock-doc/share/doc/time-units/html/src"><span class="hs-identifier hs-type">TimeUnit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738124"><span class="hs-identifier hs-type">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738122"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-type">MonadError</span></a></span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterError"><span class="hs-identifier hs-type">InterpreterError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738122"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier hs-type">MonadMask</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738122"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">FilePath</span></a></span><span>
+</span><span id="line-102"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679738124"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679738122"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">ExitCode</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-106"></span><span id="runProcess"><span class="annot"><span class="annottext">runProcess :: String -&gt; t -&gt; [String] -&gt; String -&gt; m (ExitCode, String, String)
+</span><a href="Language.Haskell.Interpreter.html#runProcess"><span class="hs-identifier hs-var hs-var">runProcess</span></a></span></span><span> </span><span id="local-6989586621679737864"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737864"><span class="hs-identifier hs-var">bin</span></a></span></span><span> </span><span id="local-6989586621679737863"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679737863"><span class="hs-identifier hs-var">timeoutValue</span></a></span></span><span> </span><span id="local-6989586621679737862"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679737862"><span class="hs-identifier hs-var">runghcOpts</span></a></span></span><span> </span><span id="local-6989586621679737861"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737861"><span class="hs-identifier hs-var">file</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-107"></span><span>    </span><span id="local-6989586621679737860"><span class="annot"><span class="annottext">Either IOError (ExitCode, String, String)
+</span><a href="#local-6989586621679737860"><span class="hs-identifier hs-var">result</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (Either IOError (ExitCode, String, String))
+-&gt; m (Either IOError (ExitCode, String, String))
+forall (m :: * -&gt; *) a.
+(MonadIO m, MonadError InterpreterError m, MonadCatch m) =&gt;
+m a -&gt; m a
+</span><a href="#local-6989586621679737859"><span class="hs-identifier hs-var">withTimeout</span></a></span><span> </span><span class="annot"><span class="annottext">(m (Either IOError (ExitCode, String, String))
+ -&gt; m (Either IOError (ExitCode, String, String)))
+-&gt; m (Either IOError (ExitCode, String, String))
+-&gt; m (Either IOError (ExitCode, String, String))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Either IOError (ExitCode, String, String))
+-&gt; m (Either IOError (ExitCode, String, String))
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Either IOError (ExitCode, String, String))
+ -&gt; m (Either IOError (ExitCode, String, String)))
+-&gt; IO (Either IOError (ExitCode, String, String))
+-&gt; m (Either IOError (ExitCode, String, String))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IO (ExitCode, String, String)
+-&gt; IO (Either IOError (ExitCode, String, String))
+forall a. IO a -&gt; IO (Either IOError a)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">tryIOError</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (ExitCode, String, String)
+ -&gt; IO (Either IOError (ExitCode, String, String)))
+-&gt; IO (ExitCode, String, String)
+-&gt; IO (Either IOError (ExitCode, String, String))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; [String] -&gt; String -&gt; IO (ExitCode, String, String)
+</span><a href="../file:///nix/store/lrjyi1qsn92kapwcckwhqsqwkgqwp0dm-process-lib-process-1.6.13.2-haddock-doc/share/doc/process/html/src"><span class="hs-identifier hs-var">readProcessWithExitCode</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737864"><span class="hs-identifier hs-var">bin</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679737862"><span class="hs-identifier hs-var">runghcOpts</span></a></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; [String] -&gt; [String]
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737861"><span class="hs-identifier hs-var">file</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;&quot;</span></span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either IOError (ExitCode, String, String)
+</span><a href="#local-6989586621679737860"><span class="hs-identifier hs-var">result</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-109"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621679737858"><span class="annot"><span class="annottext">IOError
+</span><a href="#local-6989586621679737858"><span class="hs-identifier hs-var">e</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InterpreterError -&gt; m (ExitCode, String, String)
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span> </span><span class="annot"><span class="annottext">(InterpreterError -&gt; m (ExitCode, String, String))
+-&gt; (IOError -&gt; InterpreterError)
+-&gt; IOError
+-&gt; m (ExitCode, String, String)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[CompilationError] -&gt; InterpreterError
+</span><a href="Language.Haskell.Interpreter.html#CompilationErrors"><span class="hs-identifier hs-var">CompilationErrors</span></a></span><span> </span><span class="annot"><span class="annottext">([CompilationError] -&gt; InterpreterError)
+-&gt; (IOError -&gt; [CompilationError]) -&gt; IOError -&gt; InterpreterError
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">CompilationError -&gt; [CompilationError]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(CompilationError -&gt; [CompilationError])
+-&gt; (IOError -&gt; CompilationError) -&gt; IOError -&gt; [CompilationError]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; CompilationError
+</span><a href="Language.Haskell.Interpreter.html#RawError"><span class="hs-identifier hs-var">RawError</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; CompilationError)
+-&gt; (IOError -&gt; Text) -&gt; IOError -&gt; CompilationError
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Text) -&gt; (IOError -&gt; String) -&gt; IOError -&gt; Text
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">IOError -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">(IOError -&gt; m (ExitCode, String, String))
+-&gt; IOError -&gt; m (ExitCode, String, String)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">IOError
+</span><a href="#local-6989586621679737858"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-110"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621679737856"><span class="annot"><span class="annottext">(ExitCode, String, String)
+</span><a href="#local-6989586621679737856"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(ExitCode, String, String) -&gt; m (ExitCode, String, String)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(ExitCode, String, String)
+</span><a href="#local-6989586621679737856"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-112"></span><span>        </span><span id="local-6989586621679738100"><span id="local-6989586621679738102"><span class="annot"><a href="#local-6989586621679737859"><span class="hs-identifier hs-type">withTimeout</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">MonadIO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738102"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-type">MonadError</span></a></span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterError"><span class="hs-identifier hs-type">InterpreterError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738102"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/4jv28m253ajwdki850nrrl539c42psyr-exceptions-lib-exceptions-0.10.4-haddock-doc/share/doc/exceptions/html/src"><span class="hs-identifier hs-type">MonadCatch</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738102"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679738102"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738100"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679738102"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738100"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-113"></span><span>        </span><span id="local-6989586621679737859"><span class="annot"><span class="annottext">withTimeout :: m a -&gt; m a
+</span><a href="#local-6989586621679737859"><span class="hs-identifier hs-var hs-var">withTimeout</span></a></span></span><span> </span><span id="local-6989586621679737855"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679737855"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-114"></span><span>            </span><span id="local-6989586621679737854"><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679737854"><span class="hs-identifier hs-var">mr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">t -&gt; m a -&gt; m (Maybe a)
+forall t (m :: * -&gt; *) a.
+(TimeUnit t, MonadIO m, MonadCatch m) =&gt;
+t -&gt; m a -&gt; m (Maybe a)
+</span><a href="../file:///nix/store/h457g4x9frx3vb5md06c1ks7wi2hkriq-time-out-lib-time-out-0.2-haddock-doc/share/doc/time-out/html/src"><span class="hs-identifier hs-var">timeout</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679737863"><span class="hs-identifier hs-var">timeoutValue</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679737855"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-115"></span><span>            </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="#local-6989586621679737854"><span class="hs-identifier hs-var">mr</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-116"></span><span>                </span><span class="annot"><span class="annottext">Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InterpreterError -&gt; m a
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; InterpreterError
+</span><a href="Language.Haskell.Interpreter.html#TimeoutError"><span class="hs-identifier hs-var">TimeoutError</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; InterpreterError) -&gt; (t -&gt; Text) -&gt; t -&gt; InterpreterError
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Text) -&gt; (t -&gt; String) -&gt; t -&gt; Text
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">t -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">(t -&gt; InterpreterError) -&gt; t -&gt; InterpreterError
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679737863"><span class="hs-identifier hs-var">timeoutValue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-117"></span><span>                </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679737853"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679737853"><span class="hs-identifier hs-var">r</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; m a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679737853"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span id="local-6989586621679737852"><span class="annot"><a href="Language.Haskell.Interpreter.html#avoidUnsafe"><span class="hs-identifier hs-type">avoidUnsafe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-type">MonadError</span></a></span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#InterpreterError"><span class="hs-identifier hs-type">InterpreterError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679737852"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#SourceCode"><span class="hs-identifier hs-type">SourceCode</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679737852"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-120"></span><span id="avoidUnsafe"><span class="annot"><span class="annottext">avoidUnsafe :: SourceCode -&gt; m ()
+</span><a href="Language.Haskell.Interpreter.html#avoidUnsafe"><span class="hs-identifier hs-var hs-var">avoidUnsafe</span></a></span></span><span> </span><span id="local-6989586621679737851"><span class="annot"><span class="annottext">SourceCode
+</span><a href="#local-6989586621679737851"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-121"></span><span>    </span><span class="annot"><span class="annottext">Bool -&gt; m () -&gt; m ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">unless</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Int] -&gt; Bool
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">null</span></a></span><span> </span><span class="annot"><span class="annottext">([Int] -&gt; Bool) -&gt; (SourceCode -&gt; [Int]) -&gt; SourceCode -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; [Int]
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.indices</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;unsafe&quot;</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; [Int]) -&gt; (SourceCode -&gt; Text) -&gt; SourceCode -&gt; [Int]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">SourceCode -&gt; Text
+forall n. Newtype n =&gt; n -&gt; O n
+</span><a href="../file:///nix/store/ndym3i5f1brfc2p8gl7xlxxvdlii09kc-newtype-generics-lib-newtype-generics-0.6.2-haddock-doc/share/doc/newtype-generics/html/src"><span class="hs-identifier hs-var">Newtype.unpack</span></a></span><span> </span><span class="annot"><span class="annottext">(SourceCode -&gt; Bool) -&gt; SourceCode -&gt; Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">SourceCode
+</span><a href="#local-6989586621679737851"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-122"></span><span>        </span><span class="annot"><span class="annottext">(m () -&gt; m ())
+-&gt; (CompilationError -&gt; m ()) -&gt; CompilationError -&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">InterpreterError -&gt; m ()
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">throwError</span></a></span><span>
+</span><span id="line-123"></span><span>        </span><span class="annot"><span class="annottext">(InterpreterError -&gt; m ())
+-&gt; (CompilationError -&gt; InterpreterError)
+-&gt; CompilationError
+-&gt; m ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">[CompilationError] -&gt; InterpreterError
+</span><a href="Language.Haskell.Interpreter.html#CompilationErrors"><span class="hs-identifier hs-var">CompilationErrors</span></a></span><span>
+</span><span id="line-124"></span><span>        </span><span class="annot"><span class="annottext">([CompilationError] -&gt; InterpreterError)
+-&gt; (CompilationError -&gt; [CompilationError])
+-&gt; CompilationError
+-&gt; InterpreterError
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">CompilationError -&gt; [CompilationError]
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span>
+</span><span id="line-125"></span><span>        </span><span class="annot"><span class="annottext">(CompilationError -&gt; m ()) -&gt; CompilationError -&gt; m ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; CompilationError
+</span><a href="Language.Haskell.Interpreter.html#RawError"><span class="hs-identifier hs-var">RawError</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;Cannot interpret unsafe functions&quot;</span></span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span class="annot"><a href="Language.Haskell.Interpreter.html#lookupRunghc"><span class="hs-identifier hs-type">lookupRunghc</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-128"></span><span id="lookupRunghc"><span class="annot"><span class="annottext">lookupRunghc :: IO String
+</span><a href="Language.Haskell.Interpreter.html#lookupRunghc"><span class="hs-identifier hs-var hs-var">lookupRunghc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-129"></span><span>    </span><span id="local-6989586621679737847"><span class="annot"><span class="annottext">Maybe String
+</span><a href="#local-6989586621679737847"><span class="hs-identifier hs-var">mBinDir</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (Maybe String) -&gt; IO (Maybe String)
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe String) -&gt; IO (Maybe String))
+-&gt; IO (Maybe String) -&gt; IO (Maybe String)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; IO (Maybe String)
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">lookupEnv</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;GHC_BIN_DIR&quot;</span></span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe String
+</span><a href="#local-6989586621679737847"><span class="hs-identifier hs-var">mBinDir</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-131"></span><span>        </span><span class="annot"><span class="annottext">Maybe String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO String
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;runghc&quot;</span></span><span>
+</span><span id="line-132"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679737846"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737846"><span class="hs-identifier hs-var">val</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO String
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; IO String) -&gt; String -&gt; IO String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679737846"><span class="hs-identifier hs-var">val</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; ShowS
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;/runghc&quot;</span></span><span>
+</span><span id="line-133"></span><span>
+</span><span id="line-134"></span><span class="annot"><a href="Language.Haskell.Interpreter.html#parseErrorsText"><span class="hs-identifier hs-type">parseErrorsText</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier hs-type">CompilationError</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-135"></span><span id="parseErrorsText"><span class="annot"><span class="annottext">parseErrorsText :: Text -&gt; [CompilationError]
+</span><a href="Language.Haskell.Interpreter.html#parseErrorsText"><span class="hs-identifier hs-var hs-var">parseErrorsText</span></a></span></span><span> </span><span id="local-6989586621679737845"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737845"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; CompilationError
+</span><a href="Language.Haskell.Interpreter.html#parseErrorText"><span class="hs-identifier hs-var">parseErrorText</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; CompilationError) -&gt; [Text] -&gt; [CompilationError]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; [Text]
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.splitOn</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;\n\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737845"><span class="hs-identifier hs-var">input</span></a></span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="annot"><a href="Language.Haskell.Interpreter.html#parseErrorText"><span class="hs-identifier hs-type">parseErrorText</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier hs-type">CompilationError</span></a></span><span>
+</span><span id="line-138"></span><span id="parseErrorText"><span class="annot"><span class="annottext">parseErrorText :: Text -&gt; CompilationError
+</span><a href="Language.Haskell.Interpreter.html#parseErrorText"><span class="hs-identifier hs-var hs-var">parseErrorText</span></a></span></span><span> </span><span id="local-6989586621679737842"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737842"><span class="hs-identifier hs-var">input</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompilationError -&gt; Maybe CompilationError -&gt; CompilationError
+forall a. a -&gt; Maybe a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; CompilationError
+</span><a href="Language.Haskell.Interpreter.html#RawError"><span class="hs-identifier hs-var">RawError</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737842"><span class="hs-identifier hs-var">input</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Maybe CompilationError -&gt; CompilationError)
+-&gt; Maybe CompilationError -&gt; CompilationError
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(StateT Text Maybe CompilationError
+ -&gt; Text -&gt; Maybe CompilationError)
+-&gt; Text
+-&gt; StateT Text Maybe CompilationError
+-&gt; Maybe CompilationError
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">StateT Text Maybe CompilationError
+-&gt; Text -&gt; Maybe CompilationError
+forall (m :: * -&gt; *) s a. Monad m =&gt; StateT s m a -&gt; s -&gt; m a
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">evalStateT</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737842"><span class="hs-identifier hs-var">input</span></a></span><span> </span><span class="annot"><span class="annottext">(StateT Text Maybe CompilationError -&gt; Maybe CompilationError)
+-&gt; StateT Text Maybe CompilationError -&gt; Maybe CompilationError
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-139"></span><span>    </span><span id="local-6989586621679737840"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737840"><span class="hs-identifier hs-var">filename</span></a></span></span><span>  </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; StateT Text Maybe Text
+forall (m :: * -&gt; *). Monad m =&gt; Text -&gt; StateT Text m Text
+</span><a href="Language.Haskell.Interpreter.html#consumeTo"><span class="hs-identifier hs-var">consumeTo</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;:&quot;</span></span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621679737838"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737838"><span class="hs-identifier hs-var">rowStr</span></a></span></span><span>    </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; StateT Text Maybe Text
+forall (m :: * -&gt; *). Monad m =&gt; Text -&gt; StateT Text m Text
+</span><a href="Language.Haskell.Interpreter.html#consumeTo"><span class="hs-identifier hs-var">consumeTo</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;:&quot;</span></span><span>
+</span><span id="line-141"></span><span>    </span><span id="local-6989586621679737837"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737837"><span class="hs-identifier hs-var">columnStr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; StateT Text Maybe Text
+forall (m :: * -&gt; *). Monad m =&gt; Text -&gt; StateT Text m Text
+</span><a href="Language.Haskell.Interpreter.html#consumeTo"><span class="hs-identifier hs-var">consumeTo</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;:&quot;</span></span><span>
+</span><span id="line-142"></span><span>    </span><span id="local-6989586621679737836"><span class="annot"><span class="annottext">[Text]
+</span><a href="#local-6989586621679737836"><span class="hs-identifier hs-var">text</span></a></span></span><span>      </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; [Text]
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.lines</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; [Text])
+-&gt; StateT Text Maybe Text -&gt; StateT Text Maybe [Text]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">StateT Text Maybe Text
+forall (m :: * -&gt; *) s. (Monad m, Monoid s) =&gt; StateT s m s
+</span><a href="Language.Haskell.Interpreter.html#consume"><span class="hs-identifier hs-var">consume</span></a></span><span>
+</span><span id="line-143"></span><span>    </span><span id="local-6989586621679737833"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679737833"><span class="hs-identifier hs-var">row</span></a></span></span><span>       </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Maybe Int -&gt; StateT Text Maybe Int
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe Int -&gt; StateT Text Maybe Int)
+-&gt; Maybe Int -&gt; StateT Text Maybe Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Maybe Int
+forall a. Read a =&gt; String -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">readMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Maybe Int) -&gt; String -&gt; Maybe Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; String
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.unpack</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737838"><span class="hs-identifier hs-var">rowStr</span></a></span><span>
+</span><span id="line-144"></span><span>    </span><span id="local-6989586621679737831"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679737831"><span class="hs-identifier hs-var">column</span></a></span></span><span>    </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Maybe Int -&gt; StateT Text Maybe Int
+forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe Int -&gt; StateT Text Maybe Int)
+-&gt; Maybe Int -&gt; StateT Text Maybe Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Maybe Int
+forall a. Read a =&gt; String -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">readMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Maybe Int) -&gt; String -&gt; Maybe Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; String
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.unpack</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737837"><span class="hs-identifier hs-var">columnStr</span></a></span><span>
+</span><span id="line-145"></span><span>    </span><span class="annot"><span class="annottext">CompilationError -&gt; StateT Text Maybe CompilationError
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">CompilationError :: Text -&gt; Int -&gt; Int -&gt; [Text] -&gt; CompilationError
+</span><a href="Language.Haskell.Interpreter.html#CompilationError"><span class="hs-identifier hs-type">CompilationError</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">Int
+[Text]
+Text
+column :: Int
+row :: Int
+text :: [Text]
+filename :: Text
+text :: [Text]
+column :: Int
+row :: Int
+filename :: Text
+</span><a href="#local-6989586621679737831"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-146"></span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span id="local-6989586621679738078"><span class="annot"><a href="Language.Haskell.Interpreter.html#consumeTo"><span class="hs-identifier hs-type">consumeTo</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738078"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-type">StateT</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738078"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span></span><span>
+</span><span id="line-149"></span><span id="consumeTo"><span class="annot"><span class="annottext">consumeTo :: Text -&gt; StateT Text m Text
+</span><a href="Language.Haskell.Interpreter.html#consumeTo"><span class="hs-identifier hs-var hs-var">consumeTo</span></a></span></span><span> </span><span id="local-6989586621679737830"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737830"><span class="hs-identifier hs-var">needle</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-150"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679737829"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737829"><span class="hs-identifier hs-var">before</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679737828"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737828"><span class="hs-identifier hs-var">after</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; (Text, Text)
+</span><a href="Language.Haskell.Interpreter.html#breakWith"><span class="hs-identifier hs-var">breakWith</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737830"><span class="hs-identifier hs-var">needle</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; (Text, Text))
+-&gt; StateT Text m Text -&gt; StateT Text m (Text, Text)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">StateT Text m Text
+forall (m :: * -&gt; *) s. Monad m =&gt; StateT s m s
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">get</span></a></span><span>
+</span><span id="line-151"></span><span>    </span><span class="annot"><span class="annottext">Text -&gt; StateT Text m ()
+forall (m :: * -&gt; *) s. Monad m =&gt; s -&gt; StateT s m ()
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">put</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737828"><span class="hs-identifier hs-var">after</span></a></span><span>
+</span><span id="line-152"></span><span>    </span><span class="annot"><span class="annottext">Text -&gt; StateT Text m Text
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737829"><span class="hs-identifier hs-var">before</span></a></span><span>
+</span><span id="line-153"></span><span>
+</span><span id="line-154"></span><span id="local-6989586621679738076"><span id="local-6989586621679738077"><span class="annot"><a href="Language.Haskell.Interpreter.html#consume"><span class="hs-identifier hs-type">consume</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738077"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738076"><span class="hs-identifier hs-type">s</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-type">StateT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738076"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738077"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679738076"><span class="hs-identifier hs-type">s</span></a></span></span></span><span>
+</span><span id="line-155"></span><span id="consume"><span class="annot"><span class="annottext">consume :: StateT s m s
+</span><a href="Language.Haskell.Interpreter.html#consume"><span class="hs-identifier hs-var hs-var">consume</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StateT s m s
+forall (m :: * -&gt; *) s. Monad m =&gt; StateT s m s
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">get</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m s -&gt; StateT s m () -&gt; StateT s m s
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;*</span></a></span><span> </span><span class="annot"><span class="annottext">s -&gt; StateT s m ()
+forall (m :: * -&gt; *) s. Monad m =&gt; s -&gt; StateT s m ()
+</span><a href="../file:///nix/store/8r01jj9dl6h1x2byph07y6wxfb3ysd8c-transformers-lib-transformers-0.5.6.2-haddock-doc/share/doc/transformers/html/src"><span class="hs-identifier hs-var">put</span></a></span><span> </span><span class="annot"><span class="annottext">s
+forall a. Monoid a =&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span class="hs-comment">-- | Light `Data.Text.breakOn`, but consumes the breakpoint text (the 'needle').</span><span>
+</span><span id="line-158"></span><span class="annot"><a href="Language.Haskell.Interpreter.html#breakWith"><span class="hs-identifier hs-type">breakWith</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span id="breakWith"><span class="annot"><span class="annottext">breakWith :: Text -&gt; Text -&gt; (Text, Text)
+</span><a href="Language.Haskell.Interpreter.html#breakWith"><span class="hs-identifier hs-var hs-var">breakWith</span></a></span></span><span> </span><span id="local-6989586621679737825"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737825"><span class="hs-identifier hs-var">needle</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Text) -&gt; (Text, Text) -&gt; (Text, Text)
+forall (p :: * -&gt; * -&gt; *) b c a.
+Bifunctor p =&gt;
+(b -&gt; c) -&gt; p a b -&gt; p a c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">second</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Text -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.drop</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((Text, Text) -&gt; (Text, Text))
+-&gt; (Text -&gt; (Text, Text)) -&gt; Text -&gt; (Text, Text)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Text -&gt; (Text, Text)
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.breakOn</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679737825"><span class="hs-identifier hs-var">needle</span></a></span><span>
+</span><span id="line-160"></span></pre></body></html>

@@ -26,7 +26,7 @@ writePlutusFile filePath validator =
     Left err -> print $ displayError err
     Right _ -> putStrLn $ "Compiled Plutus script at: " ++ filePath
 
-
+{-# INLINABLE wrap #-}
 wrap ::
   forall a b c.
   ( UnsafeFromData a,

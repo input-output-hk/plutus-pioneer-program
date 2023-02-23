@@ -1,0 +1,787 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds           #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass      #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric       #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies  #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts    #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NamedFieldPuns      #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE NoImplicitPrelude   #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards     #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE TemplateHaskell     #-}</span><span>
+</span><span id="line-12"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications    #-}</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies        #-}</span><span>
+</span><span id="line-14"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators       #-}</span><span>
+</span><span id="line-15"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- | Implements an n-out-of-m multisig contract.</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.Contracts.MultiSig</span><span>
+</span><span id="line-18"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier">MultiSig</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSigSchema"><span class="hs-identifier">MultiSigSchema</span></a></span><span>
+</span><span id="line-20"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#contract"><span class="hs-identifier">contract</span></a></span><span>
+</span><span id="line-21"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#lock"><span class="hs-identifier">lock</span></a></span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#typedValidator"><span class="hs-identifier">typedValidator</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#validate"><span class="hs-identifier">validate</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">Cardano.Node.Emulator.Params</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier">pNetworkId</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier">Ledger.Constraints</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Constraints</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Typed.Scripts</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Scripts</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier">Plutus.Contract</span></a></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Plutus.V1.Ledger.Contexts</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx</span></a></span><span> </span><span class="hs-keyword">qualified</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">PlutusTx.Prelude</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier">foldMap</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Haskell</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Show</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">foldMap</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">type</span><span> </span><span id="MultiSigSchema"><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSigSchema"><span class="hs-identifier hs-var">MultiSigSchema</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-41"></span><span>        </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;lock&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">Value</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>        </span><span class="annot"><a href="../file:///nix/store/g8vgm61qs4g5v6yyv8hvi8bm9dvsf9sa-row-types-lib-row-types-1.0.1.2-haddock-doc/share/doc/row-types/html/src"><span class="hs-operator hs-type">.\/</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Endpoint</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;unlock&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PaymentPubKeyHash</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span id="local-6989586621680975719"><span id="local-6989586621680975720"></span></span><span class="hs-keyword">data</span><span> </span><span id="MultiSig"><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-var">MultiSig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-45"></span><span>        </span><span id="MultiSig"><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-var">MultiSig</span></a></span></span><span>
+</span><span id="line-46"></span><span>                </span><span class="hs-special">{</span><span> </span><span id="signatories"><span class="annot"><span class="annottext">MultiSig -&gt; [PaymentPubKeyHash]
+</span><a href="Plutus.Contracts.MultiSig.html#signatories"><span class="hs-identifier hs-var hs-var">signatories</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Ledger.PaymentPubKeyHash</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-47"></span><span>                </span><span class="hs-comment">-- ^ List of public keys of people who may sign the transaction</span><span>
+</span><span id="line-48"></span><span>                </span><span class="hs-special">,</span><span> </span><span id="minNumSignatures"><span class="annot"><span class="annottext">MultiSig -&gt; Integer
+</span><a href="Plutus.Contracts.MultiSig.html#minNumSignatures"><span class="hs-identifier hs-var hs-var">minNumSignatures</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-49"></span><span>                </span><span class="hs-comment">-- ^ Minimum number of signatures required to unlock</span><span>
+</span><span id="line-50"></span><span>                </span><span class="hs-comment">--   the output (should not exceed @length signatories@)</span><span>
+</span><span id="line-51"></span><span>                </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680975710"><span id="local-6989586621680975712"><span id="local-6989586621680975714"><span class="annot"><span class="annottext">Int -&gt; MultiSig -&gt; ShowS
+[MultiSig] -&gt; ShowS
+MultiSig -&gt; String
+(Int -&gt; MultiSig -&gt; ShowS)
+-&gt; (MultiSig -&gt; String) -&gt; ([MultiSig] -&gt; ShowS) -&gt; Show MultiSig
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [MultiSig] -&gt; ShowS
+$cshowList :: [MultiSig] -&gt; ShowS
+show :: MultiSig -&gt; String
+$cshow :: MultiSig -&gt; String
+showsPrec :: Int -&gt; MultiSig -&gt; ShowS
+$cshowsPrec :: Int -&gt; MultiSig -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. MultiSig -&gt; Rep MultiSig x)
+-&gt; (forall x. Rep MultiSig x -&gt; MultiSig) -&gt; Generic MultiSig
+forall x. Rep MultiSig x -&gt; MultiSig
+forall x. MultiSig -&gt; Rep MultiSig x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep MultiSig x -&gt; MultiSig
+$cfrom :: forall x. MultiSig -&gt; Rep MultiSig x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>                  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680975698"><span id="local-6989586621680975700"><span id="local-6989586621680975702"><span id="local-6989586621680975704"><span class="annot"><span class="annottext">[MultiSig] -&gt; Encoding
+[MultiSig] -&gt; Value
+MultiSig -&gt; Encoding
+MultiSig -&gt; Value
+(MultiSig -&gt; Value)
+-&gt; (MultiSig -&gt; Encoding)
+-&gt; ([MultiSig] -&gt; Value)
+-&gt; ([MultiSig] -&gt; Encoding)
+-&gt; ToJSON MultiSig
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [MultiSig] -&gt; Encoding
+$ctoEncodingList :: [MultiSig] -&gt; Encoding
+toJSONList :: [MultiSig] -&gt; Value
+$ctoJSONList :: [MultiSig] -&gt; Value
+toEncoding :: MultiSig -&gt; Encoding
+$ctoEncoding :: MultiSig -&gt; Encoding
+toJSON :: MultiSig -&gt; Value
+$ctoJSON :: MultiSig -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680975693"><span id="local-6989586621680975695"><span class="annot"><span class="annottext">Value -&gt; Parser [MultiSig]
+Value -&gt; Parser MultiSig
+(Value -&gt; Parser MultiSig)
+-&gt; (Value -&gt; Parser [MultiSig]) -&gt; FromJSON MultiSig
+forall a.
+(Value -&gt; Parser a) -&gt; (Value -&gt; Parser [a]) -&gt; FromJSON a
+parseJSONList :: Value -&gt; Parser [MultiSig]
+$cparseJSONList :: Value -&gt; Parser [MultiSig]
+parseJSON :: Value -&gt; Parser MultiSig
+$cparseJSON :: Value -&gt; Parser MultiSig
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">FromJSON</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span id="local-6989586621680975688"><span id="local-6989586621680975690"><span class="hs-identifier">PlutusTx.makeLift</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">MultiSig</span></span></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span id="local-6989586621680975824"><span class="annot"><a href="Plutus.Contracts.MultiSig.html#contract"><span class="hs-identifier hs-type">contract</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680975824"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Contract</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSigSchema"><span class="hs-identifier hs-type">MultiSigSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680975824"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-57"></span><span id="contract"><span class="annot"><span class="annottext">contract :: Contract () MultiSigSchema e ()
+</span><a href="Plutus.Contracts.MultiSig.html#contract"><span class="hs-identifier hs-var hs-var">contract</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Promise
+   ()
+   ('R
+      '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+         &quot;unlock&quot;
+         ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+               ActiveEndpoint)])
+   e
+   ()]
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall w (s :: Row *) e a. [Promise w s e a] -&gt; Contract w s e a
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">selectList</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Promise
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  ()
+forall e. AsContractError e =&gt; Promise () MultiSigSchema e ()
+</span><a href="Plutus.Contracts.MultiSig.html#lock"><span class="hs-identifier hs-var">lock</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Promise
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  ()
+forall e. AsContractError e =&gt; Promise () MultiSigSchema e ()
+</span><a href="Plutus.Contracts.MultiSig.html#unlock"><span class="hs-identifier hs-var">unlock</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; m b -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  ()
+forall e. AsContractError e =&gt; Contract () MultiSigSchema e ()
+</span><a href="Plutus.Contracts.MultiSig.html#contract"><span class="hs-identifier hs-var">contract</span></a></span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-pragma">{-# INLINABLE</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#validate"><span class="hs-pragma hs-type">validate</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-60"></span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#validate"><span class="hs-identifier hs-type">validate</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptContext</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-61"></span><span id="validate"><span class="annot"><span class="annottext">validate :: MultiSig -&gt; () -&gt; () -&gt; ScriptContext -&gt; Bool
+</span><a href="Plutus.Contracts.MultiSig.html#validate"><span class="hs-identifier hs-var hs-var">validate</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span class="hs-special">{</span><span id="local-6989586621680975681"><span class="annot"><span class="annottext">[PaymentPubKeyHash]
+signatories :: [PaymentPubKeyHash]
+signatories :: MultiSig -&gt; [PaymentPubKeyHash]
+</span><a href="#local-6989586621680975681"><span class="hs-identifier hs-var hs-var">signatories</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680975680"><span class="annot"><span class="annottext">Integer
+minNumSignatures :: Integer
+minNumSignatures :: MultiSig -&gt; Integer
+</span><a href="#local-6989586621680975680"><span class="hs-identifier hs-var hs-var">minNumSignatures</span></a></span></span><span class="hs-special">}</span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680975679"><span class="annot"><span class="annottext">ScriptContext
+</span><a href="#local-6989586621680975679"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680975678"><span class="annot"><span class="annottext">present :: Integer
+</span><a href="#local-6989586621680975678"><span class="hs-identifier hs-var hs-var">present</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[PaymentPubKeyHash] -&gt; Integer
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Integer
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">length</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(PaymentPubKeyHash -&gt; Bool)
+-&gt; [PaymentPubKeyHash] -&gt; [PaymentPubKeyHash]
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; [a]
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">filter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxInfo -&gt; PubKeyHash -&gt; Bool
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var">V.txSignedBy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ScriptContext -&gt; TxInfo
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">scriptContextTxInfo</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptContext
+</span><a href="#local-6989586621680975679"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(PubKeyHash -&gt; Bool)
+-&gt; (PaymentPubKeyHash -&gt; PubKeyHash) -&gt; PaymentPubKeyHash -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; PubKeyHash
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var hs-var">unPaymentPubKeyHash</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[PaymentPubKeyHash]
+</span><a href="#local-6989586621680975681"><span class="hs-identifier hs-var">signatories</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">BuiltinString -&gt; Bool -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-var">traceIfFalse</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinString
+</span><span class="hs-string">&quot;not enough signatures&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680975678"><span class="hs-identifier hs-var">present</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680975680"><span class="hs-identifier hs-var">minNumSignatures</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.ValidatorTypes</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="RedeemerType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">RedeemerType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span class="hs-keyword">instance</span><span> </span><span id="DatumType"><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">DatumType</span></a></span></span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#typedValidator"><span class="hs-identifier hs-type">typedValidator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-type">Scripts.TypedValidator</span></a></span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span>
+</span><span id="line-70"></span><span id="typedValidator"><span class="annot"><span class="annottext">typedValidator :: MultiSig -&gt; TypedValidator MultiSig
+</span><a href="Plutus.Contracts.MultiSig.html#typedValidator"><span class="hs-identifier hs-var hs-var">typedValidator</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CompiledCode (MultiSig -&gt; ValidatorType MultiSig)
+-&gt; CompiledCode (ValidatorType MultiSig -&gt; UntypedValidator)
+-&gt; MultiSig
+-&gt; TypedValidator MultiSig
+forall a param.
+Lift DefaultUni param =&gt;
+CompiledCode (param -&gt; ValidatorType a)
+-&gt; CompiledCode (ValidatorType a -&gt; UntypedValidator)
+-&gt; param
+-&gt; TypedValidator a
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkTypedValidatorParam</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSig"><span class="hs-identifier hs-type">MultiSig</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">validate</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-special">$$(</span><span class="annot"><a href="../../../../plutus-tx/html/src"><span class="hs-identifier hs-type">PlutusTx.compile</span></a></span><span> </span><span class="hs-special">[||</span><span> </span><span class="hs-identifier">wrap</span><span> </span><span class="hs-special">||]</span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-74"></span><span>        </span><span id="local-6989586621680975664"><span class="annot"><span class="annottext">wrap :: (() -&gt; () -&gt; ScriptContext -&gt; Bool) -&gt; UntypedValidator
+</span><a href="#local-6989586621680975664"><span class="hs-identifier hs-var hs-var">wrap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(() -&gt; () -&gt; ScriptContext -&gt; Bool) -&gt; UntypedValidator
+forall sc d r.
+(IsScriptContext sc, UnsafeFromData d, UnsafeFromData r) =&gt;
+(d -&gt; r -&gt; sc -&gt; Bool) -&gt; UntypedValidator
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.mkUntypedValidator</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- | Lock some funds in a 'MultiSig' contract.</span><span>
+</span><span id="line-78"></span><span id="local-6989586621680975829"><span class="annot"><a href="Plutus.Contracts.MultiSig.html#lock"><span class="hs-identifier hs-type">lock</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680975829"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSigSchema"><span class="hs-identifier hs-type">MultiSigSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680975829"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-79"></span><span id="lock"><span class="annot"><span class="annottext">lock :: Promise () MultiSigSchema e ()
+</span><a href="Plutus.Contracts.MultiSig.html#lock"><span class="hs-identifier hs-var hs-var">lock</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;lock&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;lock&quot;</span></span><span> </span><span class="annot"><span class="annottext">(((MultiSig, Value)
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+             &quot;unlock&quot;
+             ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                   ActiveEndpoint)])
+       e
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+            &quot;unlock&quot;
+            ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                  ActiveEndpoint)])
+      e
+      ())
+-&gt; ((MultiSig, Value)
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680975660"><span class="annot"><span class="annottext">MultiSig
+</span><a href="#local-6989586621680975660"><span class="hs-identifier hs-var">ms</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680975659"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680975659"><span class="hs-identifier hs-var">vl</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-80"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680975658"><span class="annot"><span class="annottext">inst :: TypedValidator MultiSig
+</span><a href="#local-6989586621680975658"><span class="hs-identifier hs-var hs-var">inst</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MultiSig -&gt; TypedValidator MultiSig
+</span><a href="Plutus.Contracts.MultiSig.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">MultiSig
+</span><a href="#local-6989586621680975660"><span class="hs-identifier hs-var">ms</span></a></span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680975657"><span class="annot"><span class="annottext">tx :: TxConstraints () ()
+</span><a href="#local-6989586621680975657"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; Value -&gt; TxConstraints () ()
+forall o i. o -&gt; Value -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustPayToTheScriptWithDatumInTx</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621680975659"><span class="hs-identifier hs-var">vl</span></a></span><span>
+</span><span id="line-82"></span><span>        </span><span id="local-6989586621680975655"><span class="annot"><span class="annottext">lookups :: ScriptLookups MultiSig
+</span><a href="#local-6989586621680975655"><span class="hs-identifier hs-var hs-var">lookups</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator MultiSig -&gt; ScriptLookups MultiSig
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator MultiSig
+</span><a href="#local-6989586621680975658"><span class="hs-identifier hs-var">inst</span></a></span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="annottext">ScriptLookups MultiSig
+-&gt; TxConstraints (RedeemerType MultiSig) (DatumType MultiSig)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups MultiSig
+</span><a href="#local-6989586621680975655"><span class="hs-identifier hs-var">lookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints () ()
+TxConstraints (RedeemerType MultiSig) (DatumType MultiSig)
+</span><a href="#local-6989586621680975657"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-84"></span><span>        </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         UnbalancedTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         ())
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract
+   ()
+   ('R
+      '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+         &quot;unlock&quot;
+         ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+               ActiveEndpoint)])
+   e
+   CardanoTx
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+            &quot;unlock&quot;
+            ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                  ActiveEndpoint)])
+      e
+      ())
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         CardanoTx)
+-&gt; UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- | The @&quot;unlock&quot;@ endpoint, unlocking some funds with a list</span><span>
+</span><span id="line-87"></span><span class="hs-comment">--   of signatures.</span><span>
+</span><span id="line-88"></span><span id="local-6989586621680975650"><span class="annot"><a href="Plutus.Contracts.MultiSig.html#unlock"><span class="hs-identifier hs-type">unlock</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">AsContractError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680975650"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-type">Promise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Plutus.Contracts.MultiSig.html#MultiSigSchema"><span class="hs-identifier hs-type">MultiSigSchema</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680975650"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-89"></span><span id="unlock"><span class="annot"><span class="annottext">unlock :: Promise () MultiSigSchema e ()
+</span><a href="Plutus.Contracts.MultiSig.html#unlock"><span class="hs-identifier hs-var hs-var">unlock</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a w (s :: Row *) e b.
+(HasEndpoint &quot;unlock&quot; a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+forall (l :: Symbol) a w (s :: Row *) e b.
+(HasEndpoint l a s, AsContractError e, FromJSON a) =&gt;
+(a -&gt; Contract w s e b) -&gt; Promise w s e b
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">endpoint</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-string">&quot;unlock&quot;</span></span><span> </span><span class="annot"><span class="annottext">(((MultiSig, [PaymentPubKeyHash])
+  -&gt; Contract
+       ()
+       ('R
+          '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+             &quot;unlock&quot;
+             ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                   ActiveEndpoint)])
+       e
+       ())
+ -&gt; Promise
+      ()
+      ('R
+         '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+            &quot;unlock&quot;
+            ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                  ActiveEndpoint)])
+      e
+      ())
+-&gt; ((MultiSig, [PaymentPubKeyHash])
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         ())
+-&gt; Promise
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680975649"><span class="annot"><span class="annottext">MultiSig
+</span><a href="#local-6989586621680975649"><span class="hs-identifier hs-var">ms</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680975648"><span class="annot"><span class="annottext">[PaymentPubKeyHash]
+</span><a href="#local-6989586621680975648"><span class="hs-identifier hs-var">pks</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-90"></span><span>    </span><span id="local-6989586621680975647"><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621680975647"><span class="hs-identifier hs-var">networkId</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Params -&gt; NetworkId
+</span><a href="../../../../cardano-node-emulator/html/src"><span class="hs-identifier hs-var hs-var">pNetworkId</span></a></span><span> </span><span class="annot"><span class="annottext">(Params -&gt; NetworkId)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     Params
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     NetworkId
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  Params
+forall w (s :: Row *) e. AsContractError e =&gt; Contract w s e Params
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">getParams</span></a></span><span>
+</span><span id="line-91"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680975644"><span class="annot"><span class="annottext">inst :: TypedValidator MultiSig
+</span><a href="#local-6989586621680975644"><span class="hs-identifier hs-var hs-var">inst</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">MultiSig -&gt; TypedValidator MultiSig
+</span><a href="Plutus.Contracts.MultiSig.html#typedValidator"><span class="hs-identifier hs-var">typedValidator</span></a></span><span> </span><span class="annot"><span class="annottext">MultiSig
+</span><a href="#local-6989586621680975649"><span class="hs-identifier hs-var">ms</span></a></span><span>
+</span><span id="line-92"></span><span>    </span><span id="local-6989586621680975643"><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680975643"><span class="hs-identifier hs-var">utx</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CardanoAddress
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     (Map TxOutRef DecoratedTxOut)
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+CardanoAddress -&gt; Contract w s e (Map TxOutRef DecoratedTxOut)
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">utxosAt</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NetworkId -&gt; TypedValidator MultiSig -&gt; CardanoAddress
+forall a. NetworkId -&gt; TypedValidator a -&gt; CardanoAddress
+</span><a href="../../../../plutus-script-utils/html/src"><span class="hs-identifier hs-var">Scripts.validatorCardanoAddress</span></a></span><span> </span><span class="annot"><span class="annottext">NetworkId
+</span><a href="#local-6989586621680975647"><span class="hs-identifier hs-var">networkId</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator MultiSig
+</span><a href="#local-6989586621680975644"><span class="hs-identifier hs-var">inst</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680975640"><span class="annot"><span class="annottext">tx :: TxConstraints () ()
+</span><a href="#local-6989586621680975640"><span class="hs-identifier hs-var hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut -&gt; () -&gt; TxConstraints () ()
+forall i o. Map TxOutRef DecoratedTxOut -&gt; i -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.collectFromTheScript</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680975643"><span class="hs-identifier hs-var">utx</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-94"></span><span>                </span><span class="annot"><span class="annottext">TxConstraints () () -&gt; TxConstraints () () -&gt; TxConstraints () ()
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(PaymentPubKeyHash -&gt; TxConstraints () ())
+-&gt; [PaymentPubKeyHash] -&gt; TxConstraints () ()
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="annot"><span class="annottext">PaymentPubKeyHash -&gt; TxConstraints () ()
+forall i o. PaymentPubKeyHash -&gt; TxConstraints i o
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.mustBeSignedBy</span></a></span><span> </span><span class="annot"><span class="annottext">[PaymentPubKeyHash]
+</span><a href="#local-6989586621680975648"><span class="hs-identifier hs-var">pks</span></a></span><span>
+</span><span id="line-95"></span><span>        </span><span id="local-6989586621680975637"><span class="annot"><span class="annottext">lookups :: ScriptLookups MultiSig
+</span><a href="#local-6989586621680975637"><span class="hs-identifier hs-var hs-var">lookups</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TypedValidator MultiSig -&gt; ScriptLookups MultiSig
+forall a. TypedValidator a -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.typedValidatorLookups</span></a></span><span> </span><span class="annot"><span class="annottext">TypedValidator MultiSig
+</span><a href="#local-6989586621680975644"><span class="hs-identifier hs-var">inst</span></a></span><span>
+</span><span id="line-96"></span><span>                </span><span class="annot"><span class="annottext">ScriptLookups MultiSig
+-&gt; ScriptLookups MultiSig -&gt; ScriptLookups MultiSig
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut -&gt; ScriptLookups MultiSig
+forall a. Map TxOutRef DecoratedTxOut -&gt; ScriptLookups a
+</span><a href="../../../../plutus-ledger-constraints/html/src"><span class="hs-identifier hs-var">Constraints.unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef DecoratedTxOut
+</span><a href="#local-6989586621680975643"><span class="hs-identifier hs-var">utx</span></a></span><span>
+</span><span id="line-97"></span><span>    </span><span class="annot"><span class="annottext">ScriptLookups MultiSig
+-&gt; TxConstraints (RedeemerType MultiSig) (DatumType MultiSig)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall a w (s :: Row *) e.
+(ToData (RedeemerType a), FromData (DatumType a),
+ ToData (DatumType a), AsContractError e) =&gt;
+ScriptLookups a
+-&gt; TxConstraints (RedeemerType a) (DatumType a)
+-&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">mkTxConstraints</span></a></span><span> </span><span class="annot"><span class="annottext">ScriptLookups MultiSig
+</span><a href="#local-6989586621680975637"><span class="hs-identifier hs-var">lookups</span></a></span><span> </span><span class="annot"><span class="annottext">TxConstraints () ()
+TxConstraints (RedeemerType MultiSig) (DatumType MultiSig)
+</span><a href="#local-6989586621680975640"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-98"></span><span>        </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         UnbalancedTx)
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     UnbalancedTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e UnbalancedTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">adjustUnbalancedTx</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  UnbalancedTx
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         ())
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">Contract
+  ()
+  ('R
+     '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+        &quot;unlock&quot;
+        ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+              ActiveEndpoint)])
+  e
+  CardanoTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(Contract
+   ()
+   ('R
+      '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+         &quot;unlock&quot;
+         ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+               ActiveEndpoint)])
+   e
+   CardanoTx
+ -&gt; Contract
+      ()
+      ('R
+         '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+            &quot;unlock&quot;
+            ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                  ActiveEndpoint)])
+      e
+      ())
+-&gt; (UnbalancedTx
+    -&gt; Contract
+         ()
+         ('R
+            '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+               &quot;unlock&quot;
+               ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                     ActiveEndpoint)])
+         e
+         CardanoTx)
+-&gt; UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../plutus-tx/html/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">UnbalancedTx
+-&gt; Contract
+     ()
+     ('R
+        '[ &quot;lock&quot; ':-&gt; (EndpointValue (MultiSig, Value), ActiveEndpoint),
+           &quot;unlock&quot;
+           ':-&gt; (EndpointValue (MultiSig, [PaymentPubKeyHash]),
+                 ActiveEndpoint)])
+     e
+     CardanoTx
+forall w (s :: Row *) e.
+AsContractError e =&gt;
+UnbalancedTx -&gt; Contract w s e CardanoTx
+</span><a href="../../../../plutus-contract/html/src"><span class="hs-identifier hs-var">submitUnbalancedTx</span></a></span><span>
+</span><span id="line-99"></span></pre></body></html>

@@ -1,0 +1,794 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="%24con2tag_3xRSFe3eCOmDfTNU5jbtQA"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass    #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- | Support for visualisation of a blockchain as a graph.</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Wallet.Graph</span><span>
+</span><span id="line-9"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Wallet.Graph.html#txnFlows"><span class="hs-identifier">txnFlows</span></a></span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#graph"><span class="hs-identifier">graph</span></a></span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#FlowGraph"><span class="hs-identifier">FlowGraph</span></a></span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier">FlowLink</span></a></span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier">TxRef</span></a></span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxOwner"><span class="hs-identifier">UtxOwner</span></a></span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier">UtxoLocation</span></a></span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">Data.Aeson.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier">toJSON</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">nub</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">catMaybes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Set</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Ada</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ada</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Address</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Blockchain</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Ledger.Credential</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier">Credential</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Crypto</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier">Ledger.Tx</span></a></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- | The owner of an unspent transaction output.</span><span>
+</span><span id="line-34"></span><span id="local-6989586621680820709"><span id="local-6989586621680820710"></span></span><span class="hs-keyword">data</span><span> </span><span id="UtxOwner"><span class="annot"><a href="Wallet.Graph.html#UtxOwner"><span class="hs-identifier hs-var">UtxOwner</span></a></span></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="PubKeyOwner"><span class="annot"><a href="Wallet.Graph.html#PubKeyOwner"><span class="hs-identifier hs-var">PubKeyOwner</span></a></span></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PubKey</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-comment">-- ^ Funds owned by a known public key.</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="ScriptOwner"><span class="annot"><a href="Wallet.Graph.html#ScriptOwner"><span class="hs-identifier hs-var">ScriptOwner</span></a></span></span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-comment">-- ^ Funds locked by script.</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="OtherOwner"><span class="annot"><a href="Wallet.Graph.html#OtherOwner"><span class="hs-identifier hs-var">OtherOwner</span></a></span></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-comment">-- ^ All other funds (that is, funds owned by a public key we are not interested in).</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680820702"><span id="local-6989586621680820704"><span class="annot"><span class="annottext">UtxOwner -&gt; UtxOwner -&gt; Bool
+(UtxOwner -&gt; UtxOwner -&gt; Bool)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; Bool) -&gt; Eq UtxOwner
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UtxOwner -&gt; UtxOwner -&gt; Bool
+$c/= :: UtxOwner -&gt; UtxOwner -&gt; Bool
+== :: UtxOwner -&gt; UtxOwner -&gt; Bool
+$c== :: UtxOwner -&gt; UtxOwner -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820686"><span id="local-6989586621680820688"><span id="local-6989586621680820690"><span id="local-6989586621680820692"><span id="local-6989586621680820694"><span id="local-6989586621680820696"><span id="local-6989586621680820698"><span class="annot"><span class="annottext">Eq UtxOwner
+Eq UtxOwner
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; Ordering)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; Bool)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; Bool)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; Bool)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; Bool)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; UtxOwner)
+-&gt; (UtxOwner -&gt; UtxOwner -&gt; UtxOwner)
+-&gt; Ord UtxOwner
+UtxOwner -&gt; UtxOwner -&gt; Bool
+UtxOwner -&gt; UtxOwner -&gt; Ordering
+UtxOwner -&gt; UtxOwner -&gt; UtxOwner
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: UtxOwner -&gt; UtxOwner -&gt; UtxOwner
+$cmin :: UtxOwner -&gt; UtxOwner -&gt; UtxOwner
+max :: UtxOwner -&gt; UtxOwner -&gt; UtxOwner
+$cmax :: UtxOwner -&gt; UtxOwner -&gt; UtxOwner
+&gt;= :: UtxOwner -&gt; UtxOwner -&gt; Bool
+$c&gt;= :: UtxOwner -&gt; UtxOwner -&gt; Bool
+&gt; :: UtxOwner -&gt; UtxOwner -&gt; Bool
+$c&gt; :: UtxOwner -&gt; UtxOwner -&gt; Bool
+&lt;= :: UtxOwner -&gt; UtxOwner -&gt; Bool
+$c&lt;= :: UtxOwner -&gt; UtxOwner -&gt; Bool
+&lt; :: UtxOwner -&gt; UtxOwner -&gt; Bool
+$c&lt; :: UtxOwner -&gt; UtxOwner -&gt; Bool
+compare :: UtxOwner -&gt; UtxOwner -&gt; Ordering
+$ccompare :: UtxOwner -&gt; UtxOwner -&gt; Ordering
+$cp1Ord :: Eq UtxOwner
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820679"><span id="local-6989586621680820681"><span id="local-6989586621680820683"><span class="annot"><span class="annottext">Int -&gt; UtxOwner -&gt; ShowS
+[UtxOwner] -&gt; ShowS
+UtxOwner -&gt; String
+(Int -&gt; UtxOwner -&gt; ShowS)
+-&gt; (UtxOwner -&gt; String) -&gt; ([UtxOwner] -&gt; ShowS) -&gt; Show UtxOwner
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UtxOwner] -&gt; ShowS
+$cshowList :: [UtxOwner] -&gt; ShowS
+show :: UtxOwner -&gt; String
+$cshow :: UtxOwner -&gt; String
+showsPrec :: Int -&gt; UtxOwner -&gt; ShowS
+$cshowsPrec :: Int -&gt; UtxOwner -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. UtxOwner -&gt; Rep UtxOwner x)
+-&gt; (forall x. Rep UtxOwner x -&gt; UtxOwner) -&gt; Generic UtxOwner
+forall x. Rep UtxOwner x -&gt; UtxOwner
+forall x. UtxOwner -&gt; Rep UtxOwner x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep UtxOwner x -&gt; UtxOwner
+$cfrom :: forall x. UtxOwner -&gt; Rep UtxOwner x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820667"><span id="local-6989586621680820669"><span id="local-6989586621680820671"><span id="local-6989586621680820673"><span class="annot"><span class="annottext">[UtxOwner] -&gt; Encoding
+[UtxOwner] -&gt; Value
+UtxOwner -&gt; Encoding
+UtxOwner -&gt; Value
+(UtxOwner -&gt; Value)
+-&gt; (UtxOwner -&gt; Encoding)
+-&gt; ([UtxOwner] -&gt; Value)
+-&gt; ([UtxOwner] -&gt; Encoding)
+-&gt; ToJSON UtxOwner
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [UtxOwner] -&gt; Encoding
+$ctoEncodingList :: [UtxOwner] -&gt; Encoding
+toJSONList :: [UtxOwner] -&gt; Value
+$ctoJSONList :: [UtxOwner] -&gt; Value
+toEncoding :: UtxOwner -&gt; Encoding
+$ctoEncoding :: UtxOwner -&gt; Encoding
+toJSON :: UtxOwner -&gt; Value
+$ctoJSON :: UtxOwner -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- | Given a set of known public keys, compute the owner of a given transaction output.</span><span>
+</span><span id="line-44"></span><span class="annot"><a href="Wallet.Graph.html#owner"><span class="hs-identifier hs-type">owner</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set.Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PubKey</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">TxOut</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxOwner"><span class="hs-identifier hs-type">UtxOwner</span></a></span><span>
+</span><span id="line-45"></span><span id="owner"><span class="annot"><span class="annottext">owner :: Set PubKey -&gt; TxOut -&gt; UtxOwner
+</span><a href="Wallet.Graph.html#owner"><span class="hs-identifier hs-var hs-var">owner</span></a></span></span><span> </span><span id="local-6989586621680820664"><span class="annot"><span class="annottext">Set PubKey
+</span><a href="#local-6989586621680820664"><span class="hs-identifier hs-var">keys</span></a></span></span><span> </span><span id="local-6989586621680820663"><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680820663"><span class="hs-identifier hs-var">tx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680820662"><span class="annot"><span class="annottext">hashMap :: Map PubKeyHash PubKey
+</span><a href="#local-6989586621680820662"><span class="hs-identifier hs-var hs-var">hashMap</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(PubKey -&gt; Map PubKeyHash PubKey)
+-&gt; Set PubKey -&gt; Map PubKeyHash PubKey
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680820660"><span class="annot"><span class="annottext">PubKey
+</span><a href="#local-6989586621680820660"><span class="hs-identifier hs-var">pk</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PubKeyHash -&gt; PubKey -&gt; Map PubKeyHash PubKey
+forall k a. k -&gt; a -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.singleton</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PubKey -&gt; PubKeyHash
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">pubKeyHash</span></a></span><span> </span><span class="annot"><span class="annottext">PubKey
+</span><a href="#local-6989586621680820660"><span class="hs-identifier hs-var">pk</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PubKey
+</span><a href="#local-6989586621680820660"><span class="hs-identifier hs-var">pk</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Set PubKey
+</span><a href="#local-6989586621680820664"><span class="hs-identifier hs-var">keys</span></a></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">AddressInEra BabbageEra -&gt; Credential
+forall era. AddressInEra era -&gt; Credential
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">cardanoAddressCredential</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxOut -&gt; AddressInEra BabbageEra
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">txOutAddress</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680820663"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-48"></span><span>    </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">ScriptCredential</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span>                                       </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UtxOwner
+</span><a href="Wallet.Graph.html#ScriptOwner"><span class="hs-identifier hs-var">ScriptOwner</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">PubKeyCredential</span></a></span><span> </span><span id="local-6989586621680820653"><span class="annot"><span class="annottext">PubKeyHash
+</span><a href="#local-6989586621680820653"><span class="hs-identifier hs-var">pkh</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621680820652"><span class="annot"><span class="annottext">PubKey
+</span><a href="#local-6989586621680820652"><span class="hs-identifier hs-var">pk</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">PubKeyHash -&gt; Map PubKeyHash PubKey -&gt; Maybe PubKey
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.lookup</span></a></span><span> </span><span class="annot"><span class="annottext">PubKeyHash
+</span><a href="#local-6989586621680820653"><span class="hs-identifier hs-var">pkh</span></a></span><span> </span><span class="annot"><span class="annottext">Map PubKeyHash PubKey
+</span><a href="#local-6989586621680820662"><span class="hs-identifier hs-var">hashMap</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PubKey -&gt; UtxOwner
+</span><a href="Wallet.Graph.html#PubKeyOwner"><span class="hs-identifier hs-var">PubKeyOwner</span></a></span><span> </span><span class="annot"><span class="annottext">PubKey
+</span><a href="#local-6989586621680820652"><span class="hs-identifier hs-var">pk</span></a></span><span>
+</span><span id="line-50"></span><span>    </span><span class="annot"><span class="annottext">Credential
+</span><span class="hs-identifier">_</span></span><span>                                                        </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">UtxOwner
+</span><a href="Wallet.Graph.html#OtherOwner"><span class="hs-identifier hs-var">OtherOwner</span></a></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- | A wrapper around the first 8 digits of a 'TxId'.</span><span>
+</span><span id="line-53"></span><span id="local-6989586621680820649"><span id="local-6989586621680820650"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="TxRef"><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-var">TxRef</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-54"></span><span>  </span><span id="TxRef"><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-var">TxRef</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-type">Text.Text</span></a></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680820644"><span id="local-6989586621680820646"><span class="annot"><span class="annottext">TxRef -&gt; TxRef -&gt; Bool
+(TxRef -&gt; TxRef -&gt; Bool) -&gt; (TxRef -&gt; TxRef -&gt; Bool) -&gt; Eq TxRef
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: TxRef -&gt; TxRef -&gt; Bool
+$c/= :: TxRef -&gt; TxRef -&gt; Bool
+== :: TxRef -&gt; TxRef -&gt; Bool
+$c== :: TxRef -&gt; TxRef -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820629"><span id="local-6989586621680820631"><span id="local-6989586621680820633"><span id="local-6989586621680820635"><span id="local-6989586621680820637"><span id="local-6989586621680820639"><span id="local-6989586621680820641"><span class="annot"><span class="annottext">Eq TxRef
+Eq TxRef
+-&gt; (TxRef -&gt; TxRef -&gt; Ordering)
+-&gt; (TxRef -&gt; TxRef -&gt; Bool)
+-&gt; (TxRef -&gt; TxRef -&gt; Bool)
+-&gt; (TxRef -&gt; TxRef -&gt; Bool)
+-&gt; (TxRef -&gt; TxRef -&gt; Bool)
+-&gt; (TxRef -&gt; TxRef -&gt; TxRef)
+-&gt; (TxRef -&gt; TxRef -&gt; TxRef)
+-&gt; Ord TxRef
+TxRef -&gt; TxRef -&gt; Bool
+TxRef -&gt; TxRef -&gt; Ordering
+TxRef -&gt; TxRef -&gt; TxRef
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: TxRef -&gt; TxRef -&gt; TxRef
+$cmin :: TxRef -&gt; TxRef -&gt; TxRef
+max :: TxRef -&gt; TxRef -&gt; TxRef
+$cmax :: TxRef -&gt; TxRef -&gt; TxRef
+&gt;= :: TxRef -&gt; TxRef -&gt; Bool
+$c&gt;= :: TxRef -&gt; TxRef -&gt; Bool
+&gt; :: TxRef -&gt; TxRef -&gt; Bool
+$c&gt; :: TxRef -&gt; TxRef -&gt; Bool
+&lt;= :: TxRef -&gt; TxRef -&gt; Bool
+$c&lt;= :: TxRef -&gt; TxRef -&gt; Bool
+&lt; :: TxRef -&gt; TxRef -&gt; Bool
+$c&lt; :: TxRef -&gt; TxRef -&gt; Bool
+compare :: TxRef -&gt; TxRef -&gt; Ordering
+$ccompare :: TxRef -&gt; TxRef -&gt; Ordering
+$cp1Ord :: Eq TxRef
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820623"><span id="local-6989586621680820625"><span id="local-6989586621680820627"><span class="annot"><span class="annottext">Int -&gt; TxRef -&gt; ShowS
+[TxRef] -&gt; ShowS
+TxRef -&gt; String
+(Int -&gt; TxRef -&gt; ShowS)
+-&gt; (TxRef -&gt; String) -&gt; ([TxRef] -&gt; ShowS) -&gt; Show TxRef
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [TxRef] -&gt; ShowS
+$cshowList :: [TxRef] -&gt; ShowS
+show :: TxRef -&gt; String
+$cshow :: TxRef -&gt; String
+showsPrec :: Int -&gt; TxRef -&gt; ShowS
+$cshowsPrec :: Int -&gt; TxRef -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. TxRef -&gt; Rep TxRef x)
+-&gt; (forall x. Rep TxRef x -&gt; TxRef) -&gt; Generic TxRef
+forall x. Rep TxRef x -&gt; TxRef
+forall x. TxRef -&gt; Rep TxRef x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep TxRef x -&gt; TxRef
+$cfrom :: forall x. TxRef -&gt; Rep TxRef x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680820614"><span id="local-6989586621680820616"><span id="local-6989586621680820618"><span class="annot"><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>  </span><span id="local-6989586621680820613"><span class="annot"><span class="annottext">toJSON :: TxRef -&gt; Value
+</span><a href="#local-6989586621680820613"><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span> </span><span id="local-6989586621680820612"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680820612"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Value
+forall a. ToJSON a =&gt; a -&gt; Value
+</span><a href="../file:///nix/store/2m29g1mlr4lg9v93x77b5w3l6pyhq2vj-aeson-lib-aeson-2.0.2.0-haddock-doc/share/doc/aeson/html/src"><span class="hs-identifier hs-var">toJSON</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680820612"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span class="annot"><a href="Wallet.Graph.html#mkRef"><span class="hs-identifier hs-type">mkRef</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxId</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span>
+</span><span id="line-61"></span><span id="mkRef"><span class="annot"><span class="annottext">mkRef :: TxId -&gt; TxRef
+</span><a href="Wallet.Graph.html#mkRef"><span class="hs-identifier hs-var hs-var">mkRef</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; TxRef
+</span><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-var">TxRef</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; TxRef) -&gt; (TxId -&gt; Text) -&gt; TxId -&gt; TxRef
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Text) -&gt; (TxId -&gt; String) -&gt; TxId -&gt; Text
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ShowS
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">take</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ShowS -&gt; (TxId -&gt; String) -&gt; TxId -&gt; String
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; String)
+-&gt; (TxId -&gt; BuiltinByteString) -&gt; TxId -&gt; String
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TxId -&gt; BuiltinByteString
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">getTxId</span></a></span><span>
+</span><span id="line-62"></span><span>
+</span><span id="line-63"></span><span class="hs-comment">-- | The location of a transaction in a blockchain specified by two indices: the index of the containing</span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- block in the chain, and the index of the transaction within the block.</span><span>
+</span><span id="line-65"></span><span id="local-6989586621680820604"><span id="local-6989586621680820605"></span></span><span class="hs-keyword">data</span><span> </span><span id="UtxoLocation"><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-var">UtxoLocation</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="UtxoLocation"><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-var">UtxoLocation</span></a></span></span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="utxoLocBlock"><span class="annot"><span class="annottext">UtxoLocation -&gt; Integer
+</span><a href="Wallet.Graph.html#utxoLocBlock"><span class="hs-identifier hs-var hs-var">utxoLocBlock</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="utxoLocBlockIdx"><span class="annot"><span class="annottext">UtxoLocation -&gt; Integer
+</span><a href="Wallet.Graph.html#utxoLocBlockIdx"><span class="hs-identifier hs-var hs-var">utxoLocBlockIdx</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680820597"><span id="local-6989586621680820599"><span class="annot"><span class="annottext">UtxoLocation -&gt; UtxoLocation -&gt; Bool
+(UtxoLocation -&gt; UtxoLocation -&gt; Bool)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; Bool) -&gt; Eq UtxoLocation
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+$c/= :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+== :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+$c== :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820582"><span id="local-6989586621680820584"><span id="local-6989586621680820586"><span id="local-6989586621680820588"><span id="local-6989586621680820590"><span id="local-6989586621680820592"><span id="local-6989586621680820594"><span class="annot"><span class="annottext">Eq UtxoLocation
+Eq UtxoLocation
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; Ordering)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; Bool)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; Bool)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; Bool)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; Bool)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation)
+-&gt; (UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation)
+-&gt; Ord UtxoLocation
+UtxoLocation -&gt; UtxoLocation -&gt; Bool
+UtxoLocation -&gt; UtxoLocation -&gt; Ordering
+UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation
+$cmin :: UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation
+max :: UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation
+$cmax :: UtxoLocation -&gt; UtxoLocation -&gt; UtxoLocation
+&gt;= :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+$c&gt;= :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+&gt; :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+$c&gt; :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+&lt;= :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+$c&lt;= :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+&lt; :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+$c&lt; :: UtxoLocation -&gt; UtxoLocation -&gt; Bool
+compare :: UtxoLocation -&gt; UtxoLocation -&gt; Ordering
+$ccompare :: UtxoLocation -&gt; UtxoLocation -&gt; Ordering
+$cp1Ord :: Eq UtxoLocation
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820576"><span id="local-6989586621680820578"><span id="local-6989586621680820580"><span class="annot"><span class="annottext">Int -&gt; UtxoLocation -&gt; ShowS
+[UtxoLocation] -&gt; ShowS
+UtxoLocation -&gt; String
+(Int -&gt; UtxoLocation -&gt; ShowS)
+-&gt; (UtxoLocation -&gt; String)
+-&gt; ([UtxoLocation] -&gt; ShowS)
+-&gt; Show UtxoLocation
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [UtxoLocation] -&gt; ShowS
+$cshowList :: [UtxoLocation] -&gt; ShowS
+show :: UtxoLocation -&gt; String
+$cshow :: UtxoLocation -&gt; String
+showsPrec :: Int -&gt; UtxoLocation -&gt; ShowS
+$cshowsPrec :: Int -&gt; UtxoLocation -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. UtxoLocation -&gt; Rep UtxoLocation x)
+-&gt; (forall x. Rep UtxoLocation x -&gt; UtxoLocation)
+-&gt; Generic UtxoLocation
+forall x. Rep UtxoLocation x -&gt; UtxoLocation
+forall x. UtxoLocation -&gt; Rep UtxoLocation x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep UtxoLocation x -&gt; UtxoLocation
+$cfrom :: forall x. UtxoLocation -&gt; Rep UtxoLocation x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820566"><span id="local-6989586621680820568"><span id="local-6989586621680820570"><span id="local-6989586621680820572"><span class="annot"><span class="annottext">[UtxoLocation] -&gt; Encoding
+[UtxoLocation] -&gt; Value
+UtxoLocation -&gt; Encoding
+UtxoLocation -&gt; Value
+(UtxoLocation -&gt; Value)
+-&gt; (UtxoLocation -&gt; Encoding)
+-&gt; ([UtxoLocation] -&gt; Value)
+-&gt; ([UtxoLocation] -&gt; Encoding)
+-&gt; ToJSON UtxoLocation
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [UtxoLocation] -&gt; Encoding
+$ctoEncodingList :: [UtxoLocation] -&gt; Encoding
+toJSONList :: [UtxoLocation] -&gt; Value
+$ctoJSONList :: [UtxoLocation] -&gt; Value
+toEncoding :: UtxoLocation -&gt; Encoding
+$ctoEncoding :: UtxoLocation -&gt; Encoding
+toJSON :: UtxoLocation -&gt; Value
+$ctoJSON :: UtxoLocation -&gt; Value
+</span><a href="#local-6989586621680820566"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>
+</span><span id="line-70"></span><span class="hs-comment">-- | A link in the flow graph.</span><span>
+</span><span id="line-71"></span><span id="local-6989586621680820564"><span id="local-6989586621680820565"></span></span><span class="hs-keyword">data</span><span> </span><span id="FlowLink"><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-var">FlowLink</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FlowLink"><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-var">FlowLink</span></a></span></span><span>
+</span><span id="line-72"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="flowLinkSource"><span class="annot"><span class="annottext">FlowLink -&gt; TxRef
+</span><a href="Wallet.Graph.html#flowLinkSource"><span class="hs-identifier hs-var hs-var">flowLinkSource</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span> </span><span class="hs-comment">-- ^ The source transaction.</span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="flowLinkTarget"><span class="annot"><span class="annottext">FlowLink -&gt; TxRef
+</span><a href="Wallet.Graph.html#flowLinkTarget"><span class="hs-identifier hs-var hs-var">flowLinkTarget</span></a></span></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span> </span><span class="hs-comment">-- ^ The target transaction.</span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="flowLinkValue"><span class="annot"><span class="annottext">FlowLink -&gt; Integer
+</span><a href="Wallet.Graph.html#flowLinkValue"><span class="hs-identifier hs-var hs-var">flowLinkValue</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/integer-gmp-1.0.3.0/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-comment">-- ^ The value of Ada along this edge.</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="flowLinkOwner"><span class="annot"><span class="annottext">FlowLink -&gt; UtxOwner
+</span><a href="Wallet.Graph.html#flowLinkOwner"><span class="hs-identifier hs-var hs-var">flowLinkOwner</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxOwner"><span class="hs-identifier hs-type">UtxOwner</span></a></span><span> </span><span class="hs-comment">-- ^ The owner of this edge.</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="flowLinkSourceLoc"><span class="annot"><span class="annottext">FlowLink -&gt; UtxoLocation
+</span><a href="Wallet.Graph.html#flowLinkSourceLoc"><span class="hs-identifier hs-var hs-var">flowLinkSourceLoc</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span> </span><span class="hs-comment">-- ^ The location of the source transaction.</span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="flowLinkTargetLoc"><span class="annot"><span class="annottext">FlowLink -&gt; Maybe UtxoLocation
+</span><a href="Wallet.Graph.html#flowLinkTargetLoc"><span class="hs-identifier hs-var hs-var">flowLinkTargetLoc</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span> </span><span class="hs-comment">-- ^ The location of the target transaction, if 'Nothing' then it is unspent.</span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680820551"><span id="local-6989586621680820553"><span id="local-6989586621680820555"><span class="annot"><span class="annottext">Int -&gt; FlowLink -&gt; ShowS
+[FlowLink] -&gt; ShowS
+FlowLink -&gt; String
+(Int -&gt; FlowLink -&gt; ShowS)
+-&gt; (FlowLink -&gt; String) -&gt; ([FlowLink] -&gt; ShowS) -&gt; Show FlowLink
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [FlowLink] -&gt; ShowS
+$cshowList :: [FlowLink] -&gt; ShowS
+show :: FlowLink -&gt; String
+$cshow :: FlowLink -&gt; String
+showsPrec :: Int -&gt; FlowLink -&gt; ShowS
+$cshowsPrec :: Int -&gt; FlowLink -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. FlowLink -&gt; Rep FlowLink x)
+-&gt; (forall x. Rep FlowLink x -&gt; FlowLink) -&gt; Generic FlowLink
+forall x. Rep FlowLink x -&gt; FlowLink
+forall x. FlowLink -&gt; Rep FlowLink x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep FlowLink x -&gt; FlowLink
+$cfrom :: forall x. FlowLink -&gt; Rep FlowLink x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820541"><span id="local-6989586621680820543"><span id="local-6989586621680820545"><span id="local-6989586621680820547"><span class="annot"><span class="annottext">[FlowLink] -&gt; Encoding
+[FlowLink] -&gt; Value
+FlowLink -&gt; Encoding
+FlowLink -&gt; Value
+(FlowLink -&gt; Value)
+-&gt; (FlowLink -&gt; Encoding)
+-&gt; ([FlowLink] -&gt; Value)
+-&gt; ([FlowLink] -&gt; Encoding)
+-&gt; ToJSON FlowLink
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [FlowLink] -&gt; Encoding
+$ctoEncodingList :: [FlowLink] -&gt; Encoding
+toJSONList :: [FlowLink] -&gt; Value
+$ctoJSONList :: [FlowLink] -&gt; Value
+toEncoding :: FlowLink -&gt; Encoding
+$ctoEncoding :: FlowLink -&gt; Encoding
+toJSON :: FlowLink -&gt; Value
+$ctoJSON :: FlowLink -&gt; Value
+</span><a href="#local-6989586621680820541"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- | The flow graph, consisting of a set of nodes ('TxRef's) and edges ('FlowLink's).</span><span>
+</span><span id="line-81"></span><span id="local-6989586621680820539"><span id="local-6989586621680820540"></span></span><span class="hs-keyword">data</span><span> </span><span id="FlowGraph"><span class="annot"><a href="Wallet.Graph.html#FlowGraph"><span class="hs-identifier hs-var">FlowGraph</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FlowGraph"><span class="annot"><a href="Wallet.Graph.html#FlowGraph"><span class="hs-identifier hs-var">FlowGraph</span></a></span></span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="flowGraphLinks"><span class="annot"><span class="annottext">FlowGraph -&gt; [FlowLink]
+</span><a href="Wallet.Graph.html#flowGraphLinks"><span class="hs-identifier hs-var hs-var">flowGraphLinks</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-type">FlowLink</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="flowGraphNodes"><span class="annot"><span class="annottext">FlowGraph -&gt; [TxRef]
+</span><a href="Wallet.Graph.html#flowGraphNodes"><span class="hs-identifier hs-var hs-var">flowGraphNodes</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-84"></span><span>  </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680820530"><span id="local-6989586621680820532"><span id="local-6989586621680820534"><span class="annot"><span class="annottext">Int -&gt; FlowGraph -&gt; ShowS
+[FlowGraph] -&gt; ShowS
+FlowGraph -&gt; String
+(Int -&gt; FlowGraph -&gt; ShowS)
+-&gt; (FlowGraph -&gt; String)
+-&gt; ([FlowGraph] -&gt; ShowS)
+-&gt; Show FlowGraph
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [FlowGraph] -&gt; ShowS
+$cshowList :: [FlowGraph] -&gt; ShowS
+show :: FlowGraph -&gt; String
+$cshow :: FlowGraph -&gt; String
+showsPrec :: Int -&gt; FlowGraph -&gt; ShowS
+$cshowsPrec :: Int -&gt; FlowGraph -&gt; ShowS
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">(forall x. FlowGraph -&gt; Rep FlowGraph x)
+-&gt; (forall x. Rep FlowGraph x -&gt; FlowGraph) -&gt; Generic FlowGraph
+forall x. Rep FlowGraph x -&gt; FlowGraph
+forall x. FlowGraph -&gt; Rep FlowGraph x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep FlowGraph x -&gt; FlowGraph
+$cfrom :: forall x. FlowGraph -&gt; Rep FlowGraph x
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820520"><span id="local-6989586621680820522"><span id="local-6989586621680820524"><span id="local-6989586621680820526"><span class="annot"><span class="annottext">[FlowGraph] -&gt; Encoding
+[FlowGraph] -&gt; Value
+FlowGraph -&gt; Encoding
+FlowGraph -&gt; Value
+(FlowGraph -&gt; Value)
+-&gt; (FlowGraph -&gt; Encoding)
+-&gt; ([FlowGraph] -&gt; Value)
+-&gt; ([FlowGraph] -&gt; Encoding)
+-&gt; ToJSON FlowGraph
+forall a.
+(a -&gt; Value)
+-&gt; (a -&gt; Encoding)
+-&gt; ([a] -&gt; Value)
+-&gt; ([a] -&gt; Encoding)
+-&gt; ToJSON a
+toEncodingList :: [FlowGraph] -&gt; Encoding
+$ctoEncodingList :: [FlowGraph] -&gt; Encoding
+toJSONList :: [FlowGraph] -&gt; Value
+$ctoJSONList :: [FlowGraph] -&gt; Value
+toEncoding :: FlowGraph -&gt; Encoding
+$ctoEncoding :: FlowGraph -&gt; Encoding
+toJSON :: FlowGraph -&gt; Value
+$ctoJSON :: FlowGraph -&gt; Value
+</span><a href="#local-6989586621680820520"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ToJSON</span></a></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- | Construct a graph from a list of 'FlowLink's.</span><span>
+</span><span id="line-87"></span><span class="annot"><a href="Wallet.Graph.html#graph"><span class="hs-identifier hs-type">graph</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-type">FlowLink</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Graph.html#FlowGraph"><span class="hs-identifier hs-type">FlowGraph</span></a></span><span>
+</span><span id="line-88"></span><span id="graph"><span class="annot"><span class="annottext">graph :: [FlowLink] -&gt; FlowGraph
+</span><a href="Wallet.Graph.html#graph"><span class="hs-identifier hs-var hs-var">graph</span></a></span></span><span> </span><span id="local-6989586621680820519"><span class="annot"><span class="annottext">[FlowLink]
+</span><a href="#local-6989586621680820519"><span class="hs-identifier hs-var">lnks</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FlowGraph :: [FlowLink] -&gt; [TxRef] -&gt; FlowGraph
+</span><a href="Wallet.Graph.html#FlowGraph"><span class="hs-identifier hs-type">FlowGraph</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><span class="annottext">[FlowLink]
+[TxRef]
+flowGraphNodes :: [TxRef]
+flowGraphLinks :: [FlowLink]
+flowGraphNodes :: [TxRef]
+flowGraphLinks :: [FlowLink]
+</span><a href="#local-6989586621680820517"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-89"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-90"></span><span>    </span><span id="local-6989586621680820518"><span class="annot"><span class="annottext">flowGraphLinks :: [FlowLink]
+</span><a href="#local-6989586621680820518"><span class="hs-identifier hs-var hs-var">flowGraphLinks</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[FlowLink]
+</span><a href="#local-6989586621680820519"><span class="hs-identifier hs-var">lnks</span></a></span><span>
+</span><span id="line-91"></span><span>    </span><span id="local-6989586621680820517"><span class="annot"><span class="annottext">flowGraphNodes :: [TxRef]
+</span><a href="#local-6989586621680820517"><span class="hs-identifier hs-var hs-var">flowGraphNodes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[TxRef] -&gt; [TxRef]
+forall a. Eq a =&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">nub</span></a></span><span> </span><span class="annot"><span class="annottext">([TxRef] -&gt; [TxRef]) -&gt; [TxRef] -&gt; [TxRef]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(FlowLink -&gt; TxRef) -&gt; [FlowLink] -&gt; [TxRef]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">FlowLink -&gt; TxRef
+</span><a href="Wallet.Graph.html#flowLinkSource"><span class="hs-identifier hs-var hs-var">flowLinkSource</span></a></span><span> </span><span class="annot"><span class="annottext">[FlowLink]
+</span><a href="#local-6989586621680820519"><span class="hs-identifier hs-var">lnks</span></a></span><span> </span><span class="annot"><span class="annottext">[TxRef] -&gt; [TxRef] -&gt; [TxRef]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">(FlowLink -&gt; TxRef) -&gt; [FlowLink] -&gt; [TxRef]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">FlowLink -&gt; TxRef
+</span><a href="Wallet.Graph.html#flowLinkTarget"><span class="hs-identifier hs-var hs-var">flowLinkTarget</span></a></span><span> </span><span class="annot"><span class="annottext">[FlowLink]
+</span><a href="#local-6989586621680820519"><span class="hs-identifier hs-var">lnks</span></a></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- | Compute the 'FlowLink's for a 'Blockchain' given a set of known 'PubKey's.</span><span>
+</span><span id="line-94"></span><span class="annot"><a href="Wallet.Graph.html#txnFlows"><span class="hs-identifier hs-type">txnFlows</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PubKey</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Blockchain</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-type">FlowLink</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-95"></span><span id="txnFlows"><span class="annot"><span class="annottext">txnFlows :: [PubKey] -&gt; Blockchain -&gt; [FlowLink]
+</span><a href="Wallet.Graph.html#txnFlows"><span class="hs-identifier hs-var hs-var">txnFlows</span></a></span></span><span> </span><span id="local-6989586621680820516"><span class="annot"><span class="annottext">[PubKey]
+</span><a href="#local-6989586621680820516"><span class="hs-identifier hs-var">keys</span></a></span></span><span> </span><span id="local-6989586621680820515"><span class="annot"><span class="annottext">Blockchain
+</span><a href="#local-6989586621680820515"><span class="hs-identifier hs-var">bc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Maybe FlowLink] -&gt; [FlowLink]
+forall a. [Maybe a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">catMaybes</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Maybe FlowLink]
+</span><a href="#local-6989586621680820514"><span class="hs-identifier hs-var">utxoLinks</span></a></span><span> </span><span class="annot"><span class="annottext">[Maybe FlowLink] -&gt; [Maybe FlowLink] -&gt; [Maybe FlowLink]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">((UtxoLocation, OnChainTx) -&gt; [Maybe FlowLink])
+-&gt; [(UtxoLocation, OnChainTx)] -&gt; [Maybe FlowLink]
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="annot"><span class="annottext">(UtxoLocation, OnChainTx) -&gt; [Maybe FlowLink]
+</span><a href="#local-6989586621680820513"><span class="hs-identifier hs-var">extract</span></a></span><span> </span><span class="annot"><span class="annottext">[(UtxoLocation, OnChainTx)]
+</span><a href="#local-6989586621680820512"><span class="hs-identifier hs-var">bc'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-97"></span><span>    </span><span id="local-6989586621680820512"><span class="annot"><span class="annottext">bc' :: [(UtxoLocation, OnChainTx)]
+</span><a href="#local-6989586621680820512"><span class="hs-identifier hs-var hs-var">bc'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((Integer, [(Integer, OnChainTx)]) -&gt; [(UtxoLocation, OnChainTx)])
+-&gt; [(Integer, [(Integer, OnChainTx)])]
+-&gt; [(UtxoLocation, OnChainTx)]
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680820511"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680820511"><span class="hs-identifier hs-var">blockNum</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820510"><span class="annot"><span class="annottext">[(Integer, OnChainTx)]
+</span><a href="#local-6989586621680820510"><span class="hs-identifier hs-var">txns</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">((Integer, OnChainTx) -&gt; (UtxoLocation, OnChainTx))
+-&gt; [(Integer, OnChainTx)] -&gt; [(UtxoLocation, OnChainTx)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680820509"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680820509"><span class="hs-identifier hs-var">blockIdx</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820508"><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680820508"><span class="hs-identifier hs-var">txn</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; UtxoLocation
+</span><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-var">UtxoLocation</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680820511"><span class="hs-identifier hs-var">blockNum</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680820509"><span class="hs-identifier hs-var">blockIdx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680820508"><span class="hs-identifier hs-var">txn</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[(Integer, OnChainTx)]
+</span><a href="#local-6989586621680820510"><span class="hs-identifier hs-var">txns</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([(Integer, [(Integer, OnChainTx)])]
+ -&gt; [(UtxoLocation, OnChainTx)])
+-&gt; [(Integer, [(Integer, OnChainTx)])]
+-&gt; [(UtxoLocation, OnChainTx)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[[(Integer, OnChainTx)]] -&gt; [(Integer, [(Integer, OnChainTx)])]
+forall b. [b] -&gt; [(Integer, b)]
+</span><a href="#local-6989586621680820507"><span class="hs-identifier hs-var">zipWithIndex</span></a></span><span> </span><span class="annot"><span class="annottext">([[(Integer, OnChainTx)]] -&gt; [(Integer, [(Integer, OnChainTx)])])
+-&gt; [[(Integer, OnChainTx)]] -&gt; [(Integer, [(Integer, OnChainTx)])]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[OnChainTx] -&gt; [(Integer, OnChainTx)]
+forall b. [b] -&gt; [(Integer, b)]
+</span><a href="#local-6989586621680820507"><span class="hs-identifier hs-var">zipWithIndex</span></a></span><span> </span><span class="annot"><span class="annottext">([OnChainTx] -&gt; [(Integer, OnChainTx)])
+-&gt; Blockchain -&gt; [[(Integer, OnChainTx)]]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain -&gt; Blockchain
+forall a. [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">reverse</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain
+</span><a href="#local-6989586621680820515"><span class="hs-identifier hs-var">bc</span></a></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><a href="#local-6989586621680820504"><span class="hs-identifier hs-type">sourceLocations</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Map.Map</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span id="local-6989586621680820504"><span class="annot"><span class="annottext">sourceLocations :: Map TxOutRef UtxoLocation
+</span><a href="#local-6989586621680820504"><span class="hs-identifier hs-var hs-var">sourceLocations</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(TxOutRef, UtxoLocation)] -&gt; Map TxOutRef UtxoLocation
+forall k a. Ord k =&gt; [(k, a)] -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.fromList</span></a></span><span> </span><span class="annot"><span class="annottext">([(TxOutRef, UtxoLocation)] -&gt; Map TxOutRef UtxoLocation)
+-&gt; [(TxOutRef, UtxoLocation)] -&gt; Map TxOutRef UtxoLocation
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">((UtxoLocation, OnChainTx) -&gt; [(TxOutRef, UtxoLocation)])
+-&gt; [(UtxoLocation, OnChainTx)] -&gt; [(TxOutRef, UtxoLocation)]
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(UtxoLocation -&gt; OnChainTx -&gt; [(TxOutRef, UtxoLocation)])
+-&gt; (UtxoLocation, OnChainTx) -&gt; [(TxOutRef, UtxoLocation)]
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">uncurry</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoLocation -&gt; OnChainTx -&gt; [(TxOutRef, UtxoLocation)]
+</span><a href="Wallet.Graph.html#outRefsWithLoc"><span class="hs-identifier hs-var">outRefsWithLoc</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[(UtxoLocation, OnChainTx)]
+</span><a href="#local-6989586621680820512"><span class="hs-identifier hs-var">bc'</span></a></span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span>    </span><span class="annot"><a href="#local-6989586621680820500"><span class="hs-identifier hs-type">knownKeys</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">Set.Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">PubKey</span></a></span><span>
+</span><span id="line-103"></span><span>    </span><span id="local-6989586621680820500"><span class="annot"><span class="annottext">knownKeys :: Set PubKey
+</span><a href="#local-6989586621680820500"><span class="hs-identifier hs-var hs-var">knownKeys</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[PubKey] -&gt; Set PubKey
+forall a. Ord a =&gt; [a] -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Set.fromList</span></a></span><span> </span><span class="annot"><span class="annottext">[PubKey]
+</span><a href="#local-6989586621680820516"><span class="hs-identifier hs-var">keys</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span>    </span><span id="local-6989586621680820498"><span class="annot"><span class="annottext">utxos :: [TxOutRef]
+</span><a href="#local-6989586621680820498"><span class="hs-identifier hs-var hs-var">utxos</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((TxOutRef, TxOut) -&gt; TxOutRef)
+-&gt; [(TxOutRef, TxOut)] -&gt; [TxOutRef]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">(TxOutRef, TxOut) -&gt; TxOutRef
+forall a b. (a, b) -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fst</span></a></span><span> </span><span class="annot"><span class="annottext">([(TxOutRef, TxOut)] -&gt; [TxOutRef])
+-&gt; [(TxOutRef, TxOut)] -&gt; [TxOutRef]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef TxOut -&gt; [(TxOutRef, TxOut)]
+forall k a. Map k a -&gt; [(k, a)]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.toList</span></a></span><span> </span><span class="annot"><span class="annottext">(Map TxOutRef TxOut -&gt; [(TxOutRef, TxOut)])
+-&gt; Map TxOutRef TxOut -&gt; [(TxOutRef, TxOut)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain -&gt; Map TxOutRef TxOut
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">unspentOutputs</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain
+</span><a href="#local-6989586621680820515"><span class="hs-identifier hs-var">bc</span></a></span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621680820514"><span class="annot"><span class="annottext">utxoLinks :: [Maybe FlowLink]
+</span><a href="#local-6989586621680820514"><span class="hs-identifier hs-var hs-var">utxoLinks</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(TxRef -&gt; TxOutRef -&gt; Maybe FlowLink)
+-&gt; (TxRef, TxOutRef) -&gt; Maybe FlowLink
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">uncurry</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe UtxoLocation -&gt; TxRef -&gt; TxOutRef -&gt; Maybe FlowLink
+</span><a href="#local-6989586621680820495"><span class="hs-identifier hs-var">flow</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe UtxoLocation
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((TxRef, TxOutRef) -&gt; Maybe FlowLink)
+-&gt; [(TxRef, TxOutRef)] -&gt; [Maybe FlowLink]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">[TxRef] -&gt; [TxOutRef] -&gt; [(TxRef, TxOutRef)]
+forall a b. [a] -&gt; [b] -&gt; [(a, b)]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">zip</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TxOutRef -&gt; TxRef
+</span><a href="Wallet.Graph.html#utxoTargets"><span class="hs-identifier hs-var">utxoTargets</span></a></span><span> </span><span class="annot"><span class="annottext">(TxOutRef -&gt; TxRef) -&gt; [TxOutRef] -&gt; [TxRef]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">[TxOutRef]
+</span><a href="#local-6989586621680820498"><span class="hs-identifier hs-var">utxos</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TxOutRef]
+</span><a href="#local-6989586621680820498"><span class="hs-identifier hs-var">utxos</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span>    </span><span class="annot"><a href="#local-6989586621680820513"><span class="hs-identifier hs-type">extract</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">OnChainTx</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-type">FlowLink</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621680820513"><span class="annot"><span class="annottext">extract :: (UtxoLocation, OnChainTx) -&gt; [Maybe FlowLink]
+</span><a href="#local-6989586621680820513"><span class="hs-identifier hs-var hs-var">extract</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680820493"><span class="annot"><span class="annottext">UtxoLocation
+</span><a href="#local-6989586621680820493"><span class="hs-identifier hs-var">loc</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680820492"><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680820492"><span class="hs-identifier hs-var">tx</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-110"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680820491"><span class="annot"><span class="annottext">targetRef :: TxRef
+</span><a href="#local-6989586621680820491"><span class="hs-identifier hs-var hs-var">targetRef</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxId -&gt; TxRef
+</span><a href="Wallet.Graph.html#mkRef"><span class="hs-identifier hs-var">mkRef</span></a></span><span> </span><span class="annot"><span class="annottext">(TxId -&gt; TxRef) -&gt; TxId -&gt; TxRef
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; TxId
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxId</span></a></span><span> </span><span class="annot"><span class="annottext">(CardanoTx -&gt; TxId) -&gt; CardanoTx -&gt; TxId
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx -&gt; CardanoTx
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">unOnChain</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680820492"><span class="hs-identifier hs-var">tx</span></a></span><span> </span><span class="hs-keyword">in</span><span>
+</span><span id="line-111"></span><span>      </span><span class="annot"><span class="annottext">(TxIn -&gt; Maybe FlowLink) -&gt; [TxIn] -&gt; [Maybe FlowLink]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe UtxoLocation -&gt; TxRef -&gt; TxOutRef -&gt; Maybe FlowLink
+</span><a href="#local-6989586621680820495"><span class="hs-identifier hs-var">flow</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">UtxoLocation -&gt; Maybe UtxoLocation
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoLocation
+</span><a href="#local-6989586621680820493"><span class="hs-identifier hs-var">loc</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TxRef
+</span><a href="#local-6989586621680820491"><span class="hs-identifier hs-var">targetRef</span></a></span><span> </span><span class="annot"><span class="annottext">(TxOutRef -&gt; Maybe FlowLink)
+-&gt; (TxIn -&gt; TxOutRef) -&gt; TxIn -&gt; Maybe FlowLink
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">TxIn -&gt; TxOutRef
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var hs-var">txInRef</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OnChainTx -&gt; [TxIn]
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">consumableInputs</span></a></span><span> </span><span class="annot"><span class="annottext">OnChainTx
+</span><a href="#local-6989586621680820492"><span class="hs-identifier hs-var">tx</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-comment">-- make a flow for a TxOutRef</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span>    </span><span class="annot"><a href="#local-6989586621680820495"><span class="hs-identifier hs-type">flow</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-type">FlowLink</span></a></span><span>
+</span><span id="line-115"></span><span>    </span><span id="local-6989586621680820495"><span class="annot"><span class="annottext">flow :: Maybe UtxoLocation -&gt; TxRef -&gt; TxOutRef -&gt; Maybe FlowLink
+</span><a href="#local-6989586621680820495"><span class="hs-identifier hs-var hs-var">flow</span></a></span></span><span> </span><span id="local-6989586621680820486"><span class="annot"><span class="annottext">Maybe UtxoLocation
+</span><a href="#local-6989586621680820486"><span class="hs-identifier hs-var">tgtLoc</span></a></span></span><span> </span><span id="local-6989586621680820485"><span class="annot"><span class="annottext">TxRef
+</span><a href="#local-6989586621680820485"><span class="hs-identifier hs-var">tgtRef</span></a></span></span><span> </span><span id="local-6989586621680820484"><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680820484"><span class="hs-identifier hs-var">rf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-116"></span><span>      </span><span id="local-6989586621680820483"><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680820483"><span class="hs-identifier hs-var">src</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Blockchain -&gt; TxOutRef -&gt; Maybe TxOut
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">out</span></a></span><span> </span><span class="annot"><span class="annottext">Blockchain
+</span><a href="#local-6989586621680820515"><span class="hs-identifier hs-var">bc</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680820484"><span class="hs-identifier hs-var">rf</span></a></span><span>
+</span><span id="line-117"></span><span>      </span><span id="local-6989586621680820481"><span class="annot"><span class="annottext">UtxoLocation
+</span><a href="#local-6989586621680820481"><span class="hs-identifier hs-var">sourceLoc</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; Map TxOutRef UtxoLocation -&gt; Maybe UtxoLocation
+forall k a. Ord k =&gt; k -&gt; Map k a -&gt; Maybe a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">Map.lookup</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680820484"><span class="hs-identifier hs-var">rf</span></a></span><span> </span><span class="annot"><span class="annottext">Map TxOutRef UtxoLocation
+</span><a href="#local-6989586621680820504"><span class="hs-identifier hs-var">sourceLocations</span></a></span><span>
+</span><span id="line-118"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680820480"><span class="annot"><span class="annottext">sourceRef :: TxRef
+</span><a href="#local-6989586621680820480"><span class="hs-identifier hs-var hs-var">sourceRef</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxId -&gt; TxRef
+</span><a href="Wallet.Graph.html#mkRef"><span class="hs-identifier hs-var">mkRef</span></a></span><span> </span><span class="annot"><span class="annottext">(TxId -&gt; TxRef) -&gt; TxId -&gt; TxRef
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef -&gt; TxId
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">txOutRefId</span></a></span><span> </span><span class="annot"><span class="annottext">TxOutRef
+</span><a href="#local-6989586621680820484"><span class="hs-identifier hs-var">rf</span></a></span><span>
+</span><span id="line-119"></span><span>      </span><span class="annot"><span class="annottext">FlowLink -&gt; Maybe FlowLink
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">FlowLink :: TxRef
+-&gt; TxRef
+-&gt; Integer
+-&gt; UtxOwner
+-&gt; UtxoLocation
+-&gt; Maybe UtxoLocation
+-&gt; FlowLink
+</span><a href="Wallet.Graph.html#FlowLink"><span class="hs-identifier hs-type">FlowLink</span></a></span><span>
+</span><span id="line-120"></span><span>            </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">flowLinkSource :: TxRef
+</span><a href="Wallet.Graph.html#flowLinkSource"><span class="hs-identifier hs-var">flowLinkSource</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxRef
+</span><a href="#local-6989586621680820480"><span class="hs-identifier hs-var">sourceRef</span></a></span><span>
+</span><span id="line-121"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">flowLinkTarget :: TxRef
+</span><a href="Wallet.Graph.html#flowLinkTarget"><span class="hs-identifier hs-var">flowLinkTarget</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TxRef
+</span><a href="#local-6989586621680820485"><span class="hs-identifier hs-var">tgtRef</span></a></span><span>
+</span><span id="line-122"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">flowLinkValue :: Integer
+</span><a href="Wallet.Graph.html#flowLinkValue"><span class="hs-identifier hs-var">flowLinkValue</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ada -&gt; Integer
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">(Ada -&gt; Integer) -&gt; Ada -&gt; Integer
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Value -&gt; Ada
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">Ada.fromValue</span></a></span><span> </span><span class="annot"><span class="annottext">(Value -&gt; Ada) -&gt; Value -&gt; Ada
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut -&gt; Value
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">txOutValue</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680820483"><span class="hs-identifier hs-var">src</span></a></span><span>
+</span><span id="line-123"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">flowLinkOwner :: UtxOwner
+</span><a href="Wallet.Graph.html#flowLinkOwner"><span class="hs-identifier hs-var">flowLinkOwner</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Set PubKey -&gt; TxOut -&gt; UtxOwner
+</span><a href="Wallet.Graph.html#owner"><span class="hs-identifier hs-var">owner</span></a></span><span> </span><span class="annot"><span class="annottext">Set PubKey
+</span><a href="#local-6989586621680820500"><span class="hs-identifier hs-var">knownKeys</span></a></span><span> </span><span class="annot"><span class="annottext">TxOut
+</span><a href="#local-6989586621680820483"><span class="hs-identifier hs-var">src</span></a></span><span>
+</span><span id="line-124"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">flowLinkSourceLoc :: UtxoLocation
+</span><a href="Wallet.Graph.html#flowLinkSourceLoc"><span class="hs-identifier hs-var">flowLinkSourceLoc</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UtxoLocation
+</span><a href="#local-6989586621680820481"><span class="hs-identifier hs-var">sourceLoc</span></a></span><span>
+</span><span id="line-125"></span><span>            </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">flowLinkTargetLoc :: Maybe UtxoLocation
+</span><a href="Wallet.Graph.html#flowLinkTargetLoc"><span class="hs-identifier hs-var">flowLinkTargetLoc</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe UtxoLocation
+</span><a href="#local-6989586621680820486"><span class="hs-identifier hs-var">tgtLoc</span></a></span><span>
+</span><span id="line-126"></span><span>            </span><span class="hs-special">}</span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span>    </span><span id="local-6989586621680820507"><span class="annot"><span class="annottext">zipWithIndex :: [b] -&gt; [(Integer, b)]
+</span><a href="#local-6989586621680820507"><span class="hs-identifier hs-var hs-var">zipWithIndex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Integer] -&gt; [b] -&gt; [(Integer, b)]
+forall a b. [a] -&gt; [b] -&gt; [(a, b)]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">zip</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">1</span></span><span class="hs-glyph">..</span><span class="hs-special">]</span><span>
+</span><span id="line-129"></span><span>
+</span><span id="line-130"></span><span class="hs-comment">-- | Annotate the 'TxOutRef's produced by a transaction with the location of the transaction.</span><span>
+</span><span id="line-131"></span><span class="annot"><a href="Wallet.Graph.html#outRefsWithLoc"><span class="hs-identifier hs-type">outRefsWithLoc</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">OnChainTx</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Wallet.Graph.html#UtxoLocation"><span class="hs-identifier hs-type">UtxoLocation</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-132"></span><span id="outRefsWithLoc"><span class="annot"><span class="annottext">outRefsWithLoc :: UtxoLocation -&gt; OnChainTx -&gt; [(TxOutRef, UtxoLocation)]
+</span><a href="Wallet.Graph.html#outRefsWithLoc"><span class="hs-identifier hs-var hs-var">outRefsWithLoc</span></a></span></span><span> </span><span id="local-6989586621680820476"><span class="annot"><span class="annottext">UtxoLocation
+</span><a href="#local-6989586621680820476"><span class="hs-identifier hs-var">loc</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Valid</span></a></span><span> </span><span id="local-6989586621680820474"><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680820474"><span class="hs-identifier hs-var">tx</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621680820473"><span class="annot"><span class="annottext">(TxOut, TxOutRef)
+</span><a href="#local-6989586621680820473"><span class="hs-identifier hs-var">txo</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(TxOut, TxOutRef) -&gt; TxOutRef
+forall a b. (a, b) -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">snd</span></a></span><span> </span><span class="annot"><span class="annottext">(TxOut, TxOutRef)
+</span><a href="#local-6989586621680820473"><span class="hs-identifier hs-var">txo</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">UtxoLocation
+</span><a href="#local-6989586621680820476"><span class="hs-identifier hs-var">loc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((TxOut, TxOutRef) -&gt; (TxOutRef, UtxoLocation))
+-&gt; [(TxOut, TxOutRef)] -&gt; [(TxOutRef, UtxoLocation)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx -&gt; [(TxOut, TxOutRef)]
+</span><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-var">getCardanoTxOutRefs</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><a href="#local-6989586621680820474"><span class="hs-identifier hs-var">tx</span></a></span><span>
+</span><span id="line-133"></span><span class="annot"><a href="Wallet.Graph.html#outRefsWithLoc"><span class="hs-identifier hs-var">outRefsWithLoc</span></a></span><span> </span><span class="annot"><span class="annottext">UtxoLocation
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger/html/src"><span class="hs-identifier hs-type">Invalid</span></a></span><span> </span><span class="annot"><span class="annottext">CardanoTx
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-comment">-- | Create a 'TxRef' from a 'TxOutRef'.</span><span>
+</span><span id="line-136"></span><span class="annot"><a href="Wallet.Graph.html#utxoTargets"><span class="hs-identifier hs-type">utxoTargets</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-type">TxRef</span></a></span><span>
+</span><span id="line-137"></span><span id="utxoTargets"><span class="annot"><span class="annottext">utxoTargets :: TxOutRef -&gt; TxRef
+</span><a href="Wallet.Graph.html#utxoTargets"><span class="hs-identifier hs-var hs-var">utxoTargets</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-type">TxOutRef</span></a></span><span> </span><span id="local-6989586621680820469"><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680820469"><span class="hs-identifier hs-var">rf</span></a></span></span><span> </span><span id="local-6989586621680820468"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680820468"><span class="hs-identifier hs-var">idx</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; TxRef
+</span><a href="Wallet.Graph.html#TxRef"><span class="hs-identifier hs-var">TxRef</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; TxRef) -&gt; Text -&gt; TxRef
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[Text] -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.unwords</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;utxo&quot;</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Text) -&gt; String -&gt; Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ShowS
+forall a. Int -&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">take</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span> </span><span class="annot"><span class="annottext">ShowS -&gt; ShowS
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">BuiltinByteString -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">(BuiltinByteString -&gt; String) -&gt; BuiltinByteString -&gt; String
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">TxId -&gt; BuiltinByteString
+</span><a href="../../../../plutus-ledger-api/html/src"><span class="hs-identifier hs-var hs-var">getTxId</span></a></span><span> </span><span class="annot"><span class="annottext">TxId
+</span><a href="#local-6989586621680820469"><span class="hs-identifier hs-var">rf</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Text) -&gt; String -&gt; Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680820468"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-138"></span></pre></body></html>

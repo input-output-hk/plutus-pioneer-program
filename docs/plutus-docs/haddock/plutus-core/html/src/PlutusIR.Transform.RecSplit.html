@@ -1,0 +1,452 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE LambdaCase          #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE TupleSections       #-}</span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusIR.Transform.RecSplit</span><span>
+</span><span id="line-5"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Transform.RecSplit.html#recSplit"><span class="hs-identifier">recSplit</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Name.html"><span class="hs-identifier">PlutusCore.Name</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PLC</span></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.html"><span class="hs-identifier">PlutusIR</span></a></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.Subst.html"><span class="hs-identifier">PlutusIR.Subst</span></a></span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier">Algebra.Graph.AdjacencyMap</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">AM</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier">Algebra.Graph.AdjacencyMap.Algorithm</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">AM</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier">isAcyclic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier">Algebra.Graph.NonEmpty.AdjacencyMap</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">AMN</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier">Algebra.Graph.ToGraph</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier">isAcyclic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier">Control.Lens</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Either</span></a></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Foldable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">foldl'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">nub</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.List.NonEmpty</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">NE</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">M</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/nw4fdvinqycf4cyjxfnndyyc8ydsbcr3-semigroupoids-lib-semigroupoids-5.3.4-haddock-doc/share/doc/semigroupoids/html/src"><span class="hs-identifier">Data.Semigroup.Foldable</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.MkPir.html"><span class="hs-identifier">PlutusIR.MkPir</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.MkPir.html#mkLet"><span class="hs-identifier">mkLet</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-comment">{- Note [LetRec splitting pass]
+
+This pass can achieve two things:
+
+- turn recursive let-bindings which are not really recursive into non-recursive let-bindings.
+- break down letrec groups into smaller ones, based on the dependencies of the group's bindings.
+
+This pass examines a single letrec group at a time
+and maybe splits the group into sub-letgroups (rec or nonrec).
+
+Invariants of the pass:
+
+- Preserves the well-scopedness of the term.
+- Does not turn an out-of-scope term into well-scoped.
+- Does not place/move the sub-letgroups into locations other than the original letrec location (hole).
+- Does not touch let-nonrec groups.
+
+The (a) grouping into sub-letgroups
+and the (b) order of appearance of these sub-groups inside the result term,
+is determined by locally constructing at each reclet-group location,
+a dependency graph between the bindings of the original let.
+
+The created sub-letgroups will either be
+(a) let-rec with 2 or more bindings
+(b) let-nonrec with a single binding
+
+Currently the implementation relies on 'Unique's, so there is the assumption of global uniqueness of the input term.
+However, the algorithm could be changed to work without this assumption (has not been tested).
+-}</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">{- NOTE [Principal id]
+The algorihtm identifies &amp; stores bindings and their corresponding rhs'es in some intermediate tables.
+To identify/store each binding to such tables, we need to &quot;key&quot; them by a single unique identifier.
+
+For term bindings and type bindings this is easily achieved by using the single introduced name or tyname as &quot;the key&quot; (principal id).
+
+Datatype bindings, however, introduce multiple names and tynames (i.e. type-constructor, type args, destructor, data-constructors)
+and the 'principal' function arbitrarily chooses between one of these introduced names/tynames of the databind
+to represent the &quot;principal&quot; id of the whole datatype binding so it can be used as &quot;the key&quot;.
+-}</span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">{-|
+Apply letrec splitting, recursively in bottom-up fashion.
+-}</span><span>
+</span><span id="line-69"></span><span class="annot"><a href="PlutusIR.Transform.RecSplit.html#recSplit"><span class="hs-identifier hs-type">recSplit</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680972543"><span class="annot"><a href="#local-6989586621680972543"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680972542"><span class="annot"><a href="#local-6989586621680972542"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680972541"><span class="annot"><a href="#local-6989586621680972541"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680972540"><span class="annot"><a href="#local-6989586621680972540"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680972539"><span class="annot"><a href="#local-6989586621680972539"><span class="hs-identifier hs-type">tyname</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-70"></span><span>           </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972540"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972539"><span class="hs-identifier hs-type">tyname</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972539"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TypeUnique"><span class="hs-identifier hs-type">PLC.TypeUnique</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972540"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TermUnique"><span class="hs-identifier hs-type">PLC.TermUnique</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span>         </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972539"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972540"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972543"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972542"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972541"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-72"></span><span>         </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972539"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972540"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972543"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972542"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972541"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-73"></span><span id="recSplit"><span class="annot"><span class="annottext">recSplit :: Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.RecSplit.html#recSplit"><span class="hs-identifier hs-var hs-var">recSplit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+-&gt; (Term tyname name uni fun a -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall a b. ASetter a b a b -&gt; (b -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-identifier hs-var">transformOf</span></a></span><span> </span><span class="annot"><span class="annottext">ASetter
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+  (Term tyname name uni fun a)
+forall tyname name (uni :: * -&gt; *) fun a.
+Traversal'
+  (Term tyname name uni fun a) (Term tyname name uni fun a)
+</span><a href="PlutusIR.Core.Plated.html#termSubterms"><span class="hs-identifier hs-var">termSubterms</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a -&gt; Term tyname name uni fun a
+forall (uni :: * -&gt; *) fun a name tyname.
+(Ord name, Ord tyname, HasUnique tyname TypeUnique,
+ HasUnique name TermUnique) =&gt;
+Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.RecSplit.html#recSplitStep"><span class="hs-identifier hs-var">recSplitStep</span></a></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span class="hs-comment">{-|
+Apply splitting for a single letrec group.
+-}</span><span>
+</span><span id="line-78"></span><span class="annot"><a href="PlutusIR.Transform.RecSplit.html#recSplitStep"><span class="hs-identifier hs-type">recSplitStep</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680972667"><span class="annot"><a href="#local-6989586621680972667"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680972666"><span class="annot"><a href="#local-6989586621680972666"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680972665"><span class="annot"><a href="#local-6989586621680972665"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680972672"><span class="annot"><a href="#local-6989586621680972672"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680972671"><span class="annot"><a href="#local-6989586621680972671"><span class="hs-identifier hs-type">tyname</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-79"></span><span>               </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972672"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972671"><span class="hs-identifier hs-type">tyname</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972671"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TypeUnique"><span class="hs-identifier hs-type">PLC.TypeUnique</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972672"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TermUnique"><span class="hs-identifier hs-type">PLC.TermUnique</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>             </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972671"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972672"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972667"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972666"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972665"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Term"><span class="hs-identifier hs-type">Term</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972671"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972672"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972667"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972666"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972665"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-81"></span><span id="recSplitStep"><span class="annot"><span class="annottext">recSplitStep :: Term tyname name uni fun a -&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.Transform.RecSplit.html#recSplitStep"><span class="hs-identifier hs-var hs-var">recSplitStep</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-comment">-- See Note [LetRec splitting pass]</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><a href="PlutusIR.Core.Type.html#Let"><span class="hs-identifier hs-type">Let</span></a></span><span> </span><span id="local-6989586621680972534"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680972534"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#Rec"><span class="hs-identifier hs-var">Rec</span></a></span><span> </span><span id="local-6989586621680972532"><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972532"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span id="local-6989586621680972531"><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680972531"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-84"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span class="hs-comment">-- a table from principal id to the its corresponding 'Binding'</span><span>
+</span><span id="line-85"></span><span>            </span><span class="annot"><a href="#local-6989586621680972530"><span class="hs-identifier hs-type">bindingsTable</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">M.Map</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Unique"><span class="hs-identifier hs-type">PLC.Unique</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972671"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972672"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972667"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972666"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972665"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span>            </span><span id="local-6989586621680972530"><span class="annot"><span class="annottext">bindingsTable :: Map Unique (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972530"><span class="hs-identifier hs-var hs-var">bindingsTable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Unique, Binding tyname name uni fun a)]
+-&gt; Map Unique (Binding tyname name uni fun a)
+forall k a. Ord k =&gt; [(k, a)] -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">M.fromList</span></a></span><span> </span><span class="annot"><span class="annottext">([(Unique, Binding tyname name uni fun a)]
+ -&gt; Map Unique (Binding tyname name uni fun a))
+-&gt; (NonEmpty (Unique, Binding tyname name uni fun a)
+    -&gt; [(Unique, Binding tyname name uni fun a)])
+-&gt; NonEmpty (Unique, Binding tyname name uni fun a)
+-&gt; Map Unique (Binding tyname name uni fun a)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (Unique, Binding tyname name uni fun a)
+-&gt; [(Unique, Binding tyname name uni fun a)]
+forall a. NonEmpty a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">NE.toList</span></a></span><span> </span><span class="annot"><span class="annottext">(NonEmpty (Unique, Binding tyname name uni fun a)
+ -&gt; Map Unique (Binding tyname name uni fun a))
+-&gt; NonEmpty (Unique, Binding tyname name uni fun a)
+-&gt; Map Unique (Binding tyname name uni fun a)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Binding tyname name uni fun a
+ -&gt; (Unique, Binding tyname name uni fun a))
+-&gt; NonEmpty (Binding tyname name uni fun a)
+-&gt; NonEmpty (Unique, Binding tyname name uni fun a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span> </span><span id="local-6989586621680972526"><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972526"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Binding tyname name uni fun a -&gt; Unique
+forall tyname name (uni :: * -&gt; *) fun a.
+(HasUnique tyname TypeUnique, HasUnique name TermUnique) =&gt;
+Binding tyname name uni fun a -&gt; Unique
+</span><a href="PlutusIR.Transform.RecSplit.html#principal"><span class="hs-identifier hs-var">principal</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972526"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972526"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972532"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-87"></span><span>            </span><span id="local-6989586621680972524"><span class="annot"><span class="annottext">hereSccs :: [AdjacencyMap Unique]
+</span><a href="#local-6989586621680972524"><span class="hs-identifier hs-var hs-var">hereSccs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-88"></span><span>                       </span><span class="annot"><span class="annottext">[AdjacencyMap Unique]
+-&gt; Either (Cycle (AdjacencyMap Unique)) [AdjacencyMap Unique]
+-&gt; [AdjacencyMap Unique]
+forall b a. b -&gt; Either a b -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromRight</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Char] -&gt; [AdjacencyMap Unique]
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;Cycle detected in the scc-graph. This shouldn't happen in the first place.&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-89"></span><span>                       </span><span class="hs-comment">-- we take the topological sort (for the correct order)</span><span>
+</span><span id="line-90"></span><span>                       </span><span class="hs-comment">-- from the SCCs (for the correct grouping) of the local dep-graph</span><span>
+</span><span id="line-91"></span><span>                       </span><span class="annot"><span class="annottext">(Either (Cycle (AdjacencyMap Unique)) [AdjacencyMap Unique]
+ -&gt; [AdjacencyMap Unique])
+-&gt; (AdjacencyMap Unique
+    -&gt; Either (Cycle (AdjacencyMap Unique)) [AdjacencyMap Unique])
+-&gt; AdjacencyMap Unique
+-&gt; [AdjacencyMap Unique]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">AdjacencyMap (AdjacencyMap Unique)
+-&gt; Either (Cycle (AdjacencyMap Unique)) [AdjacencyMap Unique]
+forall a. Ord a =&gt; AdjacencyMap a -&gt; Either (Cycle a) [a]
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AM.topSort</span></a></span><span> </span><span class="annot"><span class="annottext">(AdjacencyMap (AdjacencyMap Unique)
+ -&gt; Either (Cycle (AdjacencyMap Unique)) [AdjacencyMap Unique])
+-&gt; (AdjacencyMap Unique -&gt; AdjacencyMap (AdjacencyMap Unique))
+-&gt; AdjacencyMap Unique
+-&gt; Either (Cycle (AdjacencyMap Unique)) [AdjacencyMap Unique]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">AdjacencyMap Unique -&gt; AdjacencyMap (AdjacencyMap Unique)
+forall a. Ord a =&gt; AdjacencyMap a -&gt; AdjacencyMap (AdjacencyMap a)
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AM.scc</span></a></span><span> </span><span class="annot"><span class="annottext">(AdjacencyMap Unique -&gt; [AdjacencyMap Unique])
+-&gt; AdjacencyMap Unique -&gt; [AdjacencyMap Unique]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a) -&gt; AdjacencyMap Unique
+forall (uni :: * -&gt; *) fun a name tyname.
+(Ord name, Ord tyname, HasUnique tyname TypeUnique,
+ HasUnique name TermUnique) =&gt;
+NonEmpty (Binding tyname name uni fun a) -&gt; AdjacencyMap Unique
+</span><a href="PlutusIR.Transform.RecSplit.html#buildLocalDepGraph"><span class="hs-identifier hs-var">buildLocalDepGraph</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972532"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span>            </span><span id="local-6989586621680972518"><span class="annot"><span class="annottext">genLetFromScc :: Term tyname name uni fun a
+-&gt; AdjacencyMap Unique -&gt; Term tyname name uni fun a
+</span><a href="#local-6989586621680972518"><span class="hs-identifier hs-var hs-var">genLetFromScc</span></a></span></span><span> </span><span id="local-6989586621680972517"><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680972517"><span class="hs-identifier hs-var">acc</span></a></span></span><span> </span><span id="local-6989586621680972516"><span class="annot"><span class="annottext">AdjacencyMap Unique
+</span><a href="#local-6989586621680972516"><span class="hs-identifier hs-var">scc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+-&gt; Recursivity
+-&gt; [Binding tyname name uni fun a]
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+forall a tyname name (uni :: * -&gt; *) fun.
+a
+-&gt; Recursivity
+-&gt; [Binding tyname name uni fun a]
+-&gt; Term tyname name uni fun a
+-&gt; Term tyname name uni fun a
+</span><a href="PlutusIR.MkPir.html#mkLet"><span class="hs-identifier hs-var">mkLet</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680972534"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-94"></span><span>                </span><span class="hs-special">(</span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">AdjacencyMap Unique -&gt; Bool
+forall t. (ToGraph t, Ord (ToVertex t)) =&gt; t -&gt; Bool
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">isAcyclic</span></a></span><span> </span><span class="annot"><span class="annottext">AdjacencyMap Unique
+</span><a href="#local-6989586621680972516"><span class="hs-identifier hs-var">scc</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#NonRec"><span class="hs-identifier hs-var">NonRec</span></a></span><span> </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#Rec"><span class="hs-identifier hs-var">Rec</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-95"></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Map Unique (Binding tyname name uni fun a)
+-&gt; [Binding tyname name uni fun a]
+forall k a. Map k a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">M.elems</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Unique (Binding tyname name uni fun a)
+ -&gt; [Binding tyname name uni fun a])
+-&gt; (Set Unique -&gt; Map Unique (Binding tyname name uni fun a))
+-&gt; Set Unique
+-&gt; [Binding tyname name uni fun a]
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Map Unique (Binding tyname name uni fun a)
+-&gt; Set Unique -&gt; Map Unique (Binding tyname name uni fun a)
+forall k a. Ord k =&gt; Map k a -&gt; Set k -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">M.restrictKeys</span></a></span><span> </span><span class="annot"><span class="annottext">Map Unique (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972530"><span class="hs-identifier hs-var">bindingsTable</span></a></span><span> </span><span class="annot"><span class="annottext">(Set Unique -&gt; [Binding tyname name uni fun a])
+-&gt; Set Unique -&gt; [Binding tyname name uni fun a]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">AdjacencyMap Unique -&gt; Set Unique
+forall a. AdjacencyMap a -&gt; Set a
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AMN.vertexSet</span></a></span><span> </span><span class="annot"><span class="annottext">AdjacencyMap Unique
+</span><a href="#local-6989586621680972516"><span class="hs-identifier hs-var">scc</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>                </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680972517"><span class="hs-identifier hs-var">acc</span></a></span><span>
+</span><span id="line-97"></span><span>        </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">(Term tyname name uni fun a
+ -&gt; AdjacencyMap Unique -&gt; Term tyname name uni fun a)
+-&gt; Term tyname name uni fun a
+-&gt; [AdjacencyMap Unique]
+-&gt; Term tyname name uni fun a
+forall (t :: * -&gt; *) b a.
+Foldable t =&gt;
+(b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">foldl'</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+-&gt; AdjacencyMap Unique -&gt; Term tyname name uni fun a
+</span><a href="#local-6989586621680972518"><span class="hs-identifier hs-var">genLetFromScc</span></a></span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680972531"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">[AdjacencyMap Unique]
+</span><a href="#local-6989586621680972524"><span class="hs-identifier hs-var">hereSccs</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span id="local-6989586621680972511"><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680972511"><span class="hs-identifier hs-var">t</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><a href="#local-6989586621680972511"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span class="hs-comment">{-|
+It constructs a dependency graph for the currently-examined let-group.
+
+The vertices of this graph are the bindings of this let-group, and the edges,
+dependencies between those bindings.
+
+This local graph may contain loops:
+- A &quot;self-edge&quot; indicates a self-recursive binding.
+- Any other loop indicates mutual-recursive bindings.
+-}</span><span>
+</span><span id="line-110"></span><span class="annot"><a href="PlutusIR.Transform.RecSplit.html#buildLocalDepGraph"><span class="hs-identifier hs-type">buildLocalDepGraph</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680972625"><span class="annot"><a href="#local-6989586621680972625"><span class="hs-identifier hs-type">uni</span></a></span></span><span> </span><span id="local-6989586621680972624"><span class="annot"><a href="#local-6989586621680972624"><span class="hs-identifier hs-type">fun</span></a></span></span><span> </span><span id="local-6989586621680972623"><span class="annot"><a href="#local-6989586621680972623"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680972627"><span class="annot"><a href="#local-6989586621680972627"><span class="hs-identifier hs-type">name</span></a></span></span><span> </span><span id="local-6989586621680972626"><span class="annot"><a href="#local-6989586621680972626"><span class="hs-identifier hs-type">tyname</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-111"></span><span>                     </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972627"><span class="hs-identifier hs-type">name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972626"><span class="hs-identifier hs-type">tyname</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972626"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TypeUnique"><span class="hs-identifier hs-type">PLC.TypeUnique</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972627"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TermUnique"><span class="hs-identifier hs-type">PLC.TermUnique</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>                   </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">NE.NonEmpty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972626"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972627"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972625"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972624"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972623"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-type">AM.AdjacencyMap</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Unique"><span class="hs-identifier hs-type">PLC.Unique</span></a></span><span>
+</span><span id="line-113"></span><span id="buildLocalDepGraph"><span class="annot"><span class="annottext">buildLocalDepGraph :: NonEmpty (Binding tyname name uni fun a) -&gt; AdjacencyMap Unique
+</span><a href="PlutusIR.Transform.RecSplit.html#buildLocalDepGraph"><span class="hs-identifier hs-var hs-var">buildLocalDepGraph</span></a></span></span><span> </span><span id="local-6989586621680972510"><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972510"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-comment">-- join together</span><span>
+</span><span id="line-115"></span><span>    </span><span class="annot"><span class="annottext">[AdjacencyMap Unique] -&gt; AdjacencyMap Unique
+forall a. Ord a =&gt; [AdjacencyMap a] -&gt; AdjacencyMap a
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AM.overlays</span></a></span><span> </span><span class="annot"><span class="annottext">([AdjacencyMap Unique] -&gt; AdjacencyMap Unique)
+-&gt; (NonEmpty (AdjacencyMap Unique) -&gt; [AdjacencyMap Unique])
+-&gt; NonEmpty (AdjacencyMap Unique)
+-&gt; AdjacencyMap Unique
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (AdjacencyMap Unique) -&gt; [AdjacencyMap Unique]
+forall a. NonEmpty a -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">NE.toList</span></a></span><span> </span><span class="annot"><span class="annottext">(NonEmpty (AdjacencyMap Unique) -&gt; AdjacencyMap Unique)
+-&gt; NonEmpty (AdjacencyMap Unique) -&gt; AdjacencyMap Unique
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Binding tyname name uni fun a -&gt; AdjacencyMap Unique)
+-&gt; NonEmpty (Binding tyname name uni fun a)
+-&gt; NonEmpty (AdjacencyMap Unique)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a -&gt; AdjacencyMap Unique
+</span><a href="#local-6989586621680972508"><span class="hs-identifier hs-var">bindingSubGraph</span></a></span><span> </span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972510"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-116"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-117"></span><span>      </span><span class="hs-comment">-- a map of a all introduced binding ids of this letgroup to their belonging principal id</span><span>
+</span><span id="line-118"></span><span>      </span><span class="annot"><a href="#local-6989586621680972507"><span class="hs-identifier hs-type">idTable</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-type">M.Map</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Unique"><span class="hs-identifier hs-type">PLC.Unique</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Unique"><span class="hs-identifier hs-type">PLC.Unique</span></a></span><span>
+</span><span id="line-119"></span><span>      </span><span id="local-6989586621680972507"><span class="annot"><span class="annottext">idTable :: Map Unique Unique
+</span><a href="#local-6989586621680972507"><span class="hs-identifier hs-var hs-var">idTable</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Binding tyname name uni fun a -&gt; Map Unique Unique)
+-&gt; NonEmpty (Binding tyname name uni fun a) -&gt; Map Unique Unique
+forall (t :: * -&gt; *) m a.
+(Foldable1 t, Semigroup m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../file:///nix/store/nw4fdvinqycf4cyjxfnndyyc8ydsbcr3-semigroupoids-lib-semigroupoids-5.3.4-haddock-doc/share/doc/semigroupoids/html/src"><span class="hs-identifier hs-var">foldMap1</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span> </span><span id="local-6989586621680972505"><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972505"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[(Unique, Unique)] -&gt; Map Unique Unique
+forall k a. Ord k =&gt; [(k, a)] -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">M.fromList</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Unique -&gt; (Unique, Unique)) -&gt; [Unique] -&gt; [(Unique, Unique)]
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-special">,</span></span><span class="annot"><span class="annottext">Binding tyname name uni fun a -&gt; Unique
+forall tyname name (uni :: * -&gt; *) fun a.
+(HasUnique tyname TypeUnique, HasUnique name TermUnique) =&gt;
+Binding tyname name uni fun a -&gt; Unique
+</span><a href="PlutusIR.Transform.RecSplit.html#principal"><span class="hs-identifier hs-var">principal</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972505"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">([Unique] -&gt; [(Unique, Unique)]) -&gt; [Unique] -&gt; [(Unique, Unique)]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972505"><span class="hs-identifier hs-var">b</span></a></span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+-&gt; Getting (Endo [Unique]) (Binding tyname name uni fun a) Unique
+-&gt; [Unique]
+forall s a. s -&gt; Getting (Endo [a]) s a -&gt; [a]
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^..</span></a></span><span class="annot"><span class="annottext">Getting (Endo [Unique]) (Binding tyname name uni fun a) Unique
+forall tyname name (uni :: * -&gt; *) fun a.
+(HasUnique tyname TypeUnique, HasUnique name TermUnique) =&gt;
+Traversal1' (Binding tyname name uni fun a) Unique
+</span><a href="PlutusIR.Core.Plated.html#bindingIds"><span class="hs-identifier hs-var">bindingIds</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">NonEmpty (Binding tyname name uni fun a)
+</span><a href="#local-6989586621680972510"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span>      </span><span class="hs-comment">-- Given a binding, it intersects the free uniques of the binding,</span><span>
+</span><span id="line-122"></span><span>      </span><span class="hs-comment">-- with the introduced uniques of the current let group (all bindings).</span><span>
+</span><span id="line-123"></span><span>      </span><span class="hs-comment">-- The result of this intersection is the &quot;local&quot; dependencies of the binding to other</span><span>
+</span><span id="line-124"></span><span>      </span><span class="hs-comment">-- &quot;sibling&quot; bindings of this let group or to itself (if self-recursive).</span><span>
+</span><span id="line-125"></span><span>      </span><span class="hs-comment">-- It returns a graph which connects this binding to all of its calculated &quot;local&quot; dependencies.</span><span>
+</span><span id="line-126"></span><span>      </span><span class="annot"><a href="#local-6989586621680972508"><span class="hs-identifier hs-type">bindingSubGraph</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972626"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972627"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972625"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972624"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972623"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-type">AM.AdjacencyMap</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Unique"><span class="hs-identifier hs-type">PLC.Unique</span></a></span><span>
+</span><span id="line-127"></span><span>      </span><span id="local-6989586621680972508"><span class="annot"><span class="annottext">bindingSubGraph :: Binding tyname name uni fun a -&gt; AdjacencyMap Unique
+</span><a href="#local-6989586621680972508"><span class="hs-identifier hs-var hs-var">bindingSubGraph</span></a></span></span><span> </span><span id="local-6989586621680972502"><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972502"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-128"></span><span>          </span><span class="hs-comment">-- the free uniques (variables or tyvariables) that occur inside this binding</span><span>
+</span><span id="line-129"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680972501"><span class="annot"><span class="annottext">freeUniques :: Set Unique
+</span><a href="#local-6989586621680972501"><span class="hs-identifier hs-var hs-var">freeUniques</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(name -&gt; Unique) -&gt; Set name -&gt; Set Unique
+forall b a. Ord b =&gt; (a -&gt; b) -&gt; Set a -&gt; Set b
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">S.map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">name -&gt; Getting Unique name Unique -&gt; Unique
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span class="annot"><span class="annottext">Getting Unique name Unique
+forall name unique. HasUnique name unique =&gt; Lens' name Unique
+</span><a href="PlutusCore.Name.html#theUnique"><span class="hs-identifier hs-var">PLC.theUnique</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Binding tyname name uni fun a -&gt; Set name
+forall name tyname (uni :: * -&gt; *) fun ann.
+Ord name =&gt;
+Binding tyname name uni fun ann -&gt; Set name
+</span><a href="PlutusIR.Subst.html#fvBinding"><span class="hs-identifier hs-var">fvBinding</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972502"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-130"></span><span>                            </span><span class="hs-comment">-- Special case for datatype bindings:</span><span>
+</span><span id="line-131"></span><span>                            </span><span class="hs-comment">-- To find out if the binding is self-recursive,</span><span>
+</span><span id="line-132"></span><span>                            </span><span class="hs-comment">-- we treat it like it was originally belonging to a let-nonrec (`ftvBinding NonRec`).</span><span>
+</span><span id="line-133"></span><span>                            </span><span class="hs-comment">-- Then, if it the datatype is indeed self-recursive, the call to `ftvBinding NonRec` will return</span><span>
+</span><span id="line-134"></span><span>                            </span><span class="hs-comment">-- its typeconstructor as free.</span><span>
+</span><span id="line-135"></span><span>                            </span><span class="annot"><span class="annottext">Set Unique -&gt; Set Unique -&gt; Set Unique
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">(tyname -&gt; Unique) -&gt; Set tyname -&gt; Set Unique
+forall b a. Ord b =&gt; (a -&gt; b) -&gt; Set a -&gt; Set b
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">S.map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">tyname -&gt; Getting Unique tyname Unique -&gt; Unique
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span class="annot"><span class="annottext">Getting Unique tyname Unique
+forall name unique. HasUnique name unique =&gt; Lens' name Unique
+</span><a href="PlutusCore.Name.html#theUnique"><span class="hs-identifier hs-var">PLC.theUnique</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Recursivity -&gt; Binding tyname name uni fun a -&gt; Set tyname
+forall tyname name (uni :: * -&gt; *) fun ann.
+Ord tyname =&gt;
+Recursivity -&gt; Binding tyname name uni fun ann -&gt; Set tyname
+</span><a href="PlutusIR.Subst.html#ftvBinding"><span class="hs-identifier hs-var">ftvBinding</span></a></span><span> </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#NonRec"><span class="hs-identifier hs-var">NonRec</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972502"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-136"></span><span>              </span><span class="hs-comment">-- the &quot;local&quot; dependencies</span><span>
+</span><span id="line-137"></span><span>              </span><span id="local-6989586621680972495"><span class="annot"><span class="annottext">occursIds :: Set Unique
+</span><a href="#local-6989586621680972495"><span class="hs-identifier hs-var hs-var">occursIds</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Map Unique Unique -&gt; Set Unique
+forall k a. Map k a -&gt; Set k
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">M.keysSet</span></a></span><span> </span><span class="annot"><span class="annottext">Map Unique Unique
+</span><a href="#local-6989586621680972507"><span class="hs-identifier hs-var">idTable</span></a></span><span> </span><span class="annot"><span class="annottext">Set Unique -&gt; Set Unique -&gt; Set Unique
+forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`S.intersection`</span></a></span><span> </span><span class="annot"><span class="annottext">Set Unique
+</span><a href="#local-6989586621680972501"><span class="hs-identifier hs-var">freeUniques</span></a></span><span>
+</span><span id="line-138"></span><span>              </span><span class="hs-comment">-- maps the ids of the &quot;local&quot; dependencies to their principal uniques.</span><span>
+</span><span id="line-139"></span><span>              </span><span class="hs-comment">-- See Note [Principal id]</span><span>
+</span><span id="line-140"></span><span>              </span><span id="local-6989586621680972492"><span class="annot"><span class="annottext">occursPrincipals :: [Unique]
+</span><a href="#local-6989586621680972492"><span class="hs-identifier hs-var hs-var">occursPrincipals</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Unique] -&gt; [Unique]
+forall a. Eq a =&gt; [a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">nub</span></a></span><span> </span><span class="annot"><span class="annottext">([Unique] -&gt; [Unique]) -&gt; [Unique] -&gt; [Unique]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map Unique Unique -&gt; [Unique]
+forall k a. Map k a -&gt; [a]
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-identifier hs-var">M.elems</span></a></span><span> </span><span class="annot"><span class="annottext">(Map Unique Unique -&gt; [Unique]) -&gt; Map Unique Unique -&gt; [Unique]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Map Unique Unique
+</span><a href="#local-6989586621680972507"><span class="hs-identifier hs-var">idTable</span></a></span><span> </span><span class="annot"><span class="annottext">Map Unique Unique -&gt; Set Unique -&gt; Map Unique Unique
+forall k a. Ord k =&gt; Map k a -&gt; Set k -&gt; Map k a
+</span><a href="../file:///nix/store/5giw0zbshrdz1qlvzc0csv9mspljr1ax-containers-lib-containers-0.6.5.1-haddock-doc/share/doc/containers/html/src"><span class="hs-operator hs-var">`M.restrictKeys`</span></a></span><span> </span><span class="annot"><span class="annottext">Set Unique
+</span><a href="#local-6989586621680972495"><span class="hs-identifier hs-var">occursIds</span></a></span><span>
+</span><span id="line-141"></span><span>          </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">AdjacencyMap Unique -&gt; AdjacencyMap Unique -&gt; AdjacencyMap Unique
+forall a.
+Ord a =&gt;
+AdjacencyMap a -&gt; AdjacencyMap a -&gt; AdjacencyMap a
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AM.connect</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Unique -&gt; AdjacencyMap Unique
+forall a. a -&gt; AdjacencyMap a
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AM.vertex</span></a></span><span> </span><span class="annot"><span class="annottext">(Unique -&gt; AdjacencyMap Unique) -&gt; Unique -&gt; AdjacencyMap Unique
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a -&gt; Unique
+forall tyname name (uni :: * -&gt; *) fun a.
+(HasUnique tyname TypeUnique, HasUnique name TermUnique) =&gt;
+Binding tyname name uni fun a -&gt; Unique
+</span><a href="PlutusIR.Transform.RecSplit.html#principal"><span class="hs-identifier hs-var">principal</span></a></span><span> </span><span class="annot"><span class="annottext">Binding tyname name uni fun a
+</span><a href="#local-6989586621680972502"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Unique] -&gt; AdjacencyMap Unique
+forall a. Ord a =&gt; [a] -&gt; AdjacencyMap a
+</span><a href="../file:///nix/store/527l9rkvbv073xni02aq0ikh5y9k4l47-algebraic-graphs-lib-algebraic-graphs-0.6.1-haddock-doc/share/doc/algebraic-graphs/html/src"><span class="hs-identifier hs-var">AM.vertices</span></a></span><span> </span><span class="annot"><span class="annottext">[Unique]
+</span><a href="#local-6989586621680972492"><span class="hs-identifier hs-var">occursPrincipals</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span>
+</span><span id="line-144"></span><span class="hs-comment">{-|
+A function that returns a single 'Unique' for a particular binding.
+See Note [Principal id]
+-}</span><span>
+</span><span id="line-148"></span><span id="local-6989586621680972638"><span id="local-6989586621680972639"><span id="local-6989586621680972640"><span id="local-6989586621680972641"><span id="local-6989586621680972642"><span class="annot"><a href="PlutusIR.Transform.RecSplit.html#principal"><span class="hs-identifier hs-type">principal</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972642"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TypeUnique"><span class="hs-identifier hs-type">PLC.TypeUnique</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#HasUnique"><span class="hs-identifier hs-type">PLC.HasUnique</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972641"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="PlutusCore.Name.html#TermUnique"><span class="hs-identifier hs-type">PLC.TermUnique</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-149"></span><span>            </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Binding"><span class="hs-identifier hs-type">Binding</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972642"><span class="hs-identifier hs-type">tyname</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972641"><span class="hs-identifier hs-type">name</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972640"><span class="hs-identifier hs-type">uni</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972639"><span class="hs-identifier hs-type">fun</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680972638"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-150"></span><span>            </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusCore.Name.html#Unique"><span class="hs-identifier hs-type">PLC.Unique</span></a></span></span></span></span></span></span><span>
+</span><span id="line-151"></span><span id="principal"><span class="annot"><span class="annottext">principal :: Binding tyname name uni fun a -&gt; Unique
+</span><a href="PlutusIR.Transform.RecSplit.html#principal"><span class="hs-identifier hs-var hs-var">principal</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#TermBind"><span class="hs-identifier hs-type">TermBind</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Strictness
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#VarDecl"><span class="hs-identifier hs-type">VarDecl</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680972486"><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680972486"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="annot"><span class="annottext">Type tyname uni a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Term tyname name uni fun a
+</span><span class="hs-identifier">_</span></span><span>                             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">name
+</span><a href="#local-6989586621680972486"><span class="hs-identifier hs-var">n</span></a></span><span class="annot"><span class="annottext">name -&gt; Getting Unique name Unique -&gt; Unique
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting Unique name Unique
+forall name unique. HasUnique name unique =&gt; Lens' name Unique
+</span><a href="PlutusCore.Name.html#theUnique"><span class="hs-identifier hs-var">PLC.theUnique</span></a></span><span>
+</span><span id="line-152"></span><span>                  </span><span class="annot"><a href="PlutusIR.Core.Type.html#TypeBind"><span class="hs-identifier hs-type">TypeBind</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#TyVarDecl"><span class="hs-identifier hs-type">TyVarDecl</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680972483"><span class="annot"><span class="annottext">tyname
+</span><a href="#local-6989586621680972483"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="annot"><span class="annottext">Kind a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Type tyname uni a
+</span><span class="hs-identifier">_</span></span><span>                             </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">tyname
+</span><a href="#local-6989586621680972483"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">tyname -&gt; Getting Unique tyname Unique -&gt; Unique
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting Unique tyname Unique
+forall name unique. HasUnique name unique =&gt; Lens' name Unique
+</span><a href="PlutusCore.Name.html#theUnique"><span class="hs-identifier hs-var">PLC.theUnique</span></a></span><span>
+</span><span id="line-153"></span><span>                  </span><span class="hs-comment">-- arbitrary: uses the type constructor's unique as the principal unique of this data binding group</span><span>
+</span><span id="line-154"></span><span>                  </span><span class="annot"><a href="PlutusIR.Core.Type.html#DatatypeBind"><span class="hs-identifier hs-type">DatatypeBind</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Core.Type.html#Datatype"><span class="hs-identifier hs-type">Datatype</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusCore.Core.Type.html#TyVarDecl"><span class="hs-identifier hs-type">TyVarDecl</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680972480"><span class="annot"><span class="annottext">tyname
+</span><a href="#local-6989586621680972480"><span class="hs-identifier hs-var">tyConstr</span></a></span></span><span> </span><span class="annot"><span class="annottext">Kind a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TyVarDecl tyname a]
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">name
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">[VarDecl tyname name uni fun a]
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">tyname
+</span><a href="#local-6989586621680972480"><span class="hs-identifier hs-var">tyConstr</span></a></span><span> </span><span class="annot"><span class="annottext">tyname -&gt; Getting Unique tyname Unique -&gt; Unique
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><a href="../file:///nix/store/lwkxqy8dgzjvz62gfx89dnvl9mm03scy-lens-lib-lens-4.19.2-haddock-doc/share/doc/lens/html/src"><span class="hs-operator hs-var">^.</span></a></span><span> </span><span class="annot"><span class="annottext">Getting Unique tyname Unique
+forall name unique. HasUnique name unique =&gt; Lens' name Unique
+</span><a href="PlutusCore.Name.html#theUnique"><span class="hs-identifier hs-var">PLC.theUnique</span></a></span><span>
+</span><span id="line-155"></span></pre></body></html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds           #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies  #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts    #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE GADTs               #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase          #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE NumericUnderscores  #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.ChainIndex.Events</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Cardano.BM.Trace</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Trace</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Concurrent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">threadDelay</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">atomically</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Control.Concurrent.STM.TBMQueue.html"><span class="hs-identifier">Control.Concurrent.STM.TBMQueue</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Concurrent.STM.TBMQueue.html#flushTBMQueue"><span class="hs-identifier">flushTBMQueue</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Concurrent.STM.TBMQueue.html#isFullTBMQueue"><span class="hs-identifier">isFullTBMQueue</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">forever</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">catMaybes</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">isJust</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Numeric.Natural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Natural</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.ChainIndex</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CI</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html"><span class="hs-identifier">Plutus.ChainIndex.Lib</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#ChainSyncEvent"><span class="hs-identifier">ChainSyncEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#Resume"><span class="hs-identifier">Resume</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollBackward"><span class="hs-identifier">RollBackward</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollForward"><span class="hs-identifier">RollForward</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#EventsQueue"><span class="hs-identifier">EventsQueue</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">RunRequirements</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>                              </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#runChainIndexDuringSync"><span class="hs-identifier">runChainIndexDuringSync</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html"><span class="hs-identifier">Plutus.ChainIndex.SyncStats</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier">SyncLog</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#getSyncState"><span class="hs-identifier">getSyncState</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSynced"><span class="hs-identifier">isSyncStateSynced</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#logProgress"><span class="hs-identifier">logProgress</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.ChainIndex.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">tipAsPoint</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">Plutus.Monitoring.Util</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">PrettyObject</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">PrettyObject</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">convertLog</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier">runLogEffects</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">System.Clock</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">Clock</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">Monotonic</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">diffTimeSpec</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier">getTime</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- | How often do we check the queue</span><span>
+</span><span id="line-28"></span><span class="annot"><a href="Plutus.ChainIndex.Events.html#period"><span class="hs-identifier hs-type">period</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-29"></span><span id="period"><span class="annot"><span class="annottext">period :: Int
+</span><a href="Plutus.ChainIndex.Events.html#period"><span class="hs-identifier hs-var hs-var">period</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2_000_000</span></span><span> </span><span class="hs-comment">-- 2s</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- | We estimate the size of the event with the number of the transactions in the block.</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- By doing this we accumulate some number of blocks but with less than 'queueSize' number of transactions.</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- This approach helps to process blocks with a constant memory usage.</span><span>
+</span><span id="line-34"></span><span class="hs-comment">--</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- However, once we are in sync with the node, we want to process every block</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- instead of batches of blocks so that we can update the database as frequently</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- as possible.</span><span>
+</span><span id="line-38"></span><span class="hs-comment">--</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- Just accumulating 'queueSize' blocks doesn't work as a block can have any number of transactions.</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- It works fine at the beginning of the chain but later blocks grow in their size and the memory</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- usage grows tremendously.</span><span>
+</span><span id="line-42"></span><span class="annot"><a href="Plutus.ChainIndex.Events.html#measureEventQueueSizeByTxs"><span class="hs-identifier hs-type">measureEventQueueSizeByTxs</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Natural</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#ChainSyncEvent"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Natural</span></a></span><span>
+</span><span id="line-43"></span><span id="measureEventQueueSizeByTxs"><span class="annot"><span class="annottext">measureEventQueueSizeByTxs :: Natural -&gt; ChainSyncEvent -&gt; Natural
+</span><a href="Plutus.ChainIndex.Events.html#measureEventQueueSizeByTxs"><span class="hs-identifier hs-var hs-var">measureEventQueueSizeByTxs</span></a></span></span><span> </span><span id="local-6989586621679437078"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679437078"><span class="hs-identifier hs-var">maxQueueSize</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollForward"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">CI.Block</span></a></span><span> </span><span id="local-6989586621679437076"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679437076"><span class="hs-identifier hs-var">syncTip</span></a></span></span><span> </span><span id="local-6989586621679437075"><span class="annot"><span class="annottext">[(ChainIndexTx, TxProcessOption)]
+</span><a href="#local-6989586621679437075"><span class="hs-identifier hs-var">transactions</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679437074"><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679437074"><span class="hs-identifier hs-var">nodeTip</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679437073"><span class="annot"><span class="annottext">syncState :: SyncState
+</span><a href="#local-6989586621679437073"><span class="hs-identifier hs-var hs-var">syncState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point -&gt; SyncState
+</span><a href="Plutus.ChainIndex.SyncStats.html#getSyncState"><span class="hs-identifier hs-var">getSyncState</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tip -&gt; Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">tipAsPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679437076"><span class="hs-identifier hs-var">syncTip</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tip -&gt; Point
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">tipAsPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><a href="#local-6989586621679437074"><span class="hs-identifier hs-var">nodeTip</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>        </span><span id="local-6989586621679437072"><span class="annot"><span class="annottext">txLen :: Natural
+</span><a href="#local-6989586621679437072"><span class="hs-identifier hs-var hs-var">txLen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Natural
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Natural) -&gt; Int -&gt; Natural
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[(ChainIndexTx, TxProcessOption)] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">length</span></a></span><span> </span><span class="annot"><span class="annottext">[(ChainIndexTx, TxProcessOption)]
+</span><a href="#local-6989586621679437075"><span class="hs-identifier hs-var">transactions</span></a></span><span>
+</span><span id="line-46"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">SyncState -&gt; Bool
+</span><a href="Plutus.ChainIndex.SyncStats.html#isSyncStateSynced"><span class="hs-identifier hs-var">isSyncStateSynced</span></a></span><span> </span><span class="annot"><span class="annottext">SyncState
+</span><a href="#local-6989586621679437073"><span class="hs-identifier hs-var">syncState</span></a></span><span>
+</span><span id="line-47"></span><span>           </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679437078"><span class="hs-identifier hs-var">maxQueueSize</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-48"></span><span>           </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679437072"><span class="hs-identifier hs-var">txLen</span></a></span><span>
+</span><span id="line-49"></span><span class="annot"><a href="Plutus.ChainIndex.Events.html#measureEventQueueSizeByTxs"><span class="hs-identifier hs-var">measureEventQueueSizeByTxs</span></a></span><span> </span><span id="local-6989586621679437069"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679437069"><span class="hs-identifier hs-var">maxQueueSize</span></a></span></span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679437069"><span class="hs-identifier hs-var">maxQueueSize</span></a></span><span> </span><span class="annot"><span class="annottext">Natural -&gt; Natural -&gt; Natural
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-comment">-- to handle resume and rollback asap</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | 'processEventsQueue' reads events from 'TBQueue', collects enough 'RollForward's to</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- append blocks at once.</span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Plutus.ChainIndex.Events.html#processEventsQueue"><span class="hs-identifier hs-type">processEventsQueue</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Trace</span></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">PrettyObject</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.SyncStats.html#SyncLog"><span class="hs-identifier hs-type">SyncLog</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-type">RunRequirements</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#EventsQueue"><span class="hs-identifier hs-type">EventsQueue</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span id="processEventsQueue"><span class="annot"><span class="annottext">processEventsQueue :: Trace IO (PrettyObject SyncLog)
+-&gt; RunRequirements -&gt; EventsQueue -&gt; IO ()
+</span><a href="Plutus.ChainIndex.Events.html#processEventsQueue"><span class="hs-identifier hs-var hs-var">processEventsQueue</span></a></span></span><span> </span><span id="local-6989586621679437067"><span class="annot"><span class="annottext">Trace IO (PrettyObject SyncLog)
+</span><a href="#local-6989586621679437067"><span class="hs-identifier hs-var">trace</span></a></span></span><span> </span><span id="local-6989586621679437066"><span class="annot"><span class="annottext">RunRequirements
+</span><a href="#local-6989586621679437066"><span class="hs-identifier hs-var">runReq</span></a></span></span><span> </span><span id="local-6989586621679437065"><span class="annot"><span class="annottext">EventsQueue
+</span><a href="#local-6989586621679437065"><span class="hs-identifier hs-var">eventsQueue</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO ()
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">forever</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-55"></span><span>  </span><span id="local-6989586621679437064"><span class="annot"><span class="annottext">TimeSpec
+</span><a href="#local-6989586621679437064"><span class="hs-identifier hs-var">start</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Clock -&gt; IO TimeSpec
+</span><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">getTime</span></a></span><span> </span><span class="annot"><span class="annottext">Clock
+</span><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">Monotonic</span></a></span><span>
+</span><span id="line-56"></span><span>  </span><span id="local-6989586621679437063"><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437063"><span class="hs-identifier hs-var">eventsToProcess</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-keyword">let</span><span>
+</span><span id="line-58"></span><span>      </span><span id="local-6989586621679437062"><span class="annot"><span class="annottext">waitUntilEvents :: IO [ChainSyncEvent]
+</span><a href="#local-6989586621679437062"><span class="hs-identifier hs-var hs-var">waitUntilEvents</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-59"></span><span>        </span><span id="local-6989586621679437061"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679437061"><span class="hs-identifier hs-var">isFull</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM Bool -&gt; IO Bool
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM Bool -&gt; IO Bool) -&gt; STM Bool -&gt; IO Bool
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">EventsQueue -&gt; STM Bool
+forall a. TBMQueue a -&gt; STM Bool
+</span><a href="Control.Concurrent.STM.TBMQueue.html#isFullTBMQueue"><span class="hs-identifier hs-var">isFullTBMQueue</span></a></span><span> </span><span class="annot"><span class="annottext">EventsQueue
+</span><a href="#local-6989586621679437065"><span class="hs-identifier hs-var">eventsQueue</span></a></span><span>
+</span><span id="line-60"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679437061"><span class="hs-identifier hs-var">isFull</span></a></span><span> </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">STM [ChainSyncEvent] -&gt; IO [ChainSyncEvent]
+forall a. STM a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">atomically</span></a></span><span> </span><span class="annot"><span class="annottext">(STM [ChainSyncEvent] -&gt; IO [ChainSyncEvent])
+-&gt; STM [ChainSyncEvent] -&gt; IO [ChainSyncEvent]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">EventsQueue -&gt; STM [ChainSyncEvent]
+forall a. TBMQueue a -&gt; STM [a]
+</span><a href="Control.Concurrent.STM.TBMQueue.html#flushTBMQueue"><span class="hs-identifier hs-var">flushTBMQueue</span></a></span><span> </span><span class="annot"><span class="annottext">EventsQueue
+</span><a href="#local-6989586621679437065"><span class="hs-identifier hs-var">eventsQueue</span></a></span><span>
+</span><span id="line-61"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">threadDelay</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="Plutus.ChainIndex.Events.html#period"><span class="hs-identifier hs-var">period</span></a></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; IO [ChainSyncEvent] -&gt; IO [ChainSyncEvent]
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; m b -&gt; m b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">&gt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">IO [ChainSyncEvent]
+</span><a href="#local-6989586621679437062"><span class="hs-identifier hs-var">waitUntilEvents</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span class="annot"><span class="annottext">IO [ChainSyncEvent]
+</span><a href="#local-6989586621679437062"><span class="hs-identifier hs-var">waitUntilEvents</span></a></span><span>
+</span><span id="line-63"></span><span>  </span><span class="annot"><span class="annottext">[ChainSyncEvent] -&gt; IO ()
+</span><a href="#local-6989586621679437060"><span class="hs-identifier hs-var">processEvents</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437063"><span class="hs-identifier hs-var">eventsToProcess</span></a></span><span>
+</span><span id="line-64"></span><span>  </span><span id="local-6989586621679437059"><span class="annot"><span class="annottext">TimeSpec
+</span><a href="#local-6989586621679437059"><span class="hs-identifier hs-var">end</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Clock -&gt; IO TimeSpec
+</span><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">getTime</span></a></span><span> </span><span class="annot"><span class="annottext">Clock
+</span><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">Monotonic</span></a></span><span>
+</span><span id="line-65"></span><span>  </span><span class="annot"><span class="annottext">IO () -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO () -&gt; IO ()) -&gt; IO () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO SyncLog -&gt; Eff '[LogMsg SyncLog, IO] ~&gt; IO
+forall (m :: * -&gt; *) l.
+MonadIO m =&gt;
+Trace m l -&gt; Eff '[LogMsg l, m] ~&gt; m
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">runLogEffects</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(SyncLog -&gt; PrettyObject SyncLog)
+-&gt; Trace IO (PrettyObject SyncLog) -&gt; Trace IO SyncLog
+forall a b (m :: * -&gt; *). (a -&gt; b) -&gt; Trace m b -&gt; Trace m a
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">convertLog</span></a></span><span> </span><span class="annot"><span class="annottext">SyncLog -&gt; PrettyObject SyncLog
+forall t. t -&gt; PrettyObject t
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">PrettyObject</span></a></span><span> </span><span class="annot"><span class="annottext">Trace IO (PrettyObject SyncLog)
+</span><a href="#local-6989586621679437067"><span class="hs-identifier hs-var">trace</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Eff '[LogMsg SyncLog, IO] () -&gt; IO ())
+-&gt; Eff '[LogMsg SyncLog, IO] () -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent] -&gt; TimeSpec -&gt; Eff '[LogMsg SyncLog, IO] ()
+forall (effs :: [* -&gt; *]).
+Member (LogMsg SyncLog) effs =&gt;
+[ChainSyncEvent] -&gt; TimeSpec -&gt; Eff effs ()
+</span><a href="Plutus.ChainIndex.SyncStats.html#logProgress"><span class="hs-identifier hs-var">logProgress</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437063"><span class="hs-identifier hs-var">eventsToProcess</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TimeSpec -&gt; TimeSpec -&gt; TimeSpec
+</span><a href="../file:///nix/store/v3m9kgs31wlssin0ikn4r8qqwbhnlhh6-clock-lib-clock-0.8.3-haddock-doc/share/doc/clock/html/src"><span class="hs-identifier hs-var">diffTimeSpec</span></a></span><span> </span><span class="annot"><span class="annottext">TimeSpec
+</span><a href="#local-6989586621679437059"><span class="hs-identifier hs-var">end</span></a></span><span> </span><span class="annot"><span class="annottext">TimeSpec
+</span><a href="#local-6989586621679437064"><span class="hs-identifier hs-var">start</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-67"></span><span>    </span><span class="annot"><a href="#local-6989586621679437060"><span class="hs-identifier hs-type">processEvents</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#ChainSyncEvent"><span class="hs-identifier hs-type">ChainSyncEvent</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span>    </span><span id="local-6989586621679437060"><span class="annot"><span class="annottext">processEvents :: [ChainSyncEvent] -&gt; IO ()
+</span><a href="#local-6989586621679437060"><span class="hs-identifier hs-var hs-var">processEvents</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>    </span><span class="annot"><a href="#local-6989586621679437060"><span class="hs-identifier hs-var">processEvents</span></a></span><span> </span><span id="local-6989586621679437058"><span class="annot"><span class="annottext">events :: [ChainSyncEvent]
+</span><a href="#local-6989586621679437058"><span class="hs-identifier hs-var">events</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span> </span><span id="local-6989586621679437057"><span class="annot"><span class="annottext">ChainSyncEvent
+</span><a href="#local-6989586621679437057"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-glyph hs-type">:</span></a></span><span> </span><span id="local-6989586621679437056"><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437056"><span class="hs-identifier hs-var">restEvents</span></a></span></span><span> </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent
+</span><a href="#local-6989586621679437057"><span class="hs-identifier hs-var">e</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-70"></span><span>      </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#Resume"><span class="hs-identifier hs-type">Resume</span></a></span><span> </span><span id="local-6989586621679437055"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679437055"><span class="hs-identifier hs-var">resumePoint</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-71"></span><span>        </span><span class="annot"><span class="annottext">IO (Maybe ()) -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe ()) -&gt; IO ()) -&gt; IO (Maybe ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">RunRequirements
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+-&gt; IO (Maybe ())
+forall a.
+RunRequirements
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     a
+-&gt; IO (Maybe a)
+</span><a href="Plutus.ChainIndex.Lib.html#runChainIndexDuringSync"><span class="hs-identifier hs-var">runChainIndexDuringSync</span></a></span><span> </span><span class="annot"><span class="annottext">RunRequirements
+</span><a href="#local-6989586621679437066"><span class="hs-identifier hs-var">runReq</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff
+   '[ChainIndexQueryEffect, ChainIndexControlEffect,
+     BeamEffect Sqlite]
+   ()
+ -&gt; IO (Maybe ()))
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+-&gt; IO (Maybe ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+forall (effs :: [* -&gt; *]).
+Member ChainIndexControlEffect effs =&gt;
+Point -&gt; Eff effs ()
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">CI.resumeSync</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679437055"><span class="hs-identifier hs-var">resumePoint</span></a></span><span>
+</span><span id="line-72"></span><span>        </span><span class="annot"><span class="annottext">[ChainSyncEvent] -&gt; IO ()
+</span><a href="#local-6989586621679437060"><span class="hs-identifier hs-var">processEvents</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437056"><span class="hs-identifier hs-var">restEvents</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span>      </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollBackward"><span class="hs-identifier hs-type">RollBackward</span></a></span><span> </span><span id="local-6989586621679437053"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679437053"><span class="hs-identifier hs-var">backwardPoint</span></a></span></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-75"></span><span>        </span><span class="annot"><span class="annottext">IO (Maybe ()) -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe ()) -&gt; IO ()) -&gt; IO (Maybe ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">RunRequirements
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+-&gt; IO (Maybe ())
+forall a.
+RunRequirements
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     a
+-&gt; IO (Maybe a)
+</span><a href="Plutus.ChainIndex.Lib.html#runChainIndexDuringSync"><span class="hs-identifier hs-var">runChainIndexDuringSync</span></a></span><span> </span><span class="annot"><span class="annottext">RunRequirements
+</span><a href="#local-6989586621679437066"><span class="hs-identifier hs-var">runReq</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff
+   '[ChainIndexQueryEffect, ChainIndexControlEffect,
+     BeamEffect Sqlite]
+   ()
+ -&gt; IO (Maybe ()))
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+-&gt; IO (Maybe ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+forall (effs :: [* -&gt; *]).
+Member ChainIndexControlEffect effs =&gt;
+Point -&gt; Eff effs ()
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">CI.rollback</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679437053"><span class="hs-identifier hs-var">backwardPoint</span></a></span><span>
+</span><span id="line-76"></span><span>        </span><span class="annot"><span class="annottext">[ChainSyncEvent] -&gt; IO ()
+</span><a href="#local-6989586621679437060"><span class="hs-identifier hs-var">processEvents</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437056"><span class="hs-identifier hs-var">restEvents</span></a></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span>      </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollForward"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncBlock
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-79"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679437051"><span class="annot"><span class="annottext">getBlock :: ChainSyncEvent -&gt; Maybe ChainSyncBlock
+</span><a href="#local-6989586621679437051"><span class="hs-identifier hs-var hs-var">getBlock</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-80"></span><span>              </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Lib.html#RollForward"><span class="hs-identifier hs-type">RollForward</span></a></span><span> </span><span id="local-6989586621679437050"><span class="annot"><span class="annottext">ChainSyncBlock
+</span><a href="#local-6989586621679437050"><span class="hs-identifier hs-var">block</span></a></span></span><span> </span><span class="annot"><span class="annottext">Tip
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ChainSyncBlock -&gt; Maybe ChainSyncBlock
+forall a. a -&gt; Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncBlock
+</span><a href="#local-6989586621679437050"><span class="hs-identifier hs-var">block</span></a></span><span>
+</span><span id="line-81"></span><span>              </span><span class="annot"><span class="annottext">ChainSyncEvent
+</span><span class="hs-identifier">_</span></span><span>                     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe ChainSyncBlock
+forall a. Maybe a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-82"></span><span>            </span><span id="local-6989586621679437049"><span class="annot"><span class="annottext">isRollForwardEvt :: ChainSyncEvent -&gt; Bool
+</span><a href="#local-6989586621679437049"><span class="hs-identifier hs-var hs-var">isRollForwardEvt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe ChainSyncBlock -&gt; Bool
+forall a. Maybe a -&gt; Bool
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">isJust</span></a></span><span> </span><span class="annot"><span class="annottext">(Maybe ChainSyncBlock -&gt; Bool)
+-&gt; (ChainSyncEvent -&gt; Maybe ChainSyncBlock)
+-&gt; ChainSyncEvent
+-&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent -&gt; Maybe ChainSyncBlock
+</span><a href="#local-6989586621679437051"><span class="hs-identifier hs-var">getBlock</span></a></span><span>
+</span><span id="line-83"></span><span>            </span><span class="hs-special">(</span><span id="local-6989586621679437047"><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437047"><span class="hs-identifier hs-var">rollForwardEvents</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679437046"><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437046"><span class="hs-identifier hs-var">restEvents'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(ChainSyncEvent -&gt; Bool)
+-&gt; [ChainSyncEvent] -&gt; ([ChainSyncEvent], [ChainSyncEvent])
+forall a. (a -&gt; Bool) -&gt; [a] -&gt; ([a], [a])
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">span</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent -&gt; Bool
+</span><a href="#local-6989586621679437049"><span class="hs-identifier hs-var">isRollForwardEvt</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437058"><span class="hs-identifier hs-var">events</span></a></span><span>
+</span><span id="line-84"></span><span>            </span><span id="local-6989586621679437044"><span class="annot"><span class="annottext">blocks :: [ChainSyncBlock]
+</span><a href="#local-6989586621679437044"><span class="hs-identifier hs-var hs-var">blocks</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Maybe ChainSyncBlock] -&gt; [ChainSyncBlock]
+forall a. [Maybe a] -&gt; [a]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">catMaybes</span></a></span><span> </span><span class="annot"><span class="annottext">([Maybe ChainSyncBlock] -&gt; [ChainSyncBlock])
+-&gt; [Maybe ChainSyncBlock] -&gt; [ChainSyncBlock]
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(ChainSyncEvent -&gt; Maybe ChainSyncBlock)
+-&gt; [ChainSyncEvent] -&gt; [Maybe ChainSyncBlock]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="annot"><span class="annottext">ChainSyncEvent -&gt; Maybe ChainSyncBlock
+</span><a href="#local-6989586621679437051"><span class="hs-identifier hs-var">getBlock</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437047"><span class="hs-identifier hs-var">rollForwardEvents</span></a></span><span>
+</span><span id="line-85"></span><span>        </span><span class="annot"><span class="annottext">IO (Maybe ()) -&gt; IO ()
+forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe ()) -&gt; IO ()) -&gt; IO (Maybe ()) -&gt; IO ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">RunRequirements
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+-&gt; IO (Maybe ())
+forall a.
+RunRequirements
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     a
+-&gt; IO (Maybe a)
+</span><a href="Plutus.ChainIndex.Lib.html#runChainIndexDuringSync"><span class="hs-identifier hs-var">runChainIndexDuringSync</span></a></span><span> </span><span class="annot"><span class="annottext">RunRequirements
+</span><a href="#local-6989586621679437066"><span class="hs-identifier hs-var">runReq</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff
+   '[ChainIndexQueryEffect, ChainIndexControlEffect,
+     BeamEffect Sqlite]
+   ()
+ -&gt; IO (Maybe ()))
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+-&gt; IO (Maybe ())
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncBlock]
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       BeamEffect Sqlite]
+     ()
+forall (effs :: [* -&gt; *]).
+Member ChainIndexControlEffect effs =&gt;
+[ChainSyncBlock] -&gt; Eff effs ()
+</span><a href="../../../../plutus-chain-index-core/html/src"><span class="hs-identifier hs-var">CI.appendBlocks</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncBlock]
+</span><a href="#local-6989586621679437044"><span class="hs-identifier hs-var">blocks</span></a></span><span>
+</span><span id="line-86"></span><span>        </span><span class="annot"><span class="annottext">[ChainSyncEvent] -&gt; IO ()
+</span><a href="#local-6989586621679437060"><span class="hs-identifier hs-var">processEvents</span></a></span><span> </span><span class="annot"><span class="annottext">[ChainSyncEvent]
+</span><a href="#local-6989586621679437046"><span class="hs-identifier hs-var">restEvents'</span></a></span><span>
+</span><span id="line-87"></span></pre></body></html>

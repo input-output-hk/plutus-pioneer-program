@@ -8,8 +8,7 @@ module Homework1 where
 import Plutus.V2.Ledger.Api qualified as PlutusV2
 import PlutusTx
 import PlutusTx.Prelude 
-import Utils (writePlutusFile, wrap)
-import Prelude (IO)
+import Utils (wrap)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -17,10 +16,10 @@ import Prelude (IO)
 {-# INLINABLE mkValidator #-}
 -- This should validate if and only if the two Booleans in the redeemer are True!
 mkValidator :: () -> (Bool, Bool) -> PlutusV2.ScriptContext -> Bool
-mkValidator _ _ _ = undefined
+mkValidator _ _ _ = False
 
 wrappedVal :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-wrappedVal = undefined
+wrappedVal = wrap mkValidator
 
 validator :: PlutusV2.Validator
-validator = undefined
+validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| wrappedVal ||])

@@ -1,0 +1,435 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleContexts #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE MonoLocalBinds   #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes       #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE TypeOperators    #-}</span><span>
+</span><span id="line-7"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Plutus.ChainIndex.Emulator.Server</span><span class="hs-special">(</span><span>
+</span><span id="line-8"></span><span>    </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Server.html#serveChainIndexQueryServer"><span class="hs-identifier">serveChainIndexQueryServer</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>    </span><span class="annot"><a href="Plutus.ChainIndex.Server.html#serveChainIndex"><span class="hs-identifier">serveChainIndex</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">TVar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b738x068mpk6m31fqb2w33rzbqb41k86-stm-lib-stm-2.5.0.1-haddock-doc/share/doc/stm/html/src"><span class="hs-identifier">Control.Concurrent.STM</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">STM</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier">Control.Monad.Except</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">E</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Eff</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">interpret</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">run</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-keyword">type</span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator">(~&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.Error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Error</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">runError</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Log</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">handleLogIgnore</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">Control.Monad.Freer.Extras.Modify</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../freer-extras/html/src"><span class="hs-identifier">raiseEnd</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">Control.Monad.Freer.State</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier">evalState</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Control.Monad.IO.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">MonadIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">liftIO</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier">Data.ByteString.Lazy</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BSL</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Data.Proxy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier">Proxy</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier">Data.Text.Encoding</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Text</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier">Network.Wai.Handler.Warp</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Warp</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.html"><span class="hs-identifier">Plutus.ChainIndex</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.ChainIndexError.html#ChainIndexError"><span class="hs-identifier">ChainIndexError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.ChainIndexLog.html#ChainIndexLog"><span class="hs-identifier">ChainIndexLog</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Api.html"><span class="hs-identifier">Plutus.ChainIndex.Api</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Api.html#API"><span class="hs-identifier">API</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Api.html#FullAPI"><span class="hs-identifier">FullAPI</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Api.html#swagger"><span class="hs-identifier">swagger</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Effects.html"><span class="hs-identifier">Plutus.ChainIndex.Effects</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Effects.html#ChainIndexControlEffect"><span class="hs-identifier">ChainIndexControlEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Effects.html#ChainIndexQueryEffect"><span class="hs-identifier">ChainIndexQueryEffect</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Handlers.html"><span class="hs-identifier">Plutus.ChainIndex.Emulator.Handlers</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Handlers.html#ChainIndexEmulatorState"><span class="hs-identifier">ChainIndexEmulatorState</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Handlers.html#handleControl"><span class="hs-identifier">handleControl</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Handlers.html#handleQuery"><span class="hs-identifier">handleQuery</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Server.html"><span class="hs-identifier">Plutus.ChainIndex.Server</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Plutus.ChainIndex.Server.html#serveChainIndexQueryServer"><span class="hs-identifier">serveChainIndexQueryServer</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/vyn800dwc7jzx9nlwjw9m6vsd46p5skc-servant-lib-servant-0.18.3-haddock-doc/share/doc/servant/html/src"><span class="hs-identifier">Servant.API</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/vyn800dwc7jzx9nlwjw9m6vsd46p5skc-servant-lib-servant-0.18.3-haddock-doc/share/doc/servant/html/src"><span class="hs-operator">(:&lt;|&gt;)</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">Servant.Server</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">Handler</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">ServerError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">err500</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">errBody</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">hoistServer</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier">serve</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Server.html#serveChainIndexQueryServer"><span class="hs-identifier hs-type">serveChainIndexQueryServer</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-34"></span><span>    </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span class="hs-comment">-- ^ Port</span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">TVar</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Handlers.html#ChainIndexEmulatorState"><span class="hs-identifier hs-type">ChainIndexEmulatorState</span></a></span><span> </span><span class="hs-comment">-- ^ Chain index state (TODO: When the disk state is stored in a DB, replace this with DB connection info)</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/ghc-prim-0.6.1/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span id="serveChainIndexQueryServer"><span class="annot"><span class="annottext">serveChainIndexQueryServer :: Int -&gt; TVar ChainIndexEmulatorState -&gt; IO ()
+</span><a href="Plutus.ChainIndex.Emulator.Server.html#serveChainIndexQueryServer"><span class="hs-identifier hs-var hs-var">serveChainIndexQueryServer</span></a></span></span><span> </span><span id="local-6989586621679727130"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679727130"><span class="hs-identifier hs-var">port</span></a></span></span><span> </span><span id="local-6989586621679727129"><span class="annot"><span class="annottext">TVar ChainIndexEmulatorState
+</span><a href="#local-6989586621679727129"><span class="hs-identifier hs-var">diskState</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679727128"><span class="annot"><span class="annottext">server :: ServerT API Handler
+</span><a href="#local-6989586621679727128"><span class="hs-identifier hs-var hs-var">server</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Proxy API
+-&gt; (forall x.
+    Eff
+      '[ChainIndexQueryEffect, ChainIndexControlEffect,
+        Error ServerError]
+      x
+    -&gt; Handler x)
+-&gt; ServerT
+     API
+     (Eff
+        '[ChainIndexQueryEffect, ChainIndexControlEffect,
+          Error ServerError])
+-&gt; ServerT API Handler
+forall api (m :: * -&gt; *) (n :: * -&gt; *).
+HasServer api '[] =&gt;
+Proxy api
+-&gt; (forall x. m x -&gt; n x) -&gt; ServerT api m -&gt; ServerT api n
+</span><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier hs-var">hoistServer</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy API
+forall k (t :: k). Proxy t
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Proxy</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.ChainIndex.Api.html#API"><span class="hs-identifier hs-type">API</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TVar ChainIndexEmulatorState
+-&gt; forall x.
+   Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       Error ServerError]
+     x
+   -&gt; Handler x
+</span><a href="Plutus.ChainIndex.Emulator.Server.html#runChainIndexQuery"><span class="hs-identifier hs-var">runChainIndexQuery</span></a></span><span> </span><span class="annot"><span class="annottext">TVar ChainIndexEmulatorState
+</span><a href="#local-6989586621679727129"><span class="hs-identifier hs-var">diskState</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ServerT
+  API
+  (Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       Error ServerError])
+forall (effs :: [* -&gt; *]).
+(Member (Error ServerError) effs,
+ Member ChainIndexQueryEffect effs,
+ Member ChainIndexControlEffect effs) =&gt;
+ServerT API (Eff effs)
+</span><a href="Plutus.ChainIndex.Server.html#serveChainIndex"><span class="hs-identifier hs-var">serveChainIndex</span></a></span><span>
+</span><span id="line-39"></span><span>    </span><span class="annot"><span class="annottext">Int -&gt; Application -&gt; IO ()
+</span><a href="../file:///nix/store/xr1qwbfgn013dz6gycdc4wk2n2a753kz-warp-lib-warp-3.3.23-haddock-doc/share/doc/warp/html/src"><span class="hs-identifier hs-var">Warp.run</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679727130"><span class="hs-identifier hs-var">port</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy FullAPI -&gt; Server FullAPI -&gt; Application
+forall api.
+HasServer api '[] =&gt;
+Proxy api -&gt; Server api -&gt; Application
+</span><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier hs-var">serve</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy FullAPI
+forall k (t :: k). Proxy t
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">Proxy</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.ChainIndex.Api.html#FullAPI"><span class="hs-identifier hs-type">FullAPI</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Handler NoContent
+:&lt;|&gt; (((DatumHash -&gt; Handler Datum)
+       :&lt;|&gt; ((ValidatorHash -&gt; Handler (Versioned Validator))
+             :&lt;|&gt; ((MintingPolicyHash -&gt; Handler (Versioned MintingPolicy))
+                   :&lt;|&gt; ((StakeValidatorHash -&gt; Handler (Versioned StakeValidator))
+                         :&lt;|&gt; (RedeemerHash -&gt; Handler Redeemer)))))
+      :&lt;|&gt; ((TxOutRef -&gt; Handler DecoratedTxOut)
+            :&lt;|&gt; ((TxOutRef -&gt; Handler DecoratedTxOut)
+                  :&lt;|&gt; ((TxId -&gt; Handler ChainIndexTx)
+                        :&lt;|&gt; ((TxOutRef -&gt; Handler IsUtxoResponse)
+                              :&lt;|&gt; ((UtxoAtAddressRequest -&gt; Handler UtxosResponse)
+                                    :&lt;|&gt; ((QueryAtAddressRequest
+                                           -&gt; Handler (QueryResponse [(TxOutRef, DecoratedTxOut)]))
+                                          :&lt;|&gt; ((QueryAtAddressRequest
+                                                 -&gt; Handler (QueryResponse [Datum]))
+                                                :&lt;|&gt; ((UtxoWithCurrencyRequest
+                                                       -&gt; Handler UtxosResponse)
+                                                      :&lt;|&gt; (([TxId] -&gt; Handler [ChainIndexTx])
+                                                            :&lt;|&gt; ((TxoAtAddressRequest
+                                                                   -&gt; Handler TxosResponse)
+                                                                  :&lt;|&gt; (Handler Tip
+                                                                        :&lt;|&gt; (Handler NoContent
+                                                                              :&lt;|&gt; Handler
+                                                                                     Diagnostics)))))))))))))
+ServerT API Handler
+</span><a href="#local-6989586621679727128"><span class="hs-identifier hs-var">server</span></a></span><span> </span><span class="annot"><span class="annottext">(Handler NoContent
+ :&lt;|&gt; (((DatumHash -&gt; Handler Datum)
+        :&lt;|&gt; ((ValidatorHash -&gt; Handler (Versioned Validator))
+              :&lt;|&gt; ((MintingPolicyHash -&gt; Handler (Versioned MintingPolicy))
+                    :&lt;|&gt; ((StakeValidatorHash -&gt; Handler (Versioned StakeValidator))
+                          :&lt;|&gt; (RedeemerHash -&gt; Handler Redeemer)))))
+       :&lt;|&gt; ((TxOutRef -&gt; Handler DecoratedTxOut)
+             :&lt;|&gt; ((TxOutRef -&gt; Handler DecoratedTxOut)
+                   :&lt;|&gt; ((TxId -&gt; Handler ChainIndexTx)
+                         :&lt;|&gt; ((TxOutRef -&gt; Handler IsUtxoResponse)
+                               :&lt;|&gt; ((UtxoAtAddressRequest -&gt; Handler UtxosResponse)
+                                     :&lt;|&gt; ((QueryAtAddressRequest
+                                            -&gt; Handler (QueryResponse [(TxOutRef, DecoratedTxOut)]))
+                                           :&lt;|&gt; ((QueryAtAddressRequest
+                                                  -&gt; Handler (QueryResponse [Datum]))
+                                                 :&lt;|&gt; ((UtxoWithCurrencyRequest
+                                                        -&gt; Handler UtxosResponse)
+                                                       :&lt;|&gt; (([TxId] -&gt; Handler [ChainIndexTx])
+                                                             :&lt;|&gt; ((TxoAtAddressRequest
+                                                                    -&gt; Handler TxosResponse)
+                                                                   :&lt;|&gt; (Handler Tip
+                                                                         :&lt;|&gt; (Handler NoContent
+                                                                               :&lt;|&gt; Handler
+                                                                                      Diagnostics))))))))))))))
+-&gt; (Handler Value
+    :&lt;|&gt; (Handler
+            (SwaggerUiHtml &quot;swagger-ui&quot; (&quot;swagger.json&quot; :&gt; Get '[JSON] Value))
+          :&lt;|&gt; (Handler
+                  (SwaggerUiHtml &quot;swagger-ui&quot; (&quot;swagger.json&quot; :&gt; Get '[JSON] Value))
+                :&lt;|&gt; Tagged Handler Application)))
+-&gt; (Handler NoContent
+    :&lt;|&gt; (((DatumHash -&gt; Handler Datum)
+           :&lt;|&gt; ((ValidatorHash -&gt; Handler (Versioned Validator))
+                 :&lt;|&gt; ((MintingPolicyHash -&gt; Handler (Versioned MintingPolicy))
+                       :&lt;|&gt; ((StakeValidatorHash -&gt; Handler (Versioned StakeValidator))
+                             :&lt;|&gt; (RedeemerHash -&gt; Handler Redeemer)))))
+          :&lt;|&gt; ((TxOutRef -&gt; Handler DecoratedTxOut)
+                :&lt;|&gt; ((TxOutRef -&gt; Handler DecoratedTxOut)
+                      :&lt;|&gt; ((TxId -&gt; Handler ChainIndexTx)
+                            :&lt;|&gt; ((TxOutRef -&gt; Handler IsUtxoResponse)
+                                  :&lt;|&gt; ((UtxoAtAddressRequest -&gt; Handler UtxosResponse)
+                                        :&lt;|&gt; ((QueryAtAddressRequest
+                                               -&gt; Handler
+                                                    (QueryResponse [(TxOutRef, DecoratedTxOut)]))
+                                              :&lt;|&gt; ((QueryAtAddressRequest
+                                                     -&gt; Handler (QueryResponse [Datum]))
+                                                    :&lt;|&gt; ((UtxoWithCurrencyRequest
+                                                           -&gt; Handler UtxosResponse)
+                                                          :&lt;|&gt; (([TxId] -&gt; Handler [ChainIndexTx])
+                                                                :&lt;|&gt; ((TxoAtAddressRequest
+                                                                       -&gt; Handler TxosResponse)
+                                                                      :&lt;|&gt; (Handler Tip
+                                                                            :&lt;|&gt; (Handler NoContent
+                                                                                  :&lt;|&gt; Handler
+                                                                                         Diagnostics))))))))))))))
+   :&lt;|&gt; (Handler Value
+         :&lt;|&gt; (Handler
+                 (SwaggerUiHtml &quot;swagger-ui&quot; (&quot;swagger.json&quot; :&gt; Get '[JSON] Value))
+               :&lt;|&gt; (Handler
+                       (SwaggerUiHtml &quot;swagger-ui&quot; (&quot;swagger.json&quot; :&gt; Get '[JSON] Value))
+                     :&lt;|&gt; Tagged Handler Application)))
+forall a b. a -&gt; b -&gt; a :&lt;|&gt; b
+</span><a href="../file:///nix/store/vyn800dwc7jzx9nlwjw9m6vsd46p5skc-servant-lib-servant-0.18.3-haddock-doc/share/doc/servant/html/src"><span class="hs-operator hs-var">:&lt;|&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Handler Value
+:&lt;|&gt; (Handler
+        (SwaggerUiHtml &quot;swagger-ui&quot; (&quot;swagger.json&quot; :&gt; Get '[JSON] Value))
+      :&lt;|&gt; (Handler
+              (SwaggerUiHtml &quot;swagger-ui&quot; (&quot;swagger.json&quot; :&gt; Get '[JSON] Value))
+            :&lt;|&gt; Tagged Handler Application))
+forall (dir :: Symbol) api.
+(Server api ~ Handler Value) =&gt;
+Server (SwaggerSchemaUI' dir api)
+</span><a href="Plutus.ChainIndex.Api.html#swagger"><span class="hs-identifier hs-var">swagger</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Server.html#runChainIndexQuery"><span class="hs-identifier hs-type">runChainIndexQuery</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-42"></span><span>    </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">TVar</span></a></span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Emulator.Handlers.html#ChainIndexEmulatorState"><span class="hs-identifier hs-type">ChainIndexEmulatorState</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Eff</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-special">[</span><span class="annot"><a href="Plutus.ChainIndex.Effects.html#ChainIndexQueryEffect"><span class="hs-identifier hs-type">ChainIndexQueryEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Plutus.ChainIndex.Effects.html#ChainIndexControlEffect"><span class="hs-identifier hs-type">ChainIndexControlEffect</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-type">Error</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier hs-type">ServerError</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><a href="../file:///nix/store/nkim7nifcqpdb4r433zhbv94ima3fwqb-natural-transformation-lib-natural-transformation-0.4-haddock-doc/share/doc/natural-transformation/html/src"><span class="hs-operator hs-type">~&gt;</span></a></span><span> </span><span class="annot"><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier hs-type">Handler</span></a></span><span>
+</span><span id="line-44"></span><span id="runChainIndexQuery"><span class="annot"><span class="annottext">runChainIndexQuery :: TVar ChainIndexEmulatorState
+-&gt; forall x.
+   Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       Error ServerError]
+     x
+   -&gt; Handler x
+</span><a href="Plutus.ChainIndex.Emulator.Server.html#runChainIndexQuery"><span class="hs-identifier hs-var hs-var">runChainIndexQuery</span></a></span></span><span> </span><span id="local-6989586621679727123"><span class="annot"><span class="annottext">TVar ChainIndexEmulatorState
+</span><a href="#local-6989586621679727123"><span class="hs-identifier hs-var">emState_</span></a></span></span><span> </span><span id="local-6989586621679727122"><span class="annot"><span class="annottext">Eff
+  '[ChainIndexQueryEffect, ChainIndexControlEffect,
+    Error ServerError]
+  x
+</span><a href="#local-6989586621679727122"><span class="hs-identifier hs-var">action</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-45"></span><span>    </span><span id="local-6989586621679727121"><span class="annot"><span class="annottext">ChainIndexEmulatorState
+</span><a href="#local-6989586621679727121"><span class="hs-identifier hs-var">emState</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO ChainIndexEmulatorState -&gt; Handler ChainIndexEmulatorState
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">liftIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TVar ChainIndexEmulatorState -&gt; IO ChainIndexEmulatorState
+forall a. TVar a -&gt; IO a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">STM.readTVarIO</span></a></span><span> </span><span class="annot"><span class="annottext">TVar ChainIndexEmulatorState
+</span><a href="#local-6989586621679727123"><span class="hs-identifier hs-var">emState_</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679727119"><span class="annot"><span class="annottext">result :: Either ChainIndexError (Either ServerError x)
+</span><a href="#local-6989586621679727119"><span class="hs-identifier hs-var hs-var">result</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Eff '[] (Either ChainIndexError (Either ServerError x))
+-&gt; Either ChainIndexError (Either ServerError x)
+forall a. Eff '[] a -&gt; a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">run</span></a></span><span>
+</span><span id="line-47"></span><span>                    </span><span class="annot"><span class="annottext">(Eff '[] (Either ChainIndexError (Either ServerError x))
+ -&gt; Either ChainIndexError (Either ServerError x))
+-&gt; Eff '[] (Either ChainIndexError (Either ServerError x))
+-&gt; Either ChainIndexError (Either ServerError x)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexEmulatorState
+-&gt; Eff
+     '[State ChainIndexEmulatorState]
+     (Either ChainIndexError (Either ServerError x))
+-&gt; Eff '[] (Either ChainIndexError (Either ServerError x))
+forall s (effs :: [* -&gt; *]) a.
+s -&gt; Eff (State s : effs) a -&gt; Eff effs a
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">evalState</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexEmulatorState
+</span><a href="#local-6989586621679727121"><span class="hs-identifier hs-var">emState</span></a></span><span>
+</span><span id="line-48"></span><span>                    </span><span class="annot"><span class="annottext">(Eff
+   '[State ChainIndexEmulatorState]
+   (Either ChainIndexError (Either ServerError x))
+ -&gt; Eff '[] (Either ChainIndexError (Either ServerError x)))
+-&gt; Eff
+     '[State ChainIndexEmulatorState]
+     (Either ChainIndexError (Either ServerError x))
+-&gt; Eff '[] (Either ChainIndexError (Either ServerError x))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]) a.
+Eff (Error ChainIndexError : effs) a
+-&gt; Eff effs (Either ChainIndexError a)
+forall e (effs :: [* -&gt; *]) a.
+Eff (Error e : effs) a -&gt; Eff effs (Either e a)
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">runError</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.ChainIndex.ChainIndexError.html#ChainIndexError"><span class="hs-identifier hs-type">ChainIndexError</span></a></span><span>
+</span><span id="line-49"></span><span>                    </span><span class="annot"><span class="annottext">(Eff
+   '[Error ChainIndexError, State ChainIndexEmulatorState]
+   (Either ServerError x)
+ -&gt; Eff
+      '[State ChainIndexEmulatorState]
+      (Either ChainIndexError (Either ServerError x)))
+-&gt; Eff
+     '[Error ChainIndexError, State ChainIndexEmulatorState]
+     (Either ServerError x)
+-&gt; Eff
+     '[State ChainIndexEmulatorState]
+     (Either ChainIndexError (Either ServerError x))
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+Eff (LogMsg ChainIndexLog : effs) ~&gt; Eff effs
+forall a (effs :: [* -&gt; *]). Eff (LogMsg a : effs) ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">handleLogIgnore</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Plutus.ChainIndex.ChainIndexLog.html#ChainIndexLog"><span class="hs-identifier hs-type">ChainIndexLog</span></a></span><span>
+</span><span id="line-50"></span><span>                    </span><span class="annot"><span class="annottext">(Eff
+   '[LogMsg ChainIndexLog, Error ChainIndexError,
+     State ChainIndexEmulatorState]
+   (Either ServerError x)
+ -&gt; Eff
+      '[Error ChainIndexError, State ChainIndexEmulatorState]
+      (Either ServerError x))
+-&gt; Eff
+     '[LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     (Either ServerError x)
+-&gt; Eff
+     '[Error ChainIndexError, State ChainIndexEmulatorState]
+     (Either ServerError x)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+    State ChainIndexEmulatorState]
+  x
+-&gt; Eff
+     '[LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     (Either ServerError x)
+forall e (effs :: [* -&gt; *]) a.
+Eff (Error e : effs) a -&gt; Eff effs (Either e a)
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">runError</span></a></span><span>
+</span><span id="line-51"></span><span>                    </span><span class="annot"><span class="annottext">(Eff
+   '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+     State ChainIndexEmulatorState]
+   x
+ -&gt; Eff
+      '[LogMsg ChainIndexLog, Error ChainIndexError,
+        State ChainIndexEmulatorState]
+      (Either ServerError x))
+-&gt; Eff
+     '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     x
+-&gt; Eff
+     '[LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     (Either ServerError x)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(ChainIndexControlEffect
+ ~&gt; Eff
+      '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+        State ChainIndexEmulatorState])
+-&gt; Eff
+     '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+       Error ChainIndexError, State ChainIndexEmulatorState]
+   ~&gt; Eff
+        '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+          State ChainIndexEmulatorState]
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+(eff ~&gt; Eff effs) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpret</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+(Member (State ChainIndexEmulatorState) effs,
+ Member (Error ChainIndexError) effs,
+ Member (LogMsg ChainIndexLog) effs) =&gt;
+ChainIndexControlEffect ~&gt; Eff effs
+ChainIndexControlEffect
+~&gt; Eff
+     '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+</span><a href="Plutus.ChainIndex.Emulator.Handlers.html#handleControl"><span class="hs-identifier hs-var">handleControl</span></a></span><span>
+</span><span id="line-52"></span><span>                    </span><span class="annot"><span class="annottext">(Eff
+   '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+     Error ChainIndexError, State ChainIndexEmulatorState]
+   x
+ -&gt; Eff
+      '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+        State ChainIndexEmulatorState]
+      x)
+-&gt; Eff
+     '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+       Error ChainIndexError, State ChainIndexEmulatorState]
+     x
+-&gt; Eff
+     '[Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(ChainIndexQueryEffect
+ ~&gt; Eff
+      '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+        Error ChainIndexError, State ChainIndexEmulatorState])
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+   ~&gt; Eff
+        '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+          Error ChainIndexError, State ChainIndexEmulatorState]
+forall (eff :: * -&gt; *) (effs :: [* -&gt; *]).
+(eff ~&gt; Eff effs) -&gt; Eff (eff : effs) ~&gt; Eff effs
+</span><a href="../file:///nix/store/bvsf6n0jyy81dv6f71yfdy6shyr2f8sf-freer-simple-lib-freer-simple-1.2.1.2-haddock-doc/share/doc/freer-simple/html/src"><span class="hs-identifier hs-var">interpret</span></a></span><span> </span><span class="annot"><span class="annottext">forall (effs :: [* -&gt; *]).
+(Member (State ChainIndexEmulatorState) effs,
+ Member (Error ChainIndexError) effs,
+ Member (LogMsg ChainIndexLog) effs) =&gt;
+ChainIndexQueryEffect ~&gt; Eff effs
+ChainIndexQueryEffect
+~&gt; Eff
+     '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+       Error ChainIndexError, State ChainIndexEmulatorState]
+</span><a href="Plutus.ChainIndex.Emulator.Handlers.html#handleQuery"><span class="hs-identifier hs-var">handleQuery</span></a></span><span>
+</span><span id="line-53"></span><span>                    </span><span class="annot"><span class="annottext">(Eff
+   '[ChainIndexQueryEffect, ChainIndexControlEffect,
+     Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+     State ChainIndexEmulatorState]
+   x
+ -&gt; Eff
+      '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+        Error ChainIndexError, State ChainIndexEmulatorState]
+      x)
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     x
+-&gt; Eff
+     '[ChainIndexControlEffect, Error ServerError, LogMsg ChainIndexLog,
+       Error ChainIndexError, State ChainIndexEmulatorState]
+     x
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[ChainIndexQueryEffect, ChainIndexControlEffect,
+    Error ServerError]
+  x
+-&gt; Eff
+     '[ChainIndexQueryEffect, ChainIndexControlEffect,
+       Error ServerError, LogMsg ChainIndexLog, Error ChainIndexError,
+       State ChainIndexEmulatorState]
+     x
+forall (effs :: [* -&gt; *]) (as :: [* -&gt; *]).
+CanWeakenEnd as effs =&gt;
+Eff as ~&gt; Eff effs
+</span><a href="../../../../freer-extras/html/src"><span class="hs-identifier hs-var">raiseEnd</span></a></span><span> </span><span class="annot"><span class="annottext">Eff
+  '[ChainIndexQueryEffect, ChainIndexControlEffect,
+    Error ServerError]
+  x
+</span><a href="#local-6989586621679727122"><span class="hs-identifier hs-var">action</span></a></span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Either ChainIndexError (Either ServerError x)
+</span><a href="#local-6989586621679727119"><span class="hs-identifier hs-var">result</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-55"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span id="local-6989586621679727118"><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621679727118"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">x -&gt; Handler x
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">x
+</span><a href="#local-6989586621679727118"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-56"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Right</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621679727117"><span class="annot"><span class="annottext">ServerError
+</span><a href="#local-6989586621679727117"><span class="hs-identifier hs-var">e</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ServerError -&gt; Handler x
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">E.throwError</span></a></span><span> </span><span class="annot"><span class="annottext">ServerError
+</span><a href="#local-6989586621679727117"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-57"></span><span>        </span><span class="annot"><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-type">Left</span></a></span><span> </span><span id="local-6989586621679727115"><span class="annot"><span class="annottext">ChainIndexError
+</span><a href="#local-6989586621679727115"><span class="hs-identifier hs-var">e'</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-58"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679727114"><span class="annot"><span class="annottext">err :: ServerError
+</span><a href="#local-6989586621679727114"><span class="hs-identifier hs-var hs-var">err</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ServerError
+</span><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier hs-var">err500</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">errBody :: ByteString
+</span><a href="../file:///nix/store/b04nrk4i8h9kq5glikqcildam8xwyw84-servant-server-lib-servant-server-0.18.3-haddock-doc/share/doc/servant-server/html/src"><span class="hs-identifier hs-var">errBody</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><a href="../file:///nix/store/dy85hyx24kbdxbcbs19gvac43vbvvnjd-bytestring-lib-bytestring-0.10.12.0-haddock-doc/share/doc/bytestring/html/src"><span class="hs-identifier hs-var">BSL.fromStrict</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ByteString
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.encodeUtf8</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; ByteString) -&gt; Text -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String -&gt; Text
+</span><a href="../file:///nix/store/71gg7bx8f4jr17lsf2w77qrjmdg3xvan-text-lib-text-1.2.4.1-haddock-doc/share/doc/text/html/src"><span class="hs-identifier hs-var">Text.pack</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; Text) -&gt; String -&gt; Text
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexError -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><a href="../file:///nix/store/sc7phsrhp1xzn7n38mdjvapkbif3753i-ghc-8.10.7-doc/share/doc/ghc/html/libraries/base-4.14.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">ChainIndexError
+</span><a href="#local-6989586621679727115"><span class="hs-identifier hs-var">e'</span></a></span><span> </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">in</span><span>
+</span><span id="line-59"></span><span>            </span><span class="annot"><span class="annottext">ServerError -&gt; Handler x
+forall e (m :: * -&gt; *) a. MonadError e m =&gt; e -&gt; m a
+</span><a href="../file:///nix/store/50z9mfcyab831xv3ljzrgw24b0c22y3g-mtl-lib-mtl-2.2.2-haddock-doc/share/doc/mtl/html/src"><span class="hs-identifier hs-var">E.throwError</span></a></span><span> </span><span class="annot"><span class="annottext">ServerError
+</span><a href="#local-6989586621679727114"><span class="hs-identifier hs-var">err</span></a></span><span>
+</span><span id="line-60"></span></pre></body></html>
