@@ -16,13 +16,13 @@ Follow the next steps to install Docker in your computer.
 
 1. Open your browser and navigate to <https://www.docker.com/>. Click the "Download Docker Desktop" button from the Docker's homepage. By default, you'll download a version compatible with your operating system. Docker is available for Linux, Microsoft Windows, and Apple macOS.
 
-{% hint style="warning" %}
-**Important note for macOS users.** Be sure that you download the correct version according to the chip of your computer, for M1 or M2 chips, [download the "Apple Chip" version](https://desktop.docker.com/mac/main/arm64/Docker.dmg). For Intel chips, [download the "Intel Chip" version](https://desktop.docker.com/mac/main/amd64/Docker.dmg).
-{% endhint %}
-
     The image below shows how the download button looks on a computer using Microsoft Windows. We'll use this operating system for this guide.
 
     ![Docker homepage where the Download Docker Desktop button is highlighted.](images/docker-guide-01.png)
+
+{% hint style="warning" %}
+**Important note for macOS users.** Be sure that you download the correct version according to the chip of your computer, for M1 or M2 chips, [download the "Apple Chip" version](https://desktop.docker.com/mac/main/arm64/Docker.dmg). For Intel chips, [download the "Intel Chip" version](https://desktop.docker.com/mac/main/amd64/Docker.dmg).
+{% endhint %}
 
 2. After downloading the Docker Desktop installer, execute it and follow the instructions by choosing the default options. Installation options may vary depending on your chip and operating system. If you need detailed instructions, please visit the [Get Docker section](https://docs.docker.com/get-docker/) on the docker docs website.
 
