@@ -2,6 +2,8 @@
 
 In this guide, you'll learn how to set up a local working environment using Docker and Visual Studio Code. Whether you have previous experience using Docker or not, we will guide you step by step, from installing the software you need to test your working environment.
 
+If you find issues while following this guide, please review the [Troubleshooting Guide section](#troubleshooting-guide). If you don't see a solution to your problem, you can ask for help in the [#pioneers-questions channel in Discord](https://discordapp.com/channels/826816523368005654/826836848520200233).
+
 ## Installing Docker
 
 [Docker](https://www.docker.com/) is a platform designed to help developers build, share, and run applications in an isolated environment on any operating system. 
@@ -183,6 +185,12 @@ Please follow the next steps to open and configure your PPP Docker container.
 7. Now, to finish the dev container setup, type and execute the command `cabal build all` in the VS Code terminal, as the image below shows.
 
     ![VS Code terminal window shows the `cabal build all` command.](images/docker-guide-22.png)
+
+    After successfully running this command, you will see the system prompt back with no errors, as shown in the image below.
+
+    ![VS Code terminal window shows the system prompt after executing the `cabal build all` command.](images/docker-guide-23.png)
+
+Congratulations! You have installed your local working environment.
 
 {% hint style="warning" %}
 **Be patient while running this command.** The time required to execute this command may vary depending on your hardware configuration and internet connection. It can take at least 10 minutes to finish. However, we experienced waiting times of up to 25 in some hardware and internet settings.
