@@ -114,3 +114,101 @@ Follow the next steps to fork the PPP repository.
 Now that you forked the repo, let's clone it into your computer.
 
 ### Cloning you Fork
+
+As for now, you fork of the PPP repository will be your development repository. By using your fork, you'll be able to work on the homework assignment and share your progress by pushing updates to your fork. In this section, we'll guide you on the process to clone your fork in your computer.
+
+{% hint style="info" %}
+To clone your fork into your computer, you need to have Git installed. If you don't have Git installed, please follow [these instructions from the Git documentation](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) where you'll find detailed information about installing Git on Linux, macOS, and Windows.
+{% endhint %}
+
+Please follow the next steps to clone your PPP fork.
+
+1. Ensure that in your browser, you have your PPP fork open at the GitHub website. Next, as you can see in the image below, click on the "Code" green-button to open the clone options and continue by clicking on the "Copy" icon next to the repository path to copy that path to the clipboard.
+
+    ![Sample fork of the PPP repository in GitHub where the Code button and the clone options are highlighted.](images/docker-guide-12.png)
+
+2. Open a terminal window (we recommend to use [Git BASH](https://gitforwindows.org/#bash) in Windows) and navigate to a directory where you want to save the PPP fork clone. Next, type `git clone ` paste the path you copied from your fork at GitHub to build a command as follows.
+
+    ```bash
+    git clone git@github.com:jarturomora/plutus-pioneer-program.git
+    ```
+
+3. Press enter and your fork will start to be cloned at your computer as you can see in the animation below.
+
+    ![A terminal window where the PPP fork is cloned into a local directory in a computer.](images/docker-guide-13.gif)
+
+    The previous animation shows a terminal window there the user types `cd Code` to move to a local directory called `Code`. Next, the user types `git clone ` followed by copying the path of the GitHub fork that the user wants to clone. Once the command is complete, the user hit the enter key and the fork is cloned.
+
+Now that you cloned your fork into your computer, it's time to open the Docker container using VS Code.
+
+### Opening the PPP Docker Container in Visual Studio Code
+
+Before moving forward, please close VS Code if it's open as it needs to restart to allow the "Remote Development" extension to detect the Docker file in the repo.
+
+Please follow the next steps to open and configure your PPP Docker container.
+
+1. Open a terminal windows, navigate to the directory where you clone your PPP fork and type `code .` to open Visual Studio Code from inside the repository repo. The following image shows an example of how this command look like in a Git BASH terminal.
+
+    ![A terminal window whe VS Code is opened from a repository's directory.](images/docker-guide-14.png)
+
+2. When VS Code opens, the "Remote Development" extension will detect the Docker container and you'll see a message asking to reopen your project into the container as you can see in the image bellow. Click on the "Reopen in Container" button to continue.
+
+    ![VS Code UI where a message to reopen the project in Container is highlighted.](images/docker-guide-15.png)
+
+3. After reopening your project in Container, the Docker container will be built. As you can see in the image below, you can click on the "Starting Dev Container" message to view the log. Please proceed to show the log to be aware when the container is ready.
+
+    ![VS Code UI where Starting Dev Container message is highlighted.](images/docker-guide-16.png)
+
+    The next image shows how the log looks after you open it.
+
+    ![VS Code UI where the dev container log is shown.](images/docker-guide-17.png)
+
+4. After a few minutes, you will see in the log a message that starts with the text `Start: Run in container` as you can see in the image below. This message indicates that the dev container is ready. You can safely close this terminal window by clicking on the trash can icon in the upper right corner of the terminal window.
+
+    ![VS Code UI showing a message that indicates that the dev container is ready.](images/docker-guide-18.png)
+
+5. Now, open a new terminal window into VS Code by clicking on the "Terminal" menu as you can see in the image below.
+
+    ![VS Code UI showing how to open a new terminal window.](images/docker-guide-19.png)
+
+6. From the new terminal window, type and execute the command `cd code` to enter into the _code_ directory of the repository. **This step is critical** as all the code and updates should run into the _code_ directory. Next, after switching to the _code_ directory, type and execute the command `cabal update` to update all the dependencies required by Plutus.
+
+    {% hint style="warning" %}
+    **Be patient while running these commands.** Depending on you hardware configuration and internet connection, the time required to execute the command `cabal update` may vary. It takes at least 5 minutes to finish, however, we experienced waiting times up to 15 minutes in some hardware and internet settings.
+    {% endhint %}
+
+    The follow image shows a sample execution of these commands.
+
+    ![VS Code terminal window shows how to switch to the code directory to update cabal.](images/docker-guide-20.png)
+
+    Once the `cabal update` command execution ends. You will see the terminal prompt waiting to move forward as you can see in the image below.
+
+    ![VS Code terminal window shows the terminal prompt after updating cabal.](images/docker-guide-21.png)
+
+7. Now, to finishing the dev container set up, type and execute the command `cabal build all` in the VS Code terminal as the image below shows.
+
+    ![VS Code terminal window shows the `cabal build all` command.](images/docker-guide-22.png)
+
+    {% hint style="warning" %}
+    **Be patient while running this command.** Depending on you hardware configuration and internet connection, the time required to execute this command may vary. It can takes at least 10 minutes to finish, however, we experienced waiting times up to 25 in some hardware and internet settings.
+    {% endhint %}
+
+## Troubleshooting Guide
+
+We hope you set up your local working environment smoothly! However, we know problems may happen, so please follow this guide in case you found any issues during the installation process.
+
+### Linux Issues
+
+* If while opening the Docker container in VS Code, you get an error message that says `View container 'remote' requires 'enabledApiProposals: ["contribViewsRemote"]' to be added to 'Remote'.` You may uninstall VS Code and install the Insiders version. You can download this version [from this page](https://code.visualstudio.com/insiders/). To learn more about why this issue may happen, please reade the [Using Proposed API article](https://code.visualstudio.com/api/advanced-topics/using-proposed-api) from the Visual Studio Code documentation.
+
+### Windows Issues
+
+* If you have installed Docker Desktop before joining the PPP, you may receive an error message asking to install the latest WSL version. An example of the error message is shown in the image below. Please refer to [this page from the Windows Subsystem for Linux Documentation](https://docs.microsoft.com/windows/wsl/wsl2-kernel) for further instructions.
+
+  ![A sample error message from Docker Desktop in Windows asking to update the WSL kernel.](Images/docker-error-01.PNG)
+
+---
+
+This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
+
+<figure><img src="https://i.creativecommons.org/l/by/4.0/88x31.png" alt="Creative Commons License BY 4.0"></figure>
