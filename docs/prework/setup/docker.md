@@ -14,10 +14,7 @@ A **Docker container** is a standard unit of software that packages up code and 
 
 Follow the next steps to install Docker in your computer.
 
-1. Open your browser and navigate to <https://www.docker.com/>. Click the "Download Docker Desktop" button from the Docker's homepage. By default, you'll download a version compatible with your operating system. Docker is available for Linux, Microsoft Windows, and Apple macOS.
-
-    The image below shows how the download button looks on a computer using Microsoft Windows. We'll use this operating system for this guide.
-
+1. Open your browser and navigate to <https://www.docker.com/>. Click the "Download Docker Desktop" button from the Docker's homepage. By default, you'll download a version compatible with your operating system. Docker is available for Linux, Microsoft Windows, and Apple macOS. The image below shows how the download button looks on a computer using Microsoft Windows. We'll use this operating system for this guide.    
     ![Docker homepage where the Download Docker Desktop button is highlighted.](images/docker-guide-01.png)
 
 {% hint style="warning" %}
@@ -26,13 +23,13 @@ Follow the next steps to install Docker in your computer.
 
 2. After downloading the Docker Desktop installer, execute it and follow the instructions by choosing the default options. Installation options may vary depending on your chip and operating system. If you need detailed instructions, please visit the [Get Docker section](https://docs.docker.com/get-docker/) on the docker docs website.
 
-    {% hint style="info" %}
-    After installing Docker Desktop, it'll automatically start after login into your computer. You can change this behavior by turning off the "Start Docker Desktop when you log in" in the Docker Settings configuration. The following image shows the general settings in Docker Desktop running on Windows.
+{% hint style="info" %}
+After installing Docker Desktop, it'll automatically start after login into your computer. You can change this behavior by turning off the "Start Docker Desktop when you log in" in the Docker Settings configuration. The following image shows the general settings in Docker Desktop running on Windows.
 
-    ![Docker Desktop general settings in a Windows computer.](images/docker-guide-02.png)
+![Docker Desktop general settings in a Windows computer.](images/docker-guide-02.png)
 
-    To learn more about changing the settings in Docker Desktop, please visit the ["Change Settings" section](https://docs.docker.com/desktop/settings/mac/) of the Docker Desktop manual.
-    {% endhint %}
+To learn more about changing the settings in Docker Desktop, please visit the ["Change Settings" section](https://docs.docker.com/desktop/settings/mac/) of the Docker Desktop manual.
+{% endhint %}
 
 Now that you have Docker Desktop up and running let's download and install Visual Studio Code.
 
