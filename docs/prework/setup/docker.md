@@ -40,15 +40,13 @@ Now that you have Docker Desktop up and running let's download and install Visua
 Follow the next steps to install VS Code and a handy extension that you will use in this course.
 
 1. Open your browser and navigate to <https://code.visualstudio.com/> to open the Visual Studio Code website. As the image below shows, there is a button where you 
-can download this software. Depending on your operating system, the button's name will change. Be sure to download the latest version.
-
-    {% hint style="info" %}
-    To download VS Code for any operating system, please visit the [Download Visual Studio Code page](https://code.visualstudio.com/Download) and choose the operating system of your preference.
-    {% endhint %}
-
-    The button to download VS Code for Windows is highlighted for this demo.
+can download this software. Depending on your operating system, the button's name will change. Be sure to download the latest version. The button to download VS Code for Windows is highlighted for this demo.
 
     ![Visual Studio homepage where the button to download this software for Windows is highlighted.](images/docker-guide-03.png)
+
+{% hint style="info" %}
+To download VS Code for any operating system, please visit the [Download Visual Studio Code page](https://code.visualstudio.com/Download) and choose the operating system of your preference.
+{% endhint %}
 
 2. After downloading the VS Code installer, execute it and follow the instructions by choosing the default options. Installation options may vary depending on your chip and operating system. If you need detailed instructions, please visit the [Setting up Visual Studio Code section](https://code.visualstudio.com/docs/setup/setup-overview) in the VS Code docs website.
 
@@ -88,9 +86,9 @@ Follow the next steps to fork the PPP repository.
 
     You are free to navigate through the branches of previous cohorts, but please, be aware of using the correct branch for the 4th. Cohort.
     
-    {% hint style="info" %}
-    A **branch** is an isolated version of the main repository. Usually, branches are used to work on particular projects within a git repository. You can learn more about managing branches in GitHub in the [About branches page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches) at GitHub Docs.
-    {% endhint %}
+{% hint style="info" %}
+A **branch** is an isolated version of the main repository. Usually, branches are used to work on particular projects within a git repository. You can learn more about managing branches in GitHub in the [About branches page](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches) at GitHub Docs.
+{% endhint %}
 
 3. To fork the repository, click the "Fork" icon in the upper right corner, as seen in the image below.
 
@@ -170,10 +168,6 @@ Please follow the next steps to open and configure your PPP Docker container.
 
 6. From the new terminal window, type and execute the command `cd code` to enter into the _code_ directory of the repository. **This step is critical** as all the code and updates should run into the _code_ directory. Next, after switching to the _code_ directory, type and execute the command `cabal update` to update all the dependencies required by Plutus.
 
-    {% hint style="warning" %}
-    **Be patient while running these commands.** Depending on your hardware configuration and an internet connection, the time required to execute the command `cabal update` may vary. It takes at least 5 minutes to finish; however, we experienced waiting times of up to 15 minutes in some hardware and internet settings.
-    {% endhint %}
-
     The following image shows a sample execution of these commands.
 
     ![VS Code terminal window shows how to switch to the code directory to update cabal.](images/docker-guide-20.png)
@@ -182,13 +176,17 @@ Please follow the next steps to open and configure your PPP Docker container.
 
     ![VS Code terminal window shows the terminal prompt after updating cabal.](images/docker-guide-21.png)
 
+{% hint style="warning" %}
+**Be patient while running these commands.** Depending on your hardware configuration and an internet connection, the time required to execute the command `cabal update` may vary. It takes at least 5 minutes to finish; however, we experienced waiting times of up to 15 minutes in some hardware and internet settings.
+{% endhint %}
+
 7. Now, to finish the dev container setup, type and execute the command `cabal build all` in the VS Code terminal, as the image below shows.
 
     ![VS Code terminal window shows the `cabal build all` command.](images/docker-guide-22.png)
 
-    {% hint style="warning" %}
-    **Be patient while running this command.** The time required to execute this command may vary depending on your hardware configuration and internet connection. It can take at least 10 minutes to finish. However, we experienced waiting times of up to 25 in some hardware and internet settings.
-    {% endhint %}
+{% hint style="warning" %}
+**Be patient while running this command.** The time required to execute this command may vary depending on your hardware configuration and internet connection. It can take at least 10 minutes to finish. However, we experienced waiting times of up to 25 in some hardware and internet settings.
+{% endhint %}
 
 ## Troubleshooting Guide
 
