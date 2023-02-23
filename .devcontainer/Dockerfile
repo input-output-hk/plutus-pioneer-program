@@ -8,11 +8,6 @@ WORKDIR /app
 ARG IOHK_LIBSODIUM_GIT_REV=66f017f16633f2060db25e17c170c2afa0f2a8a1
 ARG IOKH_LIBSECP251_GIT_REV=ac83be33d0956faf6b7f61a60ab524ef7d6a473a
 
-# haskell args
-ARG CABAL_VERSION=3.6.2.0
-ARG GHC_VERSION=8.10.7
-ARG HLS_VERSION=1.7.0.0
-
 # development dependencies
 RUN apt-get update -y && apt-get install -y \
   curl \
@@ -54,7 +49,13 @@ RUN git clone https://github.com/bitcoin-core/secp256k1 &&\
 
 FROM system_deps as haskell
 
-SHELL ["bash", "-lc"]
+#SHELL ["bash", "-lc"]
+
+# haskell args
+ARG CABAL_VERSION=3.6.2.0
+ARG GHC_VERSION=8.10.7
+ARG HLS_VERSION=1.7.0.0
+
 
 #RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
 #  && niv add mlabs-haskell/plutus-simple-model -r 64dd3fee4caff9472e0dcc2e14cc587452c80e77
@@ -85,7 +86,7 @@ RUN ghcup install hls ${HLS_VERSION}
 
 ENV PATH=${PATH}:${HOME:-/root}/.cabal/bin
 #RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
-RUN cabal update
+#RUN cabal update
 
 FROM haskell as cardano_node
 
