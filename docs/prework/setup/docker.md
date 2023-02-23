@@ -200,7 +200,7 @@ We hope you set up your local working environment smoothly! However, we know pro
 
 * If you have installed Docker Desktop before joining the PPP, you may receive an error message asking to install the latest WSL version. An example of the error message is shown in the image below. Please refer to [this page from the Windows Subsystem for Linux Documentation](https://docs.microsoft.com/windows/wsl/wsl2-kernel) for further instructions.
 
-  ![A sample error message from Docker Desktop in Windows asking to update the WSL kernel.](Images/docker-error-01.PNG)
+  ![A sample error message from Docker Desktop in Windows asking to update the WSL kernel.](images/docker-error-01.PNG)
 
 ---
 
