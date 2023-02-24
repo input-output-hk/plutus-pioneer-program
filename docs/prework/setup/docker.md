@@ -4,6 +4,11 @@ In this guide, you'll learn how to set up a local working environment using Dock
 
 If you find issues while following this guide, please review the [Troubleshooting Guide section](#troubleshooting-guide). If you don't see a solution to your problem, you can ask for help in the [#pioneers-questions channel in Discord](https://discordapp.com/channels/826816523368005654/826836848520200233).
 
+{% hint style="warning" %}
+**Use a host computer, not a virtual machine, to use this container.** These setup instructions will only work for a successful installation if you use Docker Desktop on your host computer. The setup inside a virtual machine will fail, whether it's a Windows or Linux virtual machine.
+{% endhint %}
+
+
 ## Installing Docker
 
 [Docker](https://www.docker.com/) is a platform designed to help developers build, share, and run applications in an isolated environment on any operating system. 
