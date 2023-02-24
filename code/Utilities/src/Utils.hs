@@ -3,7 +3,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Utils (writePlutusFile, wrap) where
+module Utils 
+  ( writePlutusFile
+  , wrap
+  ) where
 
 import Plutus.V2.Ledger.Api qualified as PlutusV2
 import Plutus.V2.Ledger.Api (UnsafeFromData, unsafeFromBuiltinData) 
