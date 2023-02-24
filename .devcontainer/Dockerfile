@@ -154,6 +154,7 @@ FROM nodejs as plutus
 RUN git clone https://github.com/input-output-hk/plutus-pioneer-program \
   && cd plutus-pioneer-program/code \
   && cabal update \
-  && cabal build all
+  && cabal build all \
+  && cabal install stylish-haskell
 
 RUN echo "alias serve-docs='python3 -m http.server -d /workspaces/plutus-pioneer-program/docs/plutus-docs'" >> ~/.bashrc
