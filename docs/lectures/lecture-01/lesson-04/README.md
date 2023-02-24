@@ -1,29 +1,25 @@
-# Lesson 1.2: Kuber Marketplace Demo
+# Lesson 1.4: The EUTxO Model
 
-Welcome to Lesson 1.2! In this lesson, you'll watch a demonstration of the Kuber Marketplace, a dApp that you'll be able to create after finishing this course.
+Welcome to Lesson 1.1! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
 
-{% embed url="https://youtu.be/ZaB-7ZYBi3g" %}
+{% embed url="https://youtu.be/ulYDNaEKf4g" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Explain what Kuber is.
-* Identify the benefits of using Kuber to create a Cardano dApp.
-* Deploy a dApp using Demeter.
-{% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Kuber Marketplace Repository](https://github.com/dQuadrant/cardano-marketplace)
-* [Demeter.run website](https://demeter.run/)
+* Describe the EUTxO model.
+* Exemplify how transactions work on Cardano using EUTxO.
+* Explain the advantages that EUTxO adds to Cardano for securing transactions.
 {% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Kuber a new open source library for Cardano](https://dquadrant.com/blog/kuber-a-new-open-source-library-for-cardano/)
+* [Essential Cardano Glossary - EUTXO: extended unspent transaction output](https://www.essentialcardano.io/glossary/eutxo)
+* [Understanding the Extended UTxO model](https://docs.cardano.org/learn/eutxo-explainer)
+* [EUTXO v Account-based models](https://www.essentialcardano.io/infographic/eutxo-v-account-based-models)
+* [The EUTxO Handbook](https://www.essentialcardano.io/article/the-eutxo-handbook)
 {% endtab %}
 {% endtabs %}
 

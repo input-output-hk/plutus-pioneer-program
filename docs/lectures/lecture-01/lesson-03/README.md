@@ -1,44 +1,36 @@
-# Lesson 1.3: Auction Contract in the EUTxO-Model 
+# Lesson 1.3: Hashing & Digital Signatures
 
-Welcome to Lesson 1.3! In this lesson you'll learn how to create an NFT token on Cardano.
+Welcome to Lesson 1.3! In this lesson, you'll learn about hashing and digital signatures, two fundamental cryptography concepts required to code with Plutus.
 
-{% embed url="https://youtu.be/Bj6bqRGT1L0" %}
+{% embed url="https://youtu.be/f-WKPWbk9Jg" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Understand how NFT tokens works on Cardano.
-* Create an NFT to implement an auction.
-{% endtab %}
-
-{% tab title="Lesson Resources" %}
-
-* [Lesson slides](#).
-
-Code examples:
-
-* [EnglishAuction.hs](demos\01-auction\EnglishAuction.hs)
-
+* Illustrate how hashing works.
+* Describe what a digital signature is.
+* Explain digital signatures use private and public keys.
+* Identify the benefits of using hashing and digital signatures in Cardano.
 {% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Minting NFTs](https://developers.cardano.org/docs/native-tokens/minting-nfts/)
+* [How Does the Blockchain Use Hashes?](https://cardano.stackexchange.com/questions/8657/how-does-the-blockchain-use-hashes)
+* [Why Cardano: Signatures](https://why.cardano.org/en/introduction/signatures/)
+* [Edwards-curve Digital Signature Algorithm (EdDSA)](https://www.essentialcardano.io/glossary/edwards-curve-digital-signature-algorithm-eddsa)
 {% endtab %}
 {% endtabs %}
 
-### Frequently Asked Questions
+## Collaborate with the Pioneers Community
 
-<details>
+Remember that you can interact with the participants of the PPP through the [IOG's technical community on Discord](https://discord.gg/inputoutput) by joining the channels under the Plutus Pioneers category.
 
-<summary>What is the difference between native assets and NFTs?</summary>
+If during the program you have questions about Plutus, we invite you to share them at [Cardano Stack Exchange (CSE)](https://cardano.stackexchange.com/) by adding the `plutus-pioneer-program` tag to your question. The IOG's Education Team members will monitor these questions to support your learning journey. Whenever you share a question at CSE, you're helping to build up the Cardano and Plutus development knowledge base.
 
-From a technical point of view, NFTs are the same as native assets. But some additional characteristics make a native asset truly an NFT:
+---
 
-* As the name states - it must be 'non-fungible. This means you need to have unique identifiers or attributes attached to a token to make it distinguishable from others.
-* Most of the time, NFT's should live on the chain forever. Therefore we need some mechanism to ensure an NFT stays unique and can not be duplicated.
+This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
 
-</details>
-
+<figure><img src="https://i.creativecommons.org/l/by/4.0/88x31.png" alt="Creative Commons License BY 4.0"></figure>

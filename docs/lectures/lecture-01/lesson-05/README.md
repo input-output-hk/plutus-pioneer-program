@@ -1,29 +1,15 @@
-# Lesson 1.2: Kuber Marketplace Demo
+# Lecture 1 Homework Assignment: Set Up Your Development Environment
 
-Welcome to Lesson 1.2! In this lesson, you'll watch a demonstration of the Kuber Marketplace, a dApp that you'll be able to create after finishing this course.
+Congratulations on finishing Lecture 1! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% embed url="https://youtu.be/ZaB-7ZYBi3g" %}
+{% embed url="https://youtu.be/Ey903I-R1KY" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
+After completing this homework assignment, you'll be able to:
 
-* Explain what Kuber is.
-* Identify the benefits of using Kuber to create a Cardano dApp.
-* Deploy a dApp using Demeter.
-{% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Kuber Marketplace Repository](https://github.com/dQuadrant/cardano-marketplace)
-* [Demeter.run website](https://demeter.run/)
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Kuber a new open source library for Cardano](https://dquadrant.com/blog/kuber-a-new-open-source-library-for-cardano/)
+* Decide what development environment works best for you, cloud-based or local.
+* Configure a development environment to follow up on the forthcoming lectures.
 {% endtab %}
 {% endtabs %}
 
