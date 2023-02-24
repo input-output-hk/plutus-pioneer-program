@@ -168,7 +168,17 @@ Please follow the next steps to open and configure your PPP Docker container.
 
     ![VS Code UI showing how to open a new terminal window.](images/docker-guide-19.png)
 
-6. From the new terminal window, type and execute the command `cd code` to enter into the _code_ directory of the repository. **This step is critical** as all the code and updates should run into the _code_ directory. Next, after switching to the _code_ directory, type and execute the command `cabal update` to update all the dependencies required by Plutus.
+6. From the new terminal window, type and execute the following command to enter into the _code_ directory of the repository. **This step is critical** as all the code and updates should run into the _code_ directory.
+
+    ```bash
+    cd code
+    ```
+    
+    Next, after switching to the _code_ directory, type and execute the following command to update all the dependencies required by Plutus.
+
+    ```bash
+    cabal update
+    ```
 
     The following image shows a sample execution of these commands.
 
@@ -182,7 +192,13 @@ Please follow the next steps to open and configure your PPP Docker container.
 **Be patient while running these commands.** Depending on your hardware configuration and an internet connection, the time required to execute the command `cabal update` may vary. It takes at least 5 minutes to finish; however, we experienced waiting times of up to 15 minutes in some hardware and internet settings.
 {% endhint %}
 
-7. Now, to finish the dev container setup, type and execute the command `cabal build all` in the VS Code terminal, as the image below shows.
+7. Now, to finish the dev container setup, type and execute the following command in the VS Code terminal to build all the dependencies required by Plutus.
+
+    ```bash
+    cabal build all
+    ```
+    
+    A sample execution of this command is shown in the image below.
 
     ![VS Code terminal window shows the `cabal build all` command.](images/docker-guide-22.png)
 
