@@ -9,7 +9,7 @@
   * [Using Demeter](prework/setup/demeter.md)
   * [Using Docker](prework/setup/docker.md)
 
-## Lessons
+## Lectures
 
 * [Lecture 1](lectures/lecture-01/README.md)
   * [Lesson 1.1: Setting Up Our Development Environment](lectures/lecture-01/lesson-01/README.md)
