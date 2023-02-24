@@ -200,6 +200,18 @@ Congratulations! You have installed your local working environment.
 
 We hope you set up your local working environment smoothly! However, we know problems may happen, so please follow this guide in case you find any issues during the installation process.
 
+### General Issues
+
+The following issues may occur on any operating system.
+
+* Some Pioneers reported that they are getting this message from the Docker terminal in VS Code.
+
+  ```text
+  The connection to the terminal's pty host process is unresponsive, the terminals may stop working.
+  ```
+
+  The solution to this issue, is to uninstall VS Code and install the Insiders version. You can download this version [from this page](https://code.visualstudio.com/insiders/).
+
 ### Linux Issues
 
 * If while opening the Docker container in VS Code, you get an error message that says `View container 'remote' requires 'enabledApiProposals: ["contribViewsRemote"]' to be added to 'Remote'.` You may uninstall VS Code and install the Insiders version. You can download this version [from this page](https://code.visualstudio.com/insiders/). To learn more about why this issue may happen, please read the [Using Proposed API article](https://code.visualstudio.com/api/advanced-topics/using-proposed-api) from the Visual Studio Code documentation.
