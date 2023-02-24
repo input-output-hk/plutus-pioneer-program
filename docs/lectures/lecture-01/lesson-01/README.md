@@ -1,50 +1,44 @@
-# Lesson 1.1: The EUTxO Model
+# Lesson 1.1: Setting up Our Development Environment
 
-Welcome to Lesson 1.1! In this lesson you'll learn about the EUTxO model and how it operates on Cardano.
+Welcome to Lesson 1.1! In this lesson, you'll learn how to set up the development environment that we'll use in the 4th. Cohort of the Plutus Pioneers Program.
 
-{% embed url="https://youtu.be/bfofA4MM0QE" %}
+{% embed url="https://youtu.be/-cmIqKCzzOU" %}
+
+{% hint style="info" %}
+You can review the installation instructions presented in this video lecture in the [Working Environment Set Up section](../../../prework/setup/README.md) of this playbook.
+{% endhint %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Describe the EUTxO model.
-* Exemplify how transactions work on Cardano using EUTxO.
-* Explain the advantages that EUTxO adds to Cardano for securing transactions.
+* Identify the Discord channels where you can ask for assistance during the PPP.
+* Create a Demeter account and set up a cloud-based development environment.
+* Fork the PPP repository in your GitHub account.
+* Clone a GitHub repository fork in your computer.
+* Set up a local development environment using Docker Desktop and Visual Studio Code.
+* Explain the differences between a cloud-based development environment and a local setup.
 {% endtab %}
 
 {% tab title="Lesson Resources" %}
+Internet resources mentioned in the lesson's video:
 
-* [Lesson slides](#).
-
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Understanding the Extended UTxO model](https://docs.cardano.org/learn/eutxo-explainer)
-* [EUTxO Handbook](https://ucarecdn.com/3da33f2f-73ac-4c9b-844b-f215dcce0628/EUTXOhandbook\_for\_EC.pdf)
+* [IOG's technical community on Discord](https://discord.gg/inputoutput).
+* [#setup-plutus-env channel on Discord](https://discordapp.com/channels/826816523368005654/873236744965857300)
+* [Demeter.run website](https://demeter.run/)
+* [Docker Desktop download](https://www.docker.com/products/docker-desktop/)
+* [Visual Studio Code download](https://code.visualstudio.com/Download)
 {% endtab %}
 {% endtabs %}
 
-### Frequently Asked Questions
+## Collaborate with the Pioneers Community
 
-<details>
+Remember that you can interact with the participants of the PPP through the [IOG's technical community on Discord](https://discord.gg/inputoutput) by joining the channels under the Plutus Pioneers category.
 
-<summary>How EUTxO extends the UTxO model?</summary>
+If during the program you have questions about Plutus, we invite you to share them at [Cardano Stack Exchange (CSE)](https://cardano.stackexchange.com/) by adding the `plutus-pioneer-program` tag to your question. The IOG's Education Team members will monitor these questions to support your learning journey. Whenever you share a question at CSE, you're helping to build up the Cardano and Plutus development knowledge base.
 
-The EUTxO model extends the UTxO model in two ways:
+---
 
-1. It generalizes the concept of ‘address’ by using the lock-and-key analogy. Instead of restricting locks to public keys and keys to signatures, addresses in the EUTxO model can contain arbitrary logic in the form of scripts. For example, when a node validates a transaction, the node determines whether or not the transaction can use a certain output as an input. The transaction will look up the script provided by the output's address and execute the script if the transaction can use the output as an input.
-2. The second difference between UTxO and EUTxO is that outputs can carry (almost) arbitrary data in addition to an address and value. This makes scripts much more powerful by allowing them to carry state information.
+This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
 
-</details>
-
-<details>
-
-<summary>What are the advantages of EUTxO?</summary>
-
-Cardano’s EUTxO model provides a secure and versatile environment to process multiple operations without system failures. This model offers better scalability and privacy, as well as more simplified transaction logic, as each UTxO can only be consumed once and as a whole, which makes transaction verification much simpler.
-
-</details>
-
+<figure><img src="https://i.creativecommons.org/l/by/4.0/88x31.png" alt="Creative Commons License BY 4.0"></figure>
