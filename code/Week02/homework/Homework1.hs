@@ -1,14 +1,14 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Homework1 where
 
-import Plutus.V2.Ledger.Api qualified as PlutusV2
-import PlutusTx
-import PlutusTx.Prelude 
-import Utils (wrap)
+import qualified Plutus.V2.Ledger.Api as PlutusV2
+import           PlutusTx
+import           PlutusTx.Prelude
+import           Utilities            (wrap)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------

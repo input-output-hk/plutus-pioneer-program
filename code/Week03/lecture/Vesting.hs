@@ -1,27 +1,26 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE NamedFieldPuns      #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE RecordWildCards     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeFamilies        #-}
 
 module Vesting where
 
-import Cardano.Api.Shelley (PlutusScript (..))
-import Codec.Serialise (serialise)
-import qualified Data.ByteString.Lazy as BSL
+import           Cardano.Api
+import           Cardano.Api.Shelley   (PlutusScript (..))
+import           Codec.Serialise       (serialise)
+import qualified Data.ByteString.Lazy  as BSL
 import qualified Data.ByteString.Short as BSS
-import Plutus.V2.Ledger.Api qualified as PlutusV2
-import PlutusTx
-import PlutusTx.Prelude
-import Cardano.Api
+import qualified Plutus.V2.Ledger.Api  as PlutusV2
+import           PlutusTx              (BuiltinData, compile)
+import           PlutusTx.Prelude      (($), (.))
 
 {-# INLINABLE mkVestingValidator #-}
 mkVestingValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()

@@ -1,16 +1,16 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module FortyTwo where
 
-import Plutus.V2.Ledger.Api qualified as PlutusV2
-import PlutusTx
-import PlutusTx.Prelude (otherwise, (==))
-import Utils (writePlutusFile)
-import Prelude (IO)
-import PlutusTx.Builtins as Builtins
+import qualified Plutus.V2.Ledger.Api as PlutusV2
+import           PlutusTx             (BuiltinData, compile)
+import           PlutusTx.Builtins    as Builtins (error, mkI)
+import           PlutusTx.Prelude     (otherwise, (==))
+import           Prelude              (IO)
+import           Utilities            (writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -30,4 +30,4 @@ validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mk42Validator ||]
 ------------------------------------- HELPER FUNCTIONS --------------------------------------------
 
 saveVal :: IO ()
-saveVal = writePlutusFile "./assets/fortytwo.plutus" validator
+saveVal = writeValidatorToFile "./assets/fortytwo.plutus" validator

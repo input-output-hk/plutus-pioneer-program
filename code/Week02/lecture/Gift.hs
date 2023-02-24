@@ -1,14 +1,14 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Gift where
 
-import Plutus.V2.Ledger.Api qualified as PlutusV2
-import PlutusTx
-import Utils (writePlutusFile)
-import Prelude (IO)
+import qualified Plutus.V2.Ledger.Api as PlutusV2
+import           PlutusTx             (BuiltinData, compile)
+import           Prelude              (IO)
+import           Utilities            (writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 -------------------------------- ON-CHAIN CODE / VALIDATOR ----------------------------------------
@@ -26,4 +26,4 @@ validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkGiftValidator |
 ------------------------------------- HELPER FUNCTIONS --------------------------------------------
 
 saveVal :: IO ()
-saveVal = writePlutusFile "./assets/gift.plutus" validator
+saveVal = writeValidatorToFile "./assets/gift.plutus" validator

@@ -1,15 +1,15 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module CustomTypes where
 
-import Plutus.V2.Ledger.Api qualified as PlutusV2
-import PlutusTx
-import PlutusTx.Prelude 
-import Utils (writePlutusFile, wrap)
-import Prelude (IO)
+import qualified Plutus.V2.Ledger.Api as PlutusV2
+import           PlutusTx             (BuiltinData, compile, unstableMakeIsData)
+import           PlutusTx.Prelude     (Bool, Eq ((==)), Integer)
+import           Prelude              (IO)
+import           Utilities            (wrap, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -34,4 +34,4 @@ validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| wrappedMkVal ||])
 ------------------------------------- HELPER FUNCTIONS --------------------------------------------
 
 saveVal :: IO ()
-saveVal = writePlutusFile "./assets/customtypes.plutus" validator
+saveVal = writeValidatorToFile "./assets/customtypes.plutus" validator
