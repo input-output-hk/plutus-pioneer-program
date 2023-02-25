@@ -44,6 +44,10 @@ Now that you have Docker Desktop up and running let's download and install Visua
 
 [Visual Studio Code](https://code.visualstudio.com/), also known as VS Code, is a source code editor freely distributed by Microsoft that runs on Windows, Linux, and macOS. Additionally, to allow code editing, VS Code allows developers to create and install extensions that ease their daily work.
 
+{% hint style="warning" %}
+**Don't install any Haskell extension in Visual Studio Code.** If you have VS Code installed, you may see several prompts from VS Code asking for permission to install several Haskell extensions when you open the PPP repository. You don't need to install any of those, as the Docker container we deliver will install all the Haskell extensions that VS Code needs. Some Pioneers who installed additional Haskell extensions report issues in completing this install guide; also, IOG's Education Team members experienced problems while compiling Plutus scripts.
+{% endhint %}
+
 Follow the next steps to install VS Code and a handy extension that you will use in this course.
 
 1. Open your browser and navigate to <https://code.visualstudio.com/> to open the Visual Studio Code website. As the image below shows, there is a button where you 
