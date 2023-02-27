@@ -3,24 +3,30 @@
 assets=/workspaces/plutus-pioneer-program/code/Week02/assets
 keypath=/workspaces/plutus-pioneer-program/keys
 name="$1"
-txin="$2"
-body="$assets/gift.txbody"
-tx="$assets/gift.tx"
+collateral="$2"
+txin="$3"
 
-# Build gift address 
-cardano-cli address build \
-    --payment-script-file "$assets/gift.plutus" \
+pp="$assets/protocol-parameters.json"
+body="$assets/collect-gift.txbody"
+tx="$assets/collect-gift.tx"
+
+# Query the protocol parameters \
+
+cardano-cli query protocol-parameters \
     --testnet-magic 2 \
-    --out-file "$assets/gift.addr"
+    --out-file "$pp"
 
 # Build the transaction
 cardano-cli transaction build \
     --babbage-era \
     --testnet-magic 2 \
     --tx-in "$txin" \
-    --tx-out "$(cat "$assets/gift.addr") + 3000000 lovelace" \
-    --tx-out-inline-datum-file "$assets/unit.json" \
+    --tx-in-script-file "$assets/gift.plutus" \
+    --tx-in-inline-datum-present \
+    --tx-in-redeemer-file "$assets/unit.json" \
+    --tx-in-collateral "$collateral" \
     --change-address "$(cat "$keypath/$name.addr")" \
+    --protocol-params-file "$pp" \
     --out-file "$body"
     
 # Sign the transaction
