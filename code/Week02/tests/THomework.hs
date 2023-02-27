@@ -39,7 +39,7 @@ homework1 cfg = do
     [ good "Case: (True, True)" $ giveGift (True, True)
     , bad "Case: (True, False)" $ giveGift (True, False)
     , bad "Case: (False, True)" $ giveGift (False, True)
-    , good "Case: (False, False)" $ giveGift (False, False)
+    , bad "Case: (False, False)" $ giveGift (False, False)
     ]
   where
     bad msg = good msg . mustFail
