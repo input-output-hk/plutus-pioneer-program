@@ -1,13 +1,15 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
 module CustomTypes where
 
 import qualified Plutus.V2.Ledger.Api as PlutusV2
 import           PlutusTx             (BuiltinData, compile, unstableMakeIsData)
-import           PlutusTx.Prelude     (Bool, Eq ((==)), Integer)
+import           PlutusTx.Prelude     (Bool, Eq ((==)), Integer, traceIfFalse,
+                                       ($))
 import           Prelude              (IO)
 import           Utilities            (wrap, writeValidatorToFile)
 
@@ -21,11 +23,12 @@ PlutusTx.unstableMakeIsData ''MySillyRedeemer -- Use TH to create an instance fo
 -- This validator succeeds only if the redeemer is `MkMySillyRedeemer 42`
 --              Datum     Redeemer            ScriptContext
 mkCTValidator :: () -> MySillyRedeemer -> PlutusV2.ScriptContext -> Bool
-mkCTValidator _ (MkMySillyRedeemer r) _ = r == 42
+mkCTValidator _ (MkMySillyRedeemer r) _ = traceIfFalse "expected 42" $ r == 42
 {-# INLINABLE mkCTValidator #-}
 
 wrappedMkVal :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 wrappedMkVal = wrap mkCTValidator
+{-# INLINABLE wrappedMkVal #-}
 
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| wrappedMkVal ||])

@@ -6,8 +6,8 @@
 module Homework1 where
 
 import qualified Plutus.V2.Ledger.Api as PlutusV2
-import           PlutusTx
-import           PlutusTx.Prelude
+import           PlutusTx             (compile)
+import           PlutusTx.Prelude     (Bool (..), BuiltinData)
 import           Utilities            (wrap)
 
 ---------------------------------------------------------------------------------------------------
