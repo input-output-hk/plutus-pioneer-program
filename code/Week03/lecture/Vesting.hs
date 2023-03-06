@@ -1,33 +1,54 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE ImportQualifiedPost #-}
-{-# LANGUAGE LambdaCase          #-}
-{-# LANGUAGE NamedFieldPuns      #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
-{-# LANGUAGE TypeApplications    #-}
-{-# LANGUAGE TypeFamilies        #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Vesting where
 
-import           Cardano.Api
-import           Cardano.Api.Shelley   (PlutusScript (..))
-import           Codec.Serialise       (serialise)
-import qualified Data.ByteString.Lazy  as BSL
-import qualified Data.ByteString.Short as BSS
-import qualified Plutus.V2.Ledger.Api  as PlutusV2
-import           PlutusTx              (BuiltinData, compile)
-import           PlutusTx.Prelude      (($), (.))
+import           Plutus.V1.Ledger.Interval (contains)
+import           Plutus.V2.Ledger.Api      (BuiltinData, POSIXTime, PubKeyHash,
+                                            ScriptContext (scriptContextTxInfo),
+                                            TxInfo (txInfoValidRange),
+                                            Validator, from, mkValidatorScript)
+import           Plutus.V2.Ledger.Contexts (txSignedBy)
+import           PlutusTx                  (compile, unstableMakeIsData)
+import           PlutusTx.Prelude          (Bool, traceIfFalse, ($), (&&))
+import           Prelude                   (IO)
+import           Utilities                 (wrap, writeValidatorToFile)
+
+---------------------------------------------------------------------------------------------------
+----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
+
+data VestingDatum = VestingDatum
+    { beneficiary :: PubKeyHash
+    , deadline    :: POSIXTime
+    }
+
+unstableMakeIsData ''VestingDatum
 
 {-# INLINABLE mkVestingValidator #-}
-mkVestingValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkVestingValidator _ _ _ = ()
+mkVestingValidator :: VestingDatum -> () -> ScriptContext -> Bool
+mkVestingValidator dat () ctx = traceIfFalse "beneficiary's signature missing" signedByBeneficiary &&
+                                traceIfFalse "deadline not reached" deadlineReached
+  where
+    info :: TxInfo
+    info = scriptContextTxInfo ctx
 
-validator :: PlutusV2.Validator
-validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| mkVestingValidator ||])
+    signedByBeneficiary :: Bool
+    signedByBeneficiary = txSignedBy info $ beneficiary dat
 
-serialized :: PlutusScript PlutusScriptV2
-serialized = PlutusScriptSerialised . BSS.toShort . BSL.toStrict . serialise $ validator
+    deadlineReached :: Bool
+    deadlineReached = contains (from $ deadline dat) $ txInfoValidRange info
+
+{-# INLINABLE  mkWrappedVestingValidator #-}
+mkWrappedVestingValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedVestingValidator = wrap mkVestingValidator
+
+validator :: Validator
+validator = mkValidatorScript $$(compile [|| mkWrappedVestingValidator ||])
+
+---------------------------------------------------------------------------------------------------
+------------------------------------- HELPER FUNCTIONS --------------------------------------------
+
+saveVal :: IO ()
+saveVal = writeValidatorToFile "./assets/vesting.plutus" validator
