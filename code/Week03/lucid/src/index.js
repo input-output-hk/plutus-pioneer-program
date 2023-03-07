@@ -28,7 +28,7 @@ async function loadCardano() {
         console.log('nami enabled');
         const lucid = await L.Lucid.new(
             new L.Blockfrost("https://cardano-preview.blockfrost.io/api/v0", "preview1JXEDVldkIyBkxEUrEx3n9ll4afFK1Xj"),
-            "Preprod",
+            "Preview",
         );
         console.log('lucid active');
         lucid.selectWallet(api);
@@ -156,8 +156,13 @@ async function findUTxO(ref) {
     const chunks = ref.split('#');
     const tid = chunks[0];
     const ix = parseInt(chunks[1]);
-    const utxos = await lucid.utxosByOutRef([{ txHash: tid, outputIndex: ix }]);
-    return utxos.length == 1 ? utxos[0] : null;
+    const utxos = await vestingUTxOs();
+    for (const utxo of utxos) {
+        if (utxo.utxo.txHash == tid && utxo.utxo.outputIndex == ix) {
+            return utxo;
+        }
+    }
+    return null;
 }
 
 async function onVest() {
@@ -174,7 +179,6 @@ async function onVest() {
         beneficiary: beneficiary,
         deadline: deadline,
     };
-    console.log(d);
     const datum = L.Data.to(d, VestingDatum);
     const tx = await lucid
         .newTx()
@@ -194,15 +198,13 @@ async function onClaim() {
     const reference = referenceText.value;
 
     const utxo = await findUTxO(reference);
-    const now = Date.now();
     if (utxo) {
         const tx = await lucid
             .newTx()
-            .collectFrom([utxo], L.Data.to(new L.Constr(0, [])))
+            .collectFrom([utxo.utxo], L.Data.to(new L.Constr(0, [])))
             .attachSpendingValidator(vestingScript)
             .addSignerKey(pkh)
-            .validFrom(now)
-            .validTo(now + 120000)
+            .validFrom(Number(utxo.datum.deadline))
             .complete();
         signAndSubmitCardanoTx(tx);
     } else {
