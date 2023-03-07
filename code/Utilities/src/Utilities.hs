@@ -2,6 +2,6 @@ module Utilities
   ( module X
   ) where
 
-import           Utilities.PlutusTx  as X (wrap)
-import           Utilities.Serialise as X (validatorToScript, writeDataToFile,
-                                           writeValidatorToFile)
+import           Utilities.Conversions as X
+import           Utilities.PlutusTx    as X
+import           Utilities.Serialise   as X

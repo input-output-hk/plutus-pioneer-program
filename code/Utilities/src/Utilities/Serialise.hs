@@ -3,6 +3,8 @@
 module Utilities.Serialise
   ( validatorToScript
   , writeValidatorToFile
+  , dataToJSON
+  , printDataToJSON
   , writeDataToFile
   ) where
 
@@ -12,6 +14,7 @@ import           Cardano.Api           (Error (displayError), PlutusScript,
 import           Cardano.Api.Shelley   (PlutusScript (..), fromPlutusData,
                                         scriptDataToJsonDetailedSchema)
 import           Codec.Serialise       (serialise)
+import           Data.Aeson            (Value)
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.ByteString.Lazy  as BSL
 import qualified Data.ByteString.Short as BSS
@@ -30,9 +33,15 @@ writeValidatorToFile filePath validator =
     Left err -> print $ displayError err
     Right () -> putStrLn $ "Compiled Plutus script at: " ++ filePath
 
+dataToJSON :: ToData a => a -> Value
+dataToJSON = scriptDataToJsonDetailedSchema . fromPlutusData . PlutusV2.toData
+
+printDataToJSON :: ToData a => a -> IO ()
+printDataToJSON = putStrLn . BS8.unpack . prettyPrintJSON . dataToJSON
+
 writeDataToFile :: ToData a => FilePath -> a -> IO ()
 writeDataToFile filePath x = do
-  let v = scriptDataToJsonDetailedSchema $ fromPlutusData $ PlutusV2.toData x
+  let v = dataToJSON x
   writeFileJSON filePath v >>= \case
    Left err -> print $ displayError err
    Right () -> printf "Wrote data to: %s\n%s\n" filePath $ BS8.unpack $ prettyPrintJSON v

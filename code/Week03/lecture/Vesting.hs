@@ -5,6 +5,7 @@
 
 module Vesting where
 
+import           Data.Maybe                (fromJust)
 import           Plutus.V1.Ledger.Interval (contains)
 import           Plutus.V2.Ledger.Api      (BuiltinData, POSIXTime, PubKeyHash,
                                             ScriptContext (scriptContextTxInfo),
@@ -13,8 +14,11 @@ import           Plutus.V2.Ledger.Api      (BuiltinData, POSIXTime, PubKeyHash,
 import           Plutus.V2.Ledger.Contexts (txSignedBy)
 import           PlutusTx                  (compile, unstableMakeIsData)
 import           PlutusTx.Prelude          (Bool, traceIfFalse, ($), (&&))
-import           Prelude                   (IO)
-import           Utilities                 (wrap, writeValidatorToFile)
+import           Prelude                   (IO, String)
+import           Utilities                 (Network, posixTimeFromIso8601,
+                                            printDataToJSON,
+                                            validatorAddressBech32, wrap,
+                                            writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -52,3 +56,12 @@ validator = mkValidatorScript $$(compile [|| mkWrappedVestingValidator ||])
 
 saveVal :: IO ()
 saveVal = writeValidatorToFile "./assets/vesting.plutus" validator
+
+vestingAddressBech32 :: Network -> String
+vestingAddressBech32 network = validatorAddressBech32 network validator
+
+printVestingDatumJSON :: PubKeyHash -> String -> IO ()
+printVestingDatumJSON pkh time = printDataToJSON $ VestingDatum
+    { beneficiary = pkh
+    , deadline    = fromJust $ posixTimeFromIso8601 time
+    }
