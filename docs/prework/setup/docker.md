@@ -69,7 +69,7 @@ To download VS Code for any operating system, please visit the [Download Visual 
 
     ![Visual Studio Extensions Marketplace where the Remote Development extension is highlighted.](images/docker-guide-05.png)
 
-5. After successfully installing the Remove Development extension, you'll note that an "Uninstall" button appears in the extension description tab, and the "Open a Remote Window" icon will appear on the bottom left corner of the VS Code UI as you can see in the following image.
+5. After successfully installing the Remote Development extension, you'll note that an "Uninstall" button appears in the extension description tab, and the "Open a Remote Window" icon will appear on the bottom left corner of the VS Code UI as you can see in the following image.
 
     ![Visual Studio UI after a successful installation of the Remote Development extension.](images/docker-guide-06.png)
 
