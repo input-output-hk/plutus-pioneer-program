@@ -166,8 +166,6 @@ async function findUTxO(ref) {
 }
 
 async function onVest() {
-    const pkh = await getCardanoPKH();
-
     const beneficiaryText = document.getElementById('vestBeneficiaryText');
     const beneficiary = beneficiaryText.value;
     const amountText = document.getElementById('vestAmountText');
