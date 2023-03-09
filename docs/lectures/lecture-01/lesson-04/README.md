@@ -1,6 +1,6 @@
 # Lesson 1.4: The EUTxO Model
 
-Welcome to Lesson 1.1! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
+Welcome to Lesson 1.4! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
 
 {% embed url="https://youtu.be/ulYDNaEKf4g" %}
 
