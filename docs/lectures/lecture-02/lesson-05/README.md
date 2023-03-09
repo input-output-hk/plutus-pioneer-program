@@ -2,11 +2,19 @@
 
 Congratulations on finishing Lecture 2! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% hint style="info" %}
-This homework assignment is intended to reinforce the skills you learned in this lesson; pushing your solutions to the PPP repository is not required. However, if you have any questions, please contact the IOG's Education Team on [the IOG's technical community on Discord](https://discord.gg/inputoutput) by posting your question on the `pioneers-questions` channel.
-{% endhint %}
-
 {% embed url="https://youtu.be/OR2IfD4oDjw" %}
+
+{% hint style="info" %}
+This homework assignment is intended to reinforce the skills you learned in this lesson; pushing your solutions to the PPP repository is not required.
+
+You can check the homework yourself by running the following command within a week's directory.
+
+```shell
+cabal test
+```
+
+However, if you have any questions, please contact the IOG's Education Team on [the IOG's technical community on Discord](https://discord.gg/inputoutput) by posting your question on the `pioneers-questions` channel.
+{% endhint %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
