@@ -1,12 +1,8 @@
 # Lesson 2.1: Low-Level, Untyped Validation Scripts
 
-Welcome to Lesson 2.1! In this lesson, you'll learn about how on-chain validation scripts works.
+Welcome to Lesson 2.1! In this lesson, you'll learn about how untyped validation scripts works.
 
 {% embed url="https://youtu.be/3tcWCZV6L_w" %}
-
-{% hint style="info" %}
-You can review the installation instructions presented in this video lecture in the [Working Environment Set Up section](../../../prework/setup/README.md) of this playbook.
-{% endhint %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
