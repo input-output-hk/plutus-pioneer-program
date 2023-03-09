@@ -1,25 +1,24 @@
-# Lesson 1.4: The EUTxO Model
+# Lesson 2.2: Using the Cardano CLI to Interact with Plutus
 
-Welcome to Lesson 1.4! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
+Welcome to Lesson 2.2! In this lesson, you'll learn how to interact with Plutus smart contracts using the Cardano CLI.
 
-{% embed url="https://youtu.be/ulYDNaEKf4g" %}
+{% embed url="https://youtu.be/2MbzKzoBiak" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Describe the EUTxO model.
-* Exemplify how transactions work on Cardano using EUTxO.
-* Explain the advantages that EUTxO adds to Cardano for securing transactions.
+* Describe what the Cardano CLI is.
+* Execute the Cardano CLI from the Docker Container and Demeter.
+* Understand why a testnet is used for coding and testing smart contracts.
+* Synchronize a Cardano node in the local development environment provided by the Docker Container.
 {% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Essential Cardano Glossary - EUTXO: extended unspent transaction output](https://www.essentialcardano.io/glossary/eutxo)
-* [Understanding the Extended UTxO model](https://docs.cardano.org/learn/eutxo-explainer)
-* [EUTXO v Account-based models](https://www.essentialcardano.io/infographic/eutxo-v-account-based-models)
-* [The EUTxO Handbook](https://www.essentialcardano.io/article/the-eutxo-handbook)
+* [Using the Cardano command line interface](https://docs.cardano.org/development-guidelines/use-cli)
+* [Cardano Node CLI Reference](https://github.com/input-output-hk/cardano-node/blob/master/doc/reference/cardano-node-cli-reference.md)
 {% endtab %}
 {% endtabs %}
 

@@ -1,25 +1,21 @@
-# Lesson 1.4: The EUTxO Model
+# Lecture 2 Homework Assignment: Implementing Validators Using Plutus
 
-Welcome to Lesson 1.4! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
+Congratulations on finishing Lecture 2! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% embed url="https://youtu.be/ulYDNaEKf4g" %}
+{% hint style="info" %}
+This homework assignment is intended to reinforce the skills you learned in this lesson; pushing your solutions to the PPP repository is not required. However, if you have any questions, please contact the IOG's Education Team on [the IOG's technical community on Discord](https://discord.gg/inputoutput) by posting your question on the `pioneers-questions` channel.
+{% endhint %}
+
+{% embed url="https://youtu.be/OR2IfD4oDjw" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
+After completing this homework assignment, you'll be able to:
 
-* Describe the EUTxO model.
-* Exemplify how transactions work on Cardano using EUTxO.
-* Explain the advantages that EUTxO adds to Cardano for securing transactions.
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [Essential Cardano Glossary - EUTXO: extended unspent transaction output](https://www.essentialcardano.io/glossary/eutxo)
-* [Understanding the Extended UTxO model](https://docs.cardano.org/learn/eutxo-explainer)
-* [EUTXO v Account-based models](https://www.essentialcardano.io/infographic/eutxo-v-account-based-models)
-* [The EUTxO Handbook](https://www.essentialcardano.io/article/the-eutxo-handbook)
+* Create an on-chain validator.
+* Inspect a validator's code to find and correct code bugs.
+* Employ custom data types.
+* Interact with validators using the cardano-cli to test them
 {% endtab %}
 {% endtabs %}
 
