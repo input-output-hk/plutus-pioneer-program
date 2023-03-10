@@ -1,0 +1,118 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module      : Foundation.IO.FileMap</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- License     : BSD-style</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Maintainer  : Vincent Hanquez &lt;vincent@snarc.org&gt;</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Stability   : experimental</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Portability : portable</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Note that the memory mapping is handled by the system, not at the haskell level.</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- The system can modify the content of the memory as any moment under your feet.</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- It also have the limitation of your system, no emulation or nice handling of all</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- those corners cases is attempted here.</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- for example mapping a large file (&gt; 4G), on a 32 bits system is likely to just</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- fail or returns inconsistent result.</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- In doubt, use 'readFile' or other simple routine that brings</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- the content of the file in IO.</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Foundation.IO.FileMap</span><span>
+</span><span id="line-22"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Foundation.IO.FileMap.html#fileMapRead"><span class="hs-identifier">fileMapRead</span></a></span><span>
+</span><span id="line-23"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Foundation.IO.FileMap.html#fileMapReadWith"><span class="hs-identifier">fileMapReadWith</span></a></span><span>
+</span><span id="line-24"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Control.Exception</span></a></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier">Basement.Types.OffsetSize</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier">Basement.Imports</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Foundation.VFS.html"><span class="hs-identifier">Foundation.VFS</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Foundation.VFS.FilePath.html#FilePath"><span class="hs-identifier">FilePath</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier">Basement.FinalPtr</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier">Basement.UArray</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Foundation.Foreign.MemoryMap.html"><span class="hs-identifier">Foundation.Foreign.MemoryMap</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">I</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="annot"><a href="Foundation.IO.FileMap.html#getSize"><span class="hs-identifier hs-type">getSize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Foundation.Foreign.MemoryMap.Types.html#FileMapping"><span class="hs-identifier hs-type">I.FileMapping</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Int</span></a></span><span>
+</span><span id="line-36"></span><span id="getSize"><span class="annot"><span class="annottext">getSize :: FileMapping -&gt; Int
+</span><a href="Foundation.IO.FileMap.html#getSize"><span class="hs-identifier hs-var hs-var">getSize</span></a></span></span><span> </span><span id="local-6989586621679174089"><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174089"><span class="hs-identifier hs-var">fm</span></a></span></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Prelude.fromIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Bounded a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">maxBound</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Int</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&lt;</span></a></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679174086"><span class="hs-identifier hs-var">sz</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;cannot map file in entirety as size overflow &quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Show a =&gt; a -&gt; String
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679174086"><span class="hs-identifier hs-var">sz</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span>                                   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Prelude.fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679174086"><span class="hs-identifier hs-var">sz</span></a></span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier hs-type">FileSize</span></a></span><span> </span><span id="local-6989586621679174086"><span class="annot"><span class="annottext">Word64
+</span><a href="#local-6989586621679174086"><span class="hs-identifier hs-var">sz</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FileMapping -&gt; FileSize
+</span><a href="Foundation.Foreign.MemoryMap.Types.html#fileMappingSize"><span class="hs-identifier hs-var">I.fileMappingSize</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174089"><span class="hs-identifier hs-var">fm</span></a></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- | Map in memory the whole content of a file.</span><span>
+</span><span id="line-43"></span><span class="hs-comment">--</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- Once the array goes out of scope, the memory get (eventually) unmap</span><span>
+</span><span id="line-45"></span><span class="annot"><a href="Foundation.IO.FileMap.html#fileMapRead"><span class="hs-identifier hs-type">fileMapRead</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Foundation.VFS.FilePath.html#FilePath"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier hs-type">V.UArray</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word8</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span id="fileMapRead"><span class="annot"><span class="annottext">fileMapRead :: FilePath -&gt; IO (UArray Word8)
+</span><a href="Foundation.IO.FileMap.html#fileMapRead"><span class="hs-identifier hs-var hs-var">fileMapRead</span></a></span></span><span> </span><span id="local-6989586621679174081"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679174081"><span class="hs-identifier hs-var">fp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-47"></span><span>    </span><span id="local-6989586621679174080"><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174080"><span class="hs-identifier hs-var">fileMapping</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FileMapReadF
+</span><a href="Foundation.Foreign.MemoryMap.Posix.html#fileMapRead"><span class="hs-identifier hs-var">I.fileMapRead</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679174081"><span class="hs-identifier hs-var">fp</span></a></span><span>
+</span><span id="line-48"></span><span>    </span><span id="local-6989586621679174078"><span class="annot"><span class="annottext">FinalPtr Word8
+</span><a href="#local-6989586621679174078"><span class="hs-identifier hs-var">fptr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">FileMapping -&gt; IO (FinalPtr Word8)
+</span><a href="Foundation.Foreign.MemoryMap.Types.html#fileMappingToFinalPtr"><span class="hs-identifier hs-var">I.fileMappingToFinalPtr</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174080"><span class="hs-identifier hs-var">fileMapping</span></a></span><span>
+</span><span id="line-49"></span><span>    </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall ty. PrimType ty =&gt; FinalPtr ty -&gt; CountOf ty -&gt; UArray ty
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">V.foreignMem</span></a></span><span> </span><span class="annot"><span class="annottext">FinalPtr Word8
+</span><a href="#local-6989586621679174078"><span class="hs-identifier hs-var">fptr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall ty. Int -&gt; CountOf ty
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">CountOf</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping -&gt; Int
+</span><a href="Foundation.IO.FileMap.html#getSize"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174080"><span class="hs-identifier hs-var">fileMapping</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | Map in memory the whole content of a file,</span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- the whole map is unmapped at the end of function after the function has been called</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- so any things that is still holding on to this memory will very likely trigger segfault</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- or other really bad behavior.</span><span>
+</span><span id="line-56"></span><span id="local-6989586621679174126"><span class="annot"><a href="Foundation.IO.FileMap.html#fileMapReadWith"><span class="hs-identifier hs-type">fileMapReadWith</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Foundation.VFS.FilePath.html#FilePath"><span class="hs-identifier hs-type">FilePath</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../basement/html/src"><span class="hs-identifier hs-type">V.UArray</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word8</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679174126"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679174126"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-57"></span><span id="fileMapReadWith"><span class="annot"><span class="annottext">fileMapReadWith :: forall a. FilePath -&gt; (UArray Word8 -&gt; IO a) -&gt; IO a
+</span><a href="Foundation.IO.FileMap.html#fileMapReadWith"><span class="hs-identifier hs-var hs-var">fileMapReadWith</span></a></span></span><span> </span><span id="local-6989586621679174069"><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679174069"><span class="hs-identifier hs-var">fp</span></a></span></span><span> </span><span id="local-6989586621679174068"><span class="annot"><span class="annottext">UArray Word8 -&gt; IO a
+</span><a href="#local-6989586621679174068"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><span class="annottext">forall a b c. IO a -&gt; (a -&gt; IO b) -&gt; (a -&gt; IO c) -&gt; IO c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">bracket</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileMapReadF
+</span><a href="Foundation.Foreign.MemoryMap.Posix.html#fileMapRead"><span class="hs-identifier hs-var">I.fileMapRead</span></a></span><span> </span><span class="annot"><span class="annottext">FilePath
+</span><a href="#local-6989586621679174069"><span class="hs-identifier hs-var">fp</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">FileMapping -&gt; IO ()
+</span><a href="Foundation.Foreign.MemoryMap.Types.html#fileMappingUnmap"><span class="hs-identifier hs-var">I.fileMappingUnmap</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679174065"><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174065"><span class="hs-identifier hs-var">fm</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-59"></span><span>        </span><span id="local-6989586621679174064"><span class="annot"><span class="annottext">FinalPtr Word8
+</span><a href="#local-6989586621679174064"><span class="hs-identifier hs-var">fptr</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (prim :: * -&gt; *) a.
+PrimMonad prim =&gt;
+Ptr a -&gt; (Ptr a -&gt; IO ()) -&gt; prim (FinalPtr a)
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">toFinalPtr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">FileMapping -&gt; Ptr Word8
+</span><a href="Foundation.Foreign.MemoryMap.Types.html#fileMappingPtr"><span class="hs-identifier hs-var">I.fileMappingPtr</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174065"><span class="hs-identifier hs-var">fm</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">Ptr Word8
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>        </span><span class="annot"><span class="annottext">UArray Word8 -&gt; IO a
+</span><a href="#local-6989586621679174068"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall ty. PrimType ty =&gt; FinalPtr ty -&gt; CountOf ty -&gt; UArray ty
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">V.foreignMem</span></a></span><span> </span><span class="annot"><span class="annottext">FinalPtr Word8
+</span><a href="#local-6989586621679174064"><span class="hs-identifier hs-var">fptr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall ty. Int -&gt; CountOf ty
+</span><a href="../../../../basement/html/src"><span class="hs-identifier hs-var">CountOf</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping -&gt; Int
+</span><a href="Foundation.IO.FileMap.html#getSize"><span class="hs-identifier hs-var">getSize</span></a></span><span> </span><span class="annot"><span class="annottext">FileMapping
+</span><a href="#local-6989586621679174065"><span class="hs-identifier hs-var">fm</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-61"></span></pre></body></html>

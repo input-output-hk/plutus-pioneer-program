@@ -1,0 +1,286 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Module:  Barbies</span><span>
+</span><span id="line-4"></span><span class="hs-comment">--</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- A common Haskell idiom is to parameterise a datatype by a functor or GADT</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- (or any &quot;indexed type&quot; @k -&gt; 'Data.Kind.Type'@), a pattern</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- sometimes called &lt;https://reasonablypolymorphic.com/blog/higher-kinded-data/ HKD&gt;).</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- This parameter acts like the outfit of a Barbie, turning it into a different</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- doll. The canonical example would be:</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- data Person f</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--   = Person</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--       { name :: f 'String'</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--       , age  :: f 'Int'</span><span>
+</span><span id="line-16"></span><span class="hs-comment">--       }</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- Let's say that we are writing an application where @Person@ data</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- will be read from a web form, validated, and stored in a database. Some</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- possibles outfits that we could use along the way are:</span><span>
+</span><span id="line-22"></span><span class="hs-comment">--</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- Person ('Data.Functor.Const.Const' 'String')  -- for the raw input from the web-form,</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- Person ('Either' 'String') -- for the result of parsing and validating,</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- Person 'Data.Functor.Identity.Identity'        -- for the actual data,</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- Person DbColumn        -- To describe how to read / write a @Person@ to the db</span><span>
+</span><span id="line-28"></span><span class="hs-comment">--</span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- data DbColumn a</span><span>
+</span><span id="line-30"></span><span class="hs-comment">--   = DbColumn</span><span>
+</span><span id="line-31"></span><span class="hs-comment">--       { colName :: 'String'</span><span>
+</span><span id="line-32"></span><span class="hs-comment">--       , fromDb  :: DbDataParser a</span><span>
+</span><span id="line-33"></span><span class="hs-comment">--       , toDb    :: a -&gt; DbData</span><span>
+</span><span id="line-34"></span><span class="hs-comment">--       }</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-36"></span><span class="hs-comment">--</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- In such application it is likely that one will have lots of types like</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- @Person@ so we will like to handle these transformations uniformly,</span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- without boilerplate or repetitions.  This package provides classes to</span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- manipulate these types, using notions that are familiar to haskellers like</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- 'Functor', 'Applicative' or 'Traversable'. For example, instead of writing</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- an ad-hoc function that checks that all fields have a correct value, like</span><span>
+</span><span id="line-43"></span><span class="hs-comment">--</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- checkPerson :: Person ('Either' 'String') -&gt; 'Either' ['String'] (Person 'Data.Functor.Identity.Identity')</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-47"></span><span class="hs-comment">--</span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- we can write only one such function:</span><span>
+</span><span id="line-49"></span><span class="hs-comment">--</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- check :: 'TraversableB' b =&gt; b ('Either' 'String') -&gt; 'Either' ['String'] (b 'Data.Functor.Identity.Identity')</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- check be</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--   = case 'btraverse' ('either' ('const' 'Nothing') ('Just' . 'Daa.Functor.Identity.Identity')) be of</span><span>
+</span><span id="line-54"></span><span class="hs-comment">--       'Just' bi -&gt; 'Right' bi</span><span>
+</span><span id="line-55"></span><span class="hs-comment">--       'Nothing' -&gt; 'Left' ('bfoldMap' ('either' (:[]) ('const' [])) be)</span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-57"></span><span class="hs-comment">--</span><span>
+</span><span id="line-58"></span><span class="hs-comment">--  Moreover, these classes come with default instances based on</span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- `GHC.Generics.Generic`, so using them is as easy as:</span><span>
+</span><span id="line-60"></span><span class="hs-comment">--</span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- data Person f</span><span>
+</span><span id="line-63"></span><span class="hs-comment">--   = Person</span><span>
+</span><span id="line-64"></span><span class="hs-comment">--       { name :: f 'String'</span><span>
+</span><span id="line-65"></span><span class="hs-comment">--       , age  :: f 'Int'</span><span>
+</span><span id="line-66"></span><span class="hs-comment">--       }</span><span>
+</span><span id="line-67"></span><span class="hs-comment">--   deriving</span><span>
+</span><span id="line-68"></span><span class="hs-comment">--     ( 'GHC.Generics.Generic'</span><span>
+</span><span id="line-69"></span><span class="hs-comment">--     , 'FunctorB', 'TraversableB', 'ApplicativeB', 'ConstraintsB'</span><span>
+</span><span id="line-70"></span><span class="hs-comment">--     )</span><span>
+</span><span id="line-71"></span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- deriving instance 'AllBF' 'Show' f Person =&gt; 'Show' (Person f)</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- deriving instance 'AllBF' 'Eq'   f Person =&gt; 'Eq'   (Person f)</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-75"></span><span class="hs-comment">--</span><span>
+</span><span id="line-76"></span><span>
+</span><span id="line-77"></span><span class="hs-comment">-----------------------------------------------------------------------------</span><span>
+</span><span id="line-78"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Barbies</span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-special">(</span><span>  </span><span class="annot"><span class="hs-comment">-- * Barbies are functors</span></span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span>     </span><span class="hs-comment">-- | Barbie-types are functors. That means that if one is familiar</span><span>
+</span><span id="line-82"></span><span>     </span><span class="hs-comment">--   with standard classes like 'Functor', 'Applicative' or 'Traversable',</span><span>
+</span><span id="line-83"></span><span>     </span><span class="hs-comment">--   one already knows how to work with barbie-types too. For instance, just</span><span>
+</span><span id="line-84"></span><span>     </span><span class="hs-comment">--   like one would use:</span><span>
+</span><span id="line-85"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-86"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-87"></span><span>     </span><span class="hs-comment">-- 'fmap' f (as :: [a])</span><span>
+</span><span id="line-88"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-89"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-90"></span><span>     </span><span class="hs-comment">--   to apply @f@ uniformly on every @a@ occurring</span><span>
+</span><span id="line-91"></span><span>     </span><span class="hs-comment">--   in @as@, one could use the following to turn a 'Either'-outfit</span><span>
+</span><span id="line-92"></span><span>     </span><span class="hs-comment">--   into 'Maybe'-outfit:</span><span>
+</span><span id="line-93"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-94"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-95"></span><span>     </span><span class="hs-comment">-- 'bmap' ('either' ('const' 'Nothing') 'Just') (p :: Person ('Either' e))</span><span>
+</span><span id="line-96"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-97"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-98"></span><span>     </span><span class="hs-comment">--   In this case, the argument of 'bmap' will have to be applied on all</span><span>
+</span><span id="line-99"></span><span>     </span><span class="hs-comment">--   fields of @p@:</span><span>
+</span><span id="line-100"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-101"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-102"></span><span>     </span><span class="hs-comment">-- name p :: 'Either' e 'String'</span><span>
+</span><span id="line-103"></span><span>     </span><span class="hs-comment">-- age  p :: 'Either' e 'Int'</span><span>
+</span><span id="line-104"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-105"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-106"></span><span>     </span><span class="hs-comment">--   So 'bmap' here demands a polymorphic function of type:</span><span>
+</span><span id="line-107"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-108"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-109"></span><span>     </span><span class="hs-comment">-- forall a . 'Either' e a -&gt; 'Maybe' a</span><span>
+</span><span id="line-110"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-111"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-112"></span><span>     </span><span class="hs-comment">--   That is why `bmap` has a rank-2 type:</span><span>
+</span><span id="line-113"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-114"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-115"></span><span>     </span><span class="hs-comment">-- 'bmap' :: 'FunctorB' b =&gt; (forall a. f a -&gt; g a) -&gt; b f -&gt; b g</span><span>
+</span><span id="line-116"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-117"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-118"></span><span>     </span><span class="hs-comment">--   Polymorphic functions with 'Applicative' effects can be applied</span><span>
+</span><span id="line-119"></span><span>     </span><span class="hs-comment">--   using 'btraverse' and the effects will be accumulated:</span><span>
+</span><span id="line-120"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-121"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-122"></span><span>     </span><span class="hs-comment">-- 'btraverse' :: ('TraversableB' b, 'Applicative' t) =&gt; (forall a. f a -&gt; t (g a)) -&gt; b f -&gt; t (b g)</span><span>
+</span><span id="line-123"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-124"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-125"></span><span>     </span><span class="hs-comment">--   Finally, some barbie-types (typically records like @Person@) have an</span><span>
+</span><span id="line-126"></span><span>     </span><span class="hs-comment">--   'Applicative' structure, and allow us to lift pure n-ary functions</span><span>
+</span><span id="line-127"></span><span>     </span><span class="hs-comment">--   to functions on barbie-types. For example, 'bzipWith' gives us an analogous</span><span>
+</span><span id="line-128"></span><span>     </span><span class="hs-comment">--   of 'Control.Applicative.liftA2':</span><span>
+</span><span id="line-129"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-130"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-131"></span><span>     </span><span class="hs-comment">-- 'bzipWith' :: 'ApplicativeB' b =&gt; (forall a. f a -&gt; g a -&gt; h a) -&gt; b f -&gt; b g -&gt; b h</span><span>
+</span><span id="line-132"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-133"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-134"></span><span>     </span><span class="hs-comment">-- We can use this to combine barbies:</span><span>
+</span><span id="line-135"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-136"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-137"></span><span>     </span><span class="hs-comment">-- addDefaults :: Person 'Maybe' -&gt; Person 'Data.Functor.Identity' -&gt; Person 'Data.Functor.Identity'</span><span>
+</span><span id="line-138"></span><span>     </span><span class="hs-comment">-- addDefaults = 'bzipWith' (\\m d -&gt; 'maybe' d 'pure' m)</span><span>
+</span><span id="line-139"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-140"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-141"></span><span>     </span><span class="hs-comment">--   Why is there not a @MonadB@ class as well? As everyone knows,</span><span>
+</span><span id="line-142"></span><span>     </span><span class="hs-comment">--   &lt;https://james-iry.blogspot.com/2009/05/brief-incomplete-and-mostly-wrong.html a monad is just a monoid in the category of endofunctors&gt;,</span><span>
+</span><span id="line-143"></span><span>     </span><span class="hs-comment">--   which in this case is a problem, since barbie-types are not endofunctors:</span><span>
+</span><span id="line-144"></span><span>     </span><span class="hs-comment">--   they map indexed-types to types, unlike the 'Functor' class, that</span><span>
+</span><span id="line-145"></span><span>     </span><span class="hs-comment">--   captures endo-functors on 'Data.Kind.Type'.</span><span>
+</span><span id="line-146"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-147"></span><span>     </span><span class="hs-comment">--  All these classes, and other convenient functions are found in:</span><span>
+</span><span id="line-148"></span><span>     </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="Data.Functor.Barbie.html"><span class="hs-identifier">Data.Functor.Barbie</span></a></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span>     </span><span class="annot"><span class="hs-comment">-- * Transformers are functors</span></span><span>
+</span><span id="line-151"></span><span>
+</span><span id="line-152"></span><span>     </span><span class="hs-comment">-- | Haskellers may be more used to playing with another family of dolls:</span><span>
+</span><span id="line-153"></span><span>     </span><span class="hs-comment">--   &lt;https://hackage.haskell.org/package/transformers transformers&gt;.</span><span>
+</span><span id="line-154"></span><span>     </span><span class="hs-comment">--   Consider for example the following functor-transformers:</span><span>
+</span><span id="line-155"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-156"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-157"></span><span>     </span><span class="hs-comment">-- 'Data.Functor.Compose.Compose' g f a</span><span>
+</span><span id="line-158"></span><span>     </span><span class="hs-comment">-- 'Control.Monad.Trans.Reader.ReaderT' r f a</span><span>
+</span><span id="line-159"></span><span>     </span><span class="hs-comment">-- 'Control.Monad.Maybe.MaybeT' f a</span><span>
+</span><span id="line-160"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-161"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-162"></span><span>     </span><span class="hs-comment">--  Like with barbies, we can think that different choices of @f@ will</span><span>
+</span><span id="line-163"></span><span>     </span><span class="hs-comment">--  give us a different doll. And if we start thinking about how</span><span>
+</span><span id="line-164"></span><span>     </span><span class="hs-comment">--  to change the outfit of a transformer, we notice that, just like</span><span>
+</span><span id="line-165"></span><span>     </span><span class="hs-comment">--  barbie-types, transformer-types are functors too.</span><span>
+</span><span id="line-166"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-167"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-168"></span><span>     </span><span class="hs-comment">-- 'tmap' :: 'FunctorT' t =&gt; (forall a. f a -&gt; g a) -&gt; t f x -&gt; b g x</span><span>
+</span><span id="line-169"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-170"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-171"></span><span>     </span><span class="hs-comment">--  Where 'FunctorB' captures functors from indexed-types to types,</span><span>
+</span><span id="line-172"></span><span>     </span><span class="hs-comment">--  'FunctorT' captures those between indexed-types. And again, we can</span><span>
+</span><span id="line-173"></span><span>     </span><span class="hs-comment">--  identitfy familiar classes of functors: 'ApplicativeT' and 'TraversableT'.</span><span>
+</span><span id="line-174"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-175"></span><span>     </span><span class="hs-comment">-- Now, transformers like the ones above, are actually endofunctors, e.g.</span><span>
+</span><span id="line-176"></span><span>     </span><span class="hs-comment">-- they map @'Data.Kind.Type' -&gt; 'Data.Kind.Type'@ to itself. So it makes</span><span>
+</span><span id="line-177"></span><span>     </span><span class="hs-comment">-- sense to classify those that are actually monads: the 'MonadT' class</span><span>
+</span><span id="line-178"></span><span>     </span><span class="hs-comment">-- gives us a notion similar to that of `Control.Monad.Trans.Class.MonadTrans',</span><span>
+</span><span id="line-179"></span><span>     </span><span class="hs-comment">-- in that it lets us lift a value to its transformed version:</span><span>
+</span><span id="line-180"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-181"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-182"></span><span>     </span><span class="hs-comment">-- 'tlift' :: 'MonadT' t =&gt; f a -&gt; t f a</span><span>
+</span><span id="line-183"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-184"></span><span>     </span><span class="hs-comment">--  -- E.g., using the instance for Compose:</span><span>
+</span><span id="line-185"></span><span>     </span><span class="hs-comment">-- 'tlift' [1, 2, 3] = 'Data.Functor.Compose.Compose' ('Just' [1, 2, 3]) :: 'Data.Functor.Compose' 'Maybe' [] 'Int'</span><span>
+</span><span id="line-186"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-187"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-188"></span><span>     </span><span class="hs-comment">-- Unlike all other classes in this package, 'MonadT' instances need to be written</span><span>
+</span><span id="line-189"></span><span>     </span><span class="hs-comment">-- by hand.</span><span>
+</span><span id="line-190"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-191"></span><span>     </span><span class="hs-comment">-- For further details, see:</span><span>
+</span><span id="line-192"></span><span>
+</span><span id="line-193"></span><span>   </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="Data.Functor.Transformer.html"><span class="hs-identifier">Data.Functor.Transformer</span></a></span><span>
+</span><span id="line-194"></span><span>
+</span><span id="line-195"></span><span>     </span><span class="annot"><span class="hs-comment">-- * Bi-functors and nesting</span></span><span>
+</span><span id="line-196"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-197"></span><span>     </span><span class="hs-comment">-- | A barbie-type that is parametric on an additional functor can be made an</span><span>
+</span><span id="line-198"></span><span>     </span><span class="hs-comment">-- instance of both 'FunctorB' and 'FunctorT'. For example:</span><span>
+</span><span id="line-199"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-200"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-201"></span><span>     </span><span class="hs-comment">-- data B f g = B (f Int) (g Bool)</span><span>
+</span><span id="line-202"></span><span>     </span><span class="hs-comment">--   deriving (Generic)</span><span>
+</span><span id="line-203"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-204"></span><span>     </span><span class="hs-comment">-- instance FunctorB (B f)</span><span>
+</span><span id="line-205"></span><span>     </span><span class="hs-comment">-- instance FunctorT B</span><span>
+</span><span id="line-206"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-207"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-208"></span><span>     </span><span class="hs-comment">-- This gives us a a bifunctor on indexed-types, as we can map</span><span>
+</span><span id="line-209"></span><span>     </span><span class="hs-comment">-- simultaneously over both arguments using 'btmap':</span><span>
+</span><span id="line-210"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-211"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-212"></span><span>     </span><span class="hs-comment">-- 'btmap' :: ('FunctorB' (b f), 'FunctorT' b) =&gt; (forall a . f a -&gt; f' a) -&gt; (forall a . g a -&gt; g' a) -&gt; b f g -&gt; b f' g'</span><span>
+</span><span id="line-213"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-214"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-215"></span><span>     </span><span class="hs-comment">-- When @f ~ g@, we can use a specialized version of 'btmap':</span><span>
+</span><span id="line-216"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-217"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-218"></span><span>     </span><span class="hs-comment">-- 'btmap1' :: ('FunctorB' (b f), 'FunctorT' b) =&gt; (forall a . f a -&gt; f' a) -&gt; b f f -&gt; b f' f'</span><span>
+</span><span id="line-219"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-220"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-221"></span><span>     </span><span class="hs-comment">-- Functions like 'btmap1' can be useful to handle cases where we would like</span><span>
+</span><span id="line-222"></span><span>     </span><span class="hs-comment">-- a barbie-type to occur under the functor-argument. Let's consider an example</span><span>
+</span><span id="line-223"></span><span>     </span><span class="hs-comment">-- of this. Continuing the web form example above, one may want to find out</span><span>
+</span><span id="line-224"></span><span>     </span><span class="hs-comment">-- about a person's dependants and model it as follows:</span><span>
+</span><span id="line-225"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-226"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-227"></span><span>     </span><span class="hs-comment">-- newtype Dependants f</span><span>
+</span><span id="line-228"></span><span>     </span><span class="hs-comment">--   = Dependants { getDependants :: f [Person f] }</span><span>
+</span><span id="line-229"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-230"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-231"></span><span>     </span><span class="hs-comment">-- This has the appeal of letting us distinguish two states:</span><span>
+</span><span id="line-232"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-233"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-234"></span><span>     </span><span class="hs-comment">-- Dependants { getDependants = Just [] }  -- the user declared 0 dependants</span><span>
+</span><span id="line-235"></span><span>     </span><span class="hs-comment">-- Dependants { getDependants = Nothing }  -- the user didn't specify dependants yet</span><span>
+</span><span id="line-236"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-237"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-238"></span><span>     </span><span class="hs-comment">-- Unfortunately, it is not possible to write a 'FunctorB' instance for such</span><span>
+</span><span id="line-239"></span><span>     </span><span class="hs-comment">-- a type (before going on, try to write one yourself!). Intuitively, we would</span><span>
+</span><span id="line-240"></span><span>     </span><span class="hs-comment">-- need to have @'Functor' f@, which we can't assume. However, such a type</span><span>
+</span><span id="line-241"></span><span>     </span><span class="hs-comment">-- can be rewritten as follows:</span><span>
+</span><span id="line-242"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-243"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-244"></span><span>     </span><span class="hs-comment">-- newtype Dependants f' f</span><span>
+</span><span id="line-245"></span><span>     </span><span class="hs-comment">--   = Dependants { getDependants :: f' [Person f] }</span><span>
+</span><span id="line-246"></span><span>     </span><span class="hs-comment">--   deriving (Generic)</span><span>
+</span><span id="line-247"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-248"></span><span>     </span><span class="hs-comment">-- instance Functor f' =&gt; FunctorB (Dependants f')</span><span>
+</span><span id="line-249"></span><span>     </span><span class="hs-comment">-- instance FunctorT Dependants</span><span>
+</span><span id="line-250"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-251"></span><span>     </span><span class="hs-comment">-- type Dependants f = Dependants f f</span><span>
+</span><span id="line-252"></span><span>     </span><span class="hs-comment">-- @</span><span>
+</span><span id="line-253"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-254"></span><span>     </span><span class="hs-comment">-- We can thus use 'btmap1' as a poor man's version of 'bmap' for 'Dependants'.</span><span>
+</span><span id="line-255"></span><span>     </span><span class="hs-comment">--</span><span>
+</span><span id="line-256"></span><span>     </span><span class="hs-comment">-- For more details, see:</span><span>
+</span><span id="line-257"></span><span>   </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="Barbies.Bi.html"><span class="hs-identifier">Barbies.Bi</span></a></span><span>
+</span><span id="line-258"></span><span>
+</span><span id="line-259"></span><span>
+</span><span id="line-260"></span><span>     </span><span class="annot"><span class="hs-comment">-- * Container-barbies</span></span><span>
+</span><span id="line-261"></span><span>
+</span><span id="line-262"></span><span>     </span><span class="hs-comment">-- | Some clothes make barbies look like containers, and we can make those</span><span>
+</span><span id="line-263"></span><span>     </span><span class="hs-comment">--   types behave like normal 'Functor's.</span><span>
+</span><span id="line-264"></span><span>
+</span><span id="line-265"></span><span>   </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Barbies.Internal.Containers.html#Container"><span class="hs-identifier">Containers.Container</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-266"></span><span>   </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Barbies.Internal.Containers.html#ErrorContainer"><span class="hs-identifier">Containers.ErrorContainer</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-267"></span><span>
+</span><span id="line-268"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Wrappers</span></span><span>
+</span><span id="line-269"></span><span>
+</span><span id="line-270"></span><span>    </span><span class="hs-comment">-- | This can be use with deriving via to automate derivation of instances</span><span>
+</span><span id="line-271"></span><span>    </span><span class="hs-comment">--   for Barbie-types.</span><span>
+</span><span id="line-272"></span><span>   </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Barbies.Internal.Wrappers.html#Barbie"><span class="hs-identifier">Wrappers.Barbie</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-273"></span><span>
+</span><span id="line-274"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Trivial Barbies</span></span><span>
+</span><span id="line-275"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Barbies.Internal.Trivial.html#Void"><span class="hs-identifier">Trivial.Void</span></a></span><span>
+</span><span id="line-276"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Barbies.Internal.Trivial.html#Unit"><span class="hs-identifier">Trivial.Unit</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-277"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-278"></span><span>
+</span><span id="line-279"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Barbies.Internal.Containers.html"><span class="hs-identifier">Barbies.Internal.Containers</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Containers</span></span><span>
+</span><span id="line-280"></span><span>
+</span><span id="line-281"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Functor.Barbie.html"><span class="hs-identifier">Data.Functor.Barbie</span></a></span><span>
+</span><span id="line-282"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Data.Functor.Transformer.html"><span class="hs-identifier">Data.Functor.Transformer</span></a></span><span>
+</span><span id="line-283"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Barbies.Bi.html"><span class="hs-identifier">Barbies.Bi</span></a></span><span>
+</span><span id="line-284"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Barbies.Internal.Trivial.html"><span class="hs-identifier">Barbies.Internal.Trivial</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Trivial</span></span><span>
+</span><span id="line-285"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Barbies.Internal.Wrappers.html"><span class="hs-identifier">Barbies.Internal.Wrappers</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Wrappers</span></span><span>
+</span><span id="line-286"></span></pre></body></html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621679938405"><span id="local-6989586621679938406"></span></span><span class="hs-comment">-- editorconfig-checker-disable-file</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase #-}</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- | This module contains the protocol versions and plutus versions as witnessed by the cardano ledger.</span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusLedgerApi.Common.Versions</span><span>
+</span><span id="line-5"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-comment">-- * Cardano Protocol versions</span></span><span>
+</span><span id="line-6"></span><span>      </span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html"><span class="hs-identifier">PlutusLedgerApi.Common.ProtocolVersions</span></a></span><span>
+</span><span id="line-7"></span><span>      </span><span class="annot"><span class="hs-comment">-- * Plutus versions</span></span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier">LedgerPlutusVersion</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>      </span><span class="annot"><span class="hs-comment">-- * Version-testing functions</span></span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#languageIntroducedIn"><span class="hs-identifier">languageIntroducedIn</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#languagesAvailableIn"><span class="hs-identifier">languagesAvailableIn</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#builtinsIntroducedIn"><span class="hs-identifier">builtinsIntroducedIn</span></a></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#builtinsAvailableIn"><span class="hs-identifier">builtinsAvailableIn</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier">PlutusCore</span></a></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html"><span class="hs-identifier">PlutusLedgerApi.Common.ProtocolVersions</span></a></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier">PlutusPrelude</span></a></span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Set</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">{- Note [New builtins and protocol versions]
+When we add a new builtin to the Plutus language, that is a *backwards-compatible* change.
+Old scripts will still work (since they don't use the new builtins), we just make some more
+scripts possible.
+
+It would be nice, therefore, to get away with just having one definition of the set of builtin
+functions. Then the new builtins will just &quot;work&quot;. However, this neglects the fact that
+the new builtins will be added to the builtin universe in the *software update* that
+brings a new ledger Plutus version, but they should only be usable after the corresponding
+*hard fork*. So there is a period of time in which they must be present in the software but not
+usable, so we need to decide this conditionally based on the protocol version.
+
+To do this we need to:
+- Know which protocol version a builtin was introduced in.
+- Given the protocol version, check a program for builtins that should not be usable yet.
+
+Note that this doesn't currently handle removals of builtins, although it fairly straighforwardly
+could do, just by tracking when they were removed.
+-}</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-comment">{-| The ledger Plutus versions. These are entirely different script languages from the ledger's perspective,
+which on our side are interpreted in very similar ways.
+
+It is a simple enumerated datatype (there is no major and minor components as in protocol version)
+and the __ordering of constructors__ is essential for deriving Enum,Ord,Bounded.
+
+IMPORTANT: this is different from the AST's `PlutusCore.Core.Type.Version`
+-}</span><span>
+</span><span id="line-52"></span><span id="local-6989586621679938378"><span id="local-6989586621679938379"></span></span><span class="hs-keyword">data</span><span> </span><span id="LedgerPlutusVersion"><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-var">LedgerPlutusVersion</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-53"></span><span>      </span><span id="PlutusV1"><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#PlutusV1"><span class="hs-identifier hs-var">PlutusV1</span></a></span></span><span> </span><span class="hs-comment">-- ^ introduced in shelley era</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="PlutusV2"><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#PlutusV2"><span class="hs-identifier hs-var">PlutusV2</span></a></span></span><span> </span><span class="hs-comment">-- ^ introduced in vasil era</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span id="PlutusV3"><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#PlutusV3"><span class="hs-identifier hs-var">PlutusV3</span></a></span></span><span> </span><span class="hs-comment">-- ^ not yet enabled, probably will be introduced in chang era</span><span>
+</span><span id="line-56"></span><span>   </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679938371"><span id="local-6989586621679938373"><span class="annot"><span class="annottext">LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+$c/= :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+== :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+$c== :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679938351"><span id="local-6989586621679938353"><span id="local-6989586621679938356"><span id="local-6989586621679938359"><span id="local-6989586621679938362"><span id="local-6989586621679938364"><span id="local-6989586621679938366"><span class="annot"><span class="annottext">Eq LedgerPlutusVersion
+LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Ordering
+LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; LedgerPlutusVersion
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; LedgerPlutusVersion
+$cmin :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; LedgerPlutusVersion
+max :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; LedgerPlutusVersion
+$cmax :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; LedgerPlutusVersion
+&gt;= :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+$c&gt;= :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+&gt; :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+$c&gt; :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+&lt;= :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+$c&lt;= :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+&lt; :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+$c&lt; :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Bool
+compare :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Ordering
+$ccompare :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679938344"><span id="local-6989586621679938346"><span id="local-6989586621679938348"><span class="annot"><span class="annottext">Int -&gt; LedgerPlutusVersion -&gt; ShowS
+[LedgerPlutusVersion] -&gt; ShowS
+LedgerPlutusVersion -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [LedgerPlutusVersion] -&gt; ShowS
+$cshowList :: [LedgerPlutusVersion] -&gt; ShowS
+show :: LedgerPlutusVersion -&gt; String
+$cshow :: LedgerPlutusVersion -&gt; String
+showsPrec :: Int -&gt; LedgerPlutusVersion -&gt; ShowS
+$cshowsPrec :: Int -&gt; LedgerPlutusVersion -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep LedgerPlutusVersion x -&gt; LedgerPlutusVersion
+forall x. LedgerPlutusVersion -&gt; Rep LedgerPlutusVersion x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep LedgerPlutusVersion x -&gt; LedgerPlutusVersion
+$cfrom :: forall x. LedgerPlutusVersion -&gt; Rep LedgerPlutusVersion x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679938301"><span id="local-6989586621679938303"><span id="local-6989586621679938307"><span id="local-6989586621679938311"><span id="local-6989586621679938313"><span id="local-6989586621679938323"><span id="local-6989586621679938329"><span id="local-6989586621679938337"><span class="annot"><span class="annottext">Int -&gt; LedgerPlutusVersion
+LedgerPlutusVersion -&gt; Int
+LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+LedgerPlutusVersion -&gt; LedgerPlutusVersion
+LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+LedgerPlutusVersion
+-&gt; LedgerPlutusVersion
+-&gt; LedgerPlutusVersion
+-&gt; [LedgerPlutusVersion]
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+enumFromThenTo :: LedgerPlutusVersion
+-&gt; LedgerPlutusVersion
+-&gt; LedgerPlutusVersion
+-&gt; [LedgerPlutusVersion]
+$cenumFromThenTo :: LedgerPlutusVersion
+-&gt; LedgerPlutusVersion
+-&gt; LedgerPlutusVersion
+-&gt; [LedgerPlutusVersion]
+enumFromTo :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+$cenumFromTo :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+enumFromThen :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+$cenumFromThen :: LedgerPlutusVersion -&gt; LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+enumFrom :: LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+$cenumFrom :: LedgerPlutusVersion -&gt; [LedgerPlutusVersion]
+fromEnum :: LedgerPlutusVersion -&gt; Int
+$cfromEnum :: LedgerPlutusVersion -&gt; Int
+toEnum :: Int -&gt; LedgerPlutusVersion
+$ctoEnum :: Int -&gt; LedgerPlutusVersion
+pred :: LedgerPlutusVersion -&gt; LedgerPlutusVersion
+$cpred :: LedgerPlutusVersion -&gt; LedgerPlutusVersion
+succ :: LedgerPlutusVersion -&gt; LedgerPlutusVersion
+$csucc :: LedgerPlutusVersion -&gt; LedgerPlutusVersion
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></a></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679938296"><span id="local-6989586621679938298"><span class="annot"><span class="annottext">LedgerPlutusVersion
+forall a. a -&gt; a -&gt; Bounded a
+maxBound :: LedgerPlutusVersion
+$cmaxBound :: LedgerPlutusVersion
+minBound :: LedgerPlutusVersion
+$cminBound :: LedgerPlutusVersion
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679938292"><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-type">Pretty</span></a></span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-59"></span><span>    </span><span id="local-6989586621679938289"><span class="annot"><span class="annottext">pretty :: forall ann. LedgerPlutusVersion -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">pretty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a ann. Show a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">viaShow</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">{-| A map indicating which builtin functions were introduced in which 'ProtocolVersion'. Each builtin function should appear at most once.
+
+This __must__ be updated when new builtins are added.
+See Note [New builtins and protocol versions]
+-}</span><span>
+</span><span id="line-66"></span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#builtinsIntroducedIn"><span class="hs-identifier hs-type">builtinsIntroducedIn</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Map.Map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html#ProtocolVersion"><span class="hs-identifier hs-type">ProtocolVersion</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Set.Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-type">DefaultFun</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span id="builtinsIntroducedIn"><span class="annot"><span class="annottext">builtinsIntroducedIn :: Map (LedgerPlutusVersion, ProtocolVersion) (Set DefaultFun)
+</span><a href="PlutusLedgerApi.Common.Versions.html#builtinsIntroducedIn"><span class="hs-identifier hs-var hs-var">builtinsIntroducedIn</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall k a. Ord k =&gt; [(k, a)] -&gt; Map k a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Map.fromList</span></a></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-comment">-- Alonzo is protocolversion=5.0</span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#PlutusV1"><span class="hs-identifier hs-var">PlutusV1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.ProtocolVersions.html#alonzoPV"><span class="hs-identifier hs-var">alonzoPV</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; [a] -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Set.fromList</span></a></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-70"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">AddInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">SubtractInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">MultiplyInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">DivideInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">QuotientInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">RemainderInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ModInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">EqualsInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">LessThanInteger</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">LessThanEqualsInteger</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-71"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">AppendByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ConsByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">SliceByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">LengthOfByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">IndexByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">EqualsByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">LessThanByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">LessThanEqualsByteString</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-72"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">Sha2_256</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">Sha3_256</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">Blake2b_256</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">VerifyEd25519Signature</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-73"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">AppendString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">EqualsString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">EncodeUtf8</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">DecodeUtf8</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-74"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">IfThenElse</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-75"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ChooseUnit</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-76"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">Trace</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-77"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">FstPair</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">SndPair</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-78"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ChooseList</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">MkCons</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">HeadList</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">TailList</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">NullList</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-79"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ChooseData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ConstrData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">MapData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">ListData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">IData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">BData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">UnConstrData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">UnMapData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">UnListData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">UnIData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">UnBData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">EqualsData</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-80"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">MkPairData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">MkNilData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">MkNilPairData</span></a></span><span>
+</span><span id="line-81"></span><span>          </span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-comment">-- Vasil is protocolversion=7.0</span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#PlutusV2"><span class="hs-identifier hs-var">PlutusV2</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.ProtocolVersions.html#vasilPV"><span class="hs-identifier hs-var">vasilPV</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; [a] -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Set.fromList</span></a></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-84"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">SerialiseData</span></a></span><span>
+</span><span id="line-85"></span><span>          </span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-86"></span><span>  </span><span class="hs-comment">-- Chang is protocolversion=8.0</span><span>
+</span><span id="line-87"></span><span>  </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#PlutusV2"><span class="hs-identifier hs-var">PlutusV2</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.ProtocolVersions.html#changPV"><span class="hs-identifier hs-var">changPV</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; [a] -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Set.fromList</span></a></span><span> </span><span class="hs-special">[</span><span>
+</span><span id="line-88"></span><span>          </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">VerifyEcdsaSecp256k1Signature</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DefaultFun
+</span><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-var">VerifySchnorrSecp256k1Signature</span></a></span><span>
+</span><span id="line-89"></span><span>          </span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-special">]</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-comment">{-| Query the protocol version that a specific ledger Plutus version was first introduced in.
+
+/Introduction/ in this context means the enablement/allowance of scripts of that ledger Plutus version to be executed on-chain.
+-}</span><span>
+</span><span id="line-96"></span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#languageIntroducedIn"><span class="hs-identifier hs-type">languageIntroducedIn</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html#ProtocolVersion"><span class="hs-identifier hs-type">ProtocolVersion</span></a></span><span>
+</span><span id="line-97"></span><span id="languageIntroducedIn"><span class="annot"><span class="annottext">languageIntroducedIn :: LedgerPlutusVersion -&gt; ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#languageIntroducedIn"><span class="hs-identifier hs-var hs-var">languageIntroducedIn</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-98"></span><span>    </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#PlutusV1"><span class="hs-identifier hs-var">PlutusV1</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.ProtocolVersions.html#alonzoPV"><span class="hs-identifier hs-var">alonzoPV</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#PlutusV2"><span class="hs-identifier hs-var">PlutusV2</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.ProtocolVersions.html#vasilPV"><span class="hs-identifier hs-var">vasilPV</span></a></span><span>
+</span><span id="line-100"></span><span>    </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#PlutusV3"><span class="hs-identifier hs-var">PlutusV3</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.ProtocolVersions.html#changPV"><span class="hs-identifier hs-var">changPV</span></a></span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-comment">{-| Given a protocol version return a set of all available ledger Plutus versions that are enabled/allowed to run.
+
+Assumes that the ledger Plutus versions once introduced/enabled, will never be disabled in the future.
+-}</span><span>
+</span><span id="line-106"></span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#languagesAvailableIn"><span class="hs-identifier hs-type">languagesAvailableIn</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html#ProtocolVersion"><span class="hs-identifier hs-type">ProtocolVersion</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Set.Set</span></a></span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span>
+</span><span id="line-107"></span><span id="languagesAvailableIn"><span class="annot"><span class="annottext">languagesAvailableIn :: ProtocolVersion -&gt; Set LedgerPlutusVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#languagesAvailableIn"><span class="hs-identifier hs-var hs-var">languagesAvailableIn</span></a></span></span><span> </span><span id="local-6989586621679938227"><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="#local-6989586621679938227"><span class="hs-identifier hs-var">searchPv</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-108"></span><span>    </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="annot"><span class="annottext">LedgerPlutusVersion -&gt; Set LedgerPlutusVersion
+</span><a href="#local-6989586621679938225"><span class="hs-identifier hs-var">ledgerVersionToSet</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. (Enum a, Bounded a) =&gt; [a]
+</span><a href="../../../../extra/html/src"><span class="hs-identifier hs-var">enumerate</span></a></span><span>
+</span><span id="line-109"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-comment">-- OPTIMIZE: could be done faster using takeWhile</span><span>
+</span><span id="line-111"></span><span>    </span><span class="annot"><a href="#local-6989586621679938225"><span class="hs-identifier hs-type">ledgerVersionToSet</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Set.Set</span></a></span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span>
+</span><span id="line-112"></span><span>    </span><span id="local-6989586621679938225"><span class="annot"><span class="annottext">ledgerVersionToSet :: LedgerPlutusVersion -&gt; Set LedgerPlutusVersion
+</span><a href="#local-6989586621679938225"><span class="hs-identifier hs-var hs-var">ledgerVersionToSet</span></a></span></span><span> </span><span id="local-6989586621679938223"><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938223"><span class="hs-identifier hs-var">lv</span></a></span></span><span>
+</span><span id="line-113"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">LedgerPlutusVersion -&gt; ProtocolVersion
+</span><a href="PlutusLedgerApi.Common.Versions.html#languageIntroducedIn"><span class="hs-identifier hs-var">languageIntroducedIn</span></a></span><span> </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938223"><span class="hs-identifier hs-var">lv</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&lt;=</span></a></span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="#local-6989586621679938227"><span class="hs-identifier hs-var">searchPv</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Set.singleton</span></a></span><span> </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938223"><span class="hs-identifier hs-var">lv</span></a></span><span>
+</span><span id="line-114"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Monoid a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">{-| Which builtin functions are available in the given 'ProtocolVersion'?
+
+See Note [New builtins and protocol versions]
+-}</span><span>
+</span><span id="line-120"></span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#builtinsAvailableIn"><span class="hs-identifier hs-type">builtinsAvailableIn</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html#ProtocolVersion"><span class="hs-identifier hs-type">ProtocolVersion</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Set.Set</span></a></span><span> </span><span class="annot"><a href="../../../../plutus-core/html/src"><span class="hs-identifier hs-type">DefaultFun</span></a></span><span>
+</span><span id="line-121"></span><span id="builtinsAvailableIn"><span class="annot"><span class="annottext">builtinsAvailableIn :: LedgerPlutusVersion -&gt; ProtocolVersion -&gt; Set DefaultFun
+</span><a href="PlutusLedgerApi.Common.Versions.html#builtinsAvailableIn"><span class="hs-identifier hs-var hs-var">builtinsAvailableIn</span></a></span></span><span> </span><span id="local-6989586621679938220"><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938220"><span class="hs-identifier hs-var">thisLv</span></a></span></span><span> </span><span id="local-6989586621679938219"><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="#local-6989586621679938219"><span class="hs-identifier hs-var">thisPv</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) m. (Foldable t, Monoid m) =&gt; t m -&gt; m
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fold</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall k a. Map k a -&gt; [a]
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Map.elems</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-122"></span><span>    </span><span class="annot"><span class="annottext">forall k a. (k -&gt; Bool) -&gt; Map k a -&gt; Map k a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Map.takeWhileAntitone</span></a></span><span> </span><span class="annot"><span class="annottext">(LedgerPlutusVersion, ProtocolVersion) -&gt; Bool
+</span><a href="#local-6989586621679938215"><span class="hs-identifier hs-var">builtinAvailableIn</span></a></span><span> </span><span class="annot"><span class="annottext">Map (LedgerPlutusVersion, ProtocolVersion) (Set DefaultFun)
+</span><a href="PlutusLedgerApi.Common.Versions.html#builtinsIntroducedIn"><span class="hs-identifier hs-var">builtinsIntroducedIn</span></a></span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-keyword">where</span><span>
+</span><span id="line-124"></span><span>      </span><span class="annot"><a href="#local-6989586621679938215"><span class="hs-identifier hs-type">builtinAvailableIn</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusLedgerApi.Common.Versions.html#LedgerPlutusVersion"><span class="hs-identifier hs-type">LedgerPlutusVersion</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="PlutusLedgerApi.Common.ProtocolVersions.html#ProtocolVersion"><span class="hs-identifier hs-type">ProtocolVersion</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-125"></span><span>      </span><span id="local-6989586621679938215"><span class="annot"><span class="annottext">builtinAvailableIn :: (LedgerPlutusVersion, ProtocolVersion) -&gt; Bool
+</span><a href="#local-6989586621679938215"><span class="hs-identifier hs-var hs-var">builtinAvailableIn</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679938214"><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938214"><span class="hs-identifier hs-var">introducedInLv</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679938213"><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="#local-6989586621679938213"><span class="hs-identifier hs-var">introducedInPv</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-126"></span><span>          </span><span class="hs-comment">-- both should be satisfied</span><span>
+</span><span id="line-127"></span><span>          </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938214"><span class="hs-identifier hs-var">introducedInLv</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&lt;=</span></a></span><span> </span><span class="annot"><span class="annottext">LedgerPlutusVersion
+</span><a href="#local-6989586621679938220"><span class="hs-identifier hs-var">thisLv</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="#local-6989586621679938213"><span class="hs-identifier hs-var">introducedInPv</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&lt;=</span></a></span><span> </span><span class="annot"><span class="annottext">ProtocolVersion
+</span><a href="#local-6989586621679938219"><span class="hs-identifier hs-var">thisPv</span></a></span><span>
+</span><span id="line-128"></span></pre></body></html>

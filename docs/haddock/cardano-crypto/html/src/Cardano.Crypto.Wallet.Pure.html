@@ -1,0 +1,352 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE BangPatterns        #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE GADTs               #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings   #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Crypto.Wallet.Pure</span><span>
+</span><span id="line-8"></span><span>    </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier">XPrv</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier">XPub</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#xprvPub"><span class="hs-identifier">xprvPub</span></a></span><span>
+</span><span id="line-11"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPrv"><span class="hs-identifier">deriveXPrv</span></a></span><span>
+</span><span id="line-12"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPrvHardened"><span class="hs-identifier">deriveXPrvHardened</span></a></span><span>
+</span><span id="line-13"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPub"><span class="hs-identifier">deriveXPub</span></a></span><span>
+</span><span id="line-14"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#hInitSeed"><span class="hs-identifier">hInitSeed</span></a></span><span>
+</span><span id="line-15"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#hFinalize"><span class="hs-identifier">hFinalize</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span>             </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Crypto.Math.Edwards25519.html"><span class="hs-identifier">Crypto.Math.Edwards25519</span></a></span><span>    </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Edwards25519</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.Hash</span></a></span><span>                 </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">SHA512</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.MAC.HMAC</span></a></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">HMAC</span></span><span>
+</span><span id="line-22"></span><span class="hs-comment">--import qualified Crypto.PubKey.Ed25519       as Ed25519</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Bits</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">Data.ByteArray</span></a></span><span>              </span><span class="hs-special">(</span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">ByteArrayAccess</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">convert</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">Data.ByteArray</span></a></span><span>              </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">splitAt</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString</span></a></span><span>             </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">ByteString</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString</span></a></span><span>             </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">pack</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../hashable/html/src"><span class="hs-identifier">Data.Hashable</span></a></span><span>               </span><span class="hs-special">(</span><span class="annot"><a href="../../../../hashable/html/src"><span class="hs-identifier">Hashable</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Word</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span>                </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html"><span class="hs-identifier">Cardano.Crypto.Wallet.Types</span></a></span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">data</span><span> </span><span id="XPrv"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-var">XPrv</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="XPrv"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-var">XPrv</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Crypto.Math.Edwards25519.html#Scalar"><span class="hs-identifier hs-type">Edwards25519.Scalar</span></a></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span id="local-6989586621679095251"><span id="local-6989586621679095252"></span></span><span class="hs-keyword">data</span><span> </span><span id="XPub"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-var">XPub</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="XPub"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-var">XPub</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Crypto.Math.Edwards25519.html#PointCompressed"><span class="hs-identifier hs-type">Edwards25519.PointCompressed</span></a></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679095242"><span id="local-6989586621679095248"><span class="annot"><span class="annottext">XPub -&gt; XPub -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: XPub -&gt; XPub -&gt; Bool
+$c/= :: XPub -&gt; XPub -&gt; Bool
+== :: XPub -&gt; XPub -&gt; Bool
+$c== :: XPub -&gt; XPub -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679095216"><span id="local-6989586621679095218"><span id="local-6989586621679095221"><span id="local-6989586621679095224"><span id="local-6989586621679095227"><span id="local-6989586621679095231"><span id="local-6989586621679095237"><span class="annot"><span class="annottext">Eq XPub
+XPub -&gt; XPub -&gt; Bool
+XPub -&gt; XPub -&gt; Ordering
+XPub -&gt; XPub -&gt; XPub
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: XPub -&gt; XPub -&gt; XPub
+$cmin :: XPub -&gt; XPub -&gt; XPub
+max :: XPub -&gt; XPub -&gt; XPub
+$cmax :: XPub -&gt; XPub -&gt; XPub
+&gt;= :: XPub -&gt; XPub -&gt; Bool
+$c&gt;= :: XPub -&gt; XPub -&gt; Bool
+&gt; :: XPub -&gt; XPub -&gt; Bool
+$c&gt; :: XPub -&gt; XPub -&gt; Bool
+&lt;= :: XPub -&gt; XPub -&gt; Bool
+$c&lt;= :: XPub -&gt; XPub -&gt; Bool
+&lt; :: XPub -&gt; XPub -&gt; Bool
+$c&lt; :: XPub -&gt; XPub -&gt; Bool
+compare :: XPub -&gt; XPub -&gt; Ordering
+$ccompare :: XPub -&gt; XPub -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679095203"><span id="local-6989586621679095205"><span id="local-6989586621679095213"><span class="annot"><span class="annottext">Int -&gt; XPub -&gt; ShowS
+[XPub] -&gt; ShowS
+XPub -&gt; [Char]
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; [Char]) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [XPub] -&gt; ShowS
+$cshowList :: [XPub] -&gt; ShowS
+show :: XPub -&gt; [Char]
+$cshow :: XPub -&gt; [Char]
+showsPrec :: Int -&gt; XPub -&gt; ShowS
+$cshowsPrec :: Int -&gt; XPub -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep XPub x -&gt; XPub
+forall x. XPub -&gt; Rep XPub x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep XPub x -&gt; XPub
+$cfrom :: forall x. XPub -&gt; Rep XPub x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679095197"><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-type">NFData</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-type">XPub</span></a></span></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679095190"><span id="local-6989586621679095192"><span class="annot"><a href="../../../../hashable/html/src"><span class="hs-identifier hs-type">Hashable</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-type">XPub</span></a></span></span></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#xprvPub"><span class="hs-identifier hs-type">xprvPub</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span>
+</span><span id="line-43"></span><span id="xprvPub"><span class="annot"><span class="annottext">xprvPub :: XPrv -&gt; ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#xprvPub"><span class="hs-identifier hs-var hs-var">xprvPub</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span> </span><span id="local-6989586621679095188"><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095188"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-44"></span><span>    </span><span class="annot"><span class="annottext">PointCompressed -&gt; ByteString
+</span><a href="Crypto.Math.Edwards25519.html#unPointCompressed"><span class="hs-identifier hs-var">Edwards25519.unPointCompressed</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar -&gt; PointCompressed
+</span><a href="Crypto.Math.Edwards25519.html#scalarToPoint"><span class="hs-identifier hs-var">Edwards25519.scalarToPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095188"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPrv"><span class="hs-identifier hs-type">deriveXPrv</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span>
+</span><span id="line-47"></span><span id="deriveXPrv"><span class="annot"><span class="annottext">deriveXPrv :: XPrv -&gt; Word32 -&gt; XPrv
+</span><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPrv"><span class="hs-identifier hs-var hs-var">deriveXPrv</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span> </span><span id="local-6989586621679095185"><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095185"><span class="hs-identifier hs-var">sec</span></a></span></span><span> </span><span id="local-6989586621679095184"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095184"><span class="hs-identifier hs-var">ccode</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679095183"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095183"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621679095182"><span class="annot"><span class="annottext">pub :: PointCompressed
+</span><a href="#local-6989586621679095182"><span class="hs-identifier hs-var hs-var">pub</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Scalar -&gt; PointCompressed
+</span><a href="Crypto.Math.Edwards25519.html#scalarToPoint"><span class="hs-identifier hs-var">Edwards25519.scalarToPoint</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095185"><span class="hs-identifier hs-var">sec</span></a></span><span>
+</span><span id="line-49"></span><span>        </span><span class="hs-special">(</span><span id="local-6989586621679095181"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095181"><span class="hs-identifier hs-var">iL</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679095180"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095180"><span class="hs-identifier hs-var">iR</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DerivationHash -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#walletHash"><span class="hs-identifier hs-var">walletHash</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed -&gt; ChainCode -&gt; Word32 -&gt; DerivationHash
+</span><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashNormal"><span class="hs-identifier hs-var">DerivationHashNormal</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095182"><span class="hs-identifier hs-var">pub</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095184"><span class="hs-identifier hs-var">ccode</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095183"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-50"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679095177"><span class="annot"><span class="annottext">derived :: Scalar
+</span><a href="#local-6989586621679095177"><span class="hs-identifier hs-var hs-var">derived</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Scalar
+</span><a href="Crypto.Math.Edwards25519.html#scalar"><span class="hs-identifier hs-var">Edwards25519.scalar</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095181"><span class="hs-identifier hs-var">iL</span></a></span><span>
+</span><span id="line-51"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Scalar -&gt; ChainCode -&gt; XPrv
+</span><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-var">XPrv</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Scalar -&gt; Scalar -&gt; Scalar
+</span><a href="Crypto.Math.Edwards25519.html#scalarAdd"><span class="hs-identifier hs-var">Edwards25519.scalarAdd</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095185"><span class="hs-identifier hs-var">sec</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095177"><span class="hs-identifier hs-var">derived</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095180"><span class="hs-identifier hs-var">iR</span></a></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPrvHardened"><span class="hs-identifier hs-type">deriveXPrvHardened</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span>
+</span><span id="line-54"></span><span id="deriveXPrvHardened"><span class="annot"><span class="annottext">deriveXPrvHardened :: XPrv -&gt; Word32 -&gt; XPrv
+</span><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPrvHardened"><span class="hs-identifier hs-var hs-var">deriveXPrvHardened</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-type">XPrv</span></a></span><span> </span><span id="local-6989586621679095174"><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095174"><span class="hs-identifier hs-var">sec</span></a></span></span><span> </span><span id="local-6989586621679095173"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095173"><span class="hs-identifier hs-var">ccode</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679095172"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095172"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679095171"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095171"><span class="hs-identifier hs-var">iL</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679095170"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095170"><span class="hs-identifier hs-var">iR</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DerivationHash -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#walletHash"><span class="hs-identifier hs-var">walletHash</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar -&gt; ChainCode -&gt; Word32 -&gt; DerivationHash
+</span><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashHardened"><span class="hs-identifier hs-var">DerivationHashHardened</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095174"><span class="hs-identifier hs-var">sec</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095173"><span class="hs-identifier hs-var">ccode</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095172"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-56"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Scalar -&gt; ChainCode -&gt; XPrv
+</span><a href="Cardano.Crypto.Wallet.Pure.html#XPrv"><span class="hs-identifier hs-var">XPrv</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Scalar
+</span><a href="Crypto.Math.Edwards25519.html#scalar"><span class="hs-identifier hs-var">Edwards25519.scalar</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095171"><span class="hs-identifier hs-var">iL</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095170"><span class="hs-identifier hs-var">iR</span></a></span><span>
+</span><span id="line-57"></span><span>
+</span><span id="line-58"></span><span class="hs-comment">-- | Derive a child public from an extended public key</span><span>
+</span><span id="line-59"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPub"><span class="hs-identifier hs-type">deriveXPub</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-type">XPub</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-type">XPub</span></a></span><span>
+</span><span id="line-60"></span><span id="deriveXPub"><span class="annot"><span class="annottext">deriveXPub :: XPub -&gt; Word32 -&gt; XPub
+</span><a href="Cardano.Crypto.Wallet.Pure.html#deriveXPub"><span class="hs-identifier hs-var hs-var">deriveXPub</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-type">XPub</span></a></span><span> </span><span id="local-6989586621679095168"><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095168"><span class="hs-identifier hs-var">pub</span></a></span></span><span> </span><span id="local-6989586621679095167"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095167"><span class="hs-identifier hs-var">ccode</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679095166"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095166"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679095165"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095165"><span class="hs-identifier hs-var">iL</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679095164"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095164"><span class="hs-identifier hs-var">iR</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DerivationHash -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#walletHash"><span class="hs-identifier hs-var">walletHash</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed -&gt; ChainCode -&gt; Word32 -&gt; DerivationHash
+</span><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashNormal"><span class="hs-identifier hs-var">DerivationHashNormal</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095168"><span class="hs-identifier hs-var">pub</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095167"><span class="hs-identifier hs-var">ccode</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095166"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-62"></span><span>        </span><span class="hs-glyph">!</span><span id="local-6989586621679095163"><span class="annot"><span class="annottext">derived :: PointCompressed
+</span><a href="#local-6989586621679095163"><span class="hs-identifier hs-var hs-var">derived</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Scalar -&gt; PointCompressed
+</span><a href="Crypto.Math.Edwards25519.html#scalarToPoint"><span class="hs-identifier hs-var">Edwards25519.scalarToPoint</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Scalar
+</span><a href="Crypto.Math.Edwards25519.html#scalar"><span class="hs-identifier hs-var">Edwards25519.scalar</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095165"><span class="hs-identifier hs-var">iL</span></a></span><span>
+</span><span id="line-63"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">PointCompressed -&gt; ChainCode -&gt; XPub
+</span><a href="Cardano.Crypto.Wallet.Pure.html#XPub"><span class="hs-identifier hs-var">XPub</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PointCompressed -&gt; PointCompressed -&gt; PointCompressed
+</span><a href="Crypto.Math.Edwards25519.html#pointAdd"><span class="hs-identifier hs-var">Edwards25519.pointAdd</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095168"><span class="hs-identifier hs-var">pub</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095163"><span class="hs-identifier hs-var">derived</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095164"><span class="hs-identifier hs-var">iR</span></a></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span class="hs-comment">-- hashing methods either hardened or normal</span><span>
+</span><span id="line-67"></span><span class="hs-keyword">data</span><span> </span><span id="DerivationHash"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHash"><span class="hs-identifier hs-var">DerivationHash</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-68"></span><span>    </span><span id="DerivationHashHardened"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashHardened"><span class="hs-identifier hs-var">DerivationHashHardened</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Math.Edwards25519.html#Scalar"><span class="hs-identifier hs-type">Edwards25519.Scalar</span></a></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHash"><span class="hs-identifier hs-type">DerivationHash</span></a></span><span>
+</span><span id="line-69"></span><span>    </span><span id="DerivationHashNormal"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashNormal"><span class="hs-identifier hs-var">DerivationHashNormal</span></a></span></span><span>   </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Crypto.Math.Edwards25519.html#PointCompressed"><span class="hs-identifier hs-type">Edwards25519.PointCompressed</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHash"><span class="hs-identifier hs-type">DerivationHash</span></a></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#walletHash"><span class="hs-identifier hs-type">walletHash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHash"><span class="hs-identifier hs-type">DerivationHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span id="walletHash"><span class="annot"><span class="annottext">walletHash :: DerivationHash -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#walletHash"><span class="hs-identifier hs-var hs-var">walletHash</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashHardened"><span class="hs-identifier hs-type">DerivationHashHardened</span></a></span><span> </span><span id="local-6989586621679095161"><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095161"><span class="hs-identifier hs-var">sec</span></a></span></span><span> </span><span id="local-6989586621679095160"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095160"><span class="hs-identifier hs-var">cc</span></a></span></span><span> </span><span id="local-6989586621679095159"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095159"><span class="hs-identifier hs-var">w</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-73"></span><span>    </span><span class="annot"><span class="annottext">Context SHA512 -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hFinalize"><span class="hs-identifier hs-var">hFinalize</span></a></span><span>
+</span><span id="line-74"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall message a.
+(ByteArrayAccess message, HashAlgorithm a) =&gt;
+Context a -&gt; message -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.update</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32 -&gt; ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#encodeIndex"><span class="hs-identifier hs-var">encodeIndex</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095159"><span class="hs-identifier hs-var">w</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall message a.
+(ByteArrayAccess message, HashAlgorithm a) =&gt;
+Context a -&gt; message -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.update</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Scalar -&gt; ByteString
+</span><a href="Crypto.Math.Edwards25519.html#unScalar"><span class="hs-identifier hs-var">Edwards25519.unScalar</span></a></span><span> </span><span class="annot"><span class="annottext">Scalar
+</span><a href="#local-6989586621679095161"><span class="hs-identifier hs-var">sec</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall message a.
+(ByteArrayAccess message, HashAlgorithm a) =&gt;
+Context a -&gt; message -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.update</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hardenedTag"><span class="hs-identifier hs-var">hardenedTag</span></a></span><span>
+</span><span id="line-77"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode -&gt; Context SHA512
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hInit"><span class="hs-identifier hs-var">hInit</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095160"><span class="hs-identifier hs-var">cc</span></a></span><span>
+</span><span id="line-78"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#walletHash"><span class="hs-identifier hs-var">walletHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#DerivationHashNormal"><span class="hs-identifier hs-type">DerivationHashNormal</span></a></span><span> </span><span id="local-6989586621679095152"><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095152"><span class="hs-identifier hs-var">pub</span></a></span></span><span> </span><span id="local-6989586621679095151"><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095151"><span class="hs-identifier hs-var">cc</span></a></span></span><span> </span><span id="local-6989586621679095150"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095150"><span class="hs-identifier hs-var">w</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-79"></span><span>    </span><span class="annot"><span class="annottext">Context SHA512 -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hFinalize"><span class="hs-identifier hs-var">hFinalize</span></a></span><span>
+</span><span id="line-80"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall message a.
+(ByteArrayAccess message, HashAlgorithm a) =&gt;
+Context a -&gt; message -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.update</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32 -&gt; ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#encodeIndex"><span class="hs-identifier hs-var">encodeIndex</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095150"><span class="hs-identifier hs-var">w</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall message a.
+(ByteArrayAccess message, HashAlgorithm a) =&gt;
+Context a -&gt; message -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.update</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PointCompressed -&gt; ByteString
+</span><a href="Crypto.Math.Edwards25519.html#unPointCompressed"><span class="hs-identifier hs-var">Edwards25519.unPointCompressed</span></a></span><span> </span><span class="annot"><span class="annottext">PointCompressed
+</span><a href="#local-6989586621679095152"><span class="hs-identifier hs-var">pub</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall message a.
+(ByteArrayAccess message, HashAlgorithm a) =&gt;
+Context a -&gt; message -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.update</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#normalTag"><span class="hs-identifier hs-var">normalTag</span></a></span><span>
+</span><span id="line-83"></span><span>            </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode -&gt; Context SHA512
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hInit"><span class="hs-identifier hs-var">hInit</span></a></span><span> </span><span class="annot"><span class="annottext">ChainCode
+</span><a href="#local-6989586621679095151"><span class="hs-identifier hs-var">cc</span></a></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#hardenedTag"><span class="hs-identifier hs-type">hardenedTag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span>
+</span><span id="line-86"></span><span id="hardenedTag"><span class="annot"><span class="annottext">hardenedTag :: ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hardenedTag"><span class="hs-identifier hs-var hs-var">hardenedTag</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Word8] -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">B.pack</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Enum a =&gt; a -&gt; Int
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromEnum</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;HARD&quot;</span></span><span>
+</span><span id="line-87"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#normalTag"><span class="hs-identifier hs-type">normalTag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span>
+</span><span id="line-88"></span><span id="normalTag"><span class="annot"><span class="annottext">normalTag :: ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#normalTag"><span class="hs-identifier hs-var hs-var">normalTag</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Word8] -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">B.pack</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Enum a =&gt; a -&gt; Int
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromEnum</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;NORM&quot;</span></span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- | Encode a Word32 in Big endian</span><span>
+</span><span id="line-91"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#encodeIndex"><span class="hs-identifier hs-type">encodeIndex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Word32</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span>
+</span><span id="line-92"></span><span id="encodeIndex"><span class="annot"><span class="annottext">encodeIndex :: Word32 -&gt; ByteString
+</span><a href="Cardano.Crypto.Wallet.Pure.html#encodeIndex"><span class="hs-identifier hs-var hs-var">encodeIndex</span></a></span></span><span> </span><span id="local-6989586621679095146"><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095146"><span class="hs-identifier hs-var">w</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Word8] -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">B.pack</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679095145"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679095144"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679095143"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621679095142"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-93"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621679095142"><span class="annot"><span class="annottext">a :: Word8
+</span><a href="#local-6989586621679095142"><span class="hs-identifier hs-var hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095146"><span class="hs-identifier hs-var">w</span></a></span><span>
+</span><span id="line-95"></span><span>    </span><span id="local-6989586621679095143"><span class="annot"><span class="annottext">b :: Word8
+</span><a href="#local-6989586621679095143"><span class="hs-identifier hs-var hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095146"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">`shiftR`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>    </span><span id="local-6989586621679095144"><span class="annot"><span class="annottext">c :: Word8
+</span><a href="#local-6989586621679095144"><span class="hs-identifier hs-var hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095146"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">`shiftR`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>    </span><span id="local-6989586621679095145"><span class="annot"><span class="annottext">d :: Word8
+</span><a href="#local-6989586621679095145"><span class="hs-identifier hs-var hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word32
+</span><a href="#local-6989586621679095146"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">`shiftR`</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">24</span></span><span class="hs-special">)</span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#hInit"><span class="hs-identifier hs-type">hInit</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">HMAC.Context</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">SHA512</span></a></span><span>
+</span><span id="line-100"></span><span id="hInit"><span class="annot"><span class="annottext">hInit :: ChainCode -&gt; Context SHA512
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hInit"><span class="hs-identifier hs-var hs-var">hInit</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span> </span><span id="local-6989586621679095139"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095139"><span class="hs-identifier hs-var">key</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall key a.
+(ByteArrayAccess key, HashAlgorithm a) =&gt;
+key -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.initialize</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095139"><span class="hs-identifier hs-var">key</span></a></span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span id="local-6989586621679095363"><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#hInitSeed"><span class="hs-identifier hs-type">hInitSeed</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier hs-type">ByteArrayAccess</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679095363"><span class="hs-identifier hs-type">seed</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679095363"><span class="hs-identifier hs-type">seed</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">HMAC.Context</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">SHA512</span></a></span></span><span>
+</span><span id="line-103"></span><span id="hInitSeed"><span class="annot"><span class="annottext">hInitSeed :: forall seed. ByteArrayAccess seed =&gt; seed -&gt; Context SHA512
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hInitSeed"><span class="hs-identifier hs-var hs-var">hInitSeed</span></a></span></span><span> </span><span id="local-6989586621679095134"><span class="annot"><span class="annottext">seed
+</span><a href="#local-6989586621679095134"><span class="hs-identifier hs-var">seed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall key a.
+(ByteArrayAccess key, HashAlgorithm a) =&gt;
+key -&gt; Context a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.initialize</span></a></span><span> </span><span class="annot"><span class="annottext">seed
+</span><a href="#local-6989586621679095134"><span class="hs-identifier hs-var">seed</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="annot"><a href="Cardano.Crypto.Wallet.Pure.html#hFinalize"><span class="hs-identifier hs-type">hFinalize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">HMAC.Context</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">SHA512</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-type">ChainCode</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span id="hFinalize"><span class="annot"><span class="annottext">hFinalize :: Context SHA512 -&gt; (ByteString, ChainCode)
+</span><a href="Cardano.Crypto.Wallet.Pure.html#hFinalize"><span class="hs-identifier hs-var hs-var">hFinalize</span></a></span></span><span> </span><span id="local-6989586621679095133"><span class="annot"><span class="annottext">Context SHA512
+</span><a href="#local-6989586621679095133"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679095132"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095132"><span class="hs-identifier hs-var">b1</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679095131"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095131"><span class="hs-identifier hs-var">b2</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall bs. ByteArray bs =&gt; Int -&gt; bs -&gt; (bs, bs)
+</span><a href="../../../../memory/html/src"><span class="hs-identifier hs-var">B.splitAt</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+bin -&gt; bout
+</span><a href="../../../../memory/html/src"><span class="hs-identifier hs-var">convert</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. HashAlgorithm a =&gt; Context a -&gt; HMAC a
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">HMAC.finalize</span></a></span><span> </span><span class="annot"><span class="annottext">Context SHA512
+</span><a href="#local-6989586621679095133"><span class="hs-identifier hs-var">ctx</span></a></span><span>
+</span><span id="line-108"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095132"><span class="hs-identifier hs-var">b1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ChainCode
+</span><a href="Cardano.Crypto.Wallet.Types.html#ChainCode"><span class="hs-identifier hs-var">ChainCode</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679095131"><span class="hs-identifier hs-var">b2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-109"></span></pre></body></html>

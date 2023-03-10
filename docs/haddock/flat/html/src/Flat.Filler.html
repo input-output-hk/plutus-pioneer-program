@@ -1,0 +1,317 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass      #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric       #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- |Pre-value and post-value byte alignments</span><span>
+</span><span id="line-7"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Flat.Filler</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-8"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier">Filler</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#fillerLength"><span class="hs-identifier">fillerLength</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#PreAligned"><span class="hs-identifier">PreAligned</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#preAligned"><span class="hs-identifier">preAligned</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#PostAligned"><span class="hs-identifier">PostAligned</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#postAligned"><span class="hs-identifier">postAligned</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#preAlignedDecoder"><span class="hs-identifier">preAlignedDecoder</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="Flat.Filler.html#postAlignedDecoder"><span class="hs-identifier">postAlignedDecoder</span></a></span><span>
+</span><span id="line-16"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Flat.Class.html"><span class="hs-identifier">Flat.Class</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Flat.Class.html#Flat"><span class="hs-identifier">Flat</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Flat.Encoder.Strict.html"><span class="hs-identifier">Flat.Encoder.Strict</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Flat.Encoder.Strict.html#eFiller"><span class="hs-identifier">eFiller</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Flat.Encoder.Strict.html#sFillerMax"><span class="hs-identifier">sFillerMax</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Flat.Decoder.Types.html"><span class="hs-identifier">Flat.Decoder.Types</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Flat.Decoder.Types.html#Get"><span class="hs-identifier">Get</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Typeable</span></a></span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Typeable</span></a></span><span> </span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- |A meaningless sequence of 0 bits terminated with a 1 bit (easier to implement than the reverse)</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- </span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- Used to align encoded values at byte/word boundaries.</span><span>
+</span><span id="line-27"></span><span id="local-6989586621679100215"><span id="local-6989586621679100216"></span></span><span class="hs-keyword">data</span><span> </span><span id="Filler"><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-var">Filler</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FillerBit"><span class="annot"><a href="Flat.Filler.html#FillerBit"><span class="hs-identifier hs-var">FillerBit</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span><span>
+</span><span id="line-28"></span><span>            </span><span class="hs-glyph">|</span><span> </span><span id="FillerEnd"><span class="annot"><a href="Flat.Filler.html#FillerEnd"><span class="hs-identifier hs-var">FillerEnd</span></a></span></span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679100204"><span id="local-6989586621679100206"><span id="local-6989586621679100211"><span class="annot"><span class="annottext">Int -&gt; Filler -&gt; ShowS
+[Filler] -&gt; ShowS
+Filler -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Filler] -&gt; ShowS
+$cshowList :: [Filler] -&gt; ShowS
+show :: Filler -&gt; String
+$cshow :: Filler -&gt; String
+showsPrec :: Int -&gt; Filler -&gt; ShowS
+$cshowsPrec :: Int -&gt; Filler -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100198"><span id="local-6989586621679100201"><span class="annot"><span class="annottext">Filler -&gt; Filler -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Filler -&gt; Filler -&gt; Bool
+$c/= :: Filler -&gt; Filler -&gt; Bool
+== :: Filler -&gt; Filler -&gt; Bool
+$c== :: Filler -&gt; Filler -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100176"><span id="local-6989586621679100178"><span id="local-6989586621679100181"><span id="local-6989586621679100184"><span id="local-6989586621679100187"><span id="local-6989586621679100190"><span id="local-6989586621679100193"><span class="annot"><span class="annottext">Eq Filler
+Filler -&gt; Filler -&gt; Bool
+Filler -&gt; Filler -&gt; Ordering
+Filler -&gt; Filler -&gt; Filler
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: Filler -&gt; Filler -&gt; Filler
+$cmin :: Filler -&gt; Filler -&gt; Filler
+max :: Filler -&gt; Filler -&gt; Filler
+$cmax :: Filler -&gt; Filler -&gt; Filler
+&gt;= :: Filler -&gt; Filler -&gt; Bool
+$c&gt;= :: Filler -&gt; Filler -&gt; Bool
+&gt; :: Filler -&gt; Filler -&gt; Bool
+$c&gt; :: Filler -&gt; Filler -&gt; Bool
+&lt;= :: Filler -&gt; Filler -&gt; Bool
+$c&lt;= :: Filler -&gt; Filler -&gt; Bool
+&lt; :: Filler -&gt; Filler -&gt; Bool
+$c&lt; :: Filler -&gt; Filler -&gt; Bool
+compare :: Filler -&gt; Filler -&gt; Ordering
+$ccompare :: Filler -&gt; Filler -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep Filler x -&gt; Filler
+forall x. Filler -&gt; Rep Filler x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Filler x -&gt; Filler
+$cfrom :: forall x. Filler -&gt; Rep Filler x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100170"><span class="annot"><span class="annottext">Filler -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: Filler -&gt; ()
+$crnf :: Filler -&gt; ()
+</span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- |Use a special encoding for the filler</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679100166"><span class="annot"><a href="Flat.Class.html#Flat"><span class="hs-identifier hs-type">Flat</span></a></span><span> </span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-33"></span><span>  </span><span id="local-6989586621679100163"><span class="annot"><span class="annottext">encode :: Filler -&gt; Encoding
+</span><a href="Flat.Class.html#encode"><span class="hs-identifier hs-var hs-var hs-var hs-var">encode</span></a></span></span><span> </span><span class="annot"><span class="annottext">Filler
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Encoding
+</span><a href="Flat.Encoder.Strict.html#eFiller"><span class="hs-identifier hs-var">eFiller</span></a></span><span>
+</span><span id="line-34"></span><span>  </span><span id="local-6989586621679100161"><span class="annot"><span class="annottext">size :: Filler -&gt; Int -&gt; Int
+</span><a href="Flat.Class.html#size"><span class="hs-identifier hs-var hs-var hs-var hs-var">size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Size a
+</span><a href="Flat.Encoder.Strict.html#sFillerMax"><span class="hs-identifier hs-var">sFillerMax</span></a></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-comment">-- use generated decode</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- |A Post aligned value, a value followed by a filler</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- </span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- Useful to complete the encoding of a top-level value</span><span>
+</span><span id="line-40"></span><span id="local-6989586621679100158"><span id="local-6989586621679100159"></span></span><span class="hs-keyword">data</span><span> </span><span id="PostAligned"><span class="annot"><a href="Flat.Filler.html#PostAligned"><span class="hs-identifier hs-var">PostAligned</span></a></span></span><span> </span><span id="local-6989586621679100408"><span class="annot"><a href="#local-6989586621679100408"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PostAligned"><span class="annot"><a href="Flat.Filler.html#PostAligned"><span class="hs-identifier hs-var">PostAligned</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="postValue"><span class="annot"><span class="annottext">forall a. PostAligned a -&gt; a
+</span><a href="Flat.Filler.html#postValue"><span class="hs-identifier hs-var hs-var">postValue</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679100408"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span id="postFiller"><span class="annot"><span class="annottext">forall a. PostAligned a -&gt; Filler
+</span><a href="Flat.Filler.html#postFiller"><span class="hs-identifier hs-var hs-var">postFiller</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span><span> </span><span class="hs-special">}</span><span class="hs-cpp">
+#ifdef ETA_VERSION    
+</span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Eq</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Ord</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">Generic</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">NFData</span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">instance</span><span> </span><span class="hs-identifier">Flat</span><span> </span><span class="hs-identifier">a</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="hs-identifier">Flat</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">PostAligned</span><span> </span><span class="hs-identifier">a</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-identifier">encode</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">PostAligned</span><span> </span><span class="hs-identifier">val</span><span> </span><span class="hs-identifier">fill</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">trampolineEncoding</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">encode</span><span> </span><span class="hs-identifier">val</span><span class="hs-special">)</span><span> </span><span class="hs-operator">&lt;&gt;</span><span> </span><span class="hs-identifier">encode</span><span> </span><span class="hs-identifier">fill</span><span class="hs-cpp">
+
+#else
+</span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679100146"><span id="local-6989586621679100148"><span id="local-6989586621679100153"><span class="annot"><span class="annottext">Int -&gt; PostAligned a -&gt; ShowS
+forall a. Show a =&gt; Int -&gt; PostAligned a -&gt; ShowS
+forall a. Show a =&gt; [PostAligned a] -&gt; ShowS
+forall a. Show a =&gt; PostAligned a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PostAligned a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [PostAligned a] -&gt; ShowS
+show :: PostAligned a -&gt; String
+$cshow :: forall a. Show a =&gt; PostAligned a -&gt; String
+showsPrec :: Int -&gt; PostAligned a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; PostAligned a -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100140"><span id="local-6989586621679100144"><span class="annot"><span class="annottext">PostAligned a -&gt; PostAligned a -&gt; Bool
+forall a. Eq a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PostAligned a -&gt; PostAligned a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+== :: PostAligned a -&gt; PostAligned a -&gt; Bool
+$c== :: forall a. Eq a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100117"><span id="local-6989586621679100119"><span id="local-6989586621679100122"><span id="local-6989586621679100125"><span id="local-6989586621679100128"><span id="local-6989586621679100132"><span id="local-6989586621679100136"><span class="annot"><span class="annottext">PostAligned a -&gt; PostAligned a -&gt; Bool
+PostAligned a -&gt; PostAligned a -&gt; Ordering
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall {a}. Ord a =&gt; Eq (PostAligned a)
+forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Ordering
+forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; PostAligned a
+min :: PostAligned a -&gt; PostAligned a -&gt; PostAligned a
+$cmin :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; PostAligned a
+max :: PostAligned a -&gt; PostAligned a -&gt; PostAligned a
+$cmax :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; PostAligned a
+&gt;= :: PostAligned a -&gt; PostAligned a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+&gt; :: PostAligned a -&gt; PostAligned a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+&lt;= :: PostAligned a -&gt; PostAligned a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+&lt; :: PostAligned a -&gt; PostAligned a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Bool
+compare :: PostAligned a -&gt; PostAligned a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; PostAligned a -&gt; PostAligned a -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (PostAligned a) x -&gt; PostAligned a
+forall a x. PostAligned a -&gt; Rep (PostAligned a) x
+$cto :: forall a x. Rep (PostAligned a) x -&gt; PostAligned a
+$cfrom :: forall a x. PostAligned a -&gt; Rep (PostAligned a) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100113"><span class="annot"><span class="annottext">forall a. NFData a =&gt; PostAligned a -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: PostAligned a -&gt; ()
+$crnf :: forall a. NFData a =&gt; PostAligned a -&gt; ()
+</span><a href="#local-6989586621679100113"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679100107"><span id="local-6989586621679100109"><span id="local-6989586621679100111"><span class="annot"><span class="annottext">forall a. Flat a =&gt; Get (PostAligned a)
+forall a. Flat a =&gt; PostAligned a -&gt; Encoding
+forall a. Flat a =&gt; PostAligned a -&gt; Int -&gt; Int
+forall a. (a -&gt; Encoding) -&gt; Get a -&gt; (a -&gt; Int -&gt; Int) -&gt; Flat a
+size :: PostAligned a -&gt; Int -&gt; Int
+$csize :: forall a. Flat a =&gt; PostAligned a -&gt; Int -&gt; Int
+decode :: Get (PostAligned a)
+$cdecode :: forall a. Flat a =&gt; Get (PostAligned a)
+encode :: PostAligned a -&gt; Encoding
+$cencode :: forall a. Flat a =&gt; PostAligned a -&gt; Encoding
+</span><a href="#local-6989586621679100107"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Flat</span></a></span></span></span></span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-comment">--  deriving (Show, Eq, Ord, Typeable, Generic, NFData,Flat)</span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- |A Pre aligned value, a value preceded by a filler</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- </span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- Useful to prealign ByteArrays, Texts and any structure that can be encoded more efficiently when byte aligned.  </span><span>
+</span><span id="line-56"></span><span id="local-6989586621679100105"><span id="local-6989586621679100106"></span></span><span class="hs-keyword">data</span><span> </span><span id="PreAligned"><span class="annot"><a href="Flat.Filler.html#PreAligned"><span class="hs-identifier hs-var">PreAligned</span></a></span></span><span> </span><span id="local-6989586621679100404"><span class="annot"><a href="#local-6989586621679100404"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PreAligned"><span class="annot"><a href="Flat.Filler.html#PreAligned"><span class="hs-identifier hs-var">PreAligned</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="preFiller"><span class="annot"><span class="annottext">forall a. PreAligned a -&gt; Filler
+</span><a href="Flat.Filler.html#preFiller"><span class="hs-identifier hs-var hs-var">preFiller</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span><span class="hs-special">,</span><span> </span><span id="preValue"><span class="annot"><span class="annottext">forall a. PreAligned a -&gt; a
+</span><a href="Flat.Filler.html#preValue"><span class="hs-identifier hs-var hs-var">preValue</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679100404"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679100093"><span id="local-6989586621679100095"><span id="local-6989586621679100100"><span class="annot"><span class="annottext">Int -&gt; PreAligned a -&gt; ShowS
+forall a. Show a =&gt; Int -&gt; PreAligned a -&gt; ShowS
+forall a. Show a =&gt; [PreAligned a] -&gt; ShowS
+forall a. Show a =&gt; PreAligned a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [PreAligned a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [PreAligned a] -&gt; ShowS
+show :: PreAligned a -&gt; String
+$cshow :: forall a. Show a =&gt; PreAligned a -&gt; String
+showsPrec :: Int -&gt; PreAligned a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; PreAligned a -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100087"><span id="local-6989586621679100091"><span class="annot"><span class="annottext">PreAligned a -&gt; PreAligned a -&gt; Bool
+forall a. Eq a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: PreAligned a -&gt; PreAligned a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+== :: PreAligned a -&gt; PreAligned a -&gt; Bool
+$c== :: forall a. Eq a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100064"><span id="local-6989586621679100066"><span id="local-6989586621679100069"><span id="local-6989586621679100072"><span id="local-6989586621679100075"><span id="local-6989586621679100079"><span id="local-6989586621679100083"><span class="annot"><span class="annottext">PreAligned a -&gt; PreAligned a -&gt; Bool
+PreAligned a -&gt; PreAligned a -&gt; Ordering
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall {a}. Ord a =&gt; Eq (PreAligned a)
+forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Ordering
+forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; PreAligned a
+min :: PreAligned a -&gt; PreAligned a -&gt; PreAligned a
+$cmin :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; PreAligned a
+max :: PreAligned a -&gt; PreAligned a -&gt; PreAligned a
+$cmax :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; PreAligned a
+&gt;= :: PreAligned a -&gt; PreAligned a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+&gt; :: PreAligned a -&gt; PreAligned a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+&lt;= :: PreAligned a -&gt; PreAligned a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+&lt; :: PreAligned a -&gt; PreAligned a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Bool
+compare :: PreAligned a -&gt; PreAligned a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; PreAligned a -&gt; PreAligned a -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (PreAligned a) x -&gt; PreAligned a
+forall a x. PreAligned a -&gt; Rep (PreAligned a) x
+$cto :: forall a x. Rep (PreAligned a) x -&gt; PreAligned a
+$cfrom :: forall a x. PreAligned a -&gt; Rep (PreAligned a) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100060"><span class="annot"><span class="annottext">forall a. NFData a =&gt; PreAligned a -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: PreAligned a -&gt; ()
+$crnf :: forall a. NFData a =&gt; PreAligned a -&gt; ()
+</span><a href="#local-6989586621679100060"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679100054"><span id="local-6989586621679100056"><span id="local-6989586621679100058"><span class="annot"><span class="annottext">forall a. Flat a =&gt; Get (PreAligned a)
+forall a. Flat a =&gt; PreAligned a -&gt; Encoding
+forall a. Flat a =&gt; PreAligned a -&gt; Int -&gt; Int
+forall a. (a -&gt; Encoding) -&gt; Get a -&gt; (a -&gt; Int -&gt; Int) -&gt; Flat a
+size :: PreAligned a -&gt; Int -&gt; Int
+$csize :: forall a. Flat a =&gt; PreAligned a -&gt; Int -&gt; Int
+decode :: Get (PreAligned a)
+$cdecode :: forall a. Flat a =&gt; Get (PreAligned a)
+encode :: PreAligned a -&gt; Encoding
+$cencode :: forall a. Flat a =&gt; PreAligned a -&gt; Encoding
+</span><a href="#local-6989586621679100054"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Flat</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- |Length of a filler in bits</span><span>
+</span><span id="line-60"></span><span id="local-6989586621679100401"><span class="annot"><a href="Flat.Filler.html#fillerLength"><span class="hs-identifier hs-type">fillerLength</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Num</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100401"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679100401"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-61"></span><span id="fillerLength"><span class="annot"><span class="annottext">fillerLength :: forall a. Num a =&gt; Filler -&gt; a
+</span><a href="Flat.Filler.html#fillerLength"><span class="hs-identifier hs-var hs-var">fillerLength</span></a></span></span><span> </span><span class="annot"><span class="annottext">Filler
+</span><a href="Flat.Filler.html#FillerEnd"><span class="hs-identifier hs-var">FillerEnd</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Flat.Filler.html#fillerLength"><span class="hs-identifier hs-var">fillerLength</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Flat.Filler.html#FillerBit"><span class="hs-identifier hs-type">FillerBit</span></a></span><span> </span><span id="local-6989586621679100048"><span class="annot"><span class="annottext">Filler
+</span><a href="#local-6989586621679100048"><span class="hs-identifier hs-var">f</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; Filler -&gt; a
+</span><a href="Flat.Filler.html#fillerLength"><span class="hs-identifier hs-var">fillerLength</span></a></span><span> </span><span class="annot"><span class="annottext">Filler
+</span><a href="#local-6989586621679100048"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- |Post align a value</span><span>
+</span><span id="line-65"></span><span id="local-6989586621679100398"><span class="annot"><a href="Flat.Filler.html#postAligned"><span class="hs-identifier hs-type">postAligned</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679100398"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Flat.Filler.html#PostAligned"><span class="hs-identifier hs-type">PostAligned</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100398"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-66"></span><span id="postAligned"><span class="annot"><span class="annottext">postAligned :: forall a. a -&gt; PostAligned a
+</span><a href="Flat.Filler.html#postAligned"><span class="hs-identifier hs-var hs-var">postAligned</span></a></span></span><span> </span><span id="local-6989586621679100046"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679100046"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Filler -&gt; PostAligned a
+</span><a href="Flat.Filler.html#PostAligned"><span class="hs-identifier hs-var">PostAligned</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679100046"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Filler
+</span><a href="Flat.Filler.html#FillerEnd"><span class="hs-identifier hs-var">FillerEnd</span></a></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- |Pre align a value</span><span>
+</span><span id="line-69"></span><span id="local-6989586621679100396"><span class="annot"><a href="Flat.Filler.html#preAligned"><span class="hs-identifier hs-type">preAligned</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679100396"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Flat.Filler.html#PreAligned"><span class="hs-identifier hs-type">PreAligned</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100396"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-70"></span><span id="preAligned"><span class="annot"><span class="annottext">preAligned :: forall a. a -&gt; PreAligned a
+</span><a href="Flat.Filler.html#preAligned"><span class="hs-identifier hs-var hs-var">preAligned</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Filler -&gt; a -&gt; PreAligned a
+</span><a href="Flat.Filler.html#PreAligned"><span class="hs-identifier hs-var">PreAligned</span></a></span><span> </span><span class="annot"><span class="annottext">Filler
+</span><a href="Flat.Filler.html#FillerEnd"><span class="hs-identifier hs-var">FillerEnd</span></a></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- |Decode a value assuming that is PostAligned</span><span>
+</span><span id="line-73"></span><span id="local-6989586621679100395"><span class="annot"><a href="Flat.Filler.html#postAlignedDecoder"><span class="hs-identifier hs-type">postAlignedDecoder</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Flat.Decoder.Types.html#Get"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100395"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Flat.Decoder.Types.html#Get"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100395"><span class="hs-identifier hs-type">b</span></a></span></span><span>
+</span><span id="line-74"></span><span id="postAlignedDecoder"><span class="annot"><span class="annottext">postAlignedDecoder :: forall b. Get b -&gt; Get b
+</span><a href="Flat.Filler.html#postAlignedDecoder"><span class="hs-identifier hs-var hs-var">postAlignedDecoder</span></a></span></span><span> </span><span id="local-6989586621679100040"><span class="annot"><span class="annottext">Get b
+</span><a href="#local-6989586621679100040"><span class="hs-identifier hs-var">dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-75"></span><span>  </span><span id="local-6989586621679100039"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679100039"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Get b
+</span><a href="#local-6989586621679100040"><span class="hs-identifier hs-var">dec</span></a></span><span>
+</span><span id="line-76"></span><span>  </span><span class="annot"><span class="annottext">Filler
+</span><span class="hs-identifier">_</span></span><span class="hs-glyph">::</span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall a. Flat a =&gt; Get a
+</span><a href="Flat.Class.html#decode"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-77"></span><span>  </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679100039"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- |Decode a value assuming that is PreAligned</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- </span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- @since 0.5</span><span>
+</span><span id="line-82"></span><span id="local-6989586621679100037"><span class="annot"><a href="Flat.Filler.html#preAlignedDecoder"><span class="hs-identifier hs-type">preAlignedDecoder</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Flat.Decoder.Types.html#Get"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100037"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Flat.Decoder.Types.html#Get"><span class="hs-identifier hs-type">Get</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679100037"><span class="hs-identifier hs-type">b</span></a></span></span><span>
+</span><span id="line-83"></span><span id="preAlignedDecoder"><span class="annot"><span class="annottext">preAlignedDecoder :: forall b. Get b -&gt; Get b
+</span><a href="Flat.Filler.html#preAlignedDecoder"><span class="hs-identifier hs-var hs-var">preAlignedDecoder</span></a></span></span><span> </span><span id="local-6989586621679100034"><span class="annot"><span class="annottext">Get b
+</span><a href="#local-6989586621679100034"><span class="hs-identifier hs-var">dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-84"></span><span>  </span><span class="annot"><span class="annottext">Filler
+</span><span class="hs-identifier">_</span></span><span class="hs-glyph">::</span><span class="annot"><a href="Flat.Filler.html#Filler"><span class="hs-identifier hs-type">Filler</span></a></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall a. Flat a =&gt; Get a
+</span><a href="Flat.Class.html#decode"><span class="hs-identifier hs-var">decode</span></a></span><span>
+</span><span id="line-85"></span><span>  </span><span class="annot"><span class="annottext">Get b
+</span><a href="#local-6989586621679100034"><span class="hs-identifier hs-var">dec</span></a></span><span>
+</span><span id="line-86"></span></pre></body></html>

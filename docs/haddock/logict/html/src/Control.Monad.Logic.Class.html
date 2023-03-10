@@ -1,0 +1,670 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Module      : Control.Monad.Logic.Class</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright   : (c) 2007-2014 Dan Doel,</span><span>
+</span><span id="line-5"></span><span class="hs-comment">--               (c) 2011-2013 Edward Kmett,</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--               (c) 2014      Roman Cheplyaka,</span><span>
+</span><span id="line-7"></span><span class="hs-comment">--               (c) 2020-2021 Andrew Lelechenko,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--               (c) 2020-2021 Kevin Quick</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- License     : BSD3</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Maintainer  : Andrew Lelechenko &lt;andrew.lelechenko@gmail.com&gt;</span><span>
+</span><span id="line-11"></span><span class="hs-comment">--</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Adapted from the paper</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- &lt;http://okmij.org/ftp/papers/LogicT.pdf Backtracking, Interleaving, and Terminating Monad Transformers&gt;</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- by Oleg Kiselyov, Chung-chieh Shan, Daniel P. Friedman, Amr Sabry.</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Note that the paper uses 'MonadPlus' vocabulary</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- ('mzero' and 'mplus'),</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- while examples below prefer 'empty' and '&lt;|&gt;'</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- from 'Alternative'.</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span class="hs-cpp">
+
+#if __GLASGOW_HASKELL__ &gt;= 704
+</span><span class="hs-pragma">{-# LANGUAGE Safe #-}</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-27"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Control.Monad.Logic.Class</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier">MonadLogic</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#reflect"><span class="hs-identifier">reflect</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Control.Applicative</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../mtl/html/src"><span class="hs-identifier">Control.Monad.Reader</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../transformers/html/src"><span class="hs-identifier">ReaderT</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../mtl/html/src"><span class="hs-identifier">Control.Monad.Trans</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../transformers/html/src"><span class="hs-identifier">MonadTrans</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../mtl/html/src"><span class="hs-identifier">Control.Monad.State.Lazy</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">LazyST</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../mtl/html/src"><span class="hs-identifier">Control.Monad.State.Strict</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">StrictST</span></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- | A backtracking, logic programming monad.</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">class</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Monad</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Alternative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="MonadLogic"><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-var">MonadLogic</span></a></span></span><span> </span><span id="local-6989586621679041342"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-comment">-- | Attempts to __split__ the computation, giving access to the first</span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-comment">--   result. Satisfies the following laws:</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-comment">--   &gt; msplit empty          == pure Nothing</span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-comment">--   &gt; msplit (pure a &lt;|&gt; m) == pure (Just (a, m))</span><span>
+</span><span id="line-43"></span><span>    </span><span id="msplit"><span class="annot"><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-type">msplit</span></a></span></span><span>     </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621679041338"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041338"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679041338"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041338"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span>    </span><span class="hs-comment">-- | __Fair disjunction.__ It is possible for a logical computation</span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-comment">--   to have an infinite number of potential results, for instance:</span><span>
+</span><span id="line-47"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-48"></span><span>    </span><span class="hs-comment">--   &gt; odds = pure 1 &lt;|&gt; fmap (+ 2) odds</span><span>
+</span><span id="line-49"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-50"></span><span>    </span><span class="hs-comment">--   Such computations can cause problems in some circumstances. Consider:</span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-52"></span><span>    </span><span class="hs-comment">--   &gt; two = do x &lt;- odds &lt;|&gt; pure 2</span><span>
+</span><span id="line-53"></span><span>    </span><span class="hs-comment">--   &gt;          if even x then pure x else empty</span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-55"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observe two</span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-comment">--   ...never completes...</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-comment">--   Such a computation may never consider 'pure' @2@, and</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-comment">--   therefore even 'Control.Monad.Logic.observe' @two@ will</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-comment">--   never return any results. By</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">--   contrast, using 'interleave' in place of</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-comment">--   'Control.Applicative.&lt;|&gt;' ensures fair consideration of both</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-comment">--   branches of a disjunction.</span><span>
+</span><span id="line-64"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-comment">--   &gt; fairTwo = do x &lt;- odds `interleave` pure 2</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-comment">--   &gt;              if even x then pure x else empty</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observe fairTwo</span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-comment">--   2</span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-comment">--   Note that even with 'interleave' this computation will never</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-comment">--   terminate after returning 2: only the first value can be</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-comment">--   safely observed, after which each odd value becomes 'Control.Applicative.empty'</span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-comment">--   (equivalent to</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-comment">--   &lt;http://lpn.swi-prolog.org/lpnpage.php?pagetype=html&amp;pageid=lpn-htmlse45 Prolog's fail&gt;)</span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-comment">--   which does not stop the evaluation but indicates there is no</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-comment">--   value to return yet.</span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-comment">--   Unlike '&lt;|&gt;', 'interleave' is not associative:</span><span>
+</span><span id="line-80"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; let x = [1,2,3]; y = [4,5,6]; z = [7,8,9] :: [Int]</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; x `interleave` y</span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-comment">--   [1,4,2,5,3,6]</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; (x `interleave` y) `interleave` z</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-comment">--   [1,7,4,8,2,9,5,3,6]</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; y `interleave` z</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-comment">--   [4,7,5,8,6,9]</span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; x `interleave` (y `interleave` z)</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-comment">--   [1,4,2,7,3,5,8,6,9]</span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-91"></span><span>    </span><span id="interleave"><span class="annot"><a href="Control.Monad.Logic.Class.html#interleave"><span class="hs-identifier hs-type">interleave</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621679041341"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041341"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041341"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041341"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-comment">-- | __Fair conjunction.__ Similarly to the previous function, consider</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-comment">--   the distributivity law, naturally expected from 'MonadPlus':</span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-comment">--   &gt; (a &lt;|&gt; b) &gt;&gt;= k = (a &gt;&gt;= k) &lt;|&gt; (b &gt;&gt;= k)</span><span>
+</span><span id="line-97"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-98"></span><span>    </span><span class="hs-comment">--   If @a@ '&gt;&gt;=' @k@ can backtrack arbitrarily many times, @b@ '&gt;&gt;=' @k@</span><span>
+</span><span id="line-99"></span><span>    </span><span class="hs-comment">--   may never be considered. In logic statements,</span><span>
+</span><span id="line-100"></span><span>    </span><span class="hs-comment">--   &quot;backtracking&quot; is the process of discarding the current</span><span>
+</span><span id="line-101"></span><span>    </span><span class="hs-comment">--   possible solution value and returning to a previous decision</span><span>
+</span><span id="line-102"></span><span>    </span><span class="hs-comment">--   point where a new value can be obtained and tried.  For</span><span>
+</span><span id="line-103"></span><span>    </span><span class="hs-comment">--   example:</span><span>
+</span><span id="line-104"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; do { x &lt;- pure 0 &lt;|&gt; pure 1 &lt;|&gt; pure 2; if even x then pure x else empty } :: [Int]</span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-comment">--   [0,2]</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-108"></span><span>    </span><span class="hs-comment">--   Here, the @x@ value can be produced three times, where</span><span>
+</span><span id="line-109"></span><span>    </span><span class="hs-comment">--   'Control.Applicative.&lt;|&gt;' represents the decision points of that</span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-comment">--   production.  The subsequent @if@ statement specifies</span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-comment">--   'Control.Applicative.empty' (fail)</span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-comment">--   if @x@ is odd, causing it to be discarded and a return</span><span>
+</span><span id="line-113"></span><span>    </span><span class="hs-comment">--   to an 'Control.Applicative.&lt;|&gt;' decision point to get the next @x@.</span><span>
+</span><span id="line-114"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-comment">--   The statement &quot;@a@ '&gt;&gt;=' @k@ can backtrack arbitrarily many</span><span>
+</span><span id="line-116"></span><span>    </span><span class="hs-comment">--   times&quot; means that the computation is resulting in 'Control.Applicative.empty' and</span><span>
+</span><span id="line-117"></span><span>    </span><span class="hs-comment">--   that @a@ has an infinite number of 'Control.Applicative.&lt;|&gt;' applications to</span><span>
+</span><span id="line-118"></span><span>    </span><span class="hs-comment">--   return to.  This is called a conjunctive computation because</span><span>
+</span><span id="line-119"></span><span>    </span><span class="hs-comment">--   the logic for @a@ /and/ @k@ must both succeed (i.e. 'pure'</span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-comment">--   a value instead of 'Control.Applicative.empty').</span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-comment">--   Similar to the way 'interleave' allows both branches of a</span><span>
+</span><span id="line-123"></span><span>    </span><span class="hs-comment">--   disjunctive computation, the '&gt;&gt;-' operator takes care to</span><span>
+</span><span id="line-124"></span><span>    </span><span class="hs-comment">--   consider both branches of a conjunctive computation.</span><span>
+</span><span id="line-125"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-126"></span><span>    </span><span class="hs-comment">--   Consider the operation:</span><span>
+</span><span id="line-127"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-128"></span><span>    </span><span class="hs-comment">--   &gt; odds = pure 1 &lt;|&gt; fmap (2 +) odds</span><span>
+</span><span id="line-129"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-comment">--   &gt; oddsPlus n = odds &gt;&gt;= \a -&gt; pure (a + n)</span><span>
+</span><span id="line-131"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-comment">--   &gt; g = do x &lt;- (pure 0 &lt;|&gt; pure 1) &gt;&gt;= oddsPlus</span><span>
+</span><span id="line-133"></span><span>    </span><span class="hs-comment">--   &gt;        if even x then pure x else empty</span><span>
+</span><span id="line-134"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-135"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeMany 3 g</span><span>
+</span><span id="line-136"></span><span>    </span><span class="hs-comment">--   ...never completes...</span><span>
+</span><span id="line-137"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-comment">--   This will never produce any value because all values produced</span><span>
+</span><span id="line-139"></span><span>    </span><span class="hs-comment">--   by the @do@ program come from the 'pure' @1@ driven operation</span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-comment">--   (adding one to the sequence of odd values, resulting in the</span><span>
+</span><span id="line-141"></span><span>    </span><span class="hs-comment">--   even values that are allowed by the test in the second line),</span><span>
+</span><span id="line-142"></span><span>    </span><span class="hs-comment">--   but the 'pure' @0@ input to @oddsPlus@ generates an infinite</span><span>
+</span><span id="line-143"></span><span>    </span><span class="hs-comment">--   number of 'Control.Applicative.empty' failures so the even values generated by</span><span>
+</span><span id="line-144"></span><span>    </span><span class="hs-comment">--   the 'pure' @1@ alternative are never seen.  Using</span><span>
+</span><span id="line-145"></span><span>    </span><span class="hs-comment">--   'interleave' here instead of 'Control.Applicative.&lt;|&gt;' does not help due</span><span>
+</span><span id="line-146"></span><span>    </span><span class="hs-comment">--   to the aforementioned distributivity law.</span><span>
+</span><span id="line-147"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-148"></span><span>    </span><span class="hs-comment">--   Also note that the @do@ notation desugars to '&gt;&gt;=' bind</span><span>
+</span><span id="line-149"></span><span>    </span><span class="hs-comment">--   operations, so the following would also fail:</span><span>
+</span><span id="line-150"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-comment">--   &gt; do a &lt;- pure 0 &lt;|&gt; pure 1</span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-comment">--   &gt;    x &lt;- oddsPlus a</span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-comment">--   &gt;    if even x then pure x else empty</span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-comment">--   The solution is to use the '&gt;&gt;-' in place of the normal</span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-comment">--   monadic bind operation '&gt;&gt;=' when fairness between</span><span>
+</span><span id="line-157"></span><span>    </span><span class="hs-comment">--   alternative productions is needed in a conjunction of</span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-comment">--   statements (rules):</span><span>
+</span><span id="line-159"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-160"></span><span>    </span><span class="hs-comment">--   &gt; h = do x &lt;- (pure 0 &lt;|&gt; pure 1) &gt;&gt;- oddsPlus</span><span>
+</span><span id="line-161"></span><span>    </span><span class="hs-comment">--   &gt;        if even x then pure x else empty</span><span>
+</span><span id="line-162"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-163"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeMany 3 h</span><span>
+</span><span id="line-164"></span><span>    </span><span class="hs-comment">--   [2,4,6]</span><span>
+</span><span id="line-165"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-166"></span><span>    </span><span class="hs-comment">--   However, a bit of care is needed when using '&gt;&gt;-' because,</span><span>
+</span><span id="line-167"></span><span>    </span><span class="hs-comment">--   unlike '&gt;&gt;=', it is not associative.  For example:</span><span>
+</span><span id="line-168"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-169"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; let m = [2,7] :: [Int]</span><span>
+</span><span id="line-170"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; let k x = [x, x + 1]</span><span>
+</span><span id="line-171"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; let h x = [x, x * 2]</span><span>
+</span><span id="line-172"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; m &gt;&gt;= (\x -&gt; k x &gt;&gt;= h)</span><span>
+</span><span id="line-173"></span><span>    </span><span class="hs-comment">--   [2,4,3,6,7,14,8,16]</span><span>
+</span><span id="line-174"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; (m &gt;&gt;= k) &gt;&gt;= h -- same as above</span><span>
+</span><span id="line-175"></span><span>    </span><span class="hs-comment">--   [2,4,3,6,7,14,8,16]</span><span>
+</span><span id="line-176"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; m &gt;&gt;- (\x -&gt; k x &gt;&gt;- h)</span><span>
+</span><span id="line-177"></span><span>    </span><span class="hs-comment">--   [2,7,3,8,4,14,6,16]</span><span>
+</span><span id="line-178"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; (m &gt;&gt;- k) &gt;&gt;- h -- central elements are different</span><span>
+</span><span id="line-179"></span><span>    </span><span class="hs-comment">--   [2,7,4,3,14,8,6,16]</span><span>
+</span><span id="line-180"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-181"></span><span>    </span><span class="hs-comment">--   This means that the following will be productive:</span><span>
+</span><span id="line-182"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-183"></span><span>    </span><span class="hs-comment">--   &gt; (pure 0 &lt;|&gt; pure 1) &gt;&gt;-</span><span>
+</span><span id="line-184"></span><span>    </span><span class="hs-comment">--   &gt;   oddsPlus &gt;&gt;-</span><span>
+</span><span id="line-185"></span><span>    </span><span class="hs-comment">--   &gt;     \x -&gt; if even x then pure x else empty</span><span>
+</span><span id="line-186"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-187"></span><span>    </span><span class="hs-comment">--   Which is equivalent to</span><span>
+</span><span id="line-188"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-189"></span><span>    </span><span class="hs-comment">--   &gt; ((pure 0 &lt;|&gt; pure 1) &gt;&gt;- oddsPlus) &gt;&gt;-</span><span>
+</span><span id="line-190"></span><span>    </span><span class="hs-comment">--   &gt;   (\x -&gt; if even x then pure x else empty)</span><span>
+</span><span id="line-191"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-192"></span><span>    </span><span class="hs-comment">--   But the following will /not/ be productive:</span><span>
+</span><span id="line-193"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-194"></span><span>    </span><span class="hs-comment">--   &gt; (pure 0 &lt;|&gt; pure 1) &gt;&gt;-</span><span>
+</span><span id="line-195"></span><span>    </span><span class="hs-comment">--   &gt;   (\a -&gt; (oddsPlus a &gt;&gt;- \x -&gt; if even x then pure x else empty))</span><span>
+</span><span id="line-196"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-197"></span><span>    </span><span class="hs-comment">--   Since do notation desugaring results in the latter, the</span><span>
+</span><span id="line-198"></span><span>    </span><span class="hs-comment">--   @RebindableSyntax@ language pragma cannot easily be used</span><span>
+</span><span id="line-199"></span><span>    </span><span class="hs-comment">--   either.  Instead, it is recommended to carefully use explicit</span><span>
+</span><span id="line-200"></span><span>    </span><span class="hs-comment">--   '&gt;&gt;-' only when needed.</span><span>
+</span><span id="line-201"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-202"></span><span>    </span><span id="%3E%3E-"><span class="annot"><a href="Control.Monad.Logic.Class.html#%3E%3E-"><span class="hs-operator hs-type">(&gt;&gt;-)</span></a></span></span><span>      </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621679041328"><span id="local-6989586621679041329"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041329"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679041329"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041328"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041328"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-203"></span><span>    </span><span class="hs-keyword">infixl</span><span> </span><span class="hs-number">1</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#%3E%3E-"><span class="hs-operator hs-type">&gt;&gt;-</span></a></span><span>
+</span><span id="line-204"></span><span>
+</span><span id="line-205"></span><span>    </span><span class="hs-comment">-- | __Pruning.__ Selects one result out of many. Useful for when multiple</span><span>
+</span><span id="line-206"></span><span>    </span><span class="hs-comment">--   results of a computation will be equivalent, or should be treated as</span><span>
+</span><span id="line-207"></span><span>    </span><span class="hs-comment">--   such.</span><span>
+</span><span id="line-208"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-209"></span><span>    </span><span class="hs-comment">--   As an example, here's a way to determine if a number is</span><span>
+</span><span id="line-210"></span><span>    </span><span class="hs-comment">--   &lt;https://wikipedia.org/wiki/Composite_number composite&gt;</span><span>
+</span><span id="line-211"></span><span>    </span><span class="hs-comment">--   (has non-trivial integer divisors, i.e. not a</span><span>
+</span><span id="line-212"></span><span>    </span><span class="hs-comment">--   prime number):</span><span>
+</span><span id="line-213"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-214"></span><span>    </span><span class="hs-comment">--   &gt; choose = foldr ((&lt;|&gt;) . pure) empty</span><span>
+</span><span id="line-215"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-216"></span><span>    </span><span class="hs-comment">--   &gt; divisors n = do a &lt;- choose [2..n-1]</span><span>
+</span><span id="line-217"></span><span>    </span><span class="hs-comment">--   &gt;                 b &lt;- choose [2..n-1]</span><span>
+</span><span id="line-218"></span><span>    </span><span class="hs-comment">--   &gt;                 guard (a * b == n)</span><span>
+</span><span id="line-219"></span><span>    </span><span class="hs-comment">--   &gt;                 pure (a, b)</span><span>
+</span><span id="line-220"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-221"></span><span>    </span><span class="hs-comment">--   &gt; composite_ v = do _ &lt;- divisors v</span><span>
+</span><span id="line-222"></span><span>    </span><span class="hs-comment">--   &gt;                   pure &quot;Composite&quot;</span><span>
+</span><span id="line-223"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-224"></span><span>    </span><span class="hs-comment">--   While this works as intended, it actually does too much work:</span><span>
+</span><span id="line-225"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-226"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (composite_ 20)</span><span>
+</span><span id="line-227"></span><span>    </span><span class="hs-comment">--   [&quot;Composite&quot;, &quot;Composite&quot;, &quot;Composite&quot;, &quot;Composite&quot;]</span><span>
+</span><span id="line-228"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-229"></span><span>    </span><span class="hs-comment">--   Because there are multiple divisors of 20, and they can also</span><span>
+</span><span id="line-230"></span><span>    </span><span class="hs-comment">--   occur in either order:</span><span>
+</span><span id="line-231"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-232"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (divisors 20)</span><span>
+</span><span id="line-233"></span><span>    </span><span class="hs-comment">--   [(2,10), (4,5), (5,4), (10,2)]</span><span>
+</span><span id="line-234"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-235"></span><span>    </span><span class="hs-comment">--   Clearly one could just use 'Control.Monad.Logic.observe' here to get the first</span><span>
+</span><span id="line-236"></span><span>    </span><span class="hs-comment">--   non-prime result, but if the call to @composite@ is in the</span><span>
+</span><span id="line-237"></span><span>    </span><span class="hs-comment">--   middle of other logic code then use 'once' instead.</span><span>
+</span><span id="line-238"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-239"></span><span>    </span><span class="hs-comment">--   &gt; composite v = do _ &lt;- once (divisors v)</span><span>
+</span><span id="line-240"></span><span>    </span><span class="hs-comment">--   &gt;                  pure &quot;Composite&quot;</span><span>
+</span><span id="line-241"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-242"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (composite 20)</span><span>
+</span><span id="line-243"></span><span>    </span><span class="hs-comment">--   [&quot;Composite&quot;]</span><span>
+</span><span id="line-244"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-245"></span><span>    </span><span id="once"><span class="annot"><a href="Control.Monad.Logic.Class.html#once"><span class="hs-identifier hs-type">once</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621679041320"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041320"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041320"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-246"></span><span>
+</span><span id="line-247"></span><span>    </span><span class="hs-comment">-- | __Inverts__ a logic computation. If @m@ succeeds with at least one value,</span><span>
+</span><span id="line-248"></span><span>    </span><span class="hs-comment">--   'lnot' @m@ fails. If @m@ fails, then 'lnot' @m@ succeeds with the value @()@.</span><span>
+</span><span id="line-249"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-250"></span><span>    </span><span class="hs-comment">--   For example, evaluating if a number is prime can be based on</span><span>
+</span><span id="line-251"></span><span>    </span><span class="hs-comment">--   the failure to find divisors of a number:</span><span>
+</span><span id="line-252"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-253"></span><span>    </span><span class="hs-comment">--   &gt; choose = foldr ((&lt;|&gt;) . pure) empty</span><span>
+</span><span id="line-254"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-255"></span><span>    </span><span class="hs-comment">--   &gt; divisors n = do d &lt;- choose [2..n-1]</span><span>
+</span><span id="line-256"></span><span>    </span><span class="hs-comment">--   &gt;                 guard (n `rem` d == 0)</span><span>
+</span><span id="line-257"></span><span>    </span><span class="hs-comment">--   &gt;                 pure d</span><span>
+</span><span id="line-258"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-259"></span><span>    </span><span class="hs-comment">--   &gt; prime v = do _ &lt;- lnot (divisors v)</span><span>
+</span><span id="line-260"></span><span>    </span><span class="hs-comment">--   &gt;              pure True</span><span>
+</span><span id="line-261"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-262"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (prime 20)</span><span>
+</span><span id="line-263"></span><span>    </span><span class="hs-comment">--   []</span><span>
+</span><span id="line-264"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (prime 19)</span><span>
+</span><span id="line-265"></span><span>    </span><span class="hs-comment">--   [True]</span><span>
+</span><span id="line-266"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-267"></span><span>    </span><span class="hs-comment">--   Here if @divisors@ never succeeds, then the 'lnot' will</span><span>
+</span><span id="line-268"></span><span>    </span><span class="hs-comment">--   succeed and the number will be declared as prime.</span><span>
+</span><span id="line-269"></span><span>    </span><span id="lnot"><span class="annot"><a href="Control.Monad.Logic.Class.html#lnot"><span class="hs-identifier hs-type">lnot</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621679041318"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041318"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span><span>
+</span><span id="line-270"></span><span>
+</span><span id="line-271"></span><span>    </span><span class="hs-comment">-- | Logical __conditional.__ The equivalent of</span><span>
+</span><span id="line-272"></span><span>    </span><span class="hs-comment">--   &lt;http://lpn.swi-prolog.org/lpnpage.php?pagetype=html&amp;pageid=lpn-htmlse44 Prolog's soft-cut&gt;.</span><span>
+</span><span id="line-273"></span><span>    </span><span class="hs-comment">--   If its first argument succeeds at all,</span><span>
+</span><span id="line-274"></span><span>    </span><span class="hs-comment">--   then the results will be fed into the success</span><span>
+</span><span id="line-275"></span><span>    </span><span class="hs-comment">--   branch. Otherwise, the failure branch is taken.  The failure</span><span>
+</span><span id="line-276"></span><span>    </span><span class="hs-comment">--   branch is never considered if the first argument has any</span><span>
+</span><span id="line-277"></span><span>    </span><span class="hs-comment">--   successes.  The 'ifte' function satisfies the following laws:</span><span>
+</span><span id="line-278"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-279"></span><span>    </span><span class="hs-comment">--   &gt; ifte (pure a) th el       == th a</span><span>
+</span><span id="line-280"></span><span>    </span><span class="hs-comment">--   &gt; ifte empty th el          == el</span><span>
+</span><span id="line-281"></span><span>    </span><span class="hs-comment">--   &gt; ifte (pure a &lt;|&gt; m) th el == th a &lt;|&gt; (m &gt;&gt;= th)</span><span>
+</span><span id="line-282"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-283"></span><span>    </span><span class="hs-comment">--   For example, the previous @prime@ function returned nothing</span><span>
+</span><span id="line-284"></span><span>    </span><span class="hs-comment">--   if the number was not prime, but if it should return 'False'</span><span>
+</span><span id="line-285"></span><span>    </span><span class="hs-comment">--   instead, the following can be used:</span><span>
+</span><span id="line-286"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-287"></span><span>    </span><span class="hs-comment">--   &gt; choose = foldr ((&lt;|&gt;) . pure) empty</span><span>
+</span><span id="line-288"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-289"></span><span>    </span><span class="hs-comment">--   &gt; divisors n = do d &lt;- choose [2..n-1]</span><span>
+</span><span id="line-290"></span><span>    </span><span class="hs-comment">--   &gt;                 guard (n `rem` d == 0)</span><span>
+</span><span id="line-291"></span><span>    </span><span class="hs-comment">--   &gt;                 pure d</span><span>
+</span><span id="line-292"></span><span>    </span><span class="hs-comment">--   &gt;</span><span>
+</span><span id="line-293"></span><span>    </span><span class="hs-comment">--   &gt; prime v = once (ifte (divisors v)</span><span>
+</span><span id="line-294"></span><span>    </span><span class="hs-comment">--   &gt;                   (const (pure False))</span><span>
+</span><span id="line-295"></span><span>    </span><span class="hs-comment">--   &gt;                   (pure True))</span><span>
+</span><span id="line-296"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-297"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (prime 20)</span><span>
+</span><span id="line-298"></span><span>    </span><span class="hs-comment">--   [False]</span><span>
+</span><span id="line-299"></span><span>    </span><span class="hs-comment">--   &gt;&gt;&gt; observeAll (prime 19)</span><span>
+</span><span id="line-300"></span><span>    </span><span class="hs-comment">--   [True]</span><span>
+</span><span id="line-301"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-302"></span><span>    </span><span class="hs-comment">--   Notice that this cannot be done with a simple @if-then-else@</span><span>
+</span><span id="line-303"></span><span>    </span><span class="hs-comment">--   because @divisors@ either generates values or it does not, so</span><span>
+</span><span id="line-304"></span><span>    </span><span class="hs-comment">--   there's no &quot;false&quot; condition to check with a simple @if@</span><span>
+</span><span id="line-305"></span><span>    </span><span class="hs-comment">--   statement.</span><span>
+</span><span id="line-306"></span><span>    </span><span id="ifte"><span class="annot"><a href="Control.Monad.Logic.Class.html#ifte"><span class="hs-identifier hs-type">ifte</span></a></span></span><span>       </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621679041323"><span id="local-6989586621679041324"><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041324"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679041324"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041323"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041323"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041342"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041323"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-307"></span><span>
+</span><span id="line-308"></span><span>    </span><span class="hs-comment">-- All the class functions besides msplit can be derived from msplit, if</span><span>
+</span><span id="line-309"></span><span>    </span><span class="hs-comment">-- desired</span><span>
+</span><span id="line-310"></span><span>    </span><span id="local-6989586621679041207"><span class="annot"><a href="Control.Monad.Logic.Class.html#interleave"><span class="hs-identifier hs-var hs-var">interleave</span></a></span><span> </span><span id="local-6989586621679041198"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041198"><span class="hs-identifier hs-var">m1</span></a></span></span><span> </span><span id="local-6989586621679041197"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041197"><span class="hs-identifier hs-var">m2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041198"><span class="hs-identifier hs-var">m1</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span>
+</span><span id="line-311"></span><span>                        </span><span class="annot"><span class="annottext">forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041197"><span class="hs-identifier hs-var">m2</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679041195"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041195"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679041194"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041194"><span class="hs-identifier hs-var">m1'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041195"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;|&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m a -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#interleave"><span class="hs-identifier hs-var">interleave</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041197"><span class="hs-identifier hs-var">m2</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041194"><span class="hs-identifier hs-var">m1'</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-312"></span><span>
+</span><span id="line-313"></span><span>    </span><span id="local-6989586621679041192"><span id="local-6989586621679041184"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041184"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#%3E%3E-"><span class="hs-operator hs-var hs-var">&gt;&gt;-</span></a></span><span> </span><span id="local-6989586621679041183"><span class="annot"><span class="annottext">a -&gt; m b
+</span><a href="#local-6989586621679041183"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041184"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">empty</span></a></span><span>
+</span><span id="line-314"></span><span>      </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679041181"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041181"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679041180"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041180"><span class="hs-identifier hs-var">m'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m a -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#interleave"><span class="hs-identifier hs-var">interleave</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; m b
+</span><a href="#local-6989586621679041183"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041181"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041180"><span class="hs-identifier hs-var">m'</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. MonadLogic m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="Control.Monad.Logic.Class.html#%3E%3E-"><span class="hs-operator hs-var">&gt;&gt;-</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; m b
+</span><a href="#local-6989586621679041183"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-315"></span><span>
+</span><span id="line-316"></span><span>    </span><span id="local-6989586621679041179"><span class="annot"><a href="Control.Monad.Logic.Class.html#ifte"><span class="hs-identifier hs-var hs-var">ifte</span></a></span><span> </span><span id="local-6989586621679041172"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041172"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621679041171"><span class="annot"><span class="annottext">a -&gt; m b
+</span><a href="#local-6989586621679041171"><span class="hs-identifier hs-var">th</span></a></span></span><span> </span><span id="local-6989586621679041170"><span class="annot"><span class="annottext">m b
+</span><a href="#local-6989586621679041170"><span class="hs-identifier hs-var">el</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041172"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="annot"><span class="annottext">m b
+</span><a href="#local-6989586621679041170"><span class="hs-identifier hs-var">el</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679041169"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041169"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679041168"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041168"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; m b
+</span><a href="#local-6989586621679041171"><span class="hs-identifier hs-var">th</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041169"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;|&gt;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041168"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; m b
+</span><a href="#local-6989586621679041171"><span class="hs-identifier hs-var">th</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span></span><span>
+</span><span id="line-317"></span><span>
+</span><span id="line-318"></span><span>    </span><span id="local-6989586621679041167"><span class="annot"><a href="Control.Monad.Logic.Class.html#once"><span class="hs-identifier hs-var hs-var">once</span></a></span><span> </span><span id="local-6989586621679041159"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041159"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041159"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">empty</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679041158"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041158"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">m a
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041158"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-319"></span><span>
+</span><span id="line-320"></span><span>    </span><span id="local-6989586621679041157"><span class="annot"><a href="Control.Monad.Logic.Class.html#lnot"><span class="hs-identifier hs-var hs-var">lnot</span></a></span><span> </span><span id="local-6989586621679041149"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041149"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041149"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. a -&gt; b -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">empty</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-321"></span><span>
+</span><span id="line-322"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-323"></span><span class="hs-comment">-- | The inverse of 'msplit'. Satisfies the following law:</span><span>
+</span><span id="line-324"></span><span class="hs-comment">--</span><span>
+</span><span id="line-325"></span><span class="hs-comment">-- &gt; msplit m &gt;&gt;= reflect == m</span><span>
+</span><span id="line-326"></span><span id="local-6989586621679041313"><span id="local-6989586621679041314"><span class="annot"><a href="Control.Monad.Logic.Class.html#reflect"><span class="hs-identifier hs-type">reflect</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Alternative</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041314"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679041313"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621679041314"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041313"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679041314"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041313"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-327"></span><span id="reflect"><span class="annot"><span class="annottext">reflect :: forall (m :: * -&gt; *) a. Alternative m =&gt; Maybe (a, m a) -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#reflect"><span class="hs-identifier hs-var hs-var">reflect</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe (a, m a)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">empty</span></a></span><span>
+</span><span id="line-328"></span><span class="annot"><a href="Control.Monad.Logic.Class.html#reflect"><span class="hs-identifier hs-var">reflect</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679041141"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041141"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679041140"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041140"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041141"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;|&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041140"><span class="hs-identifier hs-var">m</span></a></span><span>
+</span><span id="line-329"></span><span>
+</span><span id="line-330"></span><span class="hs-comment">-- An instance of MonadLogic for lists</span><span>
+</span><span id="line-331"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679041123"><span id="local-6989586621679041125"><span id="local-6989586621679041127"><span id="local-6989586621679041129"><span id="local-6989586621679041131"><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-332"></span><span>    </span><span id="local-6989586621679041118"><span class="annot"><span class="annottext">msplit :: forall a. [a] -&gt; [Maybe (a, [a])]
+</span><a href="#local-6989586621679041118"><span class="hs-identifier hs-var hs-var hs-var hs-var">msplit</span></a></span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-333"></span><span>    </span><span class="annot"><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679041117"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041117"><span class="hs-identifier hs-var">x</span></a></span></span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-glyph hs-type">:</span></a></span><span id="local-6989586621679041116"><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679041116"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041117"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">[a]
+</span><a href="#local-6989586621679041116"><span class="hs-identifier hs-var">xs</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-334"></span><span>
+</span><span id="line-335"></span><span class="hs-comment">-- | Note that splitting a transformer does</span><span>
+</span><span id="line-336"></span><span class="hs-comment">-- not allow you to provide different input</span><span>
+</span><span id="line-337"></span><span class="hs-comment">-- to the monadic object returned.</span><span>
+</span><span id="line-338"></span><span class="hs-comment">-- For instance, in:</span><span>
+</span><span id="line-339"></span><span class="hs-comment">--</span><span>
+</span><span id="line-340"></span><span class="hs-comment">-- &gt; let Just (_, rm') = runReaderT (msplit rm) r in runReaderT rm' r'</span><span>
+</span><span id="line-341"></span><span class="hs-comment">--</span><span>
+</span><span id="line-342"></span><span class="hs-comment">-- @r'@ will be ignored, because @r@ was already threaded through the</span><span>
+</span><span id="line-343"></span><span class="hs-comment">-- computation.</span><span>
+</span><span id="line-344"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679041099"><span id="local-6989586621679041101"><span id="local-6989586621679041103"><span id="local-6989586621679041105"><span id="local-6989586621679041107"><span id="local-6989586621679041300"><span id="local-6989586621679041301"><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041301"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../transformers/html/src"><span class="hs-identifier hs-type">ReaderT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041300"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041301"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-345"></span><span>    </span><span id="local-6989586621679041091"><span class="annot"><span class="annottext">msplit :: forall a. ReaderT e m a -&gt; ReaderT e m (Maybe (a, ReaderT e m a))
+</span><a href="#local-6989586621679041091"><span class="hs-identifier hs-var hs-var hs-var hs-var">msplit</span></a></span></span><span> </span><span id="local-6989586621679041090"><span class="annot"><span class="annottext">ReaderT e m a
+</span><a href="#local-6989586621679041090"><span class="hs-identifier hs-var">rm</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall r (m :: * -&gt; *) a. (r -&gt; m a) -&gt; ReaderT r m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">ReaderT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041088"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679041088"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679041087"><span class="annot"><span class="annottext">Maybe (a, m a)
+</span><a href="#local-6989586621679041087"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall r (m :: * -&gt; *) a. ReaderT r m a -&gt; r -&gt; m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">runReaderT</span></a></span><span> </span><span class="annot"><span class="annottext">ReaderT e m a
+</span><a href="#local-6989586621679041090"><span class="hs-identifier hs-var">rm</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621679041088"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-346"></span><span>                                   </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe (a, m a)
+</span><a href="#local-6989586621679041087"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-347"></span><span>                                     </span><span class="annot"><span class="annottext">Maybe (a, m a)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-348"></span><span>                                     </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679041085"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041085"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679041084"><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041084"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041085"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">lift</span></a></span><span> </span><span class="annot"><span class="annottext">m a
+</span><a href="#local-6989586621679041084"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-349"></span><span>
+</span><span id="line-350"></span><span class="hs-comment">-- | See note on splitting above.</span><span>
+</span><span id="line-351"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679041071"><span id="local-6989586621679041282"><span id="local-6989586621679041283"><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041283"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">MonadPlus</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041283"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../transformers/html/src"><span class="hs-identifier hs-type">StrictST.StateT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041282"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041283"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-352"></span><span>    </span><span id="local-6989586621679041065"><span class="annot"><span class="annottext">msplit :: forall a. StateT s m a -&gt; StateT s m (Maybe (a, StateT s m a))
+</span><a href="#local-6989586621679041065"><span class="hs-identifier hs-var hs-var hs-var hs-var">msplit</span></a></span></span><span> </span><span id="local-6989586621679041064"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041064"><span class="hs-identifier hs-var">sm</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041062"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041062"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-353"></span><span>                    </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679041061"><span class="annot"><span class="annottext">Maybe ((a, s), m (a, s))
+</span><a href="#local-6989586621679041061"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041064"><span class="hs-identifier hs-var">sm</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041062"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-354"></span><span>                       </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ((a, s), m (a, s))
+</span><a href="#local-6989586621679041061"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-355"></span><span>                            </span><span class="annot"><span class="annottext">Maybe ((a, s), m (a, s))
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041062"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-356"></span><span>                            </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span id="local-6989586621679041059"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041059"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679041058"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041058"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span id="local-6989586621679041057"><span class="annot"><span class="annottext">m (a, s)
+</span><a href="#local-6989586621679041057"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-357"></span><span>                                </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041059"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.StateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. a -&gt; b -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">m (a, s)
+</span><a href="#local-6989586621679041057"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041058"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-358"></span><span>
+</span><span id="line-359"></span><span>    </span><span id="local-6989586621679041055"><span class="annot"><span class="annottext">interleave :: forall a. StateT s m a -&gt; StateT s m a -&gt; StateT s m a
+</span><a href="#local-6989586621679041055"><span class="hs-identifier hs-var hs-var hs-var hs-var">interleave</span></a></span></span><span> </span><span id="local-6989586621679041054"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041054"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span id="local-6989586621679041053"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041053"><span class="hs-identifier hs-var">mb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041052"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041052"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-360"></span><span>                        </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041054"><span class="hs-identifier hs-var">ma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041052"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m a -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#interleave"><span class="hs-operator hs-var">`interleave`</span></a></span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041053"><span class="hs-identifier hs-var">mb</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041052"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-361"></span><span>
+</span><span id="line-362"></span><span>    </span><span id="local-6989586621679041050"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041050"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span id="local-6989586621679041049"><span class="annot"><span class="annottext">&gt;&gt;- :: forall a b. StateT s m a -&gt; (a -&gt; StateT s m b) -&gt; StateT s m b
+</span><a href="#local-6989586621679041049"><span class="hs-operator hs-var hs-var hs-var hs-var">&gt;&gt;-</span></a></span></span><span> </span><span id="local-6989586621679041048"><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679041048"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041047"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041047"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-363"></span><span>                </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041050"><span class="hs-identifier hs-var">ma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041047"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. MonadLogic m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="Control.Monad.Logic.Class.html#%3E%3E-"><span class="hs-operator hs-var">&gt;&gt;-</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679041046"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041046"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679041045"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041045"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679041048"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041046"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041045"><span class="hs-identifier hs-var">s'</span></a></span><span>
+</span><span id="line-364"></span><span>
+</span><span id="line-365"></span><span>    </span><span id="local-6989586621679041043"><span class="annot"><span class="annottext">ifte :: forall a b.
+StateT s m a -&gt; (a -&gt; StateT s m b) -&gt; StateT s m b -&gt; StateT s m b
+</span><a href="#local-6989586621679041043"><span class="hs-identifier hs-var hs-var hs-var hs-var">ifte</span></a></span></span><span> </span><span id="local-6989586621679041042"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041042"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621679041041"><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679041041"><span class="hs-identifier hs-var">th</span></a></span></span><span> </span><span id="local-6989586621679041040"><span class="annot"><span class="annottext">StateT s m b
+</span><a href="#local-6989586621679041040"><span class="hs-identifier hs-var">el</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041039"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041039"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b.
+MonadLogic m =&gt;
+m a -&gt; (a -&gt; m b) -&gt; m b -&gt; m b
+</span><a href="Control.Monad.Logic.Class.html#ifte"><span class="hs-identifier hs-var">ifte</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041042"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041039"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-366"></span><span>                                                </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679041038"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041038"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679041037"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041037"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679041041"><span class="hs-identifier hs-var">th</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041038"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041037"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-367"></span><span>                                                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m b
+</span><a href="#local-6989586621679041040"><span class="hs-identifier hs-var">el</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041039"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-368"></span><span>
+</span><span id="line-369"></span><span>    </span><span id="local-6989586621679041035"><span class="annot"><span class="annottext">once :: forall a. StateT s m a -&gt; StateT s m a
+</span><a href="#local-6989586621679041035"><span class="hs-identifier hs-var hs-var hs-var hs-var">once</span></a></span></span><span> </span><span id="local-6989586621679041034"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041034"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041033"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041033"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#once"><span class="hs-identifier hs-var">once</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">StrictST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041034"><span class="hs-identifier hs-var">ma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041033"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-370"></span><span>
+</span><span id="line-371"></span><span class="hs-comment">-- | See note on splitting above.</span><span>
+</span><span id="line-372"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679041021"><span id="local-6989586621679041263"><span id="local-6989586621679041264"><span class="hs-special">(</span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041264"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">MonadPlus</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041264"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Control.Monad.Logic.Class.html#MonadLogic"><span class="hs-identifier hs-type">MonadLogic</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../transformers/html/src"><span class="hs-identifier hs-type">LazyST.StateT</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041263"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679041264"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-373"></span><span>    </span><span id="local-6989586621679041015"><span class="annot"><span class="annottext">msplit :: forall a. StateT s m a -&gt; StateT s m (Maybe (a, StateT s m a))
+</span><a href="#local-6989586621679041015"><span class="hs-identifier hs-var hs-var hs-var hs-var">msplit</span></a></span></span><span> </span><span id="local-6989586621679041014"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041014"><span class="hs-identifier hs-var">sm</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041012"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041012"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-374"></span><span>                    </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621679041011"><span class="annot"><span class="annottext">Maybe ((a, s), m (a, s))
+</span><a href="#local-6989586621679041011"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m (Maybe (a, m a))
+</span><a href="Control.Monad.Logic.Class.html#msplit"><span class="hs-identifier hs-var">msplit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041014"><span class="hs-identifier hs-var">sm</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041012"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-375"></span><span>                       </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ((a, s), m (a, s))
+</span><a href="#local-6989586621679041011"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-376"></span><span>                            </span><span class="annot"><span class="annottext">Maybe ((a, s), m (a, s))
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041012"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-377"></span><span>                            </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span id="local-6989586621679041009"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041009"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679041008"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041008"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span id="local-6989586621679041007"><span class="annot"><span class="annottext">m (a, s)
+</span><a href="#local-6989586621679041007"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-378"></span><span>                                </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679041009"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.StateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. a -&gt; b -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">const</span></a></span><span> </span><span class="annot"><span class="annottext">m (a, s)
+</span><a href="#local-6989586621679041007"><span class="hs-identifier hs-var">m</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041008"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-379"></span><span>
+</span><span id="line-380"></span><span>    </span><span id="local-6989586621679041005"><span class="annot"><span class="annottext">interleave :: forall a. StateT s m a -&gt; StateT s m a -&gt; StateT s m a
+</span><a href="#local-6989586621679041005"><span class="hs-identifier hs-var hs-var hs-var hs-var">interleave</span></a></span></span><span> </span><span id="local-6989586621679041004"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041004"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span id="local-6989586621679041003"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041003"><span class="hs-identifier hs-var">mb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679041002"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041002"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-381"></span><span>                        </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041004"><span class="hs-identifier hs-var">ma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041002"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m a -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#interleave"><span class="hs-operator hs-var">`interleave`</span></a></span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041003"><span class="hs-identifier hs-var">mb</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679041002"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-382"></span><span>
+</span><span id="line-383"></span><span>    </span><span id="local-6989586621679041000"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041000"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span id="local-6989586621679040999"><span class="annot"><span class="annottext">&gt;&gt;- :: forall a b. StateT s m a -&gt; (a -&gt; StateT s m b) -&gt; StateT s m b
+</span><a href="#local-6989586621679040999"><span class="hs-operator hs-var hs-var hs-var hs-var">&gt;&gt;-</span></a></span></span><span> </span><span id="local-6989586621679040998"><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679040998"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679040997"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040997"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-384"></span><span>                </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679041000"><span class="hs-identifier hs-var">ma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040997"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. MonadLogic m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="Control.Monad.Logic.Class.html#%3E%3E-"><span class="hs-operator hs-var">&gt;&gt;-</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679040996"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679040996"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679040995"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040995"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679040998"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679040996"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040995"><span class="hs-identifier hs-var">s'</span></a></span><span>
+</span><span id="line-385"></span><span>
+</span><span id="line-386"></span><span>    </span><span id="local-6989586621679040993"><span class="annot"><span class="annottext">ifte :: forall a b.
+StateT s m a -&gt; (a -&gt; StateT s m b) -&gt; StateT s m b -&gt; StateT s m b
+</span><a href="#local-6989586621679040993"><span class="hs-identifier hs-var hs-var hs-var hs-var">ifte</span></a></span></span><span> </span><span id="local-6989586621679040992"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679040992"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621679040991"><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679040991"><span class="hs-identifier hs-var">th</span></a></span></span><span> </span><span id="local-6989586621679040990"><span class="annot"><span class="annottext">StateT s m b
+</span><a href="#local-6989586621679040990"><span class="hs-identifier hs-var">el</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679040989"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040989"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b.
+MonadLogic m =&gt;
+m a -&gt; (a -&gt; m b) -&gt; m b -&gt; m b
+</span><a href="Control.Monad.Logic.Class.html#ifte"><span class="hs-identifier hs-var">ifte</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679040992"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040989"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-387"></span><span>                                              </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679040988"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679040988"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span id="local-6989586621679040987"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040987"><span class="hs-identifier hs-var">s'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; StateT s m b
+</span><a href="#local-6989586621679040991"><span class="hs-identifier hs-var">th</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679040988"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040987"><span class="hs-identifier hs-var">s'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-388"></span><span>                                              </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m b
+</span><a href="#local-6989586621679040990"><span class="hs-identifier hs-var">el</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040989"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-389"></span><span>
+</span><span id="line-390"></span><span>    </span><span id="local-6989586621679040985"><span class="annot"><span class="annottext">once :: forall a. StateT s m a -&gt; StateT s m a
+</span><a href="#local-6989586621679040985"><span class="hs-identifier hs-var hs-var hs-var hs-var">once</span></a></span></span><span> </span><span id="local-6989586621679040984"><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679040984"><span class="hs-identifier hs-var">ma</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. (s -&gt; m (a, s)) -&gt; StateT s m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.StateT</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679040983"><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040983"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadLogic m =&gt; m a -&gt; m a
+</span><a href="Control.Monad.Logic.Class.html#once"><span class="hs-identifier hs-var">once</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *) a. StateT s m a -&gt; s -&gt; m (a, s)
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">LazyST.runStateT</span></a></span><span> </span><span class="annot"><span class="annottext">StateT s m a
+</span><a href="#local-6989586621679040984"><span class="hs-identifier hs-var">ma</span></a></span><span> </span><span class="annot"><span class="annottext">s
+</span><a href="#local-6989586621679040983"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-391"></span></pre></body></html>

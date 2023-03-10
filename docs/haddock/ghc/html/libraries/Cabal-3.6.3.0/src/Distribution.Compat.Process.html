@@ -1,0 +1,170 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Distribution.Compat.Process</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-3"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Redefined functions</span></span><span>
+</span><span id="line-4"></span><span>    </span><span class="annot"><a href="Distribution.Compat.Process.html#createProcess"><span class="hs-identifier">createProcess</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-5"></span><span>    </span><span class="annot"><a href="Distribution.Compat.Process.html#runInteractiveProcess"><span class="hs-identifier">runInteractiveProcess</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-6"></span><span>    </span><span class="annot"><a href="Distribution.Compat.Process.html#rawSystem"><span class="hs-identifier">rawSystem</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-7"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Additions</span></span><span>
+</span><span id="line-8"></span><span>    </span><span class="annot"><a href="Distribution.Compat.Process.html#enableProcessJobs"><span class="hs-identifier">enableProcessJobs</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-9"></span><span>    </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/System-Exit.html#"><span class="hs-identifier">System.Exit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Exception.html#ExitCode"><span class="hs-identifier">ExitCode</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/System-IO.html#"><span class="hs-identifier">System.IO</span></a></span><span>   </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier">Handle</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process.html#"><span class="hs-identifier">System.Process</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreateProcess"><span class="hs-identifier">CreateProcess</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#ProcessHandle"><span class="hs-identifier">ProcessHandle</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process.html#"><span class="hs-identifier">System.Process</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Process</span></span><span class="hs-cpp">
+
+#if MIN_VERSION_process(1,2,0)
+</span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process.html#"><span class="hs-identifier">System.Process</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process.html#waitForProcess"><span class="hs-identifier">waitForProcess</span></a></span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">
+#if defined(mingw32_HOST_OS) &amp;&amp; MIN_VERSION_process(1,6,9)
+</span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">System.IO.Unsafe</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">unsafePerformIO</span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span>           </span><span class="hs-identifier">System.Win32.Info.Version</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">dwMajorVersion</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">dwMinorVersion</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">getVersionEx</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- enableProcessJobs</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span class="hs-cpp">
+
+#if defined(mingw32_HOST_OS) &amp;&amp; MIN_VERSION_process(1,6,9)
+</span><span class="hs-comment">-- This exception, needed to support Windows 7, could be removed when</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- the lowest GHC version cabal supports is a GHC that doesn&#8217;t support</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- Windows 7 any more.</span><span>
+</span><span id="line-34"></span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="hs-pragma">isWindows8OrLater</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-35"></span><span class="hs-identifier">isWindows8OrLater</span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-identifier">Bool</span><span>
+</span><span id="line-36"></span><span class="hs-identifier">isWindows8OrLater</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">unsafePerformIO</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-identifier">v</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="hs-identifier">getVersionEx</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-identifier">pure</span><span> </span><span class="hs-operator">$</span><span> </span><span class="hs-special">(</span><span class="hs-identifier">dwMajorVersion</span><span> </span><span class="hs-identifier">v</span><span class="hs-special">,</span><span> </span><span class="hs-identifier">dwMinorVersion</span><span> </span><span class="hs-identifier">v</span><span class="hs-special">)</span><span> </span><span class="hs-operator">&gt;=</span><span> </span><span class="hs-special">(</span><span class="hs-number">6</span><span class="hs-special">,</span><span> </span><span class="hs-number">2</span><span class="hs-special">)</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | Enable process jobs to ensure accurate determination of process completion</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- in the presence of @exec(3)@ on Windows.</span><span>
+</span><span id="line-43"></span><span class="hs-comment">--</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- Unfortunately the process job support is badly broken in @process@ releases</span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- prior to 1.6.9, so we disable it in these versions, despite the fact that</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- this means we may see sporadic build failures without jobs.</span><span>
+</span><span id="line-47"></span><span class="hs-comment">--</span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- On Windows 7 or before the jobs are disabled due to the fact that</span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- processes on these systems can only have one job. This prevents</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- spawned process from assigning jobs to its own children. Suppose</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- processs A spawns process B. The B process has a job assigned (call</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- it J1) and when it tries to spawn a new process C the C</span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- automatically inherits the job. But at it also tries to assign a</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- new job J2 to C since it doesn&#8217;t have access J1. This fails on</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- Windows 7 or before.</span><span>
+</span><span id="line-56"></span><span class="annot"><a href="Distribution.Compat.Process.html#enableProcessJobs"><span class="hs-identifier hs-type">enableProcessJobs</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreateProcess"><span class="hs-identifier hs-type">CreateProcess</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreateProcess"><span class="hs-identifier hs-type">CreateProcess</span></a></span><span class="hs-cpp">
+#if defined(mingw32_HOST_OS) &amp;&amp; MIN_VERSION_process(1,6,9)
+</span><span class="hs-identifier">enableProcessJobs</span><span> </span><span class="hs-identifier">cp</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">cp</span><span> </span><span class="hs-special">{</span><span class="hs-identifier">Process.use_process_jobs</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-identifier">isWindows8OrLater</span><span class="hs-special">}</span><span class="hs-cpp">
+#else
+</span><span id="enableProcessJobs"><span class="annot"><span class="annottext">enableProcessJobs :: CreateProcess -&gt; CreateProcess
+</span><a href="Distribution.Compat.Process.html#enableProcessJobs"><span class="hs-identifier hs-var hs-var">enableProcessJobs</span></a></span></span><span> </span><span id="local-6989586621679627237"><span class="annot"><span class="annottext">CreateProcess
+</span><a href="#local-6989586621679627237"><span class="hs-identifier hs-var">cp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CreateProcess
+</span><a href="#local-6989586621679627237"><span class="hs-identifier hs-var">cp</span></a></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-63"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-64"></span><span class="hs-comment">-- process redefinitions</span><span>
+</span><span id="line-65"></span><span class="hs-comment">-------------------------------------------------------------------------------</span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="hs-comment">-- | 'System.Process.createProcess' with process jobs enabled when appropriate.</span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- See 'enableProcessJobs'.</span><span>
+</span><span id="line-69"></span><span class="annot"><a href="Distribution.Compat.Process.html#createProcess"><span class="hs-identifier hs-type">createProcess</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreateProcess"><span class="hs-identifier hs-type">CreateProcess</span></a></span><span>
+</span><span id="line-70"></span><span>              </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier hs-type">Handle</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier hs-type">Handle</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier hs-type">Handle</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#ProcessHandle"><span class="hs-identifier hs-type">ProcessHandle</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span id="createProcess"><span class="annot"><span class="annottext">createProcess :: CreateProcess
+-&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+</span><a href="Distribution.Compat.Process.html#createProcess"><span class="hs-identifier hs-var hs-var">createProcess</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CreateProcess
+-&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+</span><a href="../../process-1.6.13.2/src/System-Process.html#createProcess"><span class="hs-identifier hs-var">Process.createProcess</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../base-4.16.3.0/src/GHC-Base.html#."><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">CreateProcess -&gt; CreateProcess
+</span><a href="Distribution.Compat.Process.html#enableProcessJobs"><span class="hs-identifier hs-var">enableProcessJobs</span></a></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | 'System.Process.rawSystem' with process jobs enabled when appropriate.</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- See 'enableProcessJobs'.</span><span>
+</span><span id="line-75"></span><span class="annot"><a href="Distribution.Compat.Process.html#rawSystem"><span class="hs-identifier hs-type">rawSystem</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Base.html#String"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Base.html#String"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Exception.html#ExitCode"><span class="hs-identifier hs-type">ExitCode</span></a></span><span>
+</span><span id="line-76"></span><span id="rawSystem"><span class="annot"><span class="annottext">rawSystem :: String -&gt; [String] -&gt; IO ExitCode
+</span><a href="Distribution.Compat.Process.html#rawSystem"><span class="hs-identifier hs-var hs-var">rawSystem</span></a></span></span><span> </span><span id="local-6989586621679627234"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679627234"><span class="hs-identifier hs-var">cmd</span></a></span></span><span> </span><span id="local-6989586621679627233"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679627233"><span class="hs-identifier hs-var">args</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span class="hs-cpp">
+#if MIN_VERSION_process(1,2,0)
+</span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe Handle
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Maybe Handle
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Maybe Handle
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span id="local-6989586621679627232"><span class="annot"><span class="annottext">ProcessHandle
+</span><a href="#local-6989586621679627232"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">CreateProcess
+-&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+</span><a href="Distribution.Compat.Process.html#createProcess"><span class="hs-identifier hs-var">createProcess</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; [String] -&gt; CreateProcess
+</span><a href="../../process-1.6.13.2/src/System-Process.html#proc"><span class="hs-identifier hs-var">Process.proc</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679627234"><span class="hs-identifier hs-var">cmd</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679627233"><span class="hs-identifier hs-var">args</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">delegate_ctlc :: Bool
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#delegate_ctlc"><span class="hs-identifier hs-var">Process.delegate_ctlc</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-79"></span><span>  </span><span class="annot"><span class="annottext">ProcessHandle -&gt; IO ExitCode
+</span><a href="../../process-1.6.13.2/src/System-Process.html#waitForProcess"><span class="hs-identifier hs-var">waitForProcess</span></a></span><span> </span><span class="annot"><span class="annottext">ProcessHandle
+</span><a href="#local-6989586621679627232"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-cpp">
+#else
+</span><span>  </span><span class="hs-comment">-- With very old 'process', just do its rawSystem</span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-identifier">Process.rawSystem</span><span> </span><span class="hs-identifier">cmd</span><span> </span><span class="hs-identifier">args</span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- | 'System.Process.runInteractiveProcess' with process jobs enabled when</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- appropriate. See 'enableProcessJobs'.</span><span>
+</span><span id="line-87"></span><span class="annot"><a href="Distribution.Compat.Process.html#runInteractiveProcess"><span class="hs-identifier hs-type">runInteractiveProcess</span></a></span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO.html#FilePath"><span class="hs-identifier hs-type">FilePath</span></a></span><span>                   </span><span class="hs-comment">-- ^ Filename of the executable (see 'RawCommand' for details)</span><span>
+</span><span id="line-89"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Base.html#String"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">]</span><span>                   </span><span class="hs-comment">-- ^ Arguments to pass to the executable</span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO.html#FilePath"><span class="hs-identifier hs-type">FilePath</span></a></span><span>             </span><span class="hs-comment">-- ^ Optional path to the working directory</span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Maybe.html#Maybe"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Base.html#String"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">,</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-Base.html#String"><span class="hs-identifier hs-type">String</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>    </span><span class="hs-comment">-- ^ Optional environment (otherwise inherit)</span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier hs-type">Handle</span></a></span><span class="hs-special">,</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier hs-type">Handle</span></a></span><span class="hs-special">,</span><span class="annot"><a href="../../base-4.16.3.0/src/GHC-IO-Handle-Types.html#Handle"><span class="hs-identifier hs-type">Handle</span></a></span><span class="hs-special">,</span><span class="annot"><a href="../../process-1.6.13.2/src/System-Process-Common.html#ProcessHandle"><span class="hs-identifier hs-type">ProcessHandle</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span id="runInteractiveProcess"><span class="annot"><span class="annottext">runInteractiveProcess :: String
+-&gt; [String]
+-&gt; Maybe String
+-&gt; Maybe [(String, String)]
+-&gt; IO (Handle, Handle, Handle, ProcessHandle)
+</span><a href="Distribution.Compat.Process.html#runInteractiveProcess"><span class="hs-identifier hs-var hs-var">runInteractiveProcess</span></a></span></span><span> </span><span id="local-6989586621679627228"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679627228"><span class="hs-identifier hs-var">cmd</span></a></span></span><span> </span><span id="local-6989586621679627227"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679627227"><span class="hs-identifier hs-var">args</span></a></span></span><span> </span><span id="local-6989586621679627226"><span class="annot"><span class="annottext">Maybe String
+</span><a href="#local-6989586621679627226"><span class="hs-identifier hs-var">mb_cwd</span></a></span></span><span> </span><span id="local-6989586621679627225"><span class="annot"><span class="annottext">Maybe [(String, String)]
+</span><a href="#local-6989586621679627225"><span class="hs-identifier hs-var">mb_env</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-94"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621679627224"><span class="annot"><span class="annottext">Maybe Handle
+</span><a href="#local-6989586621679627224"><span class="hs-identifier hs-var">mb_in</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679627223"><span class="annot"><span class="annottext">Maybe Handle
+</span><a href="#local-6989586621679627223"><span class="hs-identifier hs-var">mb_out</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679627222"><span class="annot"><span class="annottext">Maybe Handle
+</span><a href="#local-6989586621679627222"><span class="hs-identifier hs-var">mb_err</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679627221"><span class="annot"><span class="annottext">ProcessHandle
+</span><a href="#local-6989586621679627221"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-95"></span><span>      </span><span class="annot"><span class="annottext">CreateProcess
+-&gt; IO (Maybe Handle, Maybe Handle, Maybe Handle, ProcessHandle)
+</span><a href="Distribution.Compat.Process.html#createProcess"><span class="hs-identifier hs-var">createProcess</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; [String] -&gt; CreateProcess
+</span><a href="../../process-1.6.13.2/src/System-Process.html#proc"><span class="hs-identifier hs-var">Process.proc</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679627228"><span class="hs-identifier hs-var">cmd</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679627227"><span class="hs-identifier hs-var">args</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-96"></span><span>              </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">std_in :: StdStream
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#std_in"><span class="hs-identifier hs-var">Process.std_in</span></a></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StdStream
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreatePipe"><span class="hs-identifier hs-var">Process.CreatePipe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-97"></span><span>                </span><span class="annot"><span class="annottext">std_out :: StdStream
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#std_out"><span class="hs-identifier hs-var">Process.std_out</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StdStream
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreatePipe"><span class="hs-identifier hs-var">Process.CreatePipe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-98"></span><span>                </span><span class="annot"><span class="annottext">std_err :: StdStream
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#std_err"><span class="hs-identifier hs-var">Process.std_err</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">StdStream
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#CreatePipe"><span class="hs-identifier hs-var">Process.CreatePipe</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-99"></span><span>                </span><span class="annot"><span class="annottext">env :: Maybe [(String, String)]
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#env"><span class="hs-identifier hs-var">Process.env</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe [(String, String)]
+</span><a href="#local-6989586621679627225"><span class="hs-identifier hs-var">mb_env</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-100"></span><span>                </span><span class="annot"><span class="annottext">cwd :: Maybe String
+</span><a href="../../process-1.6.13.2/src/System-Process-Common.html#cwd"><span class="hs-identifier hs-var">Process.cwd</span></a></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Maybe String
+</span><a href="#local-6989586621679627226"><span class="hs-identifier hs-var">mb_cwd</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-101"></span><span>  </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../base-4.16.3.0/src/GHC-Base.html#return"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall {b}. Maybe b -&gt; b
+</span><a href="#local-6989586621679627214"><span class="hs-identifier hs-var">fromJust</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Handle
+</span><a href="#local-6989586621679627224"><span class="hs-identifier hs-var">mb_in</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall {b}. Maybe b -&gt; b
+</span><a href="#local-6989586621679627214"><span class="hs-identifier hs-var">fromJust</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Handle
+</span><a href="#local-6989586621679627223"><span class="hs-identifier hs-var">mb_out</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall {b}. Maybe b -&gt; b
+</span><a href="#local-6989586621679627214"><span class="hs-identifier hs-var">fromJust</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe Handle
+</span><a href="#local-6989586621679627222"><span class="hs-identifier hs-var">mb_err</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">ProcessHandle
+</span><a href="#local-6989586621679627221"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-103"></span><span>    </span><span id="local-6989586621679627214"><span class="annot"><span class="annottext">fromJust :: Maybe b -&gt; b
+</span><a href="#local-6989586621679627214"><span class="hs-identifier hs-var hs-var">fromJust</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><a href="../../base-4.16.3.0/src/Data-Maybe.html#maybe"><span class="hs-identifier hs-var">maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../base-4.16.3.0/src/GHC-Err.html#error"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;runInteractiveProcess: fromJust&quot;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; a
+</span><a href="../../base-4.16.3.0/src/GHC-Base.html#id"><span class="hs-identifier hs-var">id</span></a></span><span>
+</span><span id="line-104"></span></pre></body></html>

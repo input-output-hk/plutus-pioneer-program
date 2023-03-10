@@ -1,0 +1,494 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass     #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveFunctor      #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric      #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingStrategies #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances  #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving  #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE Rank2Types         #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies       #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- | The CBOR class 'FromCBOR' does not support access to the original bytestring that is being deserialized.</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--   The 'Annotated' module recovers this ability by introducing several newtypes types that,</span><span>
+</span><span id="line-13"></span><span class="hs-comment">--   along with some new operations, recover this ability.</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- 1. 'ByteSpan'  A pair of indexes into a bytestring, indicating a substring.</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- 2. 'Annotated'  Used in practice to pair a value with a 'ByteSpan'.</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- 3. 'FullByteString' A newtype (around a bytestring) used to store the original bytestring being deserialized.</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- 4. 'Annotator' An explict reader monad whose environment is a 'FullByteString'</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- The basic idea is, for a given type @t@, where we need the original bytestring, either</span><span>
+</span><span id="line-21"></span><span class="hs-comment">--</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- 1. To complete the deserialization, or</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- 2. To combine the deserialized answer with the original bytestring.</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- We should proceed as follows: Define instances</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- @(FromCBOR (Annotator t))@ instead of @(FromCBOR t)@. When making this instance we may freely use</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- that both 'Decoder' and 'Annotator' are both monads, and that functions 'withSlice' and 'annotatorSlice'</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- provide access to the original bytes, or portions thereof, inside of decoders.</span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- Then, to actually decode a value of type @t@, we use something similar to the following code fragment.</span><span>
+</span><span id="line-30"></span><span class="hs-comment">--</span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- howToUseFullBytes bytes = do</span><span>
+</span><span id="line-33"></span><span class="hs-comment">--   Annotator f &lt;- decodeFullDecoder \&quot;DecodingAnnotator\&quot; (fromCBOR :: forall s. Decoder s (Annotator t)) bytes</span><span>
+</span><span id="line-34"></span><span class="hs-comment">--   pure (f (Full bytes))</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- Decode the bytes to get an @(Annotator f)@ where f is a function that when given original bytes produces a value of type @t@, then apply @f@ to @(Full bytes)@ to get the answer.</span><span>
+</span><span id="line-37"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Binary.Annotated</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier">Annotated</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier">ByteSpan</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Decoded"><span class="hs-identifier">Decoded</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#annotationBytes"><span class="hs-identifier">annotationBytes</span></a></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#annotatedDecoder"><span class="hs-identifier">annotatedDecoder</span></a></span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#slice"><span class="hs-identifier">slice</span></a></span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#fromCBORAnnotated"><span class="hs-identifier">fromCBORAnnotated</span></a></span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#decodeFullAnnotatedBytes"><span class="hs-identifier">decodeFullAnnotatedBytes</span></a></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#reAnnotate"><span class="hs-identifier">reAnnotate</span></a></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier">Annotator</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#annotatorSlice"><span class="hs-identifier">annotatorSlice</span></a></span><span>
+</span><span id="line-49"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#decodeAnnotator"><span class="hs-identifier">decodeAnnotator</span></a></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#withSlice"><span class="hs-identifier">withSlice</span></a></span><span>
+</span><span id="line-51"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#FullByteString"><span class="hs-identifier">FullByteString</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier">serializeEncoding</span></a></span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">encodePreEncoded</span></a></span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">Codec.CBOR.Read</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">ByteOffset</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier">Data.Aeson</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier">FromJSON</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier">ToJSON</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString.Lazy</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BSL</span></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Binary.Deserialize.html"><span class="hs-identifier">Cardano.Binary.Deserialize</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Deserialize.html#decodeFullDecoder"><span class="hs-identifier">decodeFullDecoder</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Binary.FromCBOR.html"><span class="hs-identifier">Cardano.Binary.FromCBOR</span></a></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">Decoder</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.FromCBOR.html#DecoderError"><span class="hs-identifier">DecoderError</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.FromCBOR.html#FromCBOR"><span class="hs-identifier">FromCBOR</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">decodeWithByteSpan</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html"><span class="hs-identifier">Cardano.Binary.ToCBOR</span></a></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier">ToCBOR</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html"><span class="hs-identifier">Cardano.Binary.Serialize</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Serialize.html#serialize%27"><span class="hs-identifier">serialize'</span></a></span><span class="hs-special">,</span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier">serializeEncoding</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">Codec.CBOR.Encoding</span></a></span><span class="hs-special">(</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">encodePreEncoded</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-68"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Bifunctor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">first</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">second</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-71"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Function</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">on</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Functor</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator">(&lt;&amp;&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Kind</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier">Type</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-74"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../text/html/src"><span class="hs-identifier">Data.Text</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../text/html/src"><span class="hs-identifier">Text</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-75"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-76"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- | Extract a substring of a given ByteString corresponding to the offsets.</span><span>
+</span><span id="line-79"></span><span class="annot"><a href="Cardano.Binary.Annotated.html#slice"><span class="hs-identifier hs-type">slice</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span>
+</span><span id="line-80"></span><span id="slice"><span class="annot"><span class="annottext">slice :: ByteString -&gt; ByteSpan -&gt; ByteString
+</span><a href="Cardano.Binary.Annotated.html#slice"><span class="hs-identifier hs-var hs-var">slice</span></a></span></span><span> </span><span id="local-6989586621679110819"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110819"><span class="hs-identifier hs-var">bytes</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span><span> </span><span id="local-6989586621679110817"><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110817"><span class="hs-identifier hs-var">start</span></a></span></span><span> </span><span id="local-6989586621679110816"><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110816"><span class="hs-identifier hs-var">end</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-81"></span><span>  </span><span class="annot"><span class="annottext">ByteOffset -&gt; ByteString -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">BSL.take</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110816"><span class="hs-identifier hs-var">end</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-glyph hs-var">-</span></a></span><span> </span><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110817"><span class="hs-identifier hs-var">start</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ByteOffset -&gt; ByteString -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">BSL.drop</span></a></span><span> </span><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110817"><span class="hs-identifier hs-var">start</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110819"><span class="hs-identifier hs-var">bytes</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- | A pair of offsets delimiting the beginning and end of a substring of a ByteString</span><span>
+</span><span id="line-84"></span><span id="local-6989586621679110812"><span id="local-6989586621679110813"></span></span><span class="hs-keyword">data</span><span> </span><span id="ByteSpan"><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-var">ByteSpan</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ByteSpan"><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-var">ByteSpan</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">ByteOffset</span></a></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">ByteOffset</span></a></span><span>
+</span><span id="line-85"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall x. Rep ByteSpan x -&gt; ByteSpan
+forall x. ByteSpan -&gt; Rep ByteSpan x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep ByteSpan x -&gt; ByteSpan
+$cfrom :: forall x. ByteSpan -&gt; Rep ByteSpan x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110798"><span id="local-6989586621679110800"><span id="local-6989586621679110807"><span class="annot"><span class="annottext">Int -&gt; ByteSpan -&gt; ShowS
+[ByteSpan] -&gt; ShowS
+ByteSpan -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [ByteSpan] -&gt; ShowS
+$cshowList :: [ByteSpan] -&gt; ShowS
+show :: ByteSpan -&gt; String
+$cshow :: ByteSpan -&gt; String
+showsPrec :: Int -&gt; ByteSpan -&gt; ShowS
+$cshowsPrec :: Int -&gt; ByteSpan -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- Used for debugging purposes only.</span><span>
+</span><span id="line-88"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110789"><span id="local-6989586621679110791"><span id="local-6989586621679110793"><span id="local-6989586621679110795"><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span id="local-6989586621679110786"><span id="local-6989586621679110787"></span></span><span class="hs-keyword">data</span><span> </span><span id="Annotated"><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-var">Annotated</span></a></span></span><span> </span><span id="local-6989586621679111137"><span class="annot"><a href="#local-6989586621679111137"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span id="local-6989586621679111136"><span class="annot"><a href="#local-6989586621679111136"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Annotated"><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-var">Annotated</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="unAnnotated"><span class="annot"><span class="annottext">forall b a. Annotated b a -&gt; b
+</span><a href="Cardano.Binary.Annotated.html#unAnnotated"><span class="hs-identifier hs-var hs-var">unAnnotated</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="#local-6989586621679111137"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span id="annotation"><span class="annot"><span class="annottext">forall b a. Annotated b a -&gt; a
+</span><a href="Cardano.Binary.Annotated.html#annotation"><span class="hs-identifier hs-var hs-var">annotation</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="#local-6989586621679111136"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110777"><span id="local-6989586621679110781"><span class="annot"><span class="annottext">Annotated b a -&gt; Annotated b a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall b a. (Eq b, Eq a) =&gt; Annotated b a -&gt; Annotated b a -&gt; Bool
+/= :: Annotated b a -&gt; Annotated b a -&gt; Bool
+$c/= :: forall b a. (Eq b, Eq a) =&gt; Annotated b a -&gt; Annotated b a -&gt; Bool
+== :: Annotated b a -&gt; Annotated b a -&gt; Bool
+$c== :: forall b a. (Eq b, Eq a) =&gt; Annotated b a -&gt; Annotated b a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110767"><span id="local-6989586621679110769"><span id="local-6989586621679110774"><span class="annot"><span class="annottext">Int -&gt; Annotated b a -&gt; ShowS
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+forall b a. (Show b, Show a) =&gt; Int -&gt; Annotated b a -&gt; ShowS
+forall b a. (Show b, Show a) =&gt; [Annotated b a] -&gt; ShowS
+forall b a. (Show b, Show a) =&gt; Annotated b a -&gt; String
+showList :: [Annotated b a] -&gt; ShowS
+$cshowList :: forall b a. (Show b, Show a) =&gt; [Annotated b a] -&gt; ShowS
+show :: Annotated b a -&gt; String
+$cshow :: forall b a. (Show b, Show a) =&gt; Annotated b a -&gt; String
+showsPrec :: Int -&gt; Annotated b a -&gt; ShowS
+$cshowsPrec :: forall b a. (Show b, Show a) =&gt; Int -&gt; Annotated b a -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110763"><span id="local-6989586621679110765"><span class="annot"><span class="annottext">forall a b. a -&gt; Annotated b b -&gt; Annotated b a
+forall a b. (a -&gt; b) -&gt; Annotated b a -&gt; Annotated b b
+forall b a b. a -&gt; Annotated b b -&gt; Annotated b a
+forall b a b. (a -&gt; b) -&gt; Annotated b a -&gt; Annotated b b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: forall a b. a -&gt; Annotated b b -&gt; Annotated b a
+$c&lt;$ :: forall b a b. a -&gt; Annotated b b -&gt; Annotated b a
+fmap :: forall a b. (a -&gt; b) -&gt; Annotated b a -&gt; Annotated b b
+$cfmap :: forall b a b. (a -&gt; b) -&gt; Annotated b a -&gt; Annotated b b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall b a x. Rep (Annotated b a) x -&gt; Annotated b a
+forall b a x. Annotated b a -&gt; Rep (Annotated b a) x
+$cto :: forall b a x. Rep (Annotated b a) x -&gt; Annotated b a
+$cfrom :: forall b a x. Annotated b a -&gt; Rep (Annotated b a) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-92"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110757"><span class="annot"><span class="annottext">forall a. (a -&gt; ()) -&gt; NFData a
+forall b a. (NFData b, NFData a) =&gt; Annotated b a -&gt; ()
+rnf :: Annotated b a -&gt; ()
+$crnf :: forall b a. (NFData b, NFData a) =&gt; Annotated b a -&gt; ()
+</span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110750"><span id="local-6989586621679110752"><span id="local-6989586621679110754"><span class="annot"><span class="annottext">forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+forall b a.
+(NoThunks b, NoThunks a) =&gt;
+Context -&gt; Annotated b a -&gt; IO (Maybe ThunkInfo)
+forall b a.
+(NoThunks b, NoThunks a) =&gt;
+Proxy (Annotated b a) -&gt; String
+showTypeOf :: Proxy (Annotated b a) -&gt; String
+$cshowTypeOf :: forall b a.
+(NoThunks b, NoThunks a) =&gt;
+Proxy (Annotated b a) -&gt; String
+wNoThunks :: Context -&gt; Annotated b a -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: forall b a.
+(NoThunks b, NoThunks a) =&gt;
+Context -&gt; Annotated b a -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; Annotated b a -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: forall b a.
+(NoThunks b, NoThunks a) =&gt;
+Context -&gt; Annotated b a -&gt; IO (Maybe ThunkInfo)
+</span><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110747"><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Bifunctor</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-95"></span><span>  </span><span id="local-6989586621679110743"><span class="annot"><span class="annottext">first :: forall a b c. (a -&gt; b) -&gt; Annotated a c -&gt; Annotated b c
+</span><a href="#local-6989586621679110743"><span class="hs-identifier hs-var hs-var hs-var hs-var">first</span></a></span></span><span> </span><span id="local-6989586621679110742"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679110742"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span id="local-6989586621679110741"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110741"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621679110740"><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621679110740"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; a -&gt; Annotated b a
+</span><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-var">Annotated</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679110742"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110741"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621679110740"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621679110738"><span class="annot"><span class="annottext">second :: forall b c a. (b -&gt; c) -&gt; Annotated a b -&gt; Annotated a c
+</span><a href="#local-6989586621679110738"><span class="hs-identifier hs-var hs-var hs-var hs-var">second</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110723"><span id="local-6989586621679110725"><span id="local-6989586621679110727"><span id="local-6989586621679110729"><span id="local-6989586621679110731"><span id="local-6989586621679110733"><span id="local-6989586621679111102"><span id="local-6989586621679111103"><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Eq</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111103"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111102"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111102"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111103"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>  </span><span id="local-6989586621679110720"><span class="annot"><span class="annottext">compare :: Annotated b a -&gt; Annotated b a -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">compare</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; a -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var">compare</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">`on`</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. Annotated b a -&gt; b
+</span><a href="Cardano.Binary.Annotated.html#unAnnotated"><span class="hs-identifier hs-var">unAnnotated</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110713"><span id="local-6989586621679110715"><span id="local-6989586621679111097"><span id="local-6989586621679111098"><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111098"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier hs-type">ToJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111098"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111097"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-102"></span><span>  </span><span id="local-6989586621679110711"><span class="annot"><span class="annottext">toJSON :: Annotated b a -&gt; Value
+</span><a href="../../../../aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toJSON</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToJSON a =&gt; a -&gt; Value
+</span><a href="../../../../aeson/html/src"><span class="hs-identifier hs-var">toJSON</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. Annotated b a -&gt; b
+</span><a href="Cardano.Binary.Annotated.html#unAnnotated"><span class="hs-identifier hs-var">unAnnotated</span></a></span><span>
+</span><span id="line-103"></span><span>  </span><span id="local-6989586621679110707"><span class="annot"><span class="annottext">toEncoding :: Annotated b a -&gt; Encoding
+</span><a href="../../../../aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toEncoding</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToJSON a =&gt; a -&gt; Encoding
+</span><a href="../../../../aeson/html/src"><span class="hs-identifier hs-var">toEncoding</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. Annotated b a -&gt; b
+</span><a href="Cardano.Binary.Annotated.html#unAnnotated"><span class="hs-identifier hs-var">unAnnotated</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110703"><span id="local-6989586621679111091"><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier hs-type">FromJSON</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111091"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../aeson/html/src"><span class="hs-identifier hs-type">FromJSON</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111091"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-106"></span><span>  </span><span id="local-6989586621679110698"><span class="annot"><span class="annottext">parseJSON :: Value -&gt; Parser (Annotated b ())
+</span><a href="../../../../aeson/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">parseJSON</span></a></span></span><span> </span><span id="local-6989586621679110696"><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679110696"><span class="hs-identifier hs-var">j</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">flip</span></a></span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; a -&gt; Annotated b a
+</span><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-var">Annotated</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. FromJSON a =&gt; Value -&gt; Parser a
+</span><a href="../../../../aeson/html/src"><span class="hs-identifier hs-var">parseJSON</span></a></span><span> </span><span class="annot"><span class="annottext">Value
+</span><a href="#local-6989586621679110696"><span class="hs-identifier hs-var">j</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-comment">-- | A decoder for a value paired with an annotation specifying the start and end</span><span>
+</span><span id="line-109"></span><span class="hs-comment">-- of the consumed bytes.</span><span>
+</span><span id="line-110"></span><span id="local-6989586621679111083"><span id="local-6989586621679111084"><span class="annot"><a href="Cardano.Binary.Annotated.html#annotatedDecoder"><span class="hs-identifier hs-type">annotatedDecoder</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111084"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111083"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111084"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111083"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-111"></span><span id="annotatedDecoder"><span class="annot"><span class="annottext">annotatedDecoder :: forall s a. Decoder s a -&gt; Decoder s (Annotated a ByteSpan)
+</span><a href="Cardano.Binary.Annotated.html#annotatedDecoder"><span class="hs-identifier hs-var hs-var">annotatedDecoder</span></a></span></span><span> </span><span id="local-6989586621679110691"><span class="annot"><span class="annottext">Decoder s a
+</span><a href="#local-6989586621679110691"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s a. Decoder s a -&gt; Decoder s (a, ByteOffset, ByteOffset)
+</span><a href="../../../../cborg/html/src"><span class="hs-identifier hs-var">decodeWithByteSpan</span></a></span><span> </span><span class="annot"><span class="annottext">Decoder s a
+</span><a href="#local-6989586621679110691"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-112"></span><span>  </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; (a -&gt; b) -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&amp;&gt;</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679110690"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110690"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110689"><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110689"><span class="hs-identifier hs-var">start</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110688"><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110688"><span class="hs-identifier hs-var">end</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; a -&gt; Annotated b a
+</span><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-var">Annotated</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110690"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteOffset -&gt; ByteOffset -&gt; ByteSpan
+</span><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-var">ByteSpan</span></a></span><span> </span><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110689"><span class="hs-identifier hs-var">start</span></a></span><span> </span><span class="annot"><span class="annottext">ByteOffset
+</span><a href="#local-6989586621679110688"><span class="hs-identifier hs-var">end</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | A decoder for a value paired with an annotation specifying the start and end</span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- of the consumed bytes.</span><span>
+</span><span id="line-116"></span><span id="local-6989586621679111071"><span id="local-6989586621679111073"><span class="annot"><a href="Cardano.Binary.Annotated.html#fromCBORAnnotated"><span class="hs-identifier hs-type">fromCBORAnnotated</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.FromCBOR.html#FromCBOR"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111073"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111071"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111073"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-117"></span><span id="fromCBORAnnotated"><span class="annot"><span class="annottext">fromCBORAnnotated :: forall a s. FromCBOR a =&gt; Decoder s (Annotated a ByteSpan)
+</span><a href="Cardano.Binary.Annotated.html#fromCBORAnnotated"><span class="hs-identifier hs-var hs-var">fromCBORAnnotated</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall s a. Decoder s a -&gt; Decoder s (Annotated a ByteSpan)
+</span><a href="Cardano.Binary.Annotated.html#annotatedDecoder"><span class="hs-identifier hs-var">annotatedDecoder</span></a></span><span> </span><span class="annot"><span class="annottext">forall a s. FromCBOR a =&gt; Decoder s a
+</span><a href="Cardano.Binary.FromCBOR.html#fromCBOR"><span class="hs-identifier hs-var">fromCBOR</span></a></span><span>
+</span><span id="line-118"></span><span>
+</span><span id="line-119"></span><span id="local-6989586621679111067"><span class="annot"><a href="Cardano.Binary.Annotated.html#annotationBytes"><span class="hs-identifier hs-type">annotationBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Functor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111067"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679111067"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679111067"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span></span><span>
+</span><span id="line-120"></span><span id="annotationBytes"><span class="annot"><span class="annottext">annotationBytes :: forall (f :: * -&gt; *).
+Functor f =&gt;
+ByteString -&gt; f ByteSpan -&gt; f ByteString
+</span><a href="Cardano.Binary.Annotated.html#annotationBytes"><span class="hs-identifier hs-var hs-var">annotationBytes</span></a></span></span><span> </span><span id="local-6989586621679110682"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110682"><span class="hs-identifier hs-var">bytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">BSL.toStrict</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteSpan -&gt; ByteString
+</span><a href="Cardano.Binary.Annotated.html#slice"><span class="hs-identifier hs-var">slice</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110682"><span class="hs-identifier hs-var">bytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- | Decodes a value from a ByteString, requiring that the full ByteString is consumed, and</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- replaces ByteSpan annotations with the corresponding substrings of the input string.</span><span>
+</span><span id="line-124"></span><span id="local-6989586621679111064"><span class="annot"><a href="Cardano.Binary.Annotated.html#decodeFullAnnotatedBytes"><span class="hs-identifier hs-type">decodeFullAnnotatedBytes</span></a></span><span>
+</span><span id="line-125"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Functor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111064"><span class="hs-identifier hs-type">f</span></a></span><span>
+</span><span id="line-126"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span>
+</span><span id="line-127"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679111062"><span class="annot"><a href="#local-6989586621679111062"><span class="hs-identifier hs-type">s</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111062"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679111064"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#ByteSpan"><span class="hs-identifier hs-type">ByteSpan</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span>
+</span><span id="line-129"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.FromCBOR.html#DecoderError"><span class="hs-identifier hs-type">DecoderError</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679111064"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span><span class="hs-special">)</span></span><span>
+</span><span id="line-130"></span><span id="decodeFullAnnotatedBytes"><span class="annot"><span class="annottext">decodeFullAnnotatedBytes :: forall (f :: * -&gt; *).
+Functor f =&gt;
+Text
+-&gt; (forall s. Decoder s (f ByteSpan))
+-&gt; ByteString
+-&gt; Either DecoderError (f ByteString)
+</span><a href="Cardano.Binary.Annotated.html#decodeFullAnnotatedBytes"><span class="hs-identifier hs-var hs-var">decodeFullAnnotatedBytes</span></a></span></span><span> </span><span id="local-6989586621679110676"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679110676"><span class="hs-identifier hs-var">lbl</span></a></span></span><span> </span><span id="local-6989586621679110675"><span class="annot"><span class="annottext">forall s. Decoder s (f ByteSpan)
+</span><a href="#local-6989586621679110675"><span class="hs-identifier hs-var">decoder</span></a></span></span><span> </span><span id="local-6989586621679110674"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110674"><span class="hs-identifier hs-var">bytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-131"></span><span>  </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *).
+Functor f =&gt;
+ByteString -&gt; f ByteSpan -&gt; f ByteString
+</span><a href="Cardano.Binary.Annotated.html#annotationBytes"><span class="hs-identifier hs-var">annotationBytes</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110674"><span class="hs-identifier hs-var">bytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a.
+Text
+-&gt; (forall s. Decoder s a) -&gt; ByteString -&gt; Either DecoderError a
+</span><a href="Cardano.Binary.Deserialize.html#decodeFullDecoder"><span class="hs-identifier hs-var">decodeFullDecoder</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679110676"><span class="hs-identifier hs-var">lbl</span></a></span><span> </span><span class="annot"><span class="annottext">forall s. Decoder s (f ByteSpan)
+</span><a href="#local-6989586621679110675"><span class="hs-identifier hs-var">decoder</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110674"><span class="hs-identifier hs-var">bytes</span></a></span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- | Reconstruct an annotation by re-serialising the payload to a ByteString.</span><span>
+</span><span id="line-134"></span><span id="local-6989586621679111054"><span id="local-6989586621679111056"><span class="annot"><a href="Cardano.Binary.Annotated.html#reAnnotate"><span class="hs-identifier hs-type">reAnnotate</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111056"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111056"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111054"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111056"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span></span></span><span>
+</span><span id="line-135"></span><span id="reAnnotate"><span class="annot"><span class="annottext">reAnnotate :: forall a b. ToCBOR a =&gt; Annotated a b -&gt; Annotated a ByteString
+</span><a href="Cardano.Binary.Annotated.html#reAnnotate"><span class="hs-identifier hs-var hs-var">reAnnotate</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span id="local-6989586621679110671"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110671"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall b a. b -&gt; a -&gt; Annotated b a
+</span><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-var">Annotated</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110671"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serialize%27"><span class="hs-identifier hs-var">serialize'</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110671"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="hs-keyword">class</span><span> </span><span id="Decoded"><span class="annot"><a href="Cardano.Binary.Annotated.html#Decoded"><span class="hs-identifier hs-var">Decoded</span></a></span></span><span> </span><span id="local-6989586621679111049"><span class="annot"><a href="#local-6989586621679111049"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-138"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="BaseType"><span class="annot"><a href="Cardano.Binary.Annotated.html#BaseType"><span class="hs-identifier hs-var">BaseType</span></a></span></span><span> </span><span id="local-6989586621679111049"><span class="annot"><a href="#local-6989586621679111049"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Type</span></a></span><span>
+</span><span id="line-139"></span><span>  </span><span id="recoverBytes"><span class="annot"><a href="Cardano.Binary.Annotated.html#recoverBytes"><span class="hs-identifier hs-type">recoverBytes</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621679111049"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span><span>
+</span><span id="line-140"></span><span>
+</span><span id="line-141"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679111047"><span class="annot"><a href="Cardano.Binary.Annotated.html#Decoded"><span class="hs-identifier hs-type">Decoded</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111047"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-142"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="BaseType"><span class="annot"><a href="Cardano.Binary.Annotated.html#BaseType"><span class="hs-identifier hs-var">BaseType</span></a></span></span><span> </span><span id="local-6989586621679111047"><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111047"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="#local-6989586621679111047"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-143"></span><span>  </span><span id="local-6989586621679110665"><span class="annot"><span class="annottext">recoverBytes :: Annotated b ByteString -&gt; ByteString
+</span><a href="#local-6989586621679110665"><span class="hs-identifier hs-var hs-var hs-var hs-var">recoverBytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall b a. Annotated b a -&gt; a
+</span><a href="Cardano.Binary.Annotated.html#annotation"><span class="hs-identifier hs-var">annotation</span></a></span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-146"></span><span class="hs-comment">-- Annotator</span><span>
+</span><span id="line-147"></span><span class="hs-comment">-------------------------------------------------------------------------</span><span>
+</span><span id="line-148"></span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- | This marks the entire bytestring used during decoding, rather than the</span><span>
+</span><span id="line-150"></span><span class="hs-comment">--   piece we need to finish constructing our value.</span><span>
+</span><span id="line-151"></span><span class="hs-keyword">newtype</span><span> </span><span id="FullByteString"><span class="annot"><a href="Cardano.Binary.Annotated.html#FullByteString"><span class="hs-identifier hs-var">FullByteString</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Full"><span class="annot"><a href="Cardano.Binary.Annotated.html#Full"><span class="hs-identifier hs-var">Full</span></a></span></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span class="hs-comment">-- | A value of type @(Annotator a)@ is one that needs access to the entire</span><span>
+</span><span id="line-154"></span><span class="hs-comment">--   bytestring used during decoding to finish construction of a vaue of type @a@. A typical use</span><span>
+</span><span id="line-155"></span><span class="hs-comment">--   is some type that stores the bytes that were used to deserialize it.</span><span>
+</span><span id="line-156"></span><span class="hs-comment">--   For example the type @Inner@ below is constructed using the helper function @makeInner@</span><span>
+</span><span id="line-157"></span><span class="hs-comment">--   which serializes and stores its bytes (using 'serializeEncoding').</span><span>
+</span><span id="line-158"></span><span class="hs-comment">--   Note how we build the</span><span>
+</span><span id="line-159"></span><span class="hs-comment">--   'Annotator' by abstracting over the full bytes, and</span><span>
+</span><span id="line-160"></span><span class="hs-comment">--   using those original bytes to fill the bytes field of the constructor @Inner@.</span><span>
+</span><span id="line-161"></span><span class="hs-comment">--   The 'ToCBOR' instance just reuses the stored bytes to produce an encoding</span><span>
+</span><span id="line-162"></span><span class="hs-comment">--   (using 'encodePreEncoded').</span><span>
+</span><span id="line-163"></span><span class="hs-comment">--</span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-165"></span><span class="hs-comment">-- data Inner = Inner Int Bool LByteString</span><span>
+</span><span id="line-166"></span><span class="hs-comment">--</span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- makeInner :: Int -&gt; Bool -&gt; Inner</span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- makeInner i b = Inner i b (serializeEncoding (toCBOR i &lt;&gt; toCBOR b))</span><span>
+</span><span id="line-169"></span><span class="hs-comment">--</span><span>
+</span><span id="line-170"></span><span class="hs-comment">-- instance ToCBOR Inner where</span><span>
+</span><span id="line-171"></span><span class="hs-comment">--   toCBOR (Inner _ _ bytes) = encodePreEncoded bytes</span><span>
+</span><span id="line-172"></span><span class="hs-comment">--</span><span>
+</span><span id="line-173"></span><span class="hs-comment">-- instance FromCBOR (Annotator Inner) where</span><span>
+</span><span id="line-174"></span><span class="hs-comment">--   fromCBOR = do</span><span>
+</span><span id="line-175"></span><span class="hs-comment">--      int &lt;- fromCBOR</span><span>
+</span><span id="line-176"></span><span class="hs-comment">--      trueOrFalse &lt;- fromCBOR</span><span>
+</span><span id="line-177"></span><span class="hs-comment">--      pure (Annotator (\(Full bytes) -&gt; Inner int trueOrFalse bytes))</span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-179"></span><span class="hs-comment">--</span><span>
+</span><span id="line-180"></span><span class="hs-comment">-- if an @Outer@ type has a field of type @Inner@, with a @(ToCBOR (Annotator Inner))@ instance,</span><span>
+</span><span id="line-181"></span><span class="hs-comment">-- the @Outer@ type must also have a @(ToCBOR (Annotator Outer))@ instance.</span><span>
+</span><span id="line-182"></span><span class="hs-comment">-- The key to writing that instance is to use the operation @withSlice@ which returns a pair.</span><span>
+</span><span id="line-183"></span><span class="hs-comment">-- The first component is an @Annotator@ that can build @Inner@, the second is an @Annotator@ that given the</span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- full bytes, extracts just the bytes needed to decode @Inner@.</span><span>
+</span><span id="line-185"></span><span class="hs-comment">--</span><span>
+</span><span id="line-186"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-187"></span><span class="hs-comment">-- data Outer = Outer Text Inner</span><span>
+</span><span id="line-188"></span><span class="hs-comment">--</span><span>
+</span><span id="line-189"></span><span class="hs-comment">-- instance ToCBOR Outer where</span><span>
+</span><span id="line-190"></span><span class="hs-comment">--   toCBOR (Outer t i) = toCBOR t &lt;&gt; toCBOR i</span><span>
+</span><span id="line-191"></span><span class="hs-comment">--</span><span>
+</span><span id="line-192"></span><span class="hs-comment">-- instance FromCBOR (Annotator Outer) where</span><span>
+</span><span id="line-193"></span><span class="hs-comment">--   fromCBOR = do</span><span>
+</span><span id="line-194"></span><span class="hs-comment">--     t &lt;- fromCBOR</span><span>
+</span><span id="line-195"></span><span class="hs-comment">--     (Annotator mkInner, Annotator extractInnerBytes) &lt;- withSlice fromCBOR</span><span>
+</span><span id="line-196"></span><span class="hs-comment">--     pure (Annotator (\ full -&gt; Outer t (mkInner (Full (extractInnerBytes full)))))</span><span>
+</span><span id="line-197"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-198"></span><span class="hs-comment">--</span><span>
+</span><span id="line-199"></span><span class="hs-keyword">newtype</span><span> </span><span id="Annotator"><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-var">Annotator</span></a></span></span><span> </span><span id="local-6989586621679111046"><span class="annot"><a href="#local-6989586621679111046"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Annotator"><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-var">Annotator</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="runAnnotator"><span class="annot"><span class="annottext">forall a. Annotator a -&gt; FullByteString -&gt; a
+</span><a href="Cardano.Binary.Annotated.html#runAnnotator"><span class="hs-identifier hs-var hs-var">runAnnotator</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#FullByteString"><span class="hs-identifier hs-type">FullByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679111046"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-200"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110648"><span id="local-6989586621679110652"><span id="local-6989586621679110657"><span class="annot"><span class="annottext">Applicative Annotator
+forall a. a -&gt; Annotator a
+forall a b. Annotator a -&gt; Annotator b -&gt; Annotator b
+forall a b. Annotator a -&gt; (a -&gt; Annotator b) -&gt; Annotator b
+forall (m :: * -&gt; *).
+Applicative m
+-&gt; (forall a b. m a -&gt; (a -&gt; m b) -&gt; m b)
+-&gt; (forall a b. m a -&gt; m b -&gt; m b)
+-&gt; (forall a. a -&gt; m a)
+-&gt; Monad m
+return :: forall a. a -&gt; Annotator a
+$creturn :: forall a. a -&gt; Annotator a
+&gt;&gt; :: forall a b. Annotator a -&gt; Annotator b -&gt; Annotator b
+$c&gt;&gt; :: forall a b. Annotator a -&gt; Annotator b -&gt; Annotator b
+&gt;&gt;= :: forall a b. Annotator a -&gt; (a -&gt; Annotator b) -&gt; Annotator b
+$c&gt;&gt;= :: forall a b. Annotator a -&gt; (a -&gt; Annotator b) -&gt; Annotator b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Monad</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110622"><span id="local-6989586621679110626"><span id="local-6989586621679110630"><span id="local-6989586621679110634"><span id="local-6989586621679110639"><span class="annot"><span class="annottext">Functor Annotator
+forall a. a -&gt; Annotator a
+forall a b. Annotator a -&gt; Annotator b -&gt; Annotator a
+forall a b. Annotator a -&gt; Annotator b -&gt; Annotator b
+forall a b. Annotator (a -&gt; b) -&gt; Annotator a -&gt; Annotator b
+forall a b c.
+(a -&gt; b -&gt; c) -&gt; Annotator a -&gt; Annotator b -&gt; Annotator c
+forall (f :: * -&gt; *).
+Functor f
+-&gt; (forall a. a -&gt; f a)
+-&gt; (forall a b. f (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b c. (a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c)
+-&gt; (forall a b. f a -&gt; f b -&gt; f b)
+-&gt; (forall a b. f a -&gt; f b -&gt; f a)
+-&gt; Applicative f
+&lt;* :: forall a b. Annotator a -&gt; Annotator b -&gt; Annotator a
+$c&lt;* :: forall a b. Annotator a -&gt; Annotator b -&gt; Annotator a
+*&gt; :: forall a b. Annotator a -&gt; Annotator b -&gt; Annotator b
+$c*&gt; :: forall a b. Annotator a -&gt; Annotator b -&gt; Annotator b
+liftA2 :: forall a b c.
+(a -&gt; b -&gt; c) -&gt; Annotator a -&gt; Annotator b -&gt; Annotator c
+$cliftA2 :: forall a b c.
+(a -&gt; b -&gt; c) -&gt; Annotator a -&gt; Annotator b -&gt; Annotator c
+&lt;*&gt; :: forall a b. Annotator (a -&gt; b) -&gt; Annotator a -&gt; Annotator b
+$c&lt;*&gt; :: forall a b. Annotator (a -&gt; b) -&gt; Annotator a -&gt; Annotator b
+pure :: forall a. a -&gt; Annotator a
+$cpure :: forall a. a -&gt; Annotator a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Applicative</span></a></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110612"><span id="local-6989586621679110617"><span class="annot"><span class="annottext">forall a b. a -&gt; Annotator b -&gt; Annotator a
+forall a b. (a -&gt; b) -&gt; Annotator a -&gt; Annotator b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+&lt;$ :: forall a b. a -&gt; Annotator b -&gt; Annotator a
+$c&lt;$ :: forall a b. a -&gt; Annotator b -&gt; Annotator a
+fmap :: forall a b. (a -&gt; b) -&gt; Annotator a -&gt; Annotator b
+$cfmap :: forall a b. (a -&gt; b) -&gt; Annotator a -&gt; Annotator b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-201"></span><span>
+</span><span id="line-202"></span><span class="hs-comment">-- | The argument is a decoder for a annotator that needs access to the bytes that</span><span>
+</span><span id="line-203"></span><span class="hs-comment">-- | were decoded. This function constructs and supplies the relevant piece.</span><span>
+</span><span id="line-204"></span><span id="local-6989586621679111002"><span id="local-6989586621679111003"><span class="annot"><a href="Cardano.Binary.Annotated.html#annotatorSlice"><span class="hs-identifier hs-type">annotatorSlice</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111003"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-type">Annotator</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679111002"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111003"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-type">Annotator</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679111002"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-205"></span><span id="annotatorSlice"><span class="annot"><span class="annottext">annotatorSlice :: forall s a.
+Decoder s (Annotator (ByteString -&gt; a)) -&gt; Decoder s (Annotator a)
+</span><a href="Cardano.Binary.Annotated.html#annotatorSlice"><span class="hs-identifier hs-var hs-var">annotatorSlice</span></a></span></span><span> </span><span id="local-6989586621679110604"><span class="annot"><span class="annottext">Decoder s (Annotator (ByteString -&gt; a))
+</span><a href="#local-6989586621679110604"><span class="hs-identifier hs-var">dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-206"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621679110603"><span class="annot"><span class="annottext">Annotator (ByteString -&gt; a)
+</span><a href="#local-6989586621679110603"><span class="hs-identifier hs-var">k</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110602"><span class="annot"><span class="annottext">Annotator ByteString
+</span><a href="#local-6989586621679110602"><span class="hs-identifier hs-var">bytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall s a. Decoder s a -&gt; Decoder s (a, Annotator ByteString)
+</span><a href="Cardano.Binary.Annotated.html#withSlice"><span class="hs-identifier hs-var">withSlice</span></a></span><span> </span><span class="annot"><span class="annottext">Decoder s (Annotator (ByteString -&gt; a))
+</span><a href="#local-6989586621679110604"><span class="hs-identifier hs-var">dec</span></a></span><span>
+</span><span id="line-207"></span><span>  </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Annotator (ByteString -&gt; a)
+</span><a href="#local-6989586621679110603"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;*&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Annotator ByteString
+</span><a href="#local-6989586621679110602"><span class="hs-identifier hs-var">bytes</span></a></span><span>
+</span><span id="line-208"></span><span>
+</span><span id="line-209"></span><span class="hs-comment">-- | Pairs the decoder result with an annotator that can be used to construct the exact bytes used to decode the result.</span><span>
+</span><span id="line-210"></span><span id="local-6989586621679110996"><span id="local-6989586621679110997"><span class="annot"><a href="Cardano.Binary.Annotated.html#withSlice"><span class="hs-identifier hs-type">withSlice</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110997"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110996"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110997"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679110996"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-type">Annotator</span></a></span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-211"></span><span id="withSlice"><span class="annot"><span class="annottext">withSlice :: forall s a. Decoder s a -&gt; Decoder s (a, Annotator ByteString)
+</span><a href="Cardano.Binary.Annotated.html#withSlice"><span class="hs-identifier hs-var hs-var">withSlice</span></a></span></span><span> </span><span id="local-6989586621679110599"><span class="annot"><span class="annottext">Decoder s a
+</span><a href="#local-6989586621679110599"><span class="hs-identifier hs-var">dec</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-212"></span><span>  </span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotated"><span class="hs-identifier hs-type">Annotated</span></a></span><span> </span><span id="local-6989586621679110598"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110598"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span id="local-6989586621679110597"><span class="annot"><span class="annottext">ByteSpan
+</span><a href="#local-6989586621679110597"><span class="hs-identifier hs-var">byteSpan</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall s a. Decoder s a -&gt; Decoder s (Annotated a ByteSpan)
+</span><a href="Cardano.Binary.Annotated.html#annotatedDecoder"><span class="hs-identifier hs-var">annotatedDecoder</span></a></span><span> </span><span class="annot"><span class="annottext">Decoder s a
+</span><a href="#local-6989586621679110599"><span class="hs-identifier hs-var">dec</span></a></span><span>
+</span><span id="line-213"></span><span>  </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110598"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall a. (FullByteString -&gt; a) -&gt; Annotator a
+</span><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-var">Annotator</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Full"><span class="hs-identifier hs-type">Full</span></a></span><span> </span><span id="local-6989586621679110596"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110596"><span class="hs-identifier hs-var">bsl</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteSpan -&gt; ByteString
+</span><a href="Cardano.Binary.Annotated.html#slice"><span class="hs-identifier hs-var">slice</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110596"><span class="hs-identifier hs-var">bsl</span></a></span><span> </span><span class="annot"><span class="annottext">ByteSpan
+</span><a href="#local-6989586621679110597"><span class="hs-identifier hs-var">byteSpan</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-214"></span><span>
+</span><span id="line-215"></span><span class="hs-comment">-- | Supplies the bytestring argument to both the decoder and the produced annotator.</span><span>
+</span><span id="line-216"></span><span id="local-6989586621679110992"><span class="annot"><a href="Cardano.Binary.Annotated.html#decodeAnnotator"><span class="hs-identifier hs-type">decodeAnnotator</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../text/html/src"><span class="hs-identifier hs-type">Text</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679110993"><span class="annot"><a href="#local-6989586621679110993"><span class="hs-identifier hs-type">s</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Decoder</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110993"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Binary.Annotated.html#Annotator"><span class="hs-identifier hs-type">Annotator</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110992"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Either</span></a></span><span> </span><span class="annot"><a href="Cardano.Binary.FromCBOR.html#DecoderError"><span class="hs-identifier hs-type">DecoderError</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110992"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-217"></span><span id="decodeAnnotator"><span class="annot"><span class="annottext">decodeAnnotator :: forall a.
+Text
+-&gt; (forall s. Decoder s (Annotator a))
+-&gt; ByteString
+-&gt; Either DecoderError a
+</span><a href="Cardano.Binary.Annotated.html#decodeAnnotator"><span class="hs-identifier hs-var hs-var">decodeAnnotator</span></a></span></span><span> </span><span id="local-6989586621679110594"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679110594"><span class="hs-identifier hs-var">label'</span></a></span></span><span> </span><span id="local-6989586621679110593"><span class="annot"><span class="annottext">forall s. Decoder s (Annotator a)
+</span><a href="#local-6989586621679110593"><span class="hs-identifier hs-var">decoder</span></a></span></span><span> </span><span id="local-6989586621679110592"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110592"><span class="hs-identifier hs-var">bytes</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-218"></span><span>  </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span id="local-6989586621679110591"><span class="annot"><span class="annottext">Annotator a
+</span><a href="#local-6989586621679110591"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. Annotator a -&gt; FullByteString -&gt; a
+</span><a href="Cardano.Binary.Annotated.html#runAnnotator"><span class="hs-identifier hs-var">runAnnotator</span></a></span><span> </span><span class="annot"><span class="annottext">Annotator a
+</span><a href="#local-6989586621679110591"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; FullByteString
+</span><a href="Cardano.Binary.Annotated.html#Full"><span class="hs-identifier hs-var">Full</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110592"><span class="hs-identifier hs-var">bytes</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a.
+Text
+-&gt; (forall s. Decoder s a) -&gt; ByteString -&gt; Either DecoderError a
+</span><a href="Cardano.Binary.Deserialize.html#decodeFullDecoder"><span class="hs-identifier hs-var">decodeFullDecoder</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621679110594"><span class="hs-identifier hs-var">label'</span></a></span><span> </span><span class="annot"><span class="annottext">forall s. Decoder s (Annotator a)
+</span><a href="#local-6989586621679110593"><span class="hs-identifier hs-var">decoder</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110592"><span class="hs-identifier hs-var">bytes</span></a></span><span>
+</span><span id="line-219"></span></pre></body></html>

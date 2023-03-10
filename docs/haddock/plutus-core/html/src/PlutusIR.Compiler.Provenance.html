@@ -1,0 +1,380 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- editorconfig-checker-disable-file</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE LambdaCase            #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings     #-}</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- | Module handling provenances of terms.</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">PlutusIR.Compiler.Provenance</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusIR.html"><span class="hs-identifier">PlutusIR</span></a></span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="PlutusCore.Pretty.html"><span class="hs-identifier">PlutusCore.Pretty</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PLC</span></span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-operator">(&lt;+&gt;)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier">Prettyprinter</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">PP</span></span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- | Indicates where a value comes from.</span><span>
+</span><span id="line-17"></span><span class="hs-comment">--</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- This is either an original annotation or a pieces of context explaining how the term</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- relates to a previous 'Provenance'. We also provide 'NoProvenance' for convenience.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- The provenance should always be just the original annotation, if we have one. It should only be another</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- kind of provenance if we're in the process of generating some term that doesn't correspond directly to a term in</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- the original AST.</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">data</span><span> </span><span id="Provenance"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-var">Provenance</span></a></span></span><span> </span><span id="local-6989586621681110172"><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Original"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Original"><span class="hs-identifier hs-var">Original</span></a></span></span><span> </span><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-25"></span><span>                  </span><span class="hs-glyph">|</span><span> </span><span id="LetBinding"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#LetBinding"><span class="hs-identifier hs-var">LetBinding</span></a></span></span><span> </span><span class="annot"><a href="PlutusIR.Core.Type.html#Recursivity"><span class="hs-identifier hs-type">Recursivity</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>                  </span><span class="hs-glyph">|</span><span> </span><span id="TermBinding"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#TermBinding"><span class="hs-identifier hs-var">TermBinding</span></a></span></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>                  </span><span class="hs-glyph">|</span><span> </span><span id="TypeBinding"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#TypeBinding"><span class="hs-identifier hs-var">TypeBinding</span></a></span></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span>                  </span><span class="hs-glyph">|</span><span> </span><span id="DatatypeComponent"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DatatypeComponent"><span class="hs-identifier hs-var">DatatypeComponent</span></a></span></span><span> </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DatatypeComponent"><span class="hs-identifier hs-type">DatatypeComponent</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span>                  </span><span class="hs-comment">-- | Added for accumulating difference provenances when floating lets</span><span>
+</span><span id="line-30"></span><span>                  </span><span class="hs-glyph">|</span><span> </span><span id="MultipleSources"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#MultipleSources"><span class="hs-identifier hs-var">MultipleSources</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">S.Set</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110172"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>                  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621681110006"><span id="local-6989586621681110008"><span id="local-6989586621681110031"><span class="annot"><span class="annottext">Int -&gt; Provenance a -&gt; ShowS
+forall a. Show a =&gt; Int -&gt; Provenance a -&gt; ShowS
+forall a. Show a =&gt; [Provenance a] -&gt; ShowS
+forall a. Show a =&gt; Provenance a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Provenance a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [Provenance a] -&gt; ShowS
+show :: Provenance a -&gt; String
+$cshow :: forall a. Show a =&gt; Provenance a -&gt; String
+showsPrec :: Int -&gt; Provenance a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; Provenance a -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681109986"><span id="local-6989586621681110002"><span class="annot"><span class="annottext">Provenance a -&gt; Provenance a -&gt; Bool
+forall a. Eq a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Provenance a -&gt; Provenance a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+== :: Provenance a -&gt; Provenance a -&gt; Bool
+$c== :: forall a. Eq a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681109954"><span id="local-6989586621681109956"><span id="local-6989586621681109958"><span id="local-6989586621681109960"><span id="local-6989586621681109962"><span id="local-6989586621681109964"><span id="local-6989586621681109980"><span class="annot"><span class="annottext">Provenance a -&gt; Provenance a -&gt; Ordering
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall {a}. Ord a =&gt; Eq (Provenance a)
+forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Ordering
+forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Provenance a
+min :: Provenance a -&gt; Provenance a -&gt; Provenance a
+$cmin :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Provenance a
+max :: Provenance a -&gt; Provenance a -&gt; Provenance a
+$cmax :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Provenance a
+&gt;= :: Provenance a -&gt; Provenance a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+&gt; :: Provenance a -&gt; Provenance a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+&lt;= :: Provenance a -&gt; Provenance a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+&lt; :: Provenance a -&gt; Provenance a -&gt; Bool
+$c&lt; :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Bool
+compare :: Provenance a -&gt; Provenance a -&gt; Ordering
+$ccompare :: forall a. Ord a =&gt; Provenance a -&gt; Provenance a -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681109892"><span id="local-6989586621681109894"><span id="local-6989586621681109896"><span id="local-6989586621681109898"><span id="local-6989586621681109900"><span id="local-6989586621681109902"><span id="local-6989586621681109910"><span id="local-6989586621681109912"><span id="local-6989586621681109914"><span id="local-6989586621681109916"><span id="local-6989586621681109918"><span id="local-6989586621681109920"><span id="local-6989586621681109922"><span id="local-6989586621681109930"><span id="local-6989586621681109932"><span id="local-6989586621681109948"><span id="local-6989586621681109950"><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; Provenance a -&gt; Bool
+forall a. Num a =&gt; Provenance a -&gt; a
+forall a. Ord a =&gt; Provenance a -&gt; a
+forall m. Monoid m =&gt; Provenance m -&gt; m
+forall a. Provenance a -&gt; Bool
+forall a. Provenance a -&gt; Int
+forall a. Provenance a -&gt; [a]
+forall a. (a -&gt; a -&gt; a) -&gt; Provenance a -&gt; a
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Provenance a -&gt; m
+forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+forall (t :: * -&gt; *).
+(forall m. Monoid m =&gt; t m -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall m a. Monoid m =&gt; (a -&gt; m) -&gt; t a -&gt; m)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; t a -&gt; b)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. (a -&gt; a -&gt; a) -&gt; t a -&gt; a)
+-&gt; (forall a. t a -&gt; [a])
+-&gt; (forall a. t a -&gt; Bool)
+-&gt; (forall a. t a -&gt; Int)
+-&gt; (forall a. Eq a =&gt; a -&gt; t a -&gt; Bool)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Ord a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; (forall a. Num a =&gt; t a -&gt; a)
+-&gt; Foldable t
+product :: forall a. Num a =&gt; Provenance a -&gt; a
+$cproduct :: forall a. Num a =&gt; Provenance a -&gt; a
+sum :: forall a. Num a =&gt; Provenance a -&gt; a
+$csum :: forall a. Num a =&gt; Provenance a -&gt; a
+minimum :: forall a. Ord a =&gt; Provenance a -&gt; a
+$cminimum :: forall a. Ord a =&gt; Provenance a -&gt; a
+maximum :: forall a. Ord a =&gt; Provenance a -&gt; a
+$cmaximum :: forall a. Ord a =&gt; Provenance a -&gt; a
+elem :: forall a. Eq a =&gt; a -&gt; Provenance a -&gt; Bool
+$celem :: forall a. Eq a =&gt; a -&gt; Provenance a -&gt; Bool
+length :: forall a. Provenance a -&gt; Int
+$clength :: forall a. Provenance a -&gt; Int
+null :: forall a. Provenance a -&gt; Bool
+$cnull :: forall a. Provenance a -&gt; Bool
+toList :: forall a. Provenance a -&gt; [a]
+$ctoList :: forall a. Provenance a -&gt; [a]
+foldl1 :: forall a. (a -&gt; a -&gt; a) -&gt; Provenance a -&gt; a
+$cfoldl1 :: forall a. (a -&gt; a -&gt; a) -&gt; Provenance a -&gt; a
+foldr1 :: forall a. (a -&gt; a -&gt; a) -&gt; Provenance a -&gt; a
+$cfoldr1 :: forall a. (a -&gt; a -&gt; a) -&gt; Provenance a -&gt; a
+foldl' :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+$cfoldl' :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+foldl :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+$cfoldl :: forall b a. (b -&gt; a -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+foldr' :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+$cfoldr' :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+foldr :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+$cfoldr :: forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; Provenance a -&gt; b
+foldMap' :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Provenance a -&gt; m
+$cfoldMap' :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Provenance a -&gt; m
+foldMap :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Provenance a -&gt; m
+$cfoldMap :: forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Provenance a -&gt; m
+fold :: forall m. Monoid m =&gt; Provenance m -&gt; m
+$cfold :: forall m. Monoid m =&gt; Provenance m -&gt; m
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Foldable</span></a></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621681109886"><span id="local-6989586621681109888"><span id="local-6989586621681110142"><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Ord</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110142"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110142"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-34"></span><span>    </span><span id="local-6989586621681109883"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109883"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621681109882"><span class="annot"><span class="annottext">&lt;&gt; :: Provenance a -&gt; Provenance a -&gt; Provenance a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span id="local-6989586621681109881"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109881"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Set (Provenance a) -&gt; Provenance a
+</span><a href="PlutusIR.Compiler.Provenance.html#MultipleSources"><span class="hs-identifier hs-var">MultipleSources</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall {a}. Provenance a -&gt; Set (Provenance a)
+</span><a href="#local-6989586621681109880"><span class="hs-identifier hs-var">toSet</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109883"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; Set a -&gt; Set a -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-operator hs-var">`S.union`</span></a></span><span> </span><span class="annot"><span class="annottext">forall {a}. Provenance a -&gt; Set (Provenance a)
+</span><a href="#local-6989586621681109880"><span class="hs-identifier hs-var">toSet</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109881"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-36"></span><span>        </span><span id="local-6989586621681109880"><span class="annot"><span class="annottext">toSet :: Provenance a -&gt; Set (Provenance a)
+</span><a href="#local-6989586621681109880"><span class="hs-identifier hs-var hs-var">toSet</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-37"></span><span>            </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#MultipleSources"><span class="hs-identifier hs-type">MultipleSources</span></a></span><span> </span><span id="local-6989586621681109878"><span class="annot"><span class="annottext">Set (Provenance a)
+</span><a href="#local-6989586621681109878"><span class="hs-identifier hs-var">ps</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Set (Provenance a)
+</span><a href="#local-6989586621681109878"><span class="hs-identifier hs-var">ps</span></a></span><span>
+</span><span id="line-38"></span><span>            </span><span id="local-6989586621681109877"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109877"><span class="hs-identifier hs-var">other</span></a></span></span><span>              </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">S.singleton</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109877"><span class="hs-identifier hs-var">other</span></a></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- workaround, use a smart constructor to replace the older NoProvenance data constructor</span><span>
+</span><span id="line-41"></span><span id="local-6989586621681110138"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#noProvenance"><span class="hs-identifier hs-type">noProvenance</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110138"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-42"></span><span id="noProvenance"><span class="annot"><span class="annottext">noProvenance :: forall a. Provenance a
+</span><a href="PlutusIR.Compiler.Provenance.html#noProvenance"><span class="hs-identifier hs-var hs-var">noProvenance</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Set (Provenance a) -&gt; Provenance a
+</span><a href="PlutusIR.Compiler.Provenance.html#MultipleSources"><span class="hs-identifier hs-var">MultipleSources</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">S.empty</span></a></span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">data</span><span> </span><span id="DatatypeComponent"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DatatypeComponent"><span class="hs-identifier hs-var">DatatypeComponent</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Constructor"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Constructor"><span class="hs-identifier hs-var">Constructor</span></a></span></span><span>
+</span><span id="line-45"></span><span>                       </span><span class="hs-glyph">|</span><span> </span><span id="ConstructorType"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#ConstructorType"><span class="hs-identifier hs-var">ConstructorType</span></a></span></span><span>
+</span><span id="line-46"></span><span>                       </span><span class="hs-glyph">|</span><span> </span><span id="Destructor"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Destructor"><span class="hs-identifier hs-var">Destructor</span></a></span></span><span>
+</span><span id="line-47"></span><span>                       </span><span class="hs-glyph">|</span><span> </span><span id="DestructorType"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DestructorType"><span class="hs-identifier hs-var">DestructorType</span></a></span></span><span>
+</span><span id="line-48"></span><span>                       </span><span class="hs-glyph">|</span><span> </span><span id="DatatypeType"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DatatypeType"><span class="hs-identifier hs-var">DatatypeType</span></a></span></span><span>
+</span><span id="line-49"></span><span>                       </span><span class="hs-glyph">|</span><span> </span><span id="PatternFunctor"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#PatternFunctor"><span class="hs-identifier hs-var">PatternFunctor</span></a></span></span><span>
+</span><span id="line-50"></span><span>                       </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621681109862"><span id="local-6989586621681109864"><span id="local-6989586621681109866"><span class="annot"><span class="annottext">Int -&gt; DatatypeComponent -&gt; ShowS
+[DatatypeComponent] -&gt; ShowS
+DatatypeComponent -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [DatatypeComponent] -&gt; ShowS
+$cshowList :: [DatatypeComponent] -&gt; ShowS
+show :: DatatypeComponent -&gt; String
+$cshow :: DatatypeComponent -&gt; String
+showsPrec :: Int -&gt; DatatypeComponent -&gt; ShowS
+$cshowsPrec :: Int -&gt; DatatypeComponent -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681109858"><span id="local-6989586621681109860"><span class="annot"><span class="annottext">DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+$c/= :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+== :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+$c== :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681109839"><span id="local-6989586621681109841"><span id="local-6989586621681109844"><span id="local-6989586621681109847"><span id="local-6989586621681109850"><span id="local-6989586621681109852"><span id="local-6989586621681109854"><span class="annot"><span class="annottext">Eq DatatypeComponent
+DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+DatatypeComponent -&gt; DatatypeComponent -&gt; Ordering
+DatatypeComponent -&gt; DatatypeComponent -&gt; DatatypeComponent
+forall a.
+Eq a
+-&gt; (a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+min :: DatatypeComponent -&gt; DatatypeComponent -&gt; DatatypeComponent
+$cmin :: DatatypeComponent -&gt; DatatypeComponent -&gt; DatatypeComponent
+max :: DatatypeComponent -&gt; DatatypeComponent -&gt; DatatypeComponent
+$cmax :: DatatypeComponent -&gt; DatatypeComponent -&gt; DatatypeComponent
+&gt;= :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+$c&gt;= :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+&gt; :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+$c&gt; :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+&lt;= :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+$c&lt;= :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+&lt; :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+$c&lt; :: DatatypeComponent -&gt; DatatypeComponent -&gt; Bool
+compare :: DatatypeComponent -&gt; DatatypeComponent -&gt; Ordering
+$ccompare :: DatatypeComponent -&gt; DatatypeComponent -&gt; Ordering
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></a></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621681109836"><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-type">PP.Pretty</span></a></span><span> </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DatatypeComponent"><span class="hs-identifier hs-type">DatatypeComponent</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-53"></span><span>    </span><span id="local-6989586621681109827"><span class="annot"><span class="annottext">pretty :: forall ann. DatatypeComponent -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">pretty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-54"></span><span>        </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="PlutusIR.Compiler.Provenance.html#Constructor"><span class="hs-identifier hs-var">Constructor</span></a></span><span>     </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;constructor&quot;</span></span><span>
+</span><span id="line-55"></span><span>        </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="PlutusIR.Compiler.Provenance.html#ConstructorType"><span class="hs-identifier hs-var">ConstructorType</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;constructor type&quot;</span></span><span>
+</span><span id="line-56"></span><span>        </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="PlutusIR.Compiler.Provenance.html#Destructor"><span class="hs-identifier hs-var">Destructor</span></a></span><span>      </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;destructor&quot;</span></span><span>
+</span><span id="line-57"></span><span>        </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="PlutusIR.Compiler.Provenance.html#DestructorType"><span class="hs-identifier hs-var">DestructorType</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;destructor type&quot;</span></span><span>
+</span><span id="line-58"></span><span>        </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="PlutusIR.Compiler.Provenance.html#DatatypeType"><span class="hs-identifier hs-var">DatatypeType</span></a></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;datatype type&quot;</span></span><span>
+</span><span id="line-59"></span><span>        </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="PlutusIR.Compiler.Provenance.html#PatternFunctor"><span class="hs-identifier hs-var">PatternFunctor</span></a></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;pattern functor&quot;</span></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-keyword">data</span><span> </span><span id="GeneratedKind"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#GeneratedKind"><span class="hs-identifier hs-var">GeneratedKind</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="RecursiveLet"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#RecursiveLet"><span class="hs-identifier hs-var">RecursiveLet</span></a></span></span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621681109819"><span id="local-6989586621681109821"><span id="local-6989586621681109823"><span class="annot"><span class="annottext">Int -&gt; GeneratedKind -&gt; ShowS
+[GeneratedKind] -&gt; ShowS
+GeneratedKind -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [GeneratedKind] -&gt; ShowS
+$cshowList :: [GeneratedKind] -&gt; ShowS
+show :: GeneratedKind -&gt; String
+$cshow :: GeneratedKind -&gt; String
+showsPrec :: Int -&gt; GeneratedKind -&gt; ShowS
+$cshowsPrec :: Int -&gt; GeneratedKind -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681109815"><span id="local-6989586621681109817"><span class="annot"><span class="annottext">GeneratedKind -&gt; GeneratedKind -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: GeneratedKind -&gt; GeneratedKind -&gt; Bool
+$c/= :: GeneratedKind -&gt; GeneratedKind -&gt; Bool
+== :: GeneratedKind -&gt; GeneratedKind -&gt; Bool
+$c== :: GeneratedKind -&gt; GeneratedKind -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621681109812"><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-type">PP.Pretty</span></a></span><span> </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#GeneratedKind"><span class="hs-identifier hs-type">GeneratedKind</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-65"></span><span>    </span><span id="local-6989586621681109810"><span class="annot"><span class="annottext">pretty :: forall ann. GeneratedKind -&gt; Doc ann
+</span><a href="#local-6989586621681109810"><span class="hs-identifier hs-var hs-var hs-var hs-var">pretty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-66"></span><span>        </span><span class="annot"><span class="annottext">GeneratedKind
+</span><a href="PlutusIR.Compiler.Provenance.html#RecursiveLet"><span class="hs-identifier hs-var">RecursiveLet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;recursive let&quot;</span></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-comment">-- | Set the provenance on a term to the given value.</span><span>
+</span><span id="line-69"></span><span id="local-6989586621681110127"><span id="local-6989586621681110128"><span id="local-6989586621681110129"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#setProvenance"><span class="hs-identifier hs-type">setProvenance</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Functor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110129"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110128"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621681110129"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110127"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621681110129"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110128"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-70"></span><span id="setProvenance"><span class="annot"><span class="annottext">setProvenance :: forall (f :: * -&gt; *) b a.
+Functor f =&gt;
+Provenance b -&gt; f a -&gt; f (Provenance b)
+</span><a href="PlutusIR.Compiler.Provenance.html#setProvenance"><span class="hs-identifier hs-var hs-var">setProvenance</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; a -&gt; f b -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">(&lt;$)</span></a></span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- | Mark all the annotations on a term as original. Useful for preparing terms for the PIR compiler.</span><span>
+</span><span id="line-73"></span><span id="local-6989586621681110121"><span id="local-6989586621681110122"><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#original"><span class="hs-identifier hs-type">original</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Functor</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110122"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621681110122"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110121"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621681110122"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110121"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-74"></span><span id="original"><span class="annot"><span class="annottext">original :: forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f (Provenance a)
+</span><a href="PlutusIR.Compiler.Provenance.html#original"><span class="hs-identifier hs-var hs-var">original</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Provenance a
+</span><a href="PlutusIR.Compiler.Provenance.html#Original"><span class="hs-identifier hs-var">Original</span></a></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621681109800"><span id="local-6989586621681110117"><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-type">PP.Pretty</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110117"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-type">PP.Pretty</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Provenance"><span class="hs-identifier hs-type">Provenance</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681110117"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-77"></span><span>    </span><span id="local-6989586621681109764"><span class="annot"><span class="annottext">pretty :: forall ann. Provenance a -&gt; Doc ann
+</span><a href="#local-6989586621681109764"><span class="hs-identifier hs-var hs-var hs-var hs-var">pretty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-78"></span><span>        </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#DatatypeComponent"><span class="hs-identifier hs-type">DatatypeComponent</span></a></span><span> </span><span id="local-6989586621681109763"><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="#local-6989586621681109763"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621681109762"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109762"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PP.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">DatatypeComponent
+</span><a href="#local-6989586621681109763"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;;&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;from&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109762"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-79"></span><span>        </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#Original"><span class="hs-identifier hs-type">Original</span></a></span><span> </span><span id="local-6989586621681109761"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621681109761"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621681109761"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-80"></span><span>        </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#LetBinding"><span class="hs-identifier hs-type">LetBinding</span></a></span><span> </span><span id="local-6989586621681109760"><span class="annot"><span class="annottext">Recursivity
+</span><a href="#local-6989586621681109760"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span id="local-6989586621681109759"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109759"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-81"></span><span>            </span><span class="hs-keyword">let</span><span>
+</span><span id="line-82"></span><span>                </span><span id="local-6989586621681109756"><span class="annot"><span class="annottext">rstr :: Doc ann
+</span><a href="#local-6989586621681109756"><span class="hs-identifier hs-var hs-var">rstr</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="#local-6989586621681109760"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-83"></span><span>                    </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#NonRec"><span class="hs-identifier hs-var">NonRec</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;non-recursive&quot;</span></span><span>
+</span><span id="line-84"></span><span>                    </span><span class="annot"><span class="annottext">Recursivity
+</span><a href="PlutusIR.Core.Type.html#Rec"><span class="hs-identifier hs-var">Rec</span></a></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;recursive&quot;</span></span><span>
+</span><span id="line-85"></span><span>            </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;(&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><a href="#local-6989586621681109756"><span class="hs-identifier hs-var">rstr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;)&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;let binding&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;;&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;from&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109759"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-86"></span><span>        </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#TermBinding"><span class="hs-identifier hs-type">TermBinding</span></a></span><span> </span><span id="local-6989586621681109753"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681109753"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621681109752"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109752"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;term binding&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;of&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681109753"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;;&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;from&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109752"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-87"></span><span>        </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#TypeBinding"><span class="hs-identifier hs-type">TypeBinding</span></a></span><span> </span><span id="local-6989586621681109751"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681109751"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621681109750"><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109750"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;type binding&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;of&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681109751"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;;&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;from&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall ann. Doc ann -&gt; Doc ann -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-operator hs-var">&lt;+&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; a -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.pretty</span></a></span><span> </span><span class="annot"><span class="annottext">Provenance a
+</span><a href="#local-6989586621681109750"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-88"></span><span>        </span><span class="annot"><a href="PlutusIR.Compiler.Provenance.html#MultipleSources"><span class="hs-identifier hs-type">MultipleSources</span></a></span><span> </span><span id="local-6989586621681109749"><span class="annot"><span class="annottext">Set (Provenance a)
+</span><a href="#local-6989586621681109749"><span class="hs-identifier hs-var">p1</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">forall a. Set a -&gt; [a]
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">S.toList</span></a></span><span> </span><span class="annot"><span class="annottext">Set (Provenance a)
+</span><a href="#local-6989586621681109749"><span class="hs-identifier hs-var">p1</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-89"></span><span>                                </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Doc ann
+</span><span class="hs-string">&quot;&lt;unknown&gt;&quot;</span></span><span>
+</span><span id="line-90"></span><span>                                </span><span id="local-6989586621681109747"><span class="annot"><span class="annottext">[Provenance a]
+</span><a href="#local-6989586621681109747"><span class="hs-identifier hs-var">l</span></a></span></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a ann. Pretty a =&gt; [a] -&gt; Doc ann
+</span><a href="../../../../prettyprinter/html/src"><span class="hs-identifier hs-var">PLC.prettyList</span></a></span><span> </span><span class="annot"><span class="annottext">[Provenance a]
+</span><a href="#local-6989586621681109747"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-91"></span></pre></body></html>

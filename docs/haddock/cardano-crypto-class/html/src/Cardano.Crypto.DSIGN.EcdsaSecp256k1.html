@@ -1,0 +1,886 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE AllowAmbiguousTypes #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications #-}</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- Needed to ensure that our hash is the right size</span><span>
+</span><span id="line-13"></span><span class="hs-pragma">{-# OPTIONS_GHC -Wno-redundant-constraints #-}</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- According to the documentation for unsafePerformIO:</span><span>
+</span><span id="line-15"></span><span class="hs-comment">--</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- &gt; Make sure that the either you switch off let-floating</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- &gt; (-fno-full-laziness), or that the call to unsafePerformIO cannot float</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- &gt; outside a lambda.</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- If we do not switch off let-floating, our calls to unsafeDupablePerformIO for</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- FFI functions become nondeterministic in their behaviour when run with</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- parallelism enabled (such as -with-rtsopts=-N), possibly yielding wrong</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- answers on a range of tasks, including serialization.</span><span>
+</span><span id="line-24"></span><span class="hs-pragma">{-# OPTIONS_GHC -fno-full-laziness #-}</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Crypto.DSIGN.EcdsaSecp256k1</span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-27"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MessageHash"><span class="hs-identifier">MessageHash</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#toMessageHash"><span class="hs-identifier">toMessageHash</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#fromMessageHash"><span class="hs-identifier">fromMessageHash</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#hashAndPack"><span class="hs-identifier">hashAndPack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier">VerKeyDSIGN</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier">SignKeyDSIGN</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-34"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier">SigDSIGN</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Foreign.ForeignPtr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">withForeignPtr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Foreign.Storable</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">poke</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">peek</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Foreign.C.Types</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">CSize</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Foreign.Marshal.Alloc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">alloca</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Foreign.Ptr</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">castPtr</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">nullPtr</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Ptr</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Control.Monad</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">when</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">void</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">unless</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.Hash.Class.html"><span class="hs-identifier">Cardano.Crypto.Hash.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Hash.Class.html#HashAlgorithm"><span class="hs-identifier">HashAlgorithm</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Hash.Class.html#SizeHash"><span class="hs-identifier">SizeHash</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Hash.Class.html#digest"><span class="hs-identifier">digest</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Proxy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Proxy</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">Cardano.Binary</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">fromCBOR</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">toCBOR</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">encodedSizeExpr</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">ByteString</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.Random</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">getRandomBytes</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.Seed.html"><span class="hs-identifier">Cardano.Crypto.Seed</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Seed.html#runMonadRandomWithSeed"><span class="hs-identifier">runMonadRandomWithSeed</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Kind</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier">Type</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-50"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-51"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html"><span class="hs-identifier">Cardano.Crypto.DSIGN.Class</span></a></span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-54"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#DSIGNAlgorithm"><span class="hs-identifier">DSIGNAlgorithm</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier">VerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-55"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier">SignKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-56"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier">SigDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-57"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SeedSizeDSIGN"><span class="hs-identifier">SeedSizeDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-58"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeSigDSIGN"><span class="hs-identifier">SizeSigDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-59"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeSignKeyDSIGN"><span class="hs-identifier">SizeSignKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-60"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeVerKeyDSIGN"><span class="hs-identifier">SizeVerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-61"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#algorithmNameDSIGN"><span class="hs-identifier">algorithmNameDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-62"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#deriveVerKeyDSIGN"><span class="hs-identifier">deriveVerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-63"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#signDSIGN"><span class="hs-identifier">signDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-64"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#verifyDSIGN"><span class="hs-identifier">verifyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-65"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#genKeyDSIGN"><span class="hs-identifier">genKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-66"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseSigDSIGN"><span class="hs-identifier">rawSerialiseSigDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-67"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#Signable"><span class="hs-identifier">Signable</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-68"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseVerKeyDSIGN"><span class="hs-identifier">rawSerialiseVerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-69"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseSignKeyDSIGN"><span class="hs-identifier">rawSerialiseSignKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-70"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseVerKeyDSIGN"><span class="hs-identifier">rawDeserialiseVerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-71"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseSignKeyDSIGN"><span class="hs-identifier">rawDeserialiseSignKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-72"></span><span>                  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseSigDSIGN"><span class="hs-identifier">rawDeserialiseSigDSIGN</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-73"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#encodeVerKeyDSIGN"><span class="hs-identifier">encodeVerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-74"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#encodedVerKeyDSIGNSizeExpr"><span class="hs-identifier">encodedVerKeyDSIGNSizeExpr</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-75"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#decodeVerKeyDSIGN"><span class="hs-identifier">decodeVerKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-76"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#encodeSignKeyDSIGN"><span class="hs-identifier">encodeSignKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-77"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#encodedSignKeyDESIGNSizeExpr"><span class="hs-identifier">encodedSignKeyDESIGNSizeExpr</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-78"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#decodeSignKeyDSIGN"><span class="hs-identifier">decodeSignKeyDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-79"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#encodeSigDSIGN"><span class="hs-identifier">encodeSigDSIGN</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-80"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#encodedSigDSIGNSizeExpr"><span class="hs-identifier">encodedSigDSIGNSizeExpr</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-81"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#decodeSigDSIGN"><span class="hs-identifier">decodeSigDSIGN</span></a></span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html"><span class="hs-identifier">Cardano.Crypto.SECP256K1.Constants</span></a></span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-84"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PRIVKEY_BYTES"><span class="hs-identifier">SECP256K1_ECDSA_PRIVKEY_BYTES</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-85"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES"><span class="hs-identifier">SECP256K1_ECDSA_SIGNATURE_BYTES</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-86"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL"><span class="hs-identifier">SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-87"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES"><span class="hs-identifier">SECP256K1_ECDSA_PUBKEY_BYTES</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-88"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL"><span class="hs-identifier">SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-89"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_MESSAGE_BYTES"><span class="hs-identifier">SECP256K1_ECDSA_MESSAGE_BYTES</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html"><span class="hs-identifier">Cardano.Crypto.PinnedSizedBytes</span></a></span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-92"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier">PinnedSizedBytes</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-93"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier">psbUseAsSizedPtr</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-94"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSized"><span class="hs-identifier">psbCreateSized</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-95"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier">psbFromByteStringCheck</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-96"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbToByteString"><span class="hs-identifier">psbToByteString</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-97"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateLen"><span class="hs-identifier">psbCreateLen</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-98"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSizedResult"><span class="hs-identifier">psbCreateSizedResult</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-99"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsCPtrLen"><span class="hs-identifier">psbUseAsCPtrLen</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">System.IO.Unsafe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">unsafeDupablePerformIO</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html"><span class="hs-identifier">Cardano.Crypto.SECP256K1.C</span></a></span><span> </span><span class="hs-special">(</span><span>
+</span><span id="line-103"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcPubkeyCreate"><span class="hs-identifier">secpEcPubkeyCreate</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-104"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier">secpCtxPtr</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-105"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaSign"><span class="hs-identifier">secpEcdsaSign</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-106"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaVerify"><span class="hs-identifier">secpEcdsaVerify</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-107"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaSignatureSerializeCompact"><span class="hs-identifier">secpEcdsaSignatureSerializeCompact</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-108"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcPubkeySerialize"><span class="hs-identifier">secpEcPubkeySerialize</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-109"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcCompressed"><span class="hs-identifier">secpEcCompressed</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-110"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaSignatureParseCompact"><span class="hs-identifier">secpEcdsaSignatureParseCompact</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-111"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.C.html#secpEcPubkeyParse"><span class="hs-identifier">secpEcPubkeyParse</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-112"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- | As ECDSA signatures on the SECP256k1 curve sign 32-byte hashes, rather than</span><span>
+</span><span id="line-115"></span><span class="hs-comment">-- whole messages, we provide a helper (opaque) newtype to ensure that the size</span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- of the input for signing and verification is strictly bounded.</span><span>
+</span><span id="line-117"></span><span class="hs-comment">--</span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- = Important note</span><span>
+</span><span id="line-119"></span><span class="hs-comment">--</span><span>
+</span><span id="line-120"></span><span class="hs-comment">-- If you are verifying a message using the algorithm provided here, you should</span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- hash the message yourself before verifying. Specifically, the sender should</span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- give you the message itself to verify, rather than the hash of the message</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- used to compute the signature.</span><span>
+</span><span id="line-124"></span><span class="hs-keyword">newtype</span><span> </span><span id="MessageHash"><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MessageHash"><span class="hs-identifier hs-var">MessageHash</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="MH"><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MH"><span class="hs-identifier hs-var">MH</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_MESSAGE_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_MESSAGE_BYTES</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679207404"><span id="local-6989586621679207409"><span class="annot"><span class="annottext">MessageHash -&gt; MessageHash -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: MessageHash -&gt; MessageHash -&gt; Bool
+$c/= :: MessageHash -&gt; MessageHash -&gt; Bool
+== :: MessageHash -&gt; MessageHash -&gt; Bool
+$c== :: MessageHash -&gt; MessageHash -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_MESSAGE_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_MESSAGE_BYTES</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span id="local-6989586621679207390"><span id="local-6989586621679207392"><span id="local-6989586621679207398"><span class="annot"><span class="annottext">Int -&gt; MessageHash -&gt; ShowS
+[MessageHash] -&gt; ShowS
+MessageHash -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [MessageHash] -&gt; ShowS
+$cshowList :: [MessageHash] -&gt; ShowS
+show :: MessageHash -&gt; String
+$cshow :: MessageHash -&gt; String
+showsPrec :: Int -&gt; MessageHash -&gt; ShowS
+$cshowsPrec :: Int -&gt; MessageHash -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span class="hs-comment">-- | Take a blob of bytes (which is presumed to be a 32-byte hash), verify its</span><span>
+</span><span id="line-129"></span><span class="hs-comment">-- length, and package it into a 'MessageHash' if that length is exactly 32.</span><span>
+</span><span id="line-130"></span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#toMessageHash"><span class="hs-identifier hs-type">toMessageHash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MessageHash"><span class="hs-identifier hs-type">MessageHash</span></a></span><span>
+</span><span id="line-131"></span><span id="toMessageHash"><span class="annot"><span class="annottext">toMessageHash :: ByteString -&gt; Maybe MessageHash
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#toMessageHash"><span class="hs-identifier hs-var hs-var">toMessageHash</span></a></span></span><span> </span><span id="local-6989586621679207388"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207388"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES -&gt; MessageHash
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MH"><span class="hs-identifier hs-var">MH</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+ByteString -&gt; Maybe (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier hs-var">psbFromByteStringCheck</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207388"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- | Turn a 'MessageHash' into its bytes without a length marker.</span><span>
+</span><span id="line-134"></span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#fromMessageHash"><span class="hs-identifier hs-type">fromMessageHash</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MessageHash"><span class="hs-identifier hs-type">MessageHash</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span>
+</span><span id="line-135"></span><span id="fromMessageHash"><span class="annot"><span class="annottext">fromMessageHash :: MessageHash -&gt; ByteString
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#fromMessageHash"><span class="hs-identifier hs-var hs-var">fromMessageHash</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MH"><span class="hs-identifier hs-type">MH</span></a></span><span> </span><span id="local-6989586621679207386"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207386"><span class="hs-identifier hs-var">psb</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat). PinnedSizedBytes n -&gt; ByteString
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbToByteString"><span class="hs-identifier hs-var">psbToByteString</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207386"><span class="hs-identifier hs-var">psb</span></a></span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="hs-comment">-- | A helper to use with the 'HashAlgorithm' API, as this can ensure sizing.</span><span>
+</span><span id="line-138"></span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#hashAndPack"><span class="hs-identifier hs-type">hashAndPack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207684"><span class="annot"><a href="#local-6989586621679207684"><span class="hs-identifier hs-type">h</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Type</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-operator">.</span><span>
+</span><span id="line-139"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Hash.Class.html#HashAlgorithm"><span class="hs-identifier hs-type">HashAlgorithm</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679207684"><span class="hs-identifier hs-type">h</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.Hash.Class.html#SizeHash"><span class="hs-identifier hs-type">SizeHash</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679207684"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-type">~</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_MESSAGE_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_MESSAGE_BYTES</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-140"></span><span>  </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Proxy</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679207684"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MessageHash"><span class="hs-identifier hs-type">MessageHash</span></a></span><span>
+</span><span id="line-141"></span><span id="hashAndPack"><span class="annot"><span class="annottext">hashAndPack :: forall h.
+(HashAlgorithm h, SizeHash h ~ SECP256K1_ECDSA_PRIVKEY_BYTES) =&gt;
+Proxy h -&gt; ByteString -&gt; MessageHash
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#hashAndPack"><span class="hs-identifier hs-var hs-var">hashAndPack</span></a></span></span><span> </span><span id="local-6989586621679207373"><span class="annot"><span class="annottext">Proxy h
+</span><a href="#local-6989586621679207373"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679207372"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207372"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+ByteString -&gt; Maybe (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier hs-var">psbFromByteStringCheck</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall h (proxy :: * -&gt; *).
+HashAlgorithm h =&gt;
+proxy h -&gt; ByteString -&gt; ByteString
+</span><a href="Cardano.Crypto.Hash.Class.html#digest"><span class="hs-identifier hs-var">digest</span></a></span><span> </span><span class="annot"><span class="annottext">Proxy h
+</span><a href="#local-6989586621679207373"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207372"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-142"></span><span>  </span><span class="annot"><span class="annottext">Maybe (PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;hashAndPack: unexpected mismatch of guaranteed hash length\n&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span>
+</span><span id="line-143"></span><span>                     </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Please report this, it's a bug!&quot;</span></span><span>
+</span><span id="line-144"></span><span>  </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679207369"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207369"><span class="hs-identifier hs-var">psb</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES -&gt; MessageHash
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MH"><span class="hs-identifier hs-var">MH</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207369"><span class="hs-identifier hs-var">psb</span></a></span><span>
+</span><span id="line-145"></span><span>
+</span><span id="line-146"></span><span class="hs-keyword">data</span><span> </span><span id="EcdsaSecp256k1DSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-var">EcdsaSecp256k1DSIGN</span></a></span></span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679207335"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#DSIGNAlgorithm"><span class="hs-identifier hs-type">DSIGNAlgorithm</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-149"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SeedSizeDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SeedSizeDSIGN"><span class="hs-identifier hs-var">SeedSizeDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PRIVKEY_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PRIVKEY_BYTES</span></a></span><span>
+</span><span id="line-150"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SizeSigDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeSigDSIGN"><span class="hs-identifier hs-var">SizeSigDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_SIGNATURE_BYTES</span></a></span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SizeSignKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeSignKeyDSIGN"><span class="hs-identifier hs-var">SizeSignKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PRIVKEY_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PRIVKEY_BYTES</span></a></span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SizeVerKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeVerKeyDSIGN"><span class="hs-identifier hs-var">SizeVerKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PUBKEY_BYTES</span></a></span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="Signable"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#Signable"><span class="hs-identifier hs-var">Signable</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-type">(~)</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MessageHash"><span class="hs-identifier hs-type">MessageHash</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-keyword">newtype</span><span> </span><span id="VerKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier hs-var">VerKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-155"></span><span>      </span><span id="VerKeyEcdsaSecp256k1"><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#VerKeyEcdsaSecp256k1"><span class="hs-identifier hs-var">VerKeyEcdsaSecp256k1</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-156"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207315"><span id="local-6989586621679207320"><span class="annot"><span class="annottext">VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+$c/= :: VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+== :: VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+$c== :: VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679207310"><span class="annot"><span class="annottext">VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+$crnf :: VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+</span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-157"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207297"><span id="local-6989586621679207299"><span id="local-6989586621679207303"><span class="annot"><span class="annottext">Int -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+[VerKeyDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [VerKeyDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+$cshowList :: [VerKeyDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+show :: VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; String
+$cshow :: VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; String
+showsPrec :: Int -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+$cshowsPrec :: Int -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x.
+Rep (VerKeyDSIGN EcdsaSecp256k1DSIGN) x
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN
+forall x.
+VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; Rep (VerKeyDSIGN EcdsaSecp256k1DSIGN) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x.
+Rep (VerKeyDSIGN EcdsaSecp256k1DSIGN) x
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN
+$cfrom :: forall x.
+VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; Rep (VerKeyDSIGN EcdsaSecp256k1DSIGN) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-158"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207288"><span id="local-6989586621679207290"><span id="local-6989586621679207292"><span class="annot"><span class="annottext">Context -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+Proxy (VerKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (VerKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+$cshowTypeOf :: Proxy (VerKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+wNoThunks :: Context -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+</span><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>    </span><span class="hs-keyword">newtype</span><span> </span><span id="SignKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier hs-var">SignKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-160"></span><span>      </span><span id="SignKeyEcdsaSecp256k1"><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SignKeyEcdsaSecp256k1"><span class="hs-identifier hs-var">SignKeyEcdsaSecp256k1</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PRIVKEY_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PRIVKEY_BYTES</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-161"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207278"><span id="local-6989586621679207282"><span class="annot"><span class="annottext">SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+$c/= :: SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+== :: SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+$c== :: SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679207273"><span class="annot"><span class="annottext">SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+$crnf :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+</span><a href="#local-6989586621679207273"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-162"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207262"><span id="local-6989586621679207264"><span id="local-6989586621679207268"><span class="annot"><span class="annottext">Int -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+[SignKeyDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SignKeyDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+$cshowList :: [SignKeyDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+show :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; String
+$cshow :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; String
+showsPrec :: Int -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+$cshowsPrec :: Int -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x.
+Rep (SignKeyDSIGN EcdsaSecp256k1DSIGN) x
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN
+forall x.
+SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; Rep (SignKeyDSIGN EcdsaSecp256k1DSIGN) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x.
+Rep (SignKeyDSIGN EcdsaSecp256k1DSIGN) x
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN
+$cfrom :: forall x.
+SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; Rep (SignKeyDSIGN EcdsaSecp256k1DSIGN) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-163"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207254"><span id="local-6989586621679207256"><span id="local-6989586621679207258"><span class="annot"><span class="annottext">Context -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+Proxy (SignKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (SignKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+$cshowTypeOf :: Proxy (SignKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+wNoThunks :: Context -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679207254"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-164"></span><span>    </span><span class="hs-keyword">newtype</span><span> </span><span id="SigDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier hs-var">SigDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-165"></span><span>      </span><span id="SigEcdsaSecp256k1"><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SigEcdsaSecp256k1"><span class="hs-identifier hs-var">SigEcdsaSecp256k1</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL"><span class="hs-identifier hs-type">SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207244"><span id="local-6989586621679207249"><span class="annot"><span class="annottext">SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+$c/= :: SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+== :: SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+$c== :: SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679207239"><span class="annot"><span class="annottext">SigDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: SigDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+$crnf :: SigDSIGN EcdsaSecp256k1DSIGN -&gt; ()
+</span><a href="#local-6989586621679207239"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207228"><span id="local-6989586621679207230"><span id="local-6989586621679207234"><span class="annot"><span class="annottext">Int -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+[SigDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+SigDSIGN EcdsaSecp256k1DSIGN -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SigDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+$cshowList :: [SigDSIGN EcdsaSecp256k1DSIGN] -&gt; ShowS
+show :: SigDSIGN EcdsaSecp256k1DSIGN -&gt; String
+$cshow :: SigDSIGN EcdsaSecp256k1DSIGN -&gt; String
+showsPrec :: Int -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+$cshowsPrec :: Int -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x.
+Rep (SigDSIGN EcdsaSecp256k1DSIGN) x
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN
+forall x.
+SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; Rep (SigDSIGN EcdsaSecp256k1DSIGN) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x.
+Rep (SigDSIGN EcdsaSecp256k1DSIGN) x
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN
+$cfrom :: forall x.
+SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; Rep (SigDSIGN EcdsaSecp256k1DSIGN) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-168"></span><span>      </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679207220"><span id="local-6989586621679207222"><span id="local-6989586621679207224"><span class="annot"><span class="annottext">Context -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+Proxy (SigDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (SigDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+$cshowTypeOf :: Proxy (SigDSIGN EcdsaSecp256k1DSIGN) -&gt; String
+wNoThunks :: Context -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SigDSIGN EcdsaSecp256k1DSIGN -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679207220"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-169"></span><span>    </span><span id="local-6989586621679207219"><span class="annot"><span class="annottext">algorithmNameDSIGN :: forall (proxy :: * -&gt; *). proxy EcdsaSecp256k1DSIGN -&gt; String
+</span><a href="#local-6989586621679207219"><span class="hs-identifier hs-var hs-var hs-var hs-var">algorithmNameDSIGN</span></a></span></span><span> </span><span class="annot"><span class="annottext">proxy EcdsaSecp256k1DSIGN
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ecdsa-secp256k1&quot;</span></span><span>
+</span><span id="line-170"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#deriveVerKeyDSIGN"><span class="hs-pragma hs-type">deriveVerKeyDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-171"></span><span>    </span><span id="local-6989586621679207205"><span class="annot"><span class="annottext">deriveVerKeyDSIGN :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN
+</span><a href="#local-6989586621679207205"><span class="hs-identifier hs-var hs-var hs-var hs-var">deriveVerKeyDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SignKeyEcdsaSecp256k1"><span class="hs-identifier hs-type">SignKeyEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207204"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207204"><span class="hs-identifier hs-var">skBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-172"></span><span>      </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#VerKeyEcdsaSecp256k1"><span class="hs-identifier hs-var">VerKeyEcdsaSecp256k1</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207204"><span class="hs-identifier hs-var">skBytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-173"></span><span>        </span><span class="hs-glyph">\</span><span id="local-6989586621679207203"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207203"><span class="hs-identifier hs-var">skp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+(SizedPtr n -&gt; IO ()) -&gt; IO (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSized"><span class="hs-identifier hs-var">psbCreateSized</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207202"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207202"><span class="hs-identifier hs-var">vkp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-174"></span><span>          </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207201"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207201"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-175"></span><span>            </span><span id="local-6989586621679207200"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207200"><span class="hs-identifier hs-var">res</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+-&gt; IO CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcPubkeyCreate"><span class="hs-identifier hs-var">secpEcPubkeyCreate</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207201"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207202"><span class="hs-identifier hs-var">vkp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207203"><span class="hs-identifier hs-var">skp</span></a></span><span>
+</span><span id="line-176"></span><span>            </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">when</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207200"><span class="hs-identifier hs-var">res</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">/=</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-177"></span><span>                 </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;deriveVerKeyDSIGN: Failed to derive VerKeyDSIGN EcdsaSecp256k1DSIGN&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-178"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#signDSIGN"><span class="hs-pragma hs-type">signDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-179"></span><span>    </span><span id="local-6989586621679207185"><span class="annot"><span class="annottext">signDSIGN :: forall a.
+(Signable EcdsaSecp256k1DSIGN a, HasCallStack) =&gt;
+ContextDSIGN EcdsaSecp256k1DSIGN
+-&gt; a
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN
+</span><a href="#local-6989586621679207185"><span class="hs-identifier hs-var hs-var hs-var hs-var">signDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MH"><span class="hs-identifier hs-type">MH</span></a></span><span> </span><span id="local-6989586621679207184"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207184"><span class="hs-identifier hs-var">psb</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SignKeyEcdsaSecp256k1"><span class="hs-identifier hs-type">SignKeyEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207183"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207183"><span class="hs-identifier hs-var">skBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-180"></span><span>      </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SigEcdsaSecp256k1"><span class="hs-identifier hs-var">SigEcdsaSecp256k1</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207184"><span class="hs-identifier hs-var">psb</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207182"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207182"><span class="hs-identifier hs-var">psp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-181"></span><span>        </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207183"><span class="hs-identifier hs-var">skBytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207181"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207181"><span class="hs-identifier hs-var">skp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-182"></span><span>          </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+(SizedPtr n -&gt; IO ()) -&gt; IO (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSized"><span class="hs-identifier hs-var">psbCreateSized</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207180"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207180"><span class="hs-identifier hs-var">sigp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-183"></span><span>            </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207179"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207179"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-184"></span><span>              </span><span class="hs-comment">-- The two nullPtr arguments correspond to nonces and extra nonce</span><span>
+</span><span id="line-185"></span><span>              </span><span class="hs-comment">-- data. We use neither, so we pass nullPtrs to indicate this to the</span><span>
+</span><span id="line-186"></span><span>              </span><span class="hs-comment">-- C API.</span><span>
+</span><span id="line-187"></span><span>              </span><span id="local-6989586621679207178"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207178"><span class="hs-identifier hs-var">res</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+-&gt; SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+-&gt; Ptr CUChar
+-&gt; Ptr CUChar
+-&gt; IO CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaSign"><span class="hs-identifier hs-var">secpEcdsaSign</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207179"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207180"><span class="hs-identifier hs-var">sigp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207182"><span class="hs-identifier hs-var">psp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207181"><span class="hs-identifier hs-var">skp</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ptr a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">nullPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ptr a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">nullPtr</span></a></span><span>
+</span><span id="line-188"></span><span>              </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">when</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207178"><span class="hs-identifier hs-var">res</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">/=</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-189"></span><span>                   </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;signDSIGN: Failed to sign EcdsaSecp256k1DSIGN message&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-190"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#verifyDSIGN"><span class="hs-pragma hs-type">verifyDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-191"></span><span>    </span><span id="local-6989586621679207169"><span class="annot"><span class="annottext">verifyDSIGN :: forall a.
+(Signable EcdsaSecp256k1DSIGN a, HasCallStack) =&gt;
+ContextDSIGN EcdsaSecp256k1DSIGN
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN
+-&gt; a
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN
+-&gt; Either String ()
+</span><a href="#local-6989586621679207169"><span class="hs-identifier hs-var hs-var hs-var hs-var">verifyDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#VerKeyEcdsaSecp256k1"><span class="hs-identifier hs-type">VerKeyEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207168"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207168"><span class="hs-identifier hs-var">vkBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#MH"><span class="hs-identifier hs-type">MH</span></a></span><span> </span><span id="local-6989586621679207167"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207167"><span class="hs-identifier hs-var">psb</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SigEcdsaSecp256k1"><span class="hs-identifier hs-type">SigEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207166"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207166"><span class="hs-identifier hs-var">sigBytes</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-192"></span><span>      </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207167"><span class="hs-identifier hs-var">psb</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207165"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207165"><span class="hs-identifier hs-var">psp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-193"></span><span>        </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207166"><span class="hs-identifier hs-var">sigBytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207164"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207164"><span class="hs-identifier hs-var">sigp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-194"></span><span>          </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207168"><span class="hs-identifier hs-var">vkBytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207163"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207163"><span class="hs-identifier hs-var">vkp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-195"></span><span>            </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207162"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207162"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-196"></span><span>              </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679207161"><span class="annot"><span class="annottext">res :: CInt
+</span><a href="#local-6989586621679207161"><span class="hs-identifier hs-var hs-var">res</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaVerify"><span class="hs-identifier hs-var">secpEcdsaVerify</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207162"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207164"><span class="hs-identifier hs-var">sigp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207165"><span class="hs-identifier hs-var">psp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207163"><span class="hs-identifier hs-var">vkp</span></a></span><span>
+</span><span id="line-197"></span><span>              </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207161"><span class="hs-identifier hs-var">res</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-198"></span><span>                </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a b. a -&gt; Either a b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;verifyDSIGN: Incorrect or unparseable SigDSIGN EcdsaSecp256k1DSIGN&quot;</span></span><span>
+</span><span id="line-199"></span><span>                </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a b. b -&gt; Either a b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-200"></span><span>    </span><span id="local-6989586621679207160"><span class="annot"><span class="annottext">genKeyDSIGN :: Seed -&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN
+</span><a href="#local-6989586621679207160"><span class="hs-identifier hs-var hs-var hs-var hs-var">genKeyDSIGN</span></a></span></span><span> </span><span id="local-6989586621679207159"><span class="annot"><span class="annottext">Seed
+</span><a href="#local-6989586621679207159"><span class="hs-identifier hs-var">seed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Seed -&gt; (forall (m :: * -&gt; *). MonadRandom m =&gt; m a) -&gt; a
+</span><a href="Cardano.Crypto.Seed.html#runMonadRandomWithSeed"><span class="hs-identifier hs-var">runMonadRandomWithSeed</span></a></span><span> </span><span class="annot"><span class="annottext">Seed
+</span><a href="#local-6989586621679207159"><span class="hs-identifier hs-var">seed</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-201"></span><span>      </span><span id="local-6989586621679207145"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207145"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) byteArray.
+(MonadRandom m, ByteArray byteArray) =&gt;
+Int -&gt; m byteArray
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">getRandomBytes</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">32</span></span><span>
+</span><span id="line-202"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+ByteString -&gt; Maybe (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier hs-var">psbFromByteStringCheck</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207145"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-203"></span><span>        </span><span class="annot"><span class="annottext">Maybe (PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;genKeyDSIGN: Failed to generate SignKeyDSIGN EcdsaSecp256k1DSIGN unexpectedly&quot;</span></span><span>
+</span><span id="line-204"></span><span>        </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679207144"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207144"><span class="hs-identifier hs-var">psb</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SignKeyEcdsaSecp256k1"><span class="hs-identifier hs-var">SignKeyEcdsaSecp256k1</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207144"><span class="hs-identifier hs-var">psb</span></a></span><span>
+</span><span id="line-205"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseSigDSIGN"><span class="hs-pragma hs-type">rawSerialiseSigDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-206"></span><span>    </span><span id="local-6989586621679207140"><span class="annot"><span class="annottext">rawSerialiseSigDSIGN :: SigDSIGN EcdsaSecp256k1DSIGN -&gt; ByteString
+</span><a href="#local-6989586621679207140"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseSigDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SigEcdsaSecp256k1"><span class="hs-identifier hs-type">SigEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207139"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207139"><span class="hs-identifier hs-var">psb</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-207"></span><span>      </span><span class="annot"><span class="annottext">forall (n :: Nat). PinnedSizedBytes n -&gt; ByteString
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbToByteString"><span class="hs-identifier hs-var">psbToByteString</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_SIGNATURE_BYTES</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-208"></span><span>        </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207139"><span class="hs-identifier hs-var">psb</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207138"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207138"><span class="hs-identifier hs-var">psp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-209"></span><span>          </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+(SizedPtr n -&gt; IO ()) -&gt; IO (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSized"><span class="hs-identifier hs-var">psbCreateSized</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207137"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207137"><span class="hs-identifier hs-var">dstp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-210"></span><span>            </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207136"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207136"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-211"></span><span>              </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Functor f =&gt; f a -&gt; f ()
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">void</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; IO CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaSignatureSerializeCompact"><span class="hs-identifier hs-var">secpEcdsaSignatureSerializeCompact</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207136"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207137"><span class="hs-identifier hs-var">dstp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207138"><span class="hs-identifier hs-var">psp</span></a></span><span>
+</span><span id="line-212"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseVerKeyDSIGN"><span class="hs-pragma hs-type">rawSerialiseVerKeyDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-213"></span><span>    </span><span id="local-6989586621679207116"><span class="annot"><span class="annottext">rawSerialiseVerKeyDSIGN :: VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ByteString
+</span><a href="#local-6989586621679207116"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseVerKeyDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#VerKeyEcdsaSecp256k1"><span class="hs-identifier hs-type">VerKeyEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207115"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207115"><span class="hs-identifier hs-var">psb</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-214"></span><span>      </span><span class="annot"><span class="annottext">forall (n :: Nat). PinnedSizedBytes n -&gt; ByteString
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbToByteString"><span class="hs-identifier hs-var">psbToByteString</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207115"><span class="hs-identifier hs-var">psb</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207114"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207114"><span class="hs-identifier hs-var">psp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-215"></span><span>        </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+(Ptr Word8 -&gt; CSize -&gt; IO ()) -&gt; IO (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateLen"><span class="hs-identifier hs-var">psbCreateLen</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PUBKEY_BYTES</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207113"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679207113"><span class="hs-identifier hs-var">ptr</span></a></span></span><span> </span><span id="local-6989586621679207112"><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207112"><span class="hs-identifier hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-216"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679207111"><span class="annot"><span class="annottext">dstp :: Ptr CUChar
+</span><a href="#local-6989586621679207111"><span class="hs-identifier hs-var hs-var">dstp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. Ptr a -&gt; Ptr b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">castPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679207113"><span class="hs-identifier hs-var">ptr</span></a></span><span>
+</span><span id="line-217"></span><span>          </span><span class="hs-comment">-- This is necessary because of how the C API handles checking writes:</span><span>
+</span><span id="line-218"></span><span>          </span><span class="hs-comment">-- maximum permissible length is given as a pointer, which is</span><span>
+</span><span id="line-219"></span><span>          </span><span class="hs-comment">-- overwritten to indicate the number of bytes we actually wrote; if</span><span>
+</span><span id="line-220"></span><span>          </span><span class="hs-comment">-- we get a mismatch, then the serialization failed. While an odd</span><span>
+</span><span id="line-221"></span><span>          </span><span class="hs-comment">-- choice, we have to go with it.</span><span>
+</span><span id="line-222"></span><span>          </span><span class="annot"><span class="annottext">forall a b. Storable a =&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">alloca</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621679207110"><span class="annot"><span class="annottext">Ptr CSize
+</span><a href="#local-6989586621679207110"><span class="hs-identifier hs-var">lenPtr</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Ptr</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">CSize</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-223"></span><span>            </span><span class="annot"><span class="annottext">forall a. Storable a =&gt; Ptr a -&gt; a -&gt; IO ()
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">poke</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CSize
+</span><a href="#local-6989586621679207110"><span class="hs-identifier hs-var">lenPtr</span></a></span><span> </span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207112"><span class="hs-identifier hs-var">len</span></a></span><span>
+</span><span id="line-224"></span><span>            </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207109"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207109"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-225"></span><span>              </span><span id="local-6989586621679207108"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207108"><span class="hs-identifier hs-var">ret</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; Ptr CUChar
+-&gt; Ptr CSize
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; CUInt
+-&gt; IO CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcPubkeySerialize"><span class="hs-identifier hs-var">secpEcPubkeySerialize</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207109"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CUChar
+</span><a href="#local-6989586621679207111"><span class="hs-identifier hs-var">dstp</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CSize
+</span><a href="#local-6989586621679207110"><span class="hs-identifier hs-var">lenPtr</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207114"><span class="hs-identifier hs-var">psp</span></a></span><span> </span><span class="annot"><span class="annottext">CUInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcCompressed"><span class="hs-identifier hs-var">secpEcCompressed</span></a></span><span>
+</span><span id="line-226"></span><span>              </span><span id="local-6989586621679207107"><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207107"><span class="hs-identifier hs-var">writtenLen</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall a. Storable a =&gt; Ptr a -&gt; IO a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">peek</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CSize
+</span><a href="#local-6989586621679207110"><span class="hs-identifier hs-var">lenPtr</span></a></span><span>
+</span><span id="line-227"></span><span>              </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unless</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207107"><span class="hs-identifier hs-var">writtenLen</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207112"><span class="hs-identifier hs-var">len</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-228"></span><span>                     </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;rawSerializeVerKeyDSIGN: Did not write correct length for VerKeyDSIGN EcdsaSecp256k1DSIGN&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-229"></span><span>              </span><span class="hs-comment">-- This should never happen, since `secpEcPubkeySerialize` in the current</span><span>
+</span><span id="line-230"></span><span>              </span><span class="hs-comment">-- version of `secp256k1` library always returns 1:</span><span>
+</span><span id="line-231"></span><span>              </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unless</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207108"><span class="hs-identifier hs-var">ret</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-232"></span><span>                     </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;rawSerializeVerKeyDSIGN: Failed for unknown reason&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-233"></span><span>    </span><span id="local-6989586621679207106"><span class="annot"><span class="annottext">rawSerialiseSignKeyDSIGN :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; ByteString
+</span><a href="#local-6989586621679207106"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseSignKeyDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SignKeyEcdsaSecp256k1"><span class="hs-identifier hs-type">SignKeyEcdsaSecp256k1</span></a></span><span> </span><span id="local-6989586621679207105"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207105"><span class="hs-identifier hs-var">psb</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat). PinnedSizedBytes n -&gt; ByteString
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbToByteString"><span class="hs-identifier hs-var">psbToByteString</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+</span><a href="#local-6989586621679207105"><span class="hs-identifier hs-var">psb</span></a></span><span>
+</span><span id="line-234"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseSigDSIGN"><span class="hs-pragma hs-type">rawDeserialiseSigDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-235"></span><span>    </span><span id="local-6989586621679207093"><span class="annot"><span class="annottext">rawDeserialiseSigDSIGN :: ByteString -&gt; Maybe (SigDSIGN EcdsaSecp256k1DSIGN)
+</span><a href="#local-6989586621679207093"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseSigDSIGN</span></a></span></span><span> </span><span id="local-6989586621679207092"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207092"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-236"></span><span>      </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SigDSIGN EcdsaSecp256k1DSIGN
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SigEcdsaSecp256k1"><span class="hs-identifier hs-var">SigEcdsaSecp256k1</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+ByteString -&gt; Maybe (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier hs-var">psbFromByteStringCheck</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207092"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; Maybe (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
+</span><a href="#local-6989586621679207091"><span class="hs-identifier hs-var">go</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-237"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-238"></span><span>        </span><span class="annot"><a href="#local-6989586621679207091"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-239"></span><span>          </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_SIGNATURE_BYTES</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-240"></span><span>          </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL"><span class="hs-identifier hs-type">SECP256K1_ECDSA_SIGNATURE_BYTES_INTERNAL</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-241"></span><span>        </span><span id="local-6989586621679207091"><span class="annot"><span class="annottext">go :: PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; Maybe (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
+</span><a href="#local-6989586621679207091"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679207090"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207090"><span class="hs-identifier hs-var">psb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+PinnedSizedBytes n -&gt; (SizedPtr n -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsSizedPtr"><span class="hs-identifier hs-var">psbUseAsSizedPtr</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207090"><span class="hs-identifier hs-var">psb</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207089"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207089"><span class="hs-identifier hs-var">psp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-242"></span><span>          </span><span class="hs-special">(</span><span id="local-6989586621679207088"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207088"><span class="hs-identifier hs-var">sigPsb</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679207087"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207087"><span class="hs-identifier hs-var">res</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+KnownNat n =&gt;
+(SizedPtr n -&gt; IO r) -&gt; IO (PinnedSizedBytes n, r)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSizedResult"><span class="hs-identifier hs-var">psbCreateSizedResult</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207086"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207086"><span class="hs-identifier hs-var">sigp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-243"></span><span>            </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207085"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207085"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-244"></span><span>              </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; IO CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcdsaSignatureParseCompact"><span class="hs-identifier hs-var">secpEcdsaSignatureParseCompact</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207085"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207086"><span class="hs-identifier hs-var">sigp</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207089"><span class="hs-identifier hs-var">psp</span></a></span><span>
+</span><span id="line-245"></span><span>          </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207087"><span class="hs-identifier hs-var">res</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-246"></span><span>            </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207088"><span class="hs-identifier hs-var">sigPsb</span></a></span><span>
+</span><span id="line-247"></span><span>            </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-248"></span><span>    </span><span class="hs-pragma">{-# NOINLINE</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseVerKeyDSIGN"><span class="hs-pragma hs-type">rawDeserialiseVerKeyDSIGN</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-249"></span><span>    </span><span id="local-6989586621679207074"><span class="annot"><span class="annottext">rawDeserialiseVerKeyDSIGN :: ByteString -&gt; Maybe (VerKeyDSIGN EcdsaSecp256k1DSIGN)
+</span><a href="#local-6989586621679207074"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseVerKeyDSIGN</span></a></span></span><span> </span><span id="local-6989586621679207073"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207073"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-250"></span><span>      </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; VerKeyDSIGN EcdsaSecp256k1DSIGN
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#VerKeyEcdsaSecp256k1"><span class="hs-identifier hs-var">VerKeyEcdsaSecp256k1</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+ByteString -&gt; Maybe (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier hs-var">psbFromByteStringCheck</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207073"><span class="hs-identifier hs-var">bs</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&gt;&gt;=</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES
+-&gt; Maybe (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
+</span><a href="#local-6989586621679207072"><span class="hs-identifier hs-var">go</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-251"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-252"></span><span>        </span><span class="annot"><a href="#local-6989586621679207072"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-253"></span><span>          </span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PUBKEY_BYTES</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-254"></span><span>          </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.PinnedSizedBytes.html#PinnedSizedBytes"><span class="hs-identifier hs-type">PinnedSizedBytes</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.SECP256K1.Constants.html#SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL"><span class="hs-identifier hs-type">SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-255"></span><span>        </span><span id="local-6989586621679207072"><span class="annot"><span class="annottext">go :: PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES
+-&gt; Maybe (PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL)
+</span><a href="#local-6989586621679207072"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679207071"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES
+</span><a href="#local-6989586621679207071"><span class="hs-identifier hs-var">psb</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. IO a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">unsafeDupablePerformIO</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+KnownNat n =&gt;
+PinnedSizedBytes n -&gt; (Ptr Word8 -&gt; CSize -&gt; IO r) -&gt; IO r
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbUseAsCPtrLen"><span class="hs-identifier hs-var">psbUseAsCPtrLen</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES
+</span><a href="#local-6989586621679207071"><span class="hs-identifier hs-var">psb</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207070"><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679207070"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679207069"><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207069"><span class="hs-identifier hs-var">srcLen</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-256"></span><span>          </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679207068"><span class="annot"><span class="annottext">srcp :: Ptr CUChar
+</span><a href="#local-6989586621679207068"><span class="hs-identifier hs-var hs-var">srcp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. Ptr a -&gt; Ptr b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">castPtr</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr Word8
+</span><a href="#local-6989586621679207070"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-257"></span><span>          </span><span class="hs-special">(</span><span id="local-6989586621679207067"><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207067"><span class="hs-identifier hs-var">vkPsb</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679207066"><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207066"><span class="hs-identifier hs-var">res</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat) r.
+KnownNat n =&gt;
+(SizedPtr n -&gt; IO r) -&gt; IO (PinnedSizedBytes n, r)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbCreateSizedResult"><span class="hs-identifier hs-var">psbCreateSizedResult</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207065"><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207065"><span class="hs-identifier hs-var">vkp</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-258"></span><span>            </span><span class="annot"><span class="annottext">forall a b. ForeignPtr a -&gt; (Ptr a -&gt; IO b) -&gt; IO b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">withForeignPtr</span></a></span><span> </span><span class="annot"><span class="annottext">ForeignPtr SECP256k1Context
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpCtxPtr"><span class="hs-identifier hs-var">secpCtxPtr</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679207064"><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207064"><span class="hs-identifier hs-var">ctx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-259"></span><span>              </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+-&gt; SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+-&gt; Ptr CUChar
+-&gt; CSize
+-&gt; IO CInt
+</span><a href="Cardano.Crypto.SECP256K1.C.html#secpEcPubkeyParse"><span class="hs-identifier hs-var">secpEcPubkeyParse</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr SECP256k1Context
+</span><a href="#local-6989586621679207064"><span class="hs-identifier hs-var">ctx</span></a></span><span> </span><span class="annot"><span class="annottext">SizedPtr SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207065"><span class="hs-identifier hs-var">vkp</span></a></span><span> </span><span class="annot"><span class="annottext">Ptr CUChar
+</span><a href="#local-6989586621679207068"><span class="hs-identifier hs-var">srcp</span></a></span><span> </span><span class="annot"><span class="annottext">CSize
+</span><a href="#local-6989586621679207069"><span class="hs-identifier hs-var">srcLen</span></a></span><span>
+</span><span id="line-260"></span><span>          </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">CInt
+</span><a href="#local-6989586621679207066"><span class="hs-identifier hs-var">res</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-261"></span><span>            </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">pure</span></a></span><span> </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PUBKEY_BYTES_INTERNAL
+</span><a href="#local-6989586621679207067"><span class="hs-identifier hs-var">vkPsb</span></a></span><span>
+</span><span id="line-262"></span><span>            </span><span class="annot"><span class="annottext">CInt
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-263"></span><span>    </span><span id="local-6989586621679207061"><span class="annot"><span class="annottext">rawDeserialiseSignKeyDSIGN :: ByteString -&gt; Maybe (SignKeyDSIGN EcdsaSecp256k1DSIGN)
+</span><a href="#local-6989586621679207061"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseSignKeyDSIGN</span></a></span></span><span> </span><span id="local-6989586621679207060"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207060"><span class="hs-identifier hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-264"></span><span>      </span><span class="annot"><span class="annottext">PinnedSizedBytes SECP256K1_ECDSA_PRIVKEY_BYTES
+-&gt; SignKeyDSIGN EcdsaSecp256k1DSIGN
+</span><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#SignKeyEcdsaSecp256k1"><span class="hs-identifier hs-var">SignKeyEcdsaSecp256k1</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall (n :: Nat).
+KnownNat n =&gt;
+ByteString -&gt; Maybe (PinnedSizedBytes n)
+</span><a href="Cardano.Crypto.PinnedSizedBytes.html#psbFromByteStringCheck"><span class="hs-identifier hs-var">psbFromByteStringCheck</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679207060"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-265"></span><span>
+</span><span id="line-266"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679207052"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier hs-type">VerKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-267"></span><span>  </span><span id="local-6989586621679207049"><span class="annot"><span class="annottext">toCBOR :: VerKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Encoding
+</span><a href="#local-6989586621679207049"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; VerKeyDSIGN v -&gt; Encoding
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodeVerKeyDSIGN"><span class="hs-identifier hs-var">encodeVerKeyDSIGN</span></a></span><span>
+</span><span id="line-268"></span><span>  </span><span id="local-6989586621679207047"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (VerKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; Size
+</span><a href="#local-6989586621679207047"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; Proxy (VerKeyDSIGN v) -&gt; Size
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodedVerKeyDSIGNSizeExpr"><span class="hs-identifier hs-var">encodedVerKeyDSIGNSizeExpr</span></a></span><span>
+</span><span id="line-269"></span><span>
+</span><span id="line-270"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679207040"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier hs-type">VerKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-271"></span><span>  </span><span id="local-6989586621679207037"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (VerKeyDSIGN EcdsaSecp256k1DSIGN)
+</span><a href="#local-6989586621679207037"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. DSIGNAlgorithm v =&gt; Decoder s (VerKeyDSIGN v)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#decodeVerKeyDSIGN"><span class="hs-identifier hs-var">decodeVerKeyDSIGN</span></a></span><span>
+</span><span id="line-272"></span><span>
+</span><span id="line-273"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679207029"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier hs-type">SignKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-274"></span><span>  </span><span id="local-6989586621679207027"><span class="annot"><span class="annottext">toCBOR :: SignKeyDSIGN EcdsaSecp256k1DSIGN -&gt; Encoding
+</span><a href="#local-6989586621679207027"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; SignKeyDSIGN v -&gt; Encoding
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodeSignKeyDSIGN"><span class="hs-identifier hs-var">encodeSignKeyDSIGN</span></a></span><span>
+</span><span id="line-275"></span><span>  </span><span id="local-6989586621679207025"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (SignKeyDSIGN EcdsaSecp256k1DSIGN) -&gt; Size
+</span><a href="#local-6989586621679207025"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; Proxy (SignKeyDSIGN v) -&gt; Size
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodedSignKeyDESIGNSizeExpr"><span class="hs-identifier hs-var">encodedSignKeyDESIGNSizeExpr</span></a></span><span>
+</span><span id="line-276"></span><span>
+</span><span id="line-277"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679207018"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier hs-type">SignKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-278"></span><span>  </span><span id="local-6989586621679207016"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (SignKeyDSIGN EcdsaSecp256k1DSIGN)
+</span><a href="#local-6989586621679207016"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. DSIGNAlgorithm v =&gt; Decoder s (SignKeyDSIGN v)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#decodeSignKeyDSIGN"><span class="hs-identifier hs-var">decodeSignKeyDSIGN</span></a></span><span>
+</span><span id="line-279"></span><span>
+</span><span id="line-280"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679207008"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier hs-type">SigDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-281"></span><span>  </span><span id="local-6989586621679207006"><span class="annot"><span class="annottext">toCBOR :: SigDSIGN EcdsaSecp256k1DSIGN -&gt; Encoding
+</span><a href="#local-6989586621679207006"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; SigDSIGN v -&gt; Encoding
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodeSigDSIGN"><span class="hs-identifier hs-var">encodeSigDSIGN</span></a></span><span>
+</span><span id="line-282"></span><span>  </span><span id="local-6989586621679207004"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (SigDSIGN EcdsaSecp256k1DSIGN) -&gt; Size
+</span><a href="#local-6989586621679207004"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; Proxy (SigDSIGN v) -&gt; Size
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodedSigDSIGNSizeExpr"><span class="hs-identifier hs-var">encodedSigDSIGNSizeExpr</span></a></span><span>
+</span><span id="line-283"></span><span>
+</span><span id="line-284"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679206997"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier hs-type">SigDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.EcdsaSecp256k1.html#EcdsaSecp256k1DSIGN"><span class="hs-identifier hs-type">EcdsaSecp256k1DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-285"></span><span>  </span><span id="local-6989586621679206995"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (SigDSIGN EcdsaSecp256k1DSIGN)
+</span><a href="#local-6989586621679206995"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. DSIGNAlgorithm v =&gt; Decoder s (SigDSIGN v)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#decodeSigDSIGN"><span class="hs-identifier hs-var">decodeSigDSIGN</span></a></span><span>
+</span><span id="line-286"></span></pre></body></html>

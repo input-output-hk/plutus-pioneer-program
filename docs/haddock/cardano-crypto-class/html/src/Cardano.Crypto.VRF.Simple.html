@@ -1,0 +1,822 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings #-}</span><span>
+</span><span id="line-8"></span><span class="hs-pragma">{-# LANGUAGE PatternSynonyms #-}</span><span>
+</span><span id="line-9"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-10"></span><span class="hs-pragma">{-# LANGUAGE TypeApplications #-}</span><span>
+</span><span id="line-11"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies #-}</span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- | Mock implementations of verifiable random functions.</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Crypto.VRF.Simple</span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier">SimpleVRF</span></a></span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pointFromMaybe"><span class="hs-identifier">pointFromMaybe</span></a></span><span>
+</span><span id="line-17"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">force</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Proxy</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Proxy</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">InspectHeap</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Numeric.Natural</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier">Natural</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">Cardano.Binary</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">Encoding</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.PubKey.ECC.Prim</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.PubKey.ECC.Types</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Cardano.Crypto.Hash.html"><span class="hs-identifier">Cardano.Crypto.Hash</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Cardano.Crypto.Seed.html"><span class="hs-identifier">Cardano.Crypto.Seed</span></a></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Cardano.Crypto.Util.html"><span class="hs-identifier">Cardano.Crypto.Util</span></a></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html"><span class="hs-identifier">Cardano.Crypto.VRF.Class</span></a></span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">data</span><span> </span><span id="SimpleVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-var">SimpleVRF</span></a></span></span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">type</span><span> </span><span id="H"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#H"><span class="hs-identifier hs-var">H</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.Hash.Short.html#ShortHash"><span class="hs-identifier hs-type">ShortHash</span></a></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-type">curve</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Curve</span></a></span><span>
+</span><span id="line-41"></span><span id="curve"><span class="annot"><span class="annottext">curve :: Curve
+</span><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-var hs-var">curve</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CurveName -&gt; Curve
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.getCurveByName</span></a></span><span> </span><span class="annot"><span class="annottext">CurveName
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.SEC_t113r1</span></a></span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- C.curveSizeBits curve = 113 bits, 15 bytes</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#q"><span class="hs-identifier hs-type">q</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-45"></span><span id="q"><span class="annot"><span class="annottext">q :: PrivateNumber
+</span><a href="Cardano.Crypto.VRF.Simple.html#q"><span class="hs-identifier hs-var hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CurveCommon -&gt; PrivateNumber
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.ecc_n</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Curve -&gt; CurveCommon
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.common_curve</span></a></span><span> </span><span class="annot"><span class="annottext">Curve
+</span><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-var">curve</span></a></span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span id="local-6989586621679209008"><span id="local-6989586621679209009"></span></span><span class="hs-keyword">newtype</span><span> </span><span id="Point"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ThunkyPoint"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#ThunkyPoint"><span class="hs-identifier hs-var">ThunkyPoint</span></a></span></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span>
+</span><span id="line-48"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679209000"><span id="local-6989586621679209005"><span class="annot"><span class="annottext">Point -&gt; Point -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: Point -&gt; Point -&gt; Bool
+$c/= :: Point -&gt; Point -&gt; Bool
+== :: Point -&gt; Point -&gt; Bool
+$c== :: Point -&gt; Point -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep Point x -&gt; Point
+forall x. Point -&gt; Rep Point x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Point x -&gt; Point
+$cfrom :: forall x. Point -&gt; Rep Point x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679208979"><span id="local-6989586621679208984"><span id="local-6989586621679208990"><span class="annot"><span class="annottext">Context -&gt; Point -&gt; IO (Maybe ThunkInfo)
+Proxy Point -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy Point -&gt; String
+$cshowTypeOf :: Proxy Point -&gt; String
+wNoThunks :: Context -&gt; Point -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; Point -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; Point -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; Point -&gt; IO (Maybe ThunkInfo)
+</span><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-type">InspectHeap</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span id="local-6989586621679208973"><span class="annot"><span class="annottext">Point -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: Point -&gt; ()
+$crnf :: Point -&gt; ()
+</span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- | Smart constructor for @Point@ that evaluates the wrapped 'C.Point' to</span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- normal form. This is needed because 'C.Point' has a constructor with two</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- 'Integer' arguments that don't have bangs on them.</span><span>
+</span><span id="line-55"></span><span class="hs-keyword">pattern</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span>
+</span><span id="line-56"></span><span class="hs-keyword">pattern</span><span> </span><span id="%24bPoint"><span id="%24mPoint"><span id="Point"><span class="annot"><span class="annottext">$bPoint :: Point -&gt; Point
+$mPoint :: forall {r}. Point -&gt; (Point -&gt; r) -&gt; ((# #) -&gt; r) -&gt; r
+</span><a href="Cardano.Crypto.VRF.Simple.html#%24bPoint"><span class="hs-identifier hs-var hs-var hs-var hs-var">Point</span></a></span></span></span></span><span> </span><span class="annot"><a href="#local-6989586621679208966"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#ThunkyPoint"><span class="hs-identifier hs-type">ThunkyPoint</span></a></span><span> </span><span id="local-6989586621679208966"><span class="annot"><a href="#local-6989586621679208966"><span class="hs-identifier hs-var">p</span></a></span></span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span id="local-6989586621679208965"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208965"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#ThunkyPoint"><span class="hs-identifier hs-var">ThunkyPoint</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. NFData a =&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var">force</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208965"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span class="hs-pragma">{-# COMPLETE</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-pragma hs-type">Point</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-61"></span><span>
+</span><span id="line-62"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208960"><span id="local-6989586621679208963"><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Show</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-63"></span><span>  </span><span id="local-6989586621679208956"><span class="annot"><span class="annottext">show :: Point -&gt; String
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">show</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span id="local-6989586621679208954"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208954"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Show a =&gt; a -&gt; String
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208954"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208947"><span id="local-6989586621679208949"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>  </span><span id="local-6989586621679208938"><span class="annot"><span class="annottext">toCBOR :: Point -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span id="local-6989586621679208936"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208936"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; Maybe (PrivateNumber, PrivateNumber)
+</span><a href="Cardano.Crypto.VRF.Simple.html#pointToMaybe"><span class="hs-identifier hs-var">pointToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208936"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208930"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-69"></span><span>  </span><span id="local-6989586621679208919"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s Point
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe (PrivateNumber, PrivateNumber) -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pointFromMaybe"><span class="hs-identifier hs-var">pointFromMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;$&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a s. FromCBOR a =&gt; Decoder s a
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">fromCBOR</span></a></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208911"><span id="local-6989586621679208913"><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Semigroup</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-72"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span id="local-6989586621679208909"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208909"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621679208908"><span class="annot"><span class="annottext">&lt;&gt; :: Point -&gt; Point -&gt; Point
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var hs-var hs-var hs-var">&lt;&gt;</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span id="local-6989586621679208907"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208907"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Curve -&gt; Point -&gt; Point -&gt; Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.pointAdd</span></a></span><span> </span><span class="annot"><span class="annottext">Curve
+</span><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-var">curve</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208909"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208907"><span class="hs-identifier hs-var">r</span></a></span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208900"><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-75"></span><span>  </span><span id="local-6989586621679208898"><span class="annot"><span class="annottext">mempty :: Point
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mempty</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.PointO</span></a></span><span>
+</span><span id="line-76"></span><span>  </span><span id="local-6989586621679208895"><span class="annot"><span class="annottext">mappend :: Point -&gt; Point -&gt; Point
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">mappend</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">(&lt;&gt;)</span></a></span><span>
+</span><span id="line-77"></span><span>
+</span><span id="line-78"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pointToMaybe"><span class="hs-identifier hs-type">pointToMaybe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span id="pointToMaybe"><span class="annot"><span class="annottext">pointToMaybe :: Point -&gt; Maybe (PrivateNumber, PrivateNumber)
+</span><a href="Cardano.Crypto.VRF.Simple.html#pointToMaybe"><span class="hs-identifier hs-var hs-var">pointToMaybe</span></a></span></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.PointO</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-80"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pointToMaybe"><span class="hs-identifier hs-var">pointToMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span> </span><span id="local-6989586621679208893"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208893"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679208892"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208892"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208893"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208892"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pointFromMaybe"><span class="hs-identifier hs-type">pointFromMaybe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span>
+</span><span id="line-83"></span><span id="pointFromMaybe"><span class="annot"><span class="annottext">pointFromMaybe :: Maybe (PrivateNumber, PrivateNumber) -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pointFromMaybe"><span class="hs-identifier hs-var hs-var">pointFromMaybe</span></a></span></span><span> </span><span class="annot"><span class="annottext">Maybe (PrivateNumber, PrivateNumber)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.PointO</span></a></span><span>
+</span><span id="line-84"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pointFromMaybe"><span class="hs-identifier hs-var">pointFromMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679208891"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208891"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208890"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208890"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PrivateNumber -&gt; PrivateNumber -&gt; Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.Point</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208891"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208890"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pow"><span class="hs-identifier hs-type">pow</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span>
+</span><span id="line-87"></span><span id="pow"><span class="annot"><span class="annottext">pow :: PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow"><span class="hs-identifier hs-var hs-var">pow</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Curve -&gt; PrivateNumber -&gt; Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.pointBaseMul</span></a></span><span> </span><span class="annot"><span class="annottext">Curve
+</span><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-var">curve</span></a></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#pow%27"><span class="hs-identifier hs-type">pow'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span>
+</span><span id="line-90"></span><span id="pow%27"><span class="annot"><span class="annottext">pow' :: Point -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow%27"><span class="hs-identifier hs-var hs-var">pow'</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span id="local-6989586621679208886"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208886"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679208885"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208885"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Curve -&gt; PrivateNumber -&gt; Point -&gt; Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.pointMul</span></a></span><span> </span><span class="annot"><span class="annottext">Curve
+</span><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-var">curve</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208885"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208886"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-type">h</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">ByteString</span></a></span><span>
+</span><span id="line-93"></span><span id="h"><span class="annot"><span class="annottext">h :: Encoding -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-var hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall h a. Hash h a -&gt; ByteString
+</span><a href="Cardano.Crypto.Hash.Class.html#hashToBytes"><span class="hs-identifier hs-var">hashToBytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall h a. HashAlgorithm h =&gt; (a -&gt; Encoding) -&gt; a -&gt; Hash h a
+</span><a href="Cardano.Crypto.Hash.Class.html#hashWithSerialiser"><span class="hs-identifier hs-var">hashWithSerialiser</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#H"><span class="hs-identifier hs-type">H</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">id</span></a></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#h%27"><span class="hs-identifier hs-type">h'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span>
+</span><span id="line-96"></span><span id="h%27"><span class="annot"><span class="annottext">h' :: Encoding -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#h%27"><span class="hs-identifier hs-var hs-var">h'</span></a></span></span><span> </span><span id="local-6989586621679208878"><span class="annot"><span class="annottext">Encoding
+</span><a href="#local-6989586621679208878"><span class="hs-identifier hs-var">enc</span></a></span></span><span> </span><span id="local-6989586621679208877"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208877"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow"><span class="hs-identifier hs-var">pow</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mod</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208877"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#bytesToNatural"><span class="hs-identifier hs-var">bytesToNatural</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding
+</span><a href="#local-6989586621679208878"><span class="hs-identifier hs-var">enc</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="Cardano.Crypto.VRF.Simple.html#q"><span class="hs-identifier hs-var">q</span></a></span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208845"><span id="local-6989586621679208850"><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#VRFAlgorithm"><span class="hs-identifier hs-type">VRFAlgorithm</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-comment">-- Key and signature types</span><span>
+</span><span id="line-102"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-103"></span><span>
+</span><span id="line-104"></span><span>  </span><span class="hs-keyword">newtype</span><span> </span><span id="VerKeyVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#VerKeyVRF"><span class="hs-identifier hs-var">VerKeyVRF</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="VerKeySimpleVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-var">VerKeySimpleVRF</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span>
+</span><span id="line-105"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span>   </span><span class="hs-special">(</span><span id="local-6989586621679208821"><span id="local-6989586621679208823"><span id="local-6989586621679208828"><span class="annot"><span class="annottext">Int -&gt; VerKeyVRF SimpleVRF -&gt; ShowS
+[VerKeyVRF SimpleVRF] -&gt; ShowS
+VerKeyVRF SimpleVRF -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [VerKeyVRF SimpleVRF] -&gt; ShowS
+$cshowList :: [VerKeyVRF SimpleVRF] -&gt; ShowS
+show :: VerKeyVRF SimpleVRF -&gt; String
+$cshow :: VerKeyVRF SimpleVRF -&gt; String
+showsPrec :: Int -&gt; VerKeyVRF SimpleVRF -&gt; ShowS
+$cshowsPrec :: Int -&gt; VerKeyVRF SimpleVRF -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208816"><span id="local-6989586621679208819"><span class="annot"><span class="annottext">VerKeyVRF SimpleVRF -&gt; VerKeyVRF SimpleVRF -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: VerKeyVRF SimpleVRF -&gt; VerKeyVRF SimpleVRF -&gt; Bool
+$c/= :: VerKeyVRF SimpleVRF -&gt; VerKeyVRF SimpleVRF -&gt; Bool
+== :: VerKeyVRF SimpleVRF -&gt; VerKeyVRF SimpleVRF -&gt; Bool
+$c== :: VerKeyVRF SimpleVRF -&gt; VerKeyVRF SimpleVRF -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep (VerKeyVRF SimpleVRF) x -&gt; VerKeyVRF SimpleVRF
+forall x. VerKeyVRF SimpleVRF -&gt; Rep (VerKeyVRF SimpleVRF) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep (VerKeyVRF SimpleVRF) x -&gt; VerKeyVRF SimpleVRF
+$cfrom :: forall x. VerKeyVRF SimpleVRF -&gt; Rep (VerKeyVRF SimpleVRF) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679208804"><span id="local-6989586621679208808"><span id="local-6989586621679208812"><span class="annot"><span class="annottext">Context -&gt; VerKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+Proxy (VerKeyVRF SimpleVRF) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (VerKeyVRF SimpleVRF) -&gt; String
+$cshowTypeOf :: Proxy (VerKeyVRF SimpleVRF) -&gt; String
+wNoThunks :: Context -&gt; VerKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; VerKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; VerKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; VerKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679208804"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-107"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679208800"><span class="annot"><span class="annottext">VerKeyVRF SimpleVRF -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: VerKeyVRF SimpleVRF -&gt; ()
+$crnf :: VerKeyVRF SimpleVRF -&gt; ()
+</span><a href="#local-6989586621679208800"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span>
+</span><span id="line-109"></span><span>  </span><span class="hs-keyword">newtype</span><span> </span><span id="SignKeyVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#SignKeyVRF"><span class="hs-identifier hs-var">SignKeyVRF</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SignKeySimpleVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SignKeySimpleVRF"><span class="hs-identifier hs-var">SignKeySimpleVRF</span></a></span></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.PrivateNumber</span></a></span><span>
+</span><span id="line-110"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span>   </span><span class="hs-special">(</span><span id="local-6989586621679208788"><span id="local-6989586621679208790"><span id="local-6989586621679208795"><span class="annot"><span class="annottext">Int -&gt; SignKeyVRF SimpleVRF -&gt; ShowS
+[SignKeyVRF SimpleVRF] -&gt; ShowS
+SignKeyVRF SimpleVRF -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SignKeyVRF SimpleVRF] -&gt; ShowS
+$cshowList :: [SignKeyVRF SimpleVRF] -&gt; ShowS
+show :: SignKeyVRF SimpleVRF -&gt; String
+$cshow :: SignKeyVRF SimpleVRF -&gt; String
+showsPrec :: Int -&gt; SignKeyVRF SimpleVRF -&gt; ShowS
+$cshowsPrec :: Int -&gt; SignKeyVRF SimpleVRF -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208782"><span id="local-6989586621679208786"><span class="annot"><span class="annottext">SignKeyVRF SimpleVRF -&gt; SignKeyVRF SimpleVRF -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SignKeyVRF SimpleVRF -&gt; SignKeyVRF SimpleVRF -&gt; Bool
+$c/= :: SignKeyVRF SimpleVRF -&gt; SignKeyVRF SimpleVRF -&gt; Bool
+== :: SignKeyVRF SimpleVRF -&gt; SignKeyVRF SimpleVRF -&gt; Bool
+$c== :: SignKeyVRF SimpleVRF -&gt; SignKeyVRF SimpleVRF -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep (SignKeyVRF SimpleVRF) x -&gt; SignKeyVRF SimpleVRF
+forall x. SignKeyVRF SimpleVRF -&gt; Rep (SignKeyVRF SimpleVRF) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep (SignKeyVRF SimpleVRF) x -&gt; SignKeyVRF SimpleVRF
+$cfrom :: forall x. SignKeyVRF SimpleVRF -&gt; Rep (SignKeyVRF SimpleVRF) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679208768"><span id="local-6989586621679208773"><span id="local-6989586621679208778"><span class="annot"><span class="annottext">Context -&gt; SignKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+Proxy (SignKeyVRF SimpleVRF) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (SignKeyVRF SimpleVRF) -&gt; String
+$cshowTypeOf :: Proxy (SignKeyVRF SimpleVRF) -&gt; String
+wNoThunks :: Context -&gt; SignKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SignKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SignKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SignKeyVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679208768"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-type">InspectHeap</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.PrivateNumber</span></a></span><span>
+</span><span id="line-112"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679208763"><span class="annot"><span class="annottext">SignKeyVRF SimpleVRF -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: SignKeyVRF SimpleVRF -&gt; ()
+$crnf :: SignKeyVRF SimpleVRF -&gt; ()
+</span><a href="#local-6989586621679208763"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span>  </span><span class="hs-keyword">data</span><span> </span><span id="CertVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#CertVRF"><span class="hs-identifier hs-var">CertVRF</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span id="CertSimpleVRF"><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#CertSimpleVRF"><span class="hs-identifier hs-var">CertSimpleVRF</span></a></span></span><span>
+</span><span id="line-116"></span><span>        </span><span class="hs-special">{</span><span> </span><span id="certU"><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#certU"><span class="hs-identifier hs-var hs-var">certU</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span>    </span><span class="hs-comment">-- 15 byte point numbers, round up to 16</span><span>
+</span><span id="line-117"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="certC"><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; Natural
+</span><a href="Cardano.Crypto.VRF.Simple.html#certC"><span class="hs-identifier hs-var hs-var">certC</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Natural</span></a></span><span>  </span><span class="hs-comment">-- md5 hash, so 16 bytes</span><span>
+</span><span id="line-118"></span><span>        </span><span class="hs-special">,</span><span> </span><span id="certS"><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; PrivateNumber
+</span><a href="Cardano.Crypto.VRF.Simple.html#certS"><span class="hs-identifier hs-var hs-var">certS</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>  </span><span class="hs-comment">-- at most q, so 15 bytes, round up to 16</span><span>
+</span><span id="line-119"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-120"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679208746"><span id="local-6989586621679208748"><span id="local-6989586621679208755"><span class="annot"><span class="annottext">Int -&gt; CertVRF SimpleVRF -&gt; ShowS
+[CertVRF SimpleVRF] -&gt; ShowS
+CertVRF SimpleVRF -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [CertVRF SimpleVRF] -&gt; ShowS
+$cshowList :: [CertVRF SimpleVRF] -&gt; ShowS
+show :: CertVRF SimpleVRF -&gt; String
+$cshow :: CertVRF SimpleVRF -&gt; String
+showsPrec :: Int -&gt; CertVRF SimpleVRF -&gt; ShowS
+$cshowsPrec :: Int -&gt; CertVRF SimpleVRF -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208738"><span id="local-6989586621679208744"><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; CertVRF SimpleVRF -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: CertVRF SimpleVRF -&gt; CertVRF SimpleVRF -&gt; Bool
+$c/= :: CertVRF SimpleVRF -&gt; CertVRF SimpleVRF -&gt; Bool
+== :: CertVRF SimpleVRF -&gt; CertVRF SimpleVRF -&gt; Bool
+$c== :: CertVRF SimpleVRF -&gt; CertVRF SimpleVRF -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep (CertVRF SimpleVRF) x -&gt; CertVRF SimpleVRF
+forall x. CertVRF SimpleVRF -&gt; Rep (CertVRF SimpleVRF) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep (CertVRF SimpleVRF) x -&gt; CertVRF SimpleVRF
+$cfrom :: forall x. CertVRF SimpleVRF -&gt; Rep (CertVRF SimpleVRF) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-121"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679208730"><span id="local-6989586621679208732"><span id="local-6989586621679208734"><span class="annot"><span class="annottext">Context -&gt; CertVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+Proxy (CertVRF SimpleVRF) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (CertVRF SimpleVRF) -&gt; String
+$cshowTypeOf :: Proxy (CertVRF SimpleVRF) -&gt; String
+wNoThunks :: Context -&gt; CertVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; CertVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; CertVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; CertVRF SimpleVRF -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679208730"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-122"></span><span>    </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679208728"><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: CertVRF SimpleVRF -&gt; ()
+$crnf :: CertVRF SimpleVRF -&gt; ()
+</span><a href="#local-6989586621679208728"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-123"></span><span>
+</span><span id="line-124"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-125"></span><span>  </span><span class="hs-comment">-- Metadata and basic key operations</span><span>
+</span><span id="line-126"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-127"></span><span>
+</span><span id="line-128"></span><span>  </span><span id="local-6989586621679208727"><span class="annot"><span class="annottext">algorithmNameVRF :: forall (proxy :: * -&gt; *). proxy SimpleVRF -&gt; String
+</span><a href="Cardano.Crypto.VRF.Class.html#algorithmNameVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">algorithmNameVRF</span></a></span></span><span> </span><span class="annot"><span class="annottext">proxy SimpleVRF
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;simple&quot;</span></span><span>
+</span><span id="line-129"></span><span>
+</span><span id="line-130"></span><span>  </span><span id="local-6989586621679208725"><span class="annot"><span class="annottext">deriveVerKeyVRF :: SignKeyVRF SimpleVRF -&gt; VerKeyVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Class.html#deriveVerKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">deriveVerKeyVRF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SignKeySimpleVRF"><span class="hs-identifier hs-type">SignKeySimpleVRF</span></a></span><span> </span><span id="local-6989586621679208723"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208723"><span class="hs-identifier hs-var">k</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-131"></span><span>    </span><span class="annot"><span class="annottext">Point -&gt; VerKeyVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-var">VerKeySimpleVRF</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow"><span class="hs-identifier hs-var">pow</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208723"><span class="hs-identifier hs-var">k</span></a></span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span>  </span><span id="local-6989586621679208722"><span class="annot"><span class="annottext">sizeVerKeyVRF :: forall (proxy :: * -&gt; *). proxy SimpleVRF -&gt; Word
+</span><a href="Cardano.Crypto.VRF.Class.html#sizeVerKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">sizeVerKeyVRF</span></a></span></span><span>  </span><span class="annot"><span class="annottext">proxy SimpleVRF
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">32</span></span><span>
+</span><span id="line-134"></span><span>  </span><span id="local-6989586621679208720"><span class="annot"><span class="annottext">sizeSignKeyVRF :: forall (proxy :: * -&gt; *). proxy SimpleVRF -&gt; Word
+</span><a href="Cardano.Crypto.VRF.Class.html#sizeSignKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">sizeSignKeyVRF</span></a></span></span><span> </span><span class="annot"><span class="annottext">proxy SimpleVRF
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">16</span></span><span>
+</span><span id="line-135"></span><span>  </span><span id="local-6989586621679208718"><span class="annot"><span class="annottext">sizeCertVRF :: forall (proxy :: * -&gt; *). proxy SimpleVRF -&gt; Word
+</span><a href="Cardano.Crypto.VRF.Class.html#sizeCertVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">sizeCertVRF</span></a></span></span><span>    </span><span class="annot"><span class="annottext">proxy SimpleVRF
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">64</span></span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-139"></span><span>  </span><span class="hs-comment">-- Core algorithm operations</span><span>
+</span><span id="line-140"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-141"></span><span>
+</span><span id="line-142"></span><span>  </span><span class="hs-keyword">type</span><span> </span><span id="Signable"><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#Signable"><span class="hs-identifier hs-var">Signable</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.Util.html#SignableRepresentation"><span class="hs-identifier hs-type">SignableRepresentation</span></a></span><span>
+</span><span id="line-143"></span><span>
+</span><span id="line-144"></span><span>  </span><span id="local-6989586621679208689"><span class="annot"><span class="annottext">evalVRF :: forall a.
+(HasCallStack, Signable SimpleVRF a) =&gt;
+ContextVRF SimpleVRF
+-&gt; a
+-&gt; SignKeyVRF SimpleVRF
+-&gt; (OutputVRF SimpleVRF, CertVRF SimpleVRF)
+</span><a href="Cardano.Crypto.VRF.Class.html#evalVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">evalVRF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span id="local-6989586621679208687"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679208687"><span class="hs-identifier hs-var">a'</span></a></span></span><span> </span><span id="local-6989586621679208686"><span class="annot"><span class="annottext">sk :: SignKeyVRF SimpleVRF
+</span><a href="#local-6989586621679208686"><span class="hs-identifier hs-var">sk</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SignKeySimpleVRF"><span class="hs-identifier hs-type">SignKeySimpleVRF</span></a></span><span> </span><span id="local-6989586621679208685"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208685"><span class="hs-identifier hs-var">k</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-145"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679208684"><span class="annot"><span class="annottext">a :: ByteString
+</span><a href="#local-6989586621679208684"><span class="hs-identifier hs-var hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. SignableRepresentation a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#getSignableRepresentation"><span class="hs-identifier hs-var">getSignableRepresentation</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679208687"><span class="hs-identifier hs-var">a'</span></a></span><span>
+</span><span id="line-146"></span><span>        </span><span id="local-6989586621679208682"><span class="annot"><span class="annottext">u :: Point
+</span><a href="#local-6989586621679208682"><span class="hs-identifier hs-var hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#h%27"><span class="hs-identifier hs-var">h'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208684"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208685"><span class="hs-identifier hs-var">k</span></a></span><span>
+</span><span id="line-147"></span><span>        </span><span id="local-6989586621679208681"><span class="annot"><span class="annottext">y :: ByteString
+</span><a href="#local-6989586621679208681"><span class="hs-identifier hs-var hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208684"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208682"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-148"></span><span>        </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-type">VerKeySimpleVRF</span></a></span><span> </span><span id="local-6989586621679208680"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208680"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; SignKeyVRF v -&gt; VerKeyVRF v
+</span><a href="Cardano.Crypto.VRF.Class.html#deriveVerKeyVRF"><span class="hs-identifier hs-var">deriveVerKeyVRF</span></a></span><span> </span><span class="annot"><span class="annottext">SignKeyVRF SimpleVRF
+</span><a href="#local-6989586621679208686"><span class="hs-identifier hs-var">sk</span></a></span><span>
+</span><span id="line-149"></span><span>
+</span><span id="line-150"></span><span>        </span><span id="local-6989586621679208679"><span class="annot"><span class="annottext">r :: PrivateNumber
+</span><a href="#local-6989586621679208679"><span class="hs-identifier hs-var hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#bytesToNatural"><span class="hs-identifier hs-var">bytesToNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208681"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">`mod`</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="Cardano.Crypto.VRF.Simple.html#q"><span class="hs-identifier hs-var">q</span></a></span><span>
+</span><span id="line-151"></span><span>        </span><span id="local-6989586621679208678"><span class="annot"><span class="annottext">c :: ByteString
+</span><a href="#local-6989586621679208678"><span class="hs-identifier hs-var hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208684"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208680"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow"><span class="hs-identifier hs-var">pow</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208679"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Encoding -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#h%27"><span class="hs-identifier hs-var">h'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208684"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208679"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-152"></span><span>        </span><span id="local-6989586621679208677"><span class="annot"><span class="annottext">s :: PrivateNumber
+</span><a href="#local-6989586621679208677"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mod</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208679"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208685"><span class="hs-identifier hs-var">k</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#bytesToNatural"><span class="hs-identifier hs-var">bytesToNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208678"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="Cardano.Crypto.VRF.Simple.html#q"><span class="hs-identifier hs-var">q</span></a></span><span>
+</span><span id="line-153"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall v. ByteString -&gt; OutputVRF v
+</span><a href="Cardano.Crypto.VRF.Class.html#OutputVRF"><span class="hs-identifier hs-var">OutputVRF</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208681"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Point -&gt; Natural -&gt; PrivateNumber -&gt; CertVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Simple.html#CertSimpleVRF"><span class="hs-identifier hs-var">CertSimpleVRF</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208682"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#bytesToNatural"><span class="hs-identifier hs-var">bytesToNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208678"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208677"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-154"></span><span>
+</span><span id="line-155"></span><span>  </span><span id="local-6989586621679208651"><span class="annot"><span class="annottext">verifyVRF :: forall a.
+(HasCallStack, Signable SimpleVRF a) =&gt;
+ContextVRF SimpleVRF
+-&gt; VerKeyVRF SimpleVRF
+-&gt; a
+-&gt; (OutputVRF SimpleVRF, CertVRF SimpleVRF)
+-&gt; Bool
+</span><a href="Cardano.Crypto.VRF.Class.html#verifyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">verifyVRF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-type">VerKeySimpleVRF</span></a></span><span> </span><span id="local-6989586621679208649"><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208649"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679208648"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679208648"><span class="hs-identifier hs-var">a'</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#OutputVRF"><span class="hs-identifier hs-type">OutputVRF</span></a></span><span> </span><span id="local-6989586621679208647"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208647"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208646"><span class="annot"><span class="annottext">CertVRF SimpleVRF
+</span><a href="#local-6989586621679208646"><span class="hs-identifier hs-var">cert</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679208645"><span class="annot"><span class="annottext">a :: ByteString
+</span><a href="#local-6989586621679208645"><span class="hs-identifier hs-var hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. SignableRepresentation a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#getSignableRepresentation"><span class="hs-identifier hs-var">getSignableRepresentation</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679208648"><span class="hs-identifier hs-var">a'</span></a></span><span>
+</span><span id="line-157"></span><span>        </span><span id="local-6989586621679208644"><span class="annot"><span class="annottext">u :: Point
+</span><a href="#local-6989586621679208644"><span class="hs-identifier hs-var hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#certU"><span class="hs-identifier hs-var">certU</span></a></span><span> </span><span class="annot"><span class="annottext">CertVRF SimpleVRF
+</span><a href="#local-6989586621679208646"><span class="hs-identifier hs-var">cert</span></a></span><span>
+</span><span id="line-158"></span><span>        </span><span id="local-6989586621679208643"><span class="annot"><span class="annottext">c :: Natural
+</span><a href="#local-6989586621679208643"><span class="hs-identifier hs-var hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; Natural
+</span><a href="Cardano.Crypto.VRF.Simple.html#certC"><span class="hs-identifier hs-var">certC</span></a></span><span> </span><span class="annot"><span class="annottext">CertVRF SimpleVRF
+</span><a href="#local-6989586621679208646"><span class="hs-identifier hs-var">cert</span></a></span><span>
+</span><span id="line-159"></span><span>        </span><span id="local-6989586621679208642"><span class="annot"><span class="annottext">c' :: PrivateNumber
+</span><a href="#local-6989586621679208642"><span class="hs-identifier hs-var hs-var">c'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromIntegral</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679208643"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-160"></span><span>        </span><span id="local-6989586621679208641"><span class="annot"><span class="annottext">s :: PrivateNumber
+</span><a href="#local-6989586621679208641"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">CertVRF SimpleVRF -&gt; PrivateNumber
+</span><a href="Cardano.Crypto.VRF.Simple.html#certS"><span class="hs-identifier hs-var">certS</span></a></span><span> </span><span class="annot"><span class="annottext">CertVRF SimpleVRF
+</span><a href="#local-6989586621679208646"><span class="hs-identifier hs-var">cert</span></a></span><span>
+</span><span id="line-161"></span><span>        </span><span id="local-6989586621679208640"><span class="annot"><span class="annottext">b1 :: Bool
+</span><a href="#local-6989586621679208640"><span class="hs-identifier hs-var hs-var">b1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208647"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208645"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208644"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-162"></span><span>        </span><span id="local-6989586621679208639"><span class="annot"><span class="annottext">rhs :: ByteString
+</span><a href="#local-6989586621679208639"><span class="hs-identifier hs-var hs-var">rhs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-163"></span><span>          </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Simple.html#h"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208645"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span>
+</span><span id="line-164"></span><span>            </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208649"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span>
+</span><span id="line-165"></span><span>            </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow"><span class="hs-identifier hs-var">pow</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208641"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow%27"><span class="hs-identifier hs-var">pow'</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208649"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208642"><span class="hs-identifier hs-var">c'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span>
+</span><span id="line-166"></span><span>            </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Encoding -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#h%27"><span class="hs-identifier hs-var">h'</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208645"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208641"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; PrivateNumber -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#pow%27"><span class="hs-identifier hs-var">pow'</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="#local-6989586621679208644"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208642"><span class="hs-identifier hs-var">c'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>    </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679208640"><span class="hs-identifier hs-var">b1</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679208643"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">==</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#bytesToNatural"><span class="hs-identifier hs-var">bytesToNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208639"><span class="hs-identifier hs-var">rhs</span></a></span><span>
+</span><span id="line-168"></span><span>
+</span><span id="line-169"></span><span>  </span><span id="local-6989586621679208636"><span class="annot"><span class="annottext">sizeOutputVRF :: forall (proxy :: * -&gt; *). proxy SimpleVRF -&gt; Word
+</span><a href="Cardano.Crypto.VRF.Class.html#sizeOutputVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">sizeOutputVRF</span></a></span></span><span> </span><span class="annot"><span class="annottext">proxy SimpleVRF
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall h (proxy :: * -&gt; *). HashAlgorithm h =&gt; proxy h -&gt; Word
+</span><a href="Cardano.Crypto.Hash.Class.html#sizeHash"><span class="hs-identifier hs-var">sizeHash</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall {k} (t :: k). Proxy t
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Proxy</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Proxy</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#H"><span class="hs-identifier hs-type">H</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-170"></span><span>
+</span><span id="line-171"></span><span>
+</span><span id="line-172"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-173"></span><span>  </span><span class="hs-comment">-- Key generation</span><span>
+</span><span id="line-174"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-175"></span><span>
+</span><span id="line-176"></span><span>  </span><span id="local-6989586621679208628"><span class="annot"><span class="annottext">seedSizeVRF :: forall (proxy :: * -&gt; *). proxy SimpleVRF -&gt; Word
+</span><a href="Cardano.Crypto.VRF.Class.html#seedSizeVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">seedSizeVRF</span></a></span></span><span> </span><span class="annot"><span class="annottext">proxy SimpleVRF
+</span><span class="hs-identifier">_</span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">16</span></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">*</span></a></span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">100</span></span><span> </span><span class="hs-comment">-- size of SEC_t113r1 * up to 100 iterations</span><span>
+</span><span id="line-177"></span><span>  </span><span id="local-6989586621679208626"><span class="annot"><span class="annottext">genKeyVRF :: Seed -&gt; SignKeyVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Class.html#genKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">genKeyVRF</span></a></span></span><span> </span><span id="local-6989586621679208624"><span class="annot"><span class="annottext">Seed
+</span><a href="#local-6989586621679208624"><span class="hs-identifier hs-var">seed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PrivateNumber -&gt; SignKeyVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Simple.html#SignKeySimpleVRF"><span class="hs-identifier hs-var">SignKeySimpleVRF</span></a></span><span>
+</span><span id="line-178"></span><span>                     </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Seed -&gt; (forall (m :: * -&gt; *). MonadRandom m =&gt; m a) -&gt; a
+</span><a href="Cardano.Crypto.Seed.html#runMonadRandomWithSeed"><span class="hs-identifier hs-var">runMonadRandomWithSeed</span></a></span><span> </span><span class="annot"><span class="annottext">Seed
+</span><a href="#local-6989586621679208624"><span class="hs-identifier hs-var">seed</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (randomly :: * -&gt; *).
+MonadRandom randomly =&gt;
+Curve -&gt; randomly PrivateNumber
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.scalarGenerate</span></a></span><span> </span><span class="annot"><span class="annottext">Curve
+</span><a href="Cardano.Crypto.VRF.Simple.html#curve"><span class="hs-identifier hs-var">curve</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-179"></span><span>
+</span><span id="line-180"></span><span>
+</span><span id="line-181"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-182"></span><span>  </span><span class="hs-comment">-- raw serialise/deserialise</span><span>
+</span><span id="line-183"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-184"></span><span>
+</span><span id="line-185"></span><span>  </span><span class="hs-comment">-- All the integers here are 15 or 16 bytes big, we round up to 16.</span><span>
+</span><span id="line-186"></span><span>
+</span><span id="line-187"></span><span>  </span><span id="local-6989586621679208612"><span class="annot"><span class="annottext">rawSerialiseVerKeyVRF :: VerKeyVRF SimpleVRF -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Class.html#rawSerialiseVerKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseVerKeyVRF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-type">VerKeySimpleVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.PointO</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-188"></span><span>      </span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;rawSerialiseVerKeyVRF: Point at infinity&quot;</span></span><span>
+</span><span id="line-189"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#rawSerialiseVerKeyVRF"><span class="hs-identifier hs-var">rawSerialiseVerKeyVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-type">VerKeySimpleVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span> </span><span id="local-6989586621679208609"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208609"><span class="hs-identifier hs-var">p1</span></a></span></span><span> </span><span id="local-6989586621679208608"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208608"><span class="hs-identifier hs-var">p2</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-190"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; PrivateNumber -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208609"><span class="hs-identifier hs-var">p1</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-191"></span><span>   </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; PrivateNumber -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208608"><span class="hs-identifier hs-var">p2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-192"></span><span>
+</span><span id="line-193"></span><span>  </span><span id="local-6989586621679208605"><span class="annot"><span class="annottext">rawSerialiseSignKeyVRF :: SignKeyVRF SimpleVRF -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Class.html#rawSerialiseSignKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseSignKeyVRF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SignKeySimpleVRF"><span class="hs-identifier hs-type">SignKeySimpleVRF</span></a></span><span> </span><span id="local-6989586621679208603"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208603"><span class="hs-identifier hs-var">sk</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-194"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; PrivateNumber -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208603"><span class="hs-identifier hs-var">sk</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-195"></span><span>
+</span><span id="line-196"></span><span>  </span><span id="local-6989586621679208594"><span class="annot"><span class="annottext">rawSerialiseCertVRF :: CertVRF SimpleVRF -&gt; ByteString
+</span><a href="Cardano.Crypto.VRF.Class.html#rawSerialiseCertVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseCertVRF</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#CertSimpleVRF"><span class="hs-identifier hs-type">CertSimpleVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="annot"><span class="annottext">Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.PointO</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Natural
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-197"></span><span>      </span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;rawSerialiseCertVRF: Point at infinity&quot;</span></span><span>
+</span><span id="line-198"></span><span>  </span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#rawSerialiseCertVRF"><span class="hs-identifier hs-var">rawSerialiseCertVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#CertSimpleVRF"><span class="hs-identifier hs-type">CertSimpleVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-type">Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">C.Point</span></a></span><span> </span><span id="local-6989586621679208592"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208592"><span class="hs-identifier hs-var">p1</span></a></span></span><span> </span><span id="local-6989586621679208591"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208591"><span class="hs-identifier hs-var">p2</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span id="local-6989586621679208590"><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679208590"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621679208589"><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208589"><span class="hs-identifier hs-var">s</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-199"></span><span>      </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; PrivateNumber -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208592"><span class="hs-identifier hs-var">p1</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-200"></span><span>   </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; PrivateNumber -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208591"><span class="hs-identifier hs-var">p2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-201"></span><span>   </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679208590"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-202"></span><span>   </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Natural -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#writeBinaryNatural"><span class="hs-identifier hs-var">writeBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Num a =&gt; PrivateNumber -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fromInteger</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208589"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-203"></span><span>
+</span><span id="line-204"></span><span>  </span><span id="local-6989586621679208586"><span class="annot"><span class="annottext">rawDeserialiseVerKeyVRF :: ByteString -&gt; Maybe (VerKeyVRF SimpleVRF)
+</span><a href="Cardano.Crypto.VRF.Class.html#rawDeserialiseVerKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseVerKeyVRF</span></a></span></span><span> </span><span id="local-6989586621679208584"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208584"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-205"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-special">[</span><span id="local-6989586621679208583"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208583"><span class="hs-identifier hs-var">p1b</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208582"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208582"><span class="hs-identifier hs-var">p2b</span></a></span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; ByteString -&gt; [ByteString]
+</span><a href="Cardano.Crypto.Util.html#splitsAt"><span class="hs-identifier hs-var">splitsAt</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208584"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-206"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679208580"><span class="annot"><span class="annottext">p1 :: PrivateNumber
+</span><a href="#local-6989586621679208580"><span class="hs-identifier hs-var hs-var">p1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; PrivateNumber
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208583"><span class="hs-identifier hs-var">p1b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-207"></span><span>          </span><span id="local-6989586621679208578"><span class="annot"><span class="annottext">p2 :: PrivateNumber
+</span><a href="#local-6989586621679208578"><span class="hs-identifier hs-var hs-var">p2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; PrivateNumber
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208582"><span class="hs-identifier hs-var">p2b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-208"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$!</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; VerKeyVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Simple.html#VerKeySimpleVRF"><span class="hs-identifier hs-var">VerKeySimpleVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber -&gt; PrivateNumber -&gt; Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.Point</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208580"><span class="hs-identifier hs-var">p1</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208578"><span class="hs-identifier hs-var">p2</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-209"></span><span>
+</span><span id="line-210"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span>
+</span><span id="line-211"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-212"></span><span>
+</span><span id="line-213"></span><span>  </span><span id="local-6989586621679208575"><span class="annot"><span class="annottext">rawDeserialiseSignKeyVRF :: ByteString -&gt; Maybe (SignKeyVRF SimpleVRF)
+</span><a href="Cardano.Crypto.VRF.Class.html#rawDeserialiseSignKeyVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseSignKeyVRF</span></a></span></span><span> </span><span id="local-6989586621679208573"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208573"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-214"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-special">[</span><span id="local-6989586621679208572"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208572"><span class="hs-identifier hs-var">skb</span></a></span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; ByteString -&gt; [ByteString]
+</span><a href="Cardano.Crypto.Util.html#splitsAt"><span class="hs-identifier hs-var">splitsAt</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208573"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-215"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679208571"><span class="annot"><span class="annottext">sk :: PrivateNumber
+</span><a href="#local-6989586621679208571"><span class="hs-identifier hs-var hs-var">sk</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; PrivateNumber
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208572"><span class="hs-identifier hs-var">skb</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-216"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$!</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber -&gt; SignKeyVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Simple.html#SignKeySimpleVRF"><span class="hs-identifier hs-var">SignKeySimpleVRF</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208571"><span class="hs-identifier hs-var">sk</span></a></span><span>
+</span><span id="line-217"></span><span>
+</span><span id="line-218"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span>
+</span><span id="line-219"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-220"></span><span>
+</span><span id="line-221"></span><span>  </span><span id="local-6989586621679208567"><span class="annot"><span class="annottext">rawDeserialiseCertVRF :: ByteString -&gt; Maybe (CertVRF SimpleVRF)
+</span><a href="Cardano.Crypto.VRF.Class.html#rawDeserialiseCertVRF"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseCertVRF</span></a></span></span><span> </span><span id="local-6989586621679208565"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208565"><span class="hs-identifier hs-var">bs</span></a></span></span><span>
+</span><span id="line-222"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="hs-special">[</span><span id="local-6989586621679208564"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208564"><span class="hs-identifier hs-var">p1b</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208563"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208563"><span class="hs-identifier hs-var">p2b</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208562"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208562"><span class="hs-identifier hs-var">cb</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679208561"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208561"><span class="hs-identifier hs-var">sb</span></a></span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; ByteString -&gt; [ByteString]
+</span><a href="Cardano.Crypto.Util.html#splitsAt"><span class="hs-identifier hs-var">splitsAt</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">,</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">16</span></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208565"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-223"></span><span>    </span><span class="hs-special">,</span><span> </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679208560"><span class="annot"><span class="annottext">p1 :: PrivateNumber
+</span><a href="#local-6989586621679208560"><span class="hs-identifier hs-var hs-var">p1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; PrivateNumber
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208564"><span class="hs-identifier hs-var">p1b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-224"></span><span>          </span><span id="local-6989586621679208559"><span class="annot"><span class="annottext">p2 :: PrivateNumber
+</span><a href="#local-6989586621679208559"><span class="hs-identifier hs-var hs-var">p2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; PrivateNumber
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208563"><span class="hs-identifier hs-var">p2b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-225"></span><span>          </span><span id="local-6989586621679208558"><span class="annot"><span class="annottext">c :: Natural
+</span><a href="#local-6989586621679208558"><span class="hs-identifier hs-var hs-var">c</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span>            </span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208562"><span class="hs-identifier hs-var">cb</span></a></span><span>
+</span><span id="line-226"></span><span>          </span><span id="local-6989586621679208557"><span class="annot"><span class="annottext">s :: PrivateNumber
+</span><a href="#local-6989586621679208557"><span class="hs-identifier hs-var hs-var">s</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Integral a =&gt; a -&gt; PrivateNumber
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">toInteger</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Natural
+</span><a href="Cardano.Crypto.Util.html#readBinaryNatural"><span class="hs-identifier hs-var">readBinaryNatural</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679208561"><span class="hs-identifier hs-var">sb</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-227"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$!</span></a></span><span> </span><span class="annot"><span class="annottext">Point -&gt; Natural -&gt; PrivateNumber -&gt; CertVRF SimpleVRF
+</span><a href="Cardano.Crypto.VRF.Simple.html#CertSimpleVRF"><span class="hs-identifier hs-var">CertSimpleVRF</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Point -&gt; Point
+</span><a href="Cardano.Crypto.VRF.Simple.html#Point"><span class="hs-identifier hs-var">Point</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">PrivateNumber -&gt; PrivateNumber -&gt; Point
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">C.Point</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208560"><span class="hs-identifier hs-var">p1</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208559"><span class="hs-identifier hs-var">p2</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Natural
+</span><a href="#local-6989586621679208558"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">PrivateNumber
+</span><a href="#local-6989586621679208557"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-228"></span><span>
+</span><span id="line-229"></span><span>    </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span>
+</span><span id="line-230"></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-231"></span><span>
+</span><span id="line-232"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208549"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#VerKeyVRF"><span class="hs-identifier hs-type">VerKeyVRF</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-233"></span><span>  </span><span id="local-6989586621679208547"><span class="annot"><span class="annottext">toCBOR :: VerKeyVRF SimpleVRF -&gt; Encoding
+</span><a href="#local-6989586621679208547"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; VerKeyVRF v -&gt; Encoding
+</span><a href="Cardano.Crypto.VRF.Class.html#encodeVerKeyVRF"><span class="hs-identifier hs-var">encodeVerKeyVRF</span></a></span><span>
+</span><span id="line-234"></span><span>  </span><span id="local-6989586621679208544"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (VerKeyVRF SimpleVRF) -&gt; Size
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679208542"><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679208542"><span class="hs-identifier hs-var">_size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; Proxy (VerKeyVRF v) -&gt; Size
+</span><a href="Cardano.Crypto.VRF.Class.html#encodedVerKeyVRFSizeExpr"><span class="hs-identifier hs-var">encodedVerKeyVRFSizeExpr</span></a></span><span>
+</span><span id="line-235"></span><span>
+</span><span id="line-236"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208534"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#VerKeyVRF"><span class="hs-identifier hs-type">VerKeyVRF</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-237"></span><span>  </span><span id="local-6989586621679208532"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (VerKeyVRF SimpleVRF)
+</span><a href="#local-6989586621679208532"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. VRFAlgorithm v =&gt; Decoder s (VerKeyVRF v)
+</span><a href="Cardano.Crypto.VRF.Class.html#decodeVerKeyVRF"><span class="hs-identifier hs-var">decodeVerKeyVRF</span></a></span><span>
+</span><span id="line-238"></span><span>
+</span><span id="line-239"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208523"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#SignKeyVRF"><span class="hs-identifier hs-type">SignKeyVRF</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-240"></span><span>  </span><span id="local-6989586621679208521"><span class="annot"><span class="annottext">toCBOR :: SignKeyVRF SimpleVRF -&gt; Encoding
+</span><a href="#local-6989586621679208521"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; SignKeyVRF v -&gt; Encoding
+</span><a href="Cardano.Crypto.VRF.Class.html#encodeSignKeyVRF"><span class="hs-identifier hs-var">encodeSignKeyVRF</span></a></span><span>
+</span><span id="line-241"></span><span>  </span><span id="local-6989586621679208518"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (SignKeyVRF SimpleVRF) -&gt; Size
+</span><a href="#local-6989586621679208518"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679208517"><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679208517"><span class="hs-identifier hs-var">_size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; Proxy (SignKeyVRF v) -&gt; Size
+</span><a href="Cardano.Crypto.VRF.Class.html#encodedSignKeyVRFSizeExpr"><span class="hs-identifier hs-var">encodedSignKeyVRFSizeExpr</span></a></span><span>
+</span><span id="line-242"></span><span>
+</span><span id="line-243"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208509"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#SignKeyVRF"><span class="hs-identifier hs-type">SignKeyVRF</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-244"></span><span>  </span><span id="local-6989586621679208507"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (SignKeyVRF SimpleVRF)
+</span><a href="#local-6989586621679208507"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. VRFAlgorithm v =&gt; Decoder s (SignKeyVRF v)
+</span><a href="Cardano.Crypto.VRF.Class.html#decodeSignKeyVRF"><span class="hs-identifier hs-var">decodeSignKeyVRF</span></a></span><span>
+</span><span id="line-245"></span><span>
+</span><span id="line-246"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208498"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#CertVRF"><span class="hs-identifier hs-type">CertVRF</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-247"></span><span>  </span><span id="local-6989586621679208496"><span class="annot"><span class="annottext">toCBOR :: CertVRF SimpleVRF -&gt; Encoding
+</span><a href="#local-6989586621679208496"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; CertVRF v -&gt; Encoding
+</span><a href="Cardano.Crypto.VRF.Class.html#encodeCertVRF"><span class="hs-identifier hs-var">encodeCertVRF</span></a></span><span>
+</span><span id="line-248"></span><span>  </span><span id="local-6989586621679208493"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (CertVRF SimpleVRF) -&gt; Size
+</span><a href="#local-6989586621679208493"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679208492"><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><a href="#local-6989586621679208492"><span class="hs-identifier hs-var">_size</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. VRFAlgorithm v =&gt; Proxy (CertVRF v) -&gt; Size
+</span><a href="Cardano.Crypto.VRF.Class.html#encodedCertVRFSizeExpr"><span class="hs-identifier hs-var">encodedCertVRFSizeExpr</span></a></span><span>
+</span><span id="line-249"></span><span>
+</span><span id="line-250"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679208484"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.VRF.Class.html#CertVRF"><span class="hs-identifier hs-type">CertVRF</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.VRF.Simple.html#SimpleVRF"><span class="hs-identifier hs-type">SimpleVRF</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-251"></span><span>  </span><span id="local-6989586621679208482"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (CertVRF SimpleVRF)
+</span><a href="#local-6989586621679208482"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. VRFAlgorithm v =&gt; Decoder s (CertVRF v)
+</span><a href="Cardano.Crypto.VRF.Class.html#decodeCertVRF"><span class="hs-identifier hs-var">decodeCertVRF</span></a></span><span>
+</span><span id="line-252"></span></pre></body></html>

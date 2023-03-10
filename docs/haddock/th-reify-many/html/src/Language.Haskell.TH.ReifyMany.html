@@ -1,0 +1,303 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE CPP #-}</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- | @th-reify-many@ provides functions for recursively reifying top</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- level declarations.  The main intended use case is for enumerating</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- the names of datatypes reachable from an initial datatype, and</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- passing these names to some function which generates instances.</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- For example, in order to define 'Language.Haskell.TH.Syntax.Lift'</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- instances for two mutually recursive datatypes, I could write</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- something like:</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- &gt; {-# LANGUAGE TemplateHaskell #-}</span><span>
+</span><span id="line-12"></span><span class="hs-comment">-- &gt; import Language.Haskell.TH.ReifyMany (reifyManyWithoutInstances)</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- &gt; import Language.Haskell.TH.Lift (Lift(..), deriveLiftMany)</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- &gt; data A = A B</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- &gt; data B = B Int</span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- &gt; $(reifyManyWithoutInstances ''Lift [''A] (const True) &gt;&gt;= deriveLiftMany)</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--</span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- One interesting feature of this is that it attempts to omit the</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- types which already have an instance defined.  For example, if</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- @$(deriveLift ''B)@ is used before @deriveLiftMany@, it will omit</span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- the instance for B.</span><span>
+</span><span id="line-25"></span><span class="hs-comment">--</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- Of course, the intended usecase for this involves many more</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- datatypes - for example, syntax trees such as those found in TH.</span><span>
+</span><span id="line-28"></span><span class="hs-comment">--</span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- Note that 'reifyManyWithoutInstances' is rather imperfect in its</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- testing of whether an instance exists, and whether an instance</span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- should exist.  See this function's docs for details.</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Language.Haskell.TH.ReifyMany</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../mtl/html/src"><span class="hs-identifier">Control.Monad.State</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">State</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Maybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">isNothing</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier">Data.Set</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier">Language.Haskell.TH</span></a></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Language.Haskell.TH.ReifyMany.Internal.html"><span class="hs-identifier">Language.Haskell.TH.ReifyMany.Internal</span></a></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- | Recursively enumerates type constructor declarations, halting</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- when datatypes appear to already have an instance for the typeclass</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- specified by the first 'Name' parameter.  It guesses that an</span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- instance exists for a given datatype if it's used in the top</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- constructor of any of its parameters (see 'instanceMatches').</span><span>
+</span><span id="line-45"></span><span class="hs-comment">--</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- This function is useful for bulk defining typeclass instances like</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- @Binary@, @Lift@, @Data@, @Typeable@, etc.  It isn't very clever,</span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- though - in particular it has the following limitations:</span><span>
+</span><span id="line-49"></span><span class="hs-comment">--</span><span>
+</span><span id="line-50"></span><span class="hs-comment">-- * It only works well when type constructors mentioned in</span><span>
+</span><span id="line-51"></span><span class="hs-comment">--   fields should all have instances defined for them.</span><span>
+</span><span id="line-52"></span><span class="hs-comment">--</span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- * It ignores data type / constructor constraints.</span><span>
+</span><span id="line-54"></span><span class="hs-comment">--</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- * It ignores data / type families.</span><span>
+</span><span id="line-56"></span><span class="hs-comment">--</span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- It also takes a user-defined predicate, which is useful in</span><span>
+</span><span id="line-58"></span><span class="hs-comment">-- situations where this attempts to descend into datatypes which do</span><span>
+</span><span id="line-59"></span><span class="hs-comment">-- not need instances defined for them.</span><span>
+</span><span id="line-60"></span><span class="hs-comment">--</span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- Note that this will always initially yield the 'Name's of the</span><span>
+</span><span id="line-62"></span><span class="hs-comment">-- initial types, regardless of whether they are instances or not.</span><span>
+</span><span id="line-63"></span><span class="annot"><a href="Language.Haskell.TH.ReifyMany.html#reifyManyWithoutInstances"><span class="hs-identifier hs-type">reifyManyWithoutInstances</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Bool</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Q</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-64"></span><span id="reifyManyWithoutInstances"><span class="annot"><span class="annottext">reifyManyWithoutInstances :: Name -&gt; [Name] -&gt; (Name -&gt; Bool) -&gt; Q [Name]
+</span><a href="Language.Haskell.TH.ReifyMany.html#reifyManyWithoutInstances"><span class="hs-identifier hs-var hs-var">reifyManyWithoutInstances</span></a></span></span><span> </span><span id="local-6989586621679042720"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042720"><span class="hs-identifier hs-var">clz</span></a></span></span><span> </span><span id="local-6989586621679042719"><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679042719"><span class="hs-identifier hs-var">initial</span></a></span></span><span> </span><span id="local-6989586621679042718"><span class="annot"><span class="annottext">Name -&gt; Bool
+</span><a href="#local-6989586621679042718"><span class="hs-identifier hs-var">recursePred</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-65"></span><span>    </span><span id="local-6989586621679042717"><span class="annot"><span class="annottext">[TypeclassInstance]
+</span><a href="#local-6989586621679042717"><span class="hs-identifier hs-var">insts</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Name -&gt; Q [TypeclassInstance]
+</span><a href="Language.Haskell.TH.ReifyMany.Internal.html#getInstances"><span class="hs-identifier hs-var">getInstances</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042720"><span class="hs-identifier hs-var">clz</span></a></span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679042712"><span class="annot"><span class="annottext">recurse :: (Name, Dec) -&gt; m (Bool, [Name])
+</span><a href="#local-6989586621679042712"><span class="hs-identifier hs-var hs-var">recurse</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679042711"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042711"><span class="hs-identifier hs-var">name</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679042710"><span class="annot"><span class="annottext">Dec
+</span><a href="#local-6989586621679042710"><span class="hs-identifier hs-var">dec</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-67"></span><span>            </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Name -&gt; Bool
+</span><a href="#local-6989586621679042718"><span class="hs-identifier hs-var">recursePred</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042711"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-operator hs-var">&amp;&amp;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">isNothing</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[TypeclassInstance] -&gt; Name -&gt; Maybe TypeclassInstance
+</span><a href="Language.Haskell.TH.ReifyMany.Internal.html#lookupInstance"><span class="hs-identifier hs-var">lookupInstance</span></a></span><span> </span><span class="annot"><span class="annottext">[TypeclassInstance]
+</span><a href="#local-6989586621679042717"><span class="hs-identifier hs-var">insts</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042711"><span class="hs-identifier hs-var">name</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-68"></span><span>                </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Dec -&gt; Bool
+</span><a href="Language.Haskell.TH.ReifyMany.Internal.html#isDataDec"><span class="hs-identifier hs-var">isDataDec</span></a></span><span> </span><span class="annot"><span class="annottext">Dec
+</span><a href="#local-6989586621679042710"><span class="hs-identifier hs-var">dec</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Dec -&gt; [Name]
+</span><a href="Language.Haskell.TH.ReifyMany.Internal.html#decConcreteNames"><span class="hs-identifier hs-var">decConcreteNames</span></a></span><span> </span><span class="annot"><span class="annottext">Dec
+</span><a href="#local-6989586621679042710"><span class="hs-identifier hs-var">dec</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span>        </span><span class="annot"><a href="#local-6989586621679042712"><span class="hs-identifier hs-var">recurse</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Dec)
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var">False</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span>    </span><span id="local-6989586621679042705"><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679042705"><span class="hs-identifier hs-var">infos</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">((Name, Dec) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><a href="Language.Haskell.TH.ReifyMany.html#reifyManyTyCons"><span class="hs-identifier hs-var">reifyManyTyCons</span></a></span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *}. Monad m =&gt; (Name, Dec) -&gt; m (Bool, [Name])
+</span><a href="#local-6989586621679042712"><span class="hs-identifier hs-var">recurse</span></a></span><span> </span><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679042719"><span class="hs-identifier hs-var">initial</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">map</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a, b) -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fst</span></a></span><span> </span><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679042705"><span class="hs-identifier hs-var">infos</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | Like 'reifyMany', but specialized for recursively enumerating</span><span>
+</span><span id="line-74"></span><span class="hs-comment">-- type constructor declarations, omitting 'PrimTyConI'.</span><span>
+</span><span id="line-75"></span><span class="hs-comment">--</span><span>
+</span><span id="line-76"></span><span class="hs-comment">-- In order to have this behave like 'reifyManyWithoutInstances', but</span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- not do any instance filtering, use it with the 'isDataDec' and</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- 'decConcreteNames' internal utilities.  For example:</span><span>
+</span><span id="line-79"></span><span class="hs-comment">--</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- &gt; {-# LANGUAGE TemplateHaskell #-}</span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- &gt; import Language.Haskell.TH</span><span>
+</span><span id="line-82"></span><span class="hs-comment">-- &gt; import Language.Haskell.TH.ReifyMany</span><span>
+</span><span id="line-83"></span><span class="hs-comment">-- &gt; import Language.Haskell.TH.ReifyMany.Internal</span><span>
+</span><span id="line-84"></span><span class="hs-comment">-- &gt;</span><span>
+</span><span id="line-85"></span><span class="hs-comment">-- &gt; $(do results &lt;- reifyManyTyCons</span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- &gt;          (\(_, dec) -&gt; return (isDataDec dec, decConcreteNames dec))</span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- &gt;          [''Exp]</span><span>
+</span><span id="line-88"></span><span class="hs-comment">-- &gt;      -- Display the results</span><span>
+</span><span id="line-89"></span><span class="hs-comment">-- &gt;      reportError (show (map fst results))</span><span>
+</span><span id="line-90"></span><span class="hs-comment">-- &gt;      -- This TH splice doesn't generate any code.</span><span>
+</span><span id="line-91"></span><span class="hs-comment">-- &gt;      return []</span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- &gt;  )</span><span>
+</span><span id="line-93"></span><span class="annot"><a href="Language.Haskell.TH.ReifyMany.html#reifyManyTyCons"><span class="hs-identifier hs-type">reifyManyTyCons</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Dec</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Q</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Bool</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-94"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-95"></span><span>                </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Q</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Info</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-96"></span><span id="reifyManyTyCons"><span class="annot"><span class="annottext">reifyManyTyCons :: ((Name, Dec) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><a href="Language.Haskell.TH.ReifyMany.html#reifyManyTyCons"><span class="hs-identifier hs-var hs-var">reifyManyTyCons</span></a></span></span><span> </span><span id="local-6989586621679042703"><span class="annot"><span class="annottext">(Name, Dec) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679042703"><span class="hs-identifier hs-var">recurse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">((Name, Info) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><a href="Language.Haskell.TH.ReifyMany.html#reifyMany"><span class="hs-identifier hs-var">reifyMany</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679042701"><span class="hs-identifier hs-var">recurse'</span></a></span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-98"></span><span>    </span><span id="local-6989586621679042701"><span class="annot"><span class="annottext">recurse' :: (Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679042701"><span class="hs-identifier hs-var hs-var">recurse'</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621679042691"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042691"><span class="hs-identifier hs-var">name</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679042690"><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679042690"><span class="hs-identifier hs-var">info</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-99"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679042687"><span class="annot"><span class="annottext">skip :: p -&gt; m (Bool, [a])
+</span><a href="#local-6989586621679042687"><span class="hs-identifier hs-var hs-var">skip</span></a></span></span><span> </span><span class="annot"><span class="annottext">p
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-100"></span><span>                </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var">False</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-101"></span><span>            </span><span id="local-6989586621679042682"><span class="annot"><span class="annottext">unexpected :: [Char] -&gt; m a
+</span><a href="#local-6989586621679042682"><span class="hs-identifier hs-var hs-var">unexpected</span></a></span></span><span> </span><span id="local-6989586621679042681"><span class="annot"><span class="annottext">[Char]
+</span><a href="#local-6989586621679042681"><span class="hs-identifier hs-var">thing</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-102"></span><span>                </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. MonadFail m =&gt; [Char] -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fail</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;reifyManyTyCons encountered unexpected &quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><a href="#local-6989586621679042681"><span class="hs-identifier hs-var">thing</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot; named &quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Ppr a =&gt; a -&gt; [Char]
+</span><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-var">pprint</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042691"><span class="hs-identifier hs-var">name</span></a></span><span>
+</span><span id="line-103"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679042690"><span class="hs-identifier hs-var">info</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-104"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">TyConI</span></a></span><span> </span><span id="local-6989586621679042678"><span class="annot"><span class="annottext">Dec
+</span><a href="#local-6989586621679042678"><span class="hs-identifier hs-var">dec</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">(Name, Dec) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679042703"><span class="hs-identifier hs-var">recurse</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042691"><span class="hs-identifier hs-var">name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Dec
+</span><a href="#local-6989586621679042678"><span class="hs-identifier hs-var">dec</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-105"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">PrimTyConI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {p} {a}. Monad m =&gt; p -&gt; m (Bool, [a])
+</span><a href="#local-6989586621679042687"><span class="hs-identifier hs-var">skip</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;prim type constructor&quot;</span></span><span>
+</span><span id="line-106"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">DataConI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {p} {a}. Monad m =&gt; p -&gt; m (Bool, [a])
+</span><a href="#local-6989586621679042687"><span class="hs-identifier hs-var">skip</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;data constructor&quot;</span></span><span>
+</span><span id="line-107"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">ClassI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {p} {a}. Monad m =&gt; p -&gt; m (Bool, [a])
+</span><a href="#local-6989586621679042687"><span class="hs-identifier hs-var">skip</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;class&quot;</span></span><span>
+</span><span id="line-108"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">ClassOpI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {a}. MonadFail m =&gt; [Char] -&gt; m a
+</span><a href="#local-6989586621679042682"><span class="hs-identifier hs-var">unexpected</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;class method&quot;</span></span><span>
+</span><span id="line-109"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">VarI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {a}. MonadFail m =&gt; [Char] -&gt; m a
+</span><a href="#local-6989586621679042682"><span class="hs-identifier hs-var">unexpected</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;value variable&quot;</span></span><span>
+</span><span id="line-110"></span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">TyVarI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {a}. MonadFail m =&gt; [Char] -&gt; m a
+</span><a href="#local-6989586621679042682"><span class="hs-identifier hs-var">unexpected</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;type variable&quot;</span></span><span class="hs-cpp">
+#if MIN_VERSION_template_haskell(2,7,0)
+</span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">FamilyI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {p} {a}. Monad m =&gt; p -&gt; m (Bool, [a])
+</span><a href="#local-6989586621679042687"><span class="hs-identifier hs-var">skip</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;type or data family&quot;</span></span><span class="hs-cpp">
+#endif
+</span><span class="hs-cpp">#if MIN_VERSION_template_haskell(2,12,0)
+</span><span>            </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">PatSynI</span></a></span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall {m :: * -&gt; *} {p} {a}. Monad m =&gt; p -&gt; m (Bool, [a])
+</span><a href="#local-6989586621679042687"><span class="hs-identifier hs-var">skip</span></a></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;pattern synonym&quot;</span></span><span class="hs-cpp">
+#endif
+</span><span>
+</span><span id="line-118"></span><span class="hs-comment">-- | Starting from a set of initial top level declarations, specified</span><span>
+</span><span id="line-119"></span><span class="hs-comment">-- by @[Name]@, recursively enumerate other related declarations.  The</span><span>
+</span><span id="line-120"></span><span class="hs-comment">-- provided function determines whether the current info be included</span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- in the list of results, and which 'Name's to lookup next. This</span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- function handles keeping track of which 'Name's have already been</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- visited.</span><span>
+</span><span id="line-124"></span><span class="annot"><a href="Language.Haskell.TH.ReifyMany.html#reifyMany"><span class="hs-identifier hs-type">reifyMany</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Info</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Q</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Bool</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-126"></span><span>          </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Q</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Info</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-127"></span><span id="reifyMany"><span class="annot"><span class="annottext">reifyMany :: ((Name, Info) -&gt; Q (Bool, [Name])) -&gt; [Name] -&gt; Q [(Name, Info)]
+</span><a href="Language.Haskell.TH.ReifyMany.html#reifyMany"><span class="hs-identifier hs-var hs-var">reifyMany</span></a></span></span><span> </span><span id="local-6989586621679042669"><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679042669"><span class="hs-identifier hs-var">recurse</span></a></span></span><span> </span><span id="local-6989586621679042668"><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679042668"><span class="hs-identifier hs-var">initial</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-128"></span><span>    </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) s a. Monad m =&gt; StateT s m a -&gt; s -&gt; m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">State.evalStateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">concat</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Traversable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m (t b)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mapM</span></a></span><span> </span><span class="annot"><span class="annottext">Name -&gt; StateT (Set Name) Q [(Name, Info)]
+</span><a href="#local-6989586621679042664"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679042668"><span class="hs-identifier hs-var">initial</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">S.empty</span></a></span><span>
+</span><span id="line-129"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-130"></span><span>    </span><span class="annot"><a href="#local-6989586621679042664"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../transformers/html/src"><span class="hs-identifier hs-type">State.StateT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">S.Set</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Q</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Name</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-type">Info</span></a></span><span class="hs-special">)</span><span class="hs-special">]</span><span>
+</span><span id="line-131"></span><span>    </span><span id="local-6989586621679042664"><span class="annot"><span class="annottext">go :: Name -&gt; StateT (Set Name) Q [(Name, Info)]
+</span><a href="#local-6989586621679042664"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679042662"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042662"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-132"></span><span>        </span><span id="local-6989586621679042661"><span class="annot"><span class="annottext">Set Name
+</span><a href="#local-6989586621679042661"><span class="hs-identifier hs-var">seen</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *). MonadState s m =&gt; m s
+</span><a href="../../../../mtl/html/src"><span class="hs-identifier hs-var">State.get</span></a></span><span>
+</span><span id="line-133"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; Set a -&gt; Bool
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">S.member</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042662"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Set Name
+</span><a href="#local-6989586621679042661"><span class="hs-identifier hs-var">seen</span></a></span><span>
+</span><span id="line-134"></span><span>            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-135"></span><span>            </span><span class="hs-keyword">else</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-136"></span><span>                </span><span class="annot"><span class="annottext">forall s (m :: * -&gt; *). MonadState s m =&gt; s -&gt; m ()
+</span><a href="../../../../mtl/html/src"><span class="hs-identifier hs-var">State.put</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Ord a =&gt; a -&gt; Set a -&gt; Set a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">S.insert</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042662"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Set Name
+</span><a href="#local-6989586621679042661"><span class="hs-identifier hs-var">seen</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>                </span><span id="local-6989586621679042656"><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679042656"><span class="hs-identifier hs-var">info</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">State.lift</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Info
+</span><a href="../../../../ghc/html/libraries/template-haskell-2.18.0.0/src"><span class="hs-identifier hs-var">reify</span></a></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042662"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>                </span><span class="hs-special">(</span><span id="local-6989586621679042653"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679042653"><span class="hs-identifier hs-var">shouldEmit</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679042652"><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679042652"><span class="hs-identifier hs-var">ns</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (t :: (* -&gt; *) -&gt; * -&gt; *) (m :: * -&gt; *) a.
+(MonadTrans t, Monad m) =&gt;
+m a -&gt; t m a
+</span><a href="../../../../transformers/html/src"><span class="hs-identifier hs-var">State.lift</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">(Name, Info) -&gt; Q (Bool, [Name])
+</span><a href="#local-6989586621679042669"><span class="hs-identifier hs-var">recurse</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042662"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679042656"><span class="hs-identifier hs-var">info</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span><span>                </span><span id="local-6989586621679042651"><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679042651"><span class="hs-identifier hs-var">results</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">concat</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) (m :: * -&gt; *) a b.
+(Traversable t, Monad m) =&gt;
+(a -&gt; m b) -&gt; t a -&gt; m (t b)
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mapM</span></a></span><span> </span><span class="annot"><span class="annottext">Name -&gt; StateT (Set Name) Q [(Name, Info)]
+</span><a href="#local-6989586621679042664"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">[Name]
+</span><a href="#local-6989586621679042652"><span class="hs-identifier hs-var">ns</span></a></span><span>
+</span><span id="line-140"></span><span>                </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679042653"><span class="hs-identifier hs-var">shouldEmit</span></a></span><span>
+</span><span id="line-141"></span><span>                    </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621679042662"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Info
+</span><a href="#local-6989586621679042656"><span class="hs-identifier hs-var">info</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-glyph hs-var">:</span></a></span><span> </span><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679042651"><span class="hs-identifier hs-var">results</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-142"></span><span>                    </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *) a. Monad m =&gt; a -&gt; m a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">return</span></a></span><span> </span><span class="annot"><span class="annottext">[(Name, Info)]
+</span><a href="#local-6989586621679042651"><span class="hs-identifier hs-var">results</span></a></span><span>
+</span><span id="line-143"></span><span>
+</span><span id="line-144"></span><span class="hs-comment">-- | Like 'getDatatypesWithoutInstanceOf', but more precise as it uses</span><span>
+</span><span id="line-145"></span><span class="hs-comment">-- the 'isInstance' function</span><span>
+</span><span id="line-146"></span><span class="hs-comment">--</span><span>
+</span><span id="line-147"></span><span class="hs-comment">-- The typeclass is specified by a 'Name', and a function</span><span>
+</span><span id="line-148"></span><span class="hs-comment">-- to take the concrete type to a list of the parameters for the</span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- typeclass.</span><span>
+</span><span id="line-150"></span><span class="hs-comment">--</span><span>
+</span><span id="line-151"></span><span class="hs-comment">-- FIXME: this code is disabled because &quot;isInstance&quot; doesn't do any</span><span>
+</span><span id="line-152"></span><span class="hs-comment">-- recursive instance resolution.  For example, it yields 'True' when</span><span>
+</span><span id="line-153"></span><span class="hs-comment">-- asked if the instance (Show [Int -&gt; Int]) exists, since one exists</span><span>
+</span><span id="line-154"></span><span class="hs-comment">-- for lists.</span><span>
+</span><span id="line-155"></span><span class="hs-comment">{-
+getDataTypesWithoutInstancesOf' :: Name -&gt; (Type -&gt; [Type]) -&gt; Name -&gt; (Name -&gt; Bool) -&gt; Q [Name]
+getDataTypesWithoutInstancesOf' clz tysFunc initial recursePred = do
+    let recurse (name, dec)
+            | recursePred name &amp;&amp; isNormalTyCon dec = do
+                let tys = concat (decToFieldTypes dec)
+                reportError (&quot;before: &quot; ++ show tys)
+                filtered &lt;- filterM (fmap not . recover (return True) . isInstance clz . tysFunc) tys
+                State.when (not (null filtered)) $ reportError (show filtered)
+                return (isDataDec dec, concatMap typeConcreteNames filtered)
+        recurse _ = return (False, [])
+    infos &lt;- reifyManyTyCons recurse initial
+    return (map fst infos)
+-}</span><span>
+</span><span id="line-169"></span></pre></body></html>

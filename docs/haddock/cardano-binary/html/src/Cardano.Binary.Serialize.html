@@ -1,0 +1,169 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE FlexibleContexts      #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances     #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE OverloadedStrings     #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE RankNTypes            #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables   #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- | Serialization primitives built on top of the @ToCBOR@ typeclass</span><span>
+</span><span id="line-9"></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Binary.Serialize</span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#serialize"><span class="hs-identifier">serialize</span></a></span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#serialize%27"><span class="hs-identifier">serialize'</span></a></span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeBuilder"><span class="hs-identifier">serializeBuilder</span></a></span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier">serializeEncoding</span></a></span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeEncoding%27"><span class="hs-identifier">serializeEncoding'</span></a></span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span>  </span><span class="annot"><span class="hs-comment">-- * CBOR in CBOR</span></span><span>
+</span><span id="line-18"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#encodeNestedCbor"><span class="hs-identifier">encodeNestedCbor</span></a></span><span>
+</span><span id="line-19"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#encodeNestedCborBytes"><span class="hs-identifier">encodeNestedCborBytes</span></a></span><span>
+</span><span id="line-20"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#nestedCborSizeExpr"><span class="hs-identifier">nestedCborSizeExpr</span></a></span><span>
+</span><span id="line-21"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.Serialize.html#nestedCborBytesSizeExpr"><span class="hs-identifier">nestedCborBytesSizeExpr</span></a></span><span>
+</span><span id="line-22"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator">(.)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">Codec.CBOR.Write</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">CBOR.Write</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Control.Category</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator">(.)</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BS</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString.Builder</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Builder</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString.Builder.Extra</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Builder</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier">Data.ByteString.Lazy</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BSL</span></span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html"><span class="hs-identifier">Cardano.Binary.ToCBOR</span></a></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">Encoding</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#Size"><span class="hs-identifier">Size</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier">ToCBOR</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#apMono"><span class="hs-identifier">apMono</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier">encodeTag</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#withWordSize"><span class="hs-identifier">withWordSize</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- | Serialize a Haskell value with a 'ToCBOR' instance to an external binary</span><span>
+</span><span id="line-39"></span><span class="hs-comment">--   representation.</span><span>
+</span><span id="line-40"></span><span class="hs-comment">--</span><span>
+</span><span id="line-41"></span><span class="hs-comment">--   The output is represented as a lazy 'LByteString' and is constructed</span><span>
+</span><span id="line-42"></span><span class="hs-comment">--   incrementally.</span><span>
+</span><span id="line-43"></span><span id="local-6989586621679110456"><span class="annot"><a href="Cardano.Binary.Serialize.html#serialize"><span class="hs-identifier hs-type">serialize</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110456"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110456"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span></span><span>
+</span><span id="line-44"></span><span id="serialize"><span class="annot"><span class="annottext">serialize :: forall a. ToCBOR a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serialize"><span class="hs-identifier hs-var hs-var">serialize</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier hs-var">serializeEncoding</span></a></span><span> </span><span class="annot"><span class="annottext">forall {k} (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="Cardano.Binary.ToCBOR.html#toCBOR"><span class="hs-identifier hs-var">toCBOR</span></a></span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- | Serialize a Haskell value to an external binary representation.</span><span>
+</span><span id="line-47"></span><span class="hs-comment">--</span><span>
+</span><span id="line-48"></span><span class="hs-comment">--   The output is represented as a strict 'ByteString'.</span><span>
+</span><span id="line-49"></span><span id="local-6989586621679110448"><span class="annot"><a href="Cardano.Binary.Serialize.html#serialize%27"><span class="hs-identifier hs-type">serialize'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110448"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110448"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span></span><span>
+</span><span id="line-50"></span><span id="serialize%27"><span class="annot"><span class="annottext">serialize' :: forall a. ToCBOR a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serialize%27"><span class="hs-identifier hs-var hs-var">serialize'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">BSL.toStrict</span></a></span><span> </span><span class="annot"><span class="annottext">forall {k} (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serialize"><span class="hs-identifier hs-var">serialize</span></a></span><span>
+</span><span id="line-51"></span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- | Serialize into a Builder. Useful if you want to throw other ByteStrings</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--   around it.</span><span>
+</span><span id="line-54"></span><span id="local-6989586621679110445"><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeBuilder"><span class="hs-identifier hs-type">serializeBuilder</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110445"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110445"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">Builder</span></a></span></span><span>
+</span><span id="line-55"></span><span id="serializeBuilder"><span class="annot"><span class="annottext">serializeBuilder :: forall a. ToCBOR a =&gt; a -&gt; Builder
+</span><a href="Cardano.Binary.Serialize.html#serializeBuilder"><span class="hs-identifier hs-var hs-var">serializeBuilder</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Builder
+</span><a href="../../../../cborg/html/src"><span class="hs-identifier hs-var">CBOR.Write.toBuilder</span></a></span><span> </span><span class="annot"><span class="annottext">forall {k} (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="Cardano.Binary.ToCBOR.html#toCBOR"><span class="hs-identifier hs-var">toCBOR</span></a></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- | Serialize a Haskell value to an external binary representation using the</span><span>
+</span><span id="line-58"></span><span class="hs-comment">--   provided CBOR 'Encoding'</span><span>
+</span><span id="line-59"></span><span class="hs-comment">--</span><span>
+</span><span id="line-60"></span><span class="hs-comment">--   The output is represented as an 'LByteString' and is constructed</span><span>
+</span><span id="line-61"></span><span class="hs-comment">--   incrementally.</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier hs-type">serializeEncoding</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span>
+</span><span id="line-63"></span><span id="serializeEncoding"><span class="annot"><span class="annottext">serializeEncoding :: Encoding -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier hs-var hs-var">serializeEncoding</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-64"></span><span>  </span><span class="annot"><span class="annottext">AllocationStrategy -&gt; ByteString -&gt; Builder -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">Builder.toLazyByteStringWith</span></a></span><span> </span><span class="annot"><span class="annottext">AllocationStrategy
+</span><a href="#local-6989586621679110384"><span class="hs-identifier hs-var">strategy</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Monoid a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span> </span><span class="annot"><span class="annottext">forall {k} (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; Builder
+</span><a href="../../../../cborg/html/src"><span class="hs-identifier hs-var">CBOR.Write.toBuilder</span></a></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-comment">-- 1024 is the size of the first buffer, 4096 is the size of subsequent</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-comment">-- buffers. Chosen because they seem to give good performance. They are not</span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-comment">-- sacred.</span><span>
+</span><span id="line-69"></span><span>        </span><span id="local-6989586621679110384"><span class="annot"><span class="annottext">strategy :: AllocationStrategy
+</span><a href="#local-6989586621679110384"><span class="hs-identifier hs-var hs-var">strategy</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; AllocationStrategy
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">Builder.safeStrategy</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1024</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">4096</span></span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-comment">-- | A strict version of 'serializeEncoding'</span><span>
+</span><span id="line-72"></span><span class="annot"><a href="Cardano.Binary.Serialize.html#serializeEncoding%27"><span class="hs-identifier hs-type">serializeEncoding'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BS.ByteString</span></a></span><span>
+</span><span id="line-73"></span><span id="serializeEncoding%27"><span class="annot"><span class="annottext">serializeEncoding' :: Encoding -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serializeEncoding%27"><span class="hs-identifier hs-var hs-var">serializeEncoding'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-var">BSL.toStrict</span></a></span><span> </span><span class="annot"><span class="annottext">forall {k} (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">Encoding -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serializeEncoding"><span class="hs-identifier hs-var">serializeEncoding</span></a></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span>
+</span><span id="line-76"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-77"></span><span class="hs-comment">-- Nested CBOR-in-CBOR</span><span>
+</span><span id="line-78"></span><span class="hs-comment">-- https://tools.ietf.org/html/rfc7049#section-2.4.4.1</span><span>
+</span><span id="line-79"></span><span class="hs-comment">--------------------------------------------------------------------------------</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-comment">-- | Encode and serialise the given `a` and sorround it with the semantic tag 24</span><span>
+</span><span id="line-82"></span><span class="hs-comment">--   In CBOR diagnostic notation:</span><span>
+</span><span id="line-83"></span><span class="hs-comment">--   &gt;&gt;&gt; 24(h'DEADBEEF')</span><span>
+</span><span id="line-84"></span><span id="local-6989586621679110382"><span class="annot"><a href="Cardano.Binary.Serialize.html#encodeNestedCbor"><span class="hs-identifier hs-type">encodeNestedCbor</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#ToCBOR"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679110382"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679110382"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span></span><span>
+</span><span id="line-85"></span><span id="encodeNestedCbor"><span class="annot"><span class="annottext">encodeNestedCbor :: forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="Cardano.Binary.Serialize.html#encodeNestedCbor"><span class="hs-identifier hs-var hs-var">encodeNestedCbor</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Encoding
+</span><a href="Cardano.Binary.Serialize.html#encodeNestedCborBytes"><span class="hs-identifier hs-var">encodeNestedCborBytes</span></a></span><span> </span><span class="annot"><span class="annottext">forall {k} (cat :: k -&gt; k -&gt; *) (b :: k) (c :: k) (a :: k).
+Category cat =&gt;
+cat b c -&gt; cat a b -&gt; cat a c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Binary.Serialize.html#serialize"><span class="hs-identifier hs-var">serialize</span></a></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- | Like `encodeNestedCbor`, but assumes nothing about the shape of</span><span>
+</span><span id="line-88"></span><span class="hs-comment">--   input object, so that it must be passed as a binary `ByteString` blob. It's</span><span>
+</span><span id="line-89"></span><span class="hs-comment">--   the caller responsibility to ensure the input `ByteString` correspond</span><span>
+</span><span id="line-90"></span><span class="hs-comment">--   indeed to valid, previously-serialised CBOR data.</span><span>
+</span><span id="line-91"></span><span class="annot"><a href="Cardano.Binary.Serialize.html#encodeNestedCborBytes"><span class="hs-identifier hs-type">encodeNestedCborBytes</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../bytestring/html/src"><span class="hs-identifier hs-type">BSL.ByteString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../cborg/html/src"><span class="hs-identifier hs-type">Encoding</span></a></span><span>
+</span><span id="line-92"></span><span id="encodeNestedCborBytes"><span class="annot"><span class="annottext">encodeNestedCborBytes :: ByteString -&gt; Encoding
+</span><a href="Cardano.Binary.Serialize.html#encodeNestedCborBytes"><span class="hs-identifier hs-var hs-var">encodeNestedCborBytes</span></a></span></span><span> </span><span id="local-6989586621679110378"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110378"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word -&gt; Encoding
+</span><a href="../../../../cborg/html/src"><span class="hs-identifier hs-var">encodeTag</span></a></span><span> </span><span class="annot"><span class="annottext">Word
+</span><span class="hs-number">24</span></span><span> </span><span class="annot"><span class="annottext">forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">&lt;&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. ToCBOR a =&gt; a -&gt; Encoding
+</span><a href="Cardano.Binary.ToCBOR.html#toCBOR"><span class="hs-identifier hs-var">toCBOR</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679110378"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-93"></span><span>
+</span><span id="line-94"></span><span class="annot"><a href="Cardano.Binary.Serialize.html#nestedCborSizeExpr"><span class="hs-identifier hs-type">nestedCborSizeExpr</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#Size"><span class="hs-identifier hs-type">Size</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#Size"><span class="hs-identifier hs-type">Size</span></a></span><span>
+</span><span id="line-95"></span><span id="nestedCborSizeExpr"><span class="annot"><span class="annottext">nestedCborSizeExpr :: Size -&gt; Size
+</span><a href="Cardano.Binary.Serialize.html#nestedCborSizeExpr"><span class="hs-identifier hs-var hs-var">nestedCborSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679110377"><span class="annot"><span class="annottext">Size
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Size
+</span><span class="hs-number">2</span></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; (Natural -&gt; Natural) -&gt; Size -&gt; Size
+</span><a href="Cardano.Binary.ToCBOR.html#apMono"><span class="hs-identifier hs-var">apMono</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;withWordSize&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall s a. (Integral s, Integral a) =&gt; s -&gt; a
+</span><a href="Cardano.Binary.ToCBOR.html#withWordSize"><span class="hs-identifier hs-var">withWordSize</span></a></span><span> </span><span class="annot"><span class="annottext">Size
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Size
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="annot"><a href="Cardano.Binary.Serialize.html#nestedCborBytesSizeExpr"><span class="hs-identifier hs-type">nestedCborBytesSizeExpr</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#Size"><span class="hs-identifier hs-type">Size</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Cardano.Binary.ToCBOR.html#Size"><span class="hs-identifier hs-type">Size</span></a></span><span>
+</span><span id="line-98"></span><span id="nestedCborBytesSizeExpr"><span class="annot"><span class="annottext">nestedCborBytesSizeExpr :: Size -&gt; Size
+</span><a href="Cardano.Binary.Serialize.html#nestedCborBytesSizeExpr"><span class="hs-identifier hs-var hs-var">nestedCborBytesSizeExpr</span></a></span></span><span> </span><span id="local-6989586621679110375"><span class="annot"><span class="annottext">Size
+</span><a href="#local-6989586621679110375"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Size
+</span><span class="hs-number">2</span></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Text -&gt; (Natural -&gt; Natural) -&gt; Size -&gt; Size
+</span><a href="Cardano.Binary.ToCBOR.html#apMono"><span class="hs-identifier hs-var">apMono</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><span class="hs-string">&quot;withWordSize&quot;</span></span><span> </span><span class="annot"><span class="annottext">forall s a. (Integral s, Integral a) =&gt; s -&gt; a
+</span><a href="Cardano.Binary.ToCBOR.html#withWordSize"><span class="hs-identifier hs-var">withWordSize</span></a></span><span> </span><span class="annot"><span class="annottext">Size
+</span><a href="#local-6989586621679110375"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">+</span></a></span><span> </span><span class="annot"><span class="annottext">Size
+</span><a href="#local-6989586621679110375"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span></pre></body></html>

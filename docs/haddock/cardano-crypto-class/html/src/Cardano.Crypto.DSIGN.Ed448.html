@@ -1,0 +1,417 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# LANGUAGE DataKinds #-}</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DerivingVia #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE FlexibleInstances #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE ScopedTypeVariables #-}</span><span>
+</span><span id="line-7"></span><span class="hs-pragma">{-# LANGUAGE TypeFamilies #-}</span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- | Ed448 digital signatures.</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Cardano.Crypto.DSIGN.Ed448</span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier">Ed448DSIGN</span></a></span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier">SigDSIGN</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier">SignKeyDSIGN</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier">VerKeyDSIGN</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">Control.DeepSeq</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier">NFData</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">Data.ByteArray</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BA</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">ByteArrayAccess</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../memory/html/src"><span class="hs-identifier">convert</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks.Class</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">NoThunks</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier">InspectHeap</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">Cardano.Binary</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.Error</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">CryptoFailable</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier">Crypto.PubKey.Ed448</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Ed448</span></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html"><span class="hs-identifier">Cardano.Crypto.DSIGN.Class</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.Seed.html"><span class="hs-identifier">Cardano.Crypto.Seed</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Cardano.Crypto.Util.html"><span class="hs-identifier">Cardano.Crypto.Util</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.Util.html#SignableRepresentation"><span class="hs-identifier">SignableRepresentation</span></a></span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">data</span><span> </span><span id="Ed448DSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-var">Ed448DSIGN</span></a></span></span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679205072"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#DSIGNAlgorithm"><span class="hs-identifier hs-type">DSIGNAlgorithm</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SeedSizeDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SeedSizeDSIGN"><span class="hs-identifier hs-var">SeedSizeDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-number">57</span></span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-comment">-- | Goldilocks points are 448 bits long</span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SizeVerKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeVerKeyDSIGN"><span class="hs-identifier hs-var">SizeVerKeyDSIGN</span></a></span></span><span>  </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-number">57</span></span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SizeSignKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeSignKeyDSIGN"><span class="hs-identifier hs-var">SizeSignKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-number">57</span></span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="SizeSigDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SizeSigDSIGN"><span class="hs-identifier hs-var">SizeSigDSIGN</span></a></span></span><span>     </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-number">114</span></span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-comment">-- Key and signature types</span><span>
+</span><span id="line-44"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span>    </span><span class="hs-keyword">newtype</span><span> </span><span id="VerKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier hs-var">VerKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="VerKeyEd448DSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#VerKeyEd448DSIGN"><span class="hs-identifier hs-var">VerKeyEd448DSIGN</span></a></span></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">PublicKey</span></a></span><span>
+</span><span id="line-47"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679205049"><span id="local-6989586621679205051"><span id="local-6989586621679205057"><span class="annot"><span class="annottext">Int -&gt; VerKeyDSIGN Ed448DSIGN -&gt; ShowS
+[VerKeyDSIGN Ed448DSIGN] -&gt; ShowS
+VerKeyDSIGN Ed448DSIGN -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [VerKeyDSIGN Ed448DSIGN] -&gt; ShowS
+$cshowList :: [VerKeyDSIGN Ed448DSIGN] -&gt; ShowS
+show :: VerKeyDSIGN Ed448DSIGN -&gt; String
+$cshow :: VerKeyDSIGN Ed448DSIGN -&gt; String
+showsPrec :: Int -&gt; VerKeyDSIGN Ed448DSIGN -&gt; ShowS
+$cshowsPrec :: Int -&gt; VerKeyDSIGN Ed448DSIGN -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679205041"><span id="local-6989586621679205046"><span class="annot"><span class="annottext">VerKeyDSIGN Ed448DSIGN -&gt; VerKeyDSIGN Ed448DSIGN -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: VerKeyDSIGN Ed448DSIGN -&gt; VerKeyDSIGN Ed448DSIGN -&gt; Bool
+$c/= :: VerKeyDSIGN Ed448DSIGN -&gt; VerKeyDSIGN Ed448DSIGN -&gt; Bool
+== :: VerKeyDSIGN Ed448DSIGN -&gt; VerKeyDSIGN Ed448DSIGN -&gt; Bool
+$c== :: VerKeyDSIGN Ed448DSIGN -&gt; VerKeyDSIGN Ed448DSIGN -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep (VerKeyDSIGN Ed448DSIGN) x -&gt; VerKeyDSIGN Ed448DSIGN
+forall x. VerKeyDSIGN Ed448DSIGN -&gt; Rep (VerKeyDSIGN Ed448DSIGN) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep (VerKeyDSIGN Ed448DSIGN) x -&gt; VerKeyDSIGN Ed448DSIGN
+$cfrom :: forall x. VerKeyDSIGN Ed448DSIGN -&gt; Rep (VerKeyDSIGN Ed448DSIGN) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679205023"><span id="local-6989586621679205027"><span id="local-6989586621679205032"><span class="annot"><span class="annottext">VerKeyDSIGN Ed448DSIGN -&gt; Int
+forall p. VerKeyDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+forall ba.
+(ba -&gt; Int)
+-&gt; (forall p a. ba -&gt; (Ptr p -&gt; IO a) -&gt; IO a)
+-&gt; (forall p. ba -&gt; Ptr p -&gt; IO ())
+-&gt; ByteArrayAccess ba
+forall p a. VerKeyDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+copyByteArrayToPtr :: forall p. VerKeyDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+$ccopyByteArrayToPtr :: forall p. VerKeyDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+withByteArray :: forall p a. VerKeyDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+$cwithByteArray :: forall p a. VerKeyDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+length :: VerKeyDSIGN Ed448DSIGN -&gt; Int
+$clength :: VerKeyDSIGN Ed448DSIGN -&gt; Int
+</span><a href="../../../../memory/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ByteArrayAccess</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span id="local-6989586621679205017"><span class="annot"><span class="annottext">VerKeyDSIGN Ed448DSIGN -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: VerKeyDSIGN Ed448DSIGN -&gt; ()
+$crnf :: VerKeyDSIGN Ed448DSIGN -&gt; ()
+</span><a href="../../../../ghc/html/libraries/deepseq-1.4.6.1/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span>
+</span><span id="line-49"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679204999"><span id="local-6989586621679205004"><span id="local-6989586621679205010"><span class="annot"><span class="annottext">Context -&gt; VerKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+Proxy (VerKeyDSIGN Ed448DSIGN) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (VerKeyDSIGN Ed448DSIGN) -&gt; String
+$cshowTypeOf :: Proxy (VerKeyDSIGN Ed448DSIGN) -&gt; String
+wNoThunks :: Context -&gt; VerKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; VerKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; VerKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; VerKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+</span><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-type">InspectHeap</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">PublicKey</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span>    </span><span class="hs-keyword">newtype</span><span> </span><span id="SignKeyDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier hs-var">SignKeyDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SignKeyEd448DSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#SignKeyEd448DSIGN"><span class="hs-identifier hs-var">SignKeyEd448DSIGN</span></a></span></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">SecretKey</span></a></span><span>
+</span><span id="line-52"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679204983"><span id="local-6989586621679204985"><span id="local-6989586621679204990"><span class="annot"><span class="annottext">Int -&gt; SignKeyDSIGN Ed448DSIGN -&gt; ShowS
+[SignKeyDSIGN Ed448DSIGN] -&gt; ShowS
+SignKeyDSIGN Ed448DSIGN -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SignKeyDSIGN Ed448DSIGN] -&gt; ShowS
+$cshowList :: [SignKeyDSIGN Ed448DSIGN] -&gt; ShowS
+show :: SignKeyDSIGN Ed448DSIGN -&gt; String
+$cshow :: SignKeyDSIGN Ed448DSIGN -&gt; String
+showsPrec :: Int -&gt; SignKeyDSIGN Ed448DSIGN -&gt; ShowS
+$cshowsPrec :: Int -&gt; SignKeyDSIGN Ed448DSIGN -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679204976"><span id="local-6989586621679204981"><span class="annot"><span class="annottext">SignKeyDSIGN Ed448DSIGN -&gt; SignKeyDSIGN Ed448DSIGN -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SignKeyDSIGN Ed448DSIGN -&gt; SignKeyDSIGN Ed448DSIGN -&gt; Bool
+$c/= :: SignKeyDSIGN Ed448DSIGN -&gt; SignKeyDSIGN Ed448DSIGN -&gt; Bool
+== :: SignKeyDSIGN Ed448DSIGN -&gt; SignKeyDSIGN Ed448DSIGN -&gt; Bool
+$c== :: SignKeyDSIGN Ed448DSIGN -&gt; SignKeyDSIGN Ed448DSIGN -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x.
+Rep (SignKeyDSIGN Ed448DSIGN) x -&gt; SignKeyDSIGN Ed448DSIGN
+forall x.
+SignKeyDSIGN Ed448DSIGN -&gt; Rep (SignKeyDSIGN Ed448DSIGN) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x.
+Rep (SignKeyDSIGN Ed448DSIGN) x -&gt; SignKeyDSIGN Ed448DSIGN
+$cfrom :: forall x.
+SignKeyDSIGN Ed448DSIGN -&gt; Rep (SignKeyDSIGN Ed448DSIGN) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679204959"><span id="local-6989586621679204963"><span id="local-6989586621679204968"><span class="annot"><span class="annottext">SignKeyDSIGN Ed448DSIGN -&gt; Int
+forall p. SignKeyDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+forall ba.
+(ba -&gt; Int)
+-&gt; (forall p a. ba -&gt; (Ptr p -&gt; IO a) -&gt; IO a)
+-&gt; (forall p. ba -&gt; Ptr p -&gt; IO ())
+-&gt; ByteArrayAccess ba
+forall p a. SignKeyDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+copyByteArrayToPtr :: forall p. SignKeyDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+$ccopyByteArrayToPtr :: forall p. SignKeyDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+withByteArray :: forall p a. SignKeyDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+$cwithByteArray :: forall p a. SignKeyDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+length :: SignKeyDSIGN Ed448DSIGN -&gt; Int
+$clength :: SignKeyDSIGN Ed448DSIGN -&gt; Int
+</span><a href="#local-6989586621679204959"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ByteArrayAccess</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span id="local-6989586621679204954"><span class="annot"><span class="annottext">SignKeyDSIGN Ed448DSIGN -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+rnf :: SignKeyDSIGN Ed448DSIGN -&gt; ()
+$crnf :: SignKeyDSIGN Ed448DSIGN -&gt; ()
+</span><a href="#local-6989586621679204954"><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></a></span></span><span>
+</span><span id="line-54"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679204938"><span id="local-6989586621679204943"><span id="local-6989586621679204948"><span class="annot"><span class="annottext">Context -&gt; SignKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+Proxy (SignKeyDSIGN Ed448DSIGN) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (SignKeyDSIGN Ed448DSIGN) -&gt; String
+$cshowTypeOf :: Proxy (SignKeyDSIGN Ed448DSIGN) -&gt; String
+wNoThunks :: Context -&gt; SignKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SignKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SignKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SignKeyDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679204938"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-type">InspectHeap</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">SecretKey</span></a></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-keyword">newtype</span><span> </span><span id="SigDSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier hs-var">SigDSIGN</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="SigEd448DSIGN"><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#SigEd448DSIGN"><span class="hs-identifier hs-var">SigEd448DSIGN</span></a></span></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">Signature</span></a></span><span>
+</span><span id="line-57"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679204923"><span id="local-6989586621679204925"><span id="local-6989586621679204930"><span class="annot"><span class="annottext">Int -&gt; SigDSIGN Ed448DSIGN -&gt; ShowS
+[SigDSIGN Ed448DSIGN] -&gt; ShowS
+SigDSIGN Ed448DSIGN -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [SigDSIGN Ed448DSIGN] -&gt; ShowS
+$cshowList :: [SigDSIGN Ed448DSIGN] -&gt; ShowS
+show :: SigDSIGN Ed448DSIGN -&gt; String
+$cshow :: SigDSIGN Ed448DSIGN -&gt; String
+showsPrec :: Int -&gt; SigDSIGN Ed448DSIGN -&gt; ShowS
+$cshowsPrec :: Int -&gt; SigDSIGN Ed448DSIGN -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679204916"><span id="local-6989586621679204921"><span class="annot"><span class="annottext">SigDSIGN Ed448DSIGN -&gt; SigDSIGN Ed448DSIGN -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: SigDSIGN Ed448DSIGN -&gt; SigDSIGN Ed448DSIGN -&gt; Bool
+$c/= :: SigDSIGN Ed448DSIGN -&gt; SigDSIGN Ed448DSIGN -&gt; Bool
+== :: SigDSIGN Ed448DSIGN -&gt; SigDSIGN Ed448DSIGN -&gt; Bool
+$c== :: SigDSIGN Ed448DSIGN -&gt; SigDSIGN Ed448DSIGN -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep (SigDSIGN Ed448DSIGN) x -&gt; SigDSIGN Ed448DSIGN
+forall x. SigDSIGN Ed448DSIGN -&gt; Rep (SigDSIGN Ed448DSIGN) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep (SigDSIGN Ed448DSIGN) x -&gt; SigDSIGN Ed448DSIGN
+$cfrom :: forall x. SigDSIGN Ed448DSIGN -&gt; Rep (SigDSIGN Ed448DSIGN) x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679204900"><span id="local-6989586621679204904"><span id="local-6989586621679204909"><span class="annot"><span class="annottext">SigDSIGN Ed448DSIGN -&gt; Int
+forall p. SigDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+forall ba.
+(ba -&gt; Int)
+-&gt; (forall p a. ba -&gt; (Ptr p -&gt; IO a) -&gt; IO a)
+-&gt; (forall p. ba -&gt; Ptr p -&gt; IO ())
+-&gt; ByteArrayAccess ba
+forall p a. SigDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+copyByteArrayToPtr :: forall p. SigDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+$ccopyByteArrayToPtr :: forall p. SigDSIGN Ed448DSIGN -&gt; Ptr p -&gt; IO ()
+withByteArray :: forall p a. SigDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+$cwithByteArray :: forall p a. SigDSIGN Ed448DSIGN -&gt; (Ptr p -&gt; IO a) -&gt; IO a
+length :: SigDSIGN Ed448DSIGN -&gt; Int
+$clength :: SigDSIGN Ed448DSIGN -&gt; Int
+</span><a href="#local-6989586621679204900"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">ByteArrayAccess</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>        </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679204885"><span id="local-6989586621679204890"><span id="local-6989586621679204895"><span class="annot"><span class="annottext">Context -&gt; SigDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+Proxy (SigDSIGN Ed448DSIGN) -&gt; String
+forall a.
+(Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Context -&gt; a -&gt; IO (Maybe ThunkInfo))
+-&gt; (Proxy a -&gt; String)
+-&gt; NoThunks a
+showTypeOf :: Proxy (SigDSIGN Ed448DSIGN) -&gt; String
+$cshowTypeOf :: Proxy (SigDSIGN Ed448DSIGN) -&gt; String
+wNoThunks :: Context -&gt; SigDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+$cwNoThunks :: Context -&gt; SigDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+noThunks :: Context -&gt; SigDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+$cnoThunks :: Context -&gt; SigDSIGN Ed448DSIGN -&gt; IO (Maybe ThunkInfo)
+</span><a href="#local-6989586621679204885"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">NoThunks</span></a></span></span></span></span><span> </span><span class="hs-keyword">via</span><span> </span><span class="annot"><a href="../../../../nothunks/html/src"><span class="hs-identifier hs-type">InspectHeap</span></a></span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">Signature</span></a></span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">-- Metadata and basic key operations</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-63"></span><span>
+</span><span id="line-64"></span><span>    </span><span id="local-6989586621679204881"><span class="annot"><span class="annottext">algorithmNameDSIGN :: forall (proxy :: * -&gt; *). proxy Ed448DSIGN -&gt; String
+</span><a href="Cardano.Crypto.DSIGN.Class.html#algorithmNameDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">algorithmNameDSIGN</span></a></span></span><span> </span><span class="annot"><span class="annottext">proxy Ed448DSIGN
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;ed448&quot;</span></span><span>
+</span><span id="line-65"></span><span>
+</span><span id="line-66"></span><span>    </span><span id="local-6989586621679204879"><span class="annot"><span class="annottext">deriveVerKeyDSIGN :: SignKeyDSIGN Ed448DSIGN -&gt; VerKeyDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Class.html#deriveVerKeyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">deriveVerKeyDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#SignKeyEd448DSIGN"><span class="hs-identifier hs-type">SignKeyEd448DSIGN</span></a></span><span> </span><span id="local-6989586621679204877"><span class="annot"><span class="annottext">SecretKey
+</span><a href="#local-6989586621679204877"><span class="hs-identifier hs-var">sk</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">PublicKey -&gt; VerKeyDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#VerKeyEd448DSIGN"><span class="hs-identifier hs-var">VerKeyEd448DSIGN</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">SecretKey -&gt; PublicKey
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">toPublic</span></a></span><span> </span><span class="annot"><span class="annottext">SecretKey
+</span><a href="#local-6989586621679204877"><span class="hs-identifier hs-var">sk</span></a></span><span>
+</span><span id="line-67"></span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-comment">-- Core algorithm operations</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-keyword">type</span><span> </span><span id="Signable"><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#Signable"><span class="hs-identifier hs-var">Signable</span></a></span></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Cardano.Crypto.Util.html#SignableRepresentation"><span class="hs-identifier hs-type">SignableRepresentation</span></a></span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span>    </span><span id="local-6989586621679204869"><span class="annot"><span class="annottext">signDSIGN :: forall a.
+(Signable Ed448DSIGN a, HasCallStack) =&gt;
+ContextDSIGN Ed448DSIGN
+-&gt; a -&gt; SignKeyDSIGN Ed448DSIGN -&gt; SigDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Class.html#signDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">signDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span id="local-6989586621679204867"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679204867"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#SignKeyEd448DSIGN"><span class="hs-identifier hs-type">SignKeyEd448DSIGN</span></a></span><span> </span><span id="local-6989586621679204866"><span class="annot"><span class="annottext">SecretKey
+</span><a href="#local-6989586621679204866"><span class="hs-identifier hs-var">sk</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-76"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679204865"><span class="annot"><span class="annottext">vk :: PublicKey
+</span><a href="#local-6989586621679204865"><span class="hs-identifier hs-var hs-var">vk</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">SecretKey -&gt; PublicKey
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">toPublic</span></a></span><span> </span><span class="annot"><span class="annottext">SecretKey
+</span><a href="#local-6989586621679204866"><span class="hs-identifier hs-var">sk</span></a></span><span>
+</span><span id="line-77"></span><span>            </span><span id="local-6989586621679204864"><span class="annot"><span class="annottext">bs :: ByteString
+</span><a href="#local-6989586621679204864"><span class="hs-identifier hs-var hs-var">bs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. SignableRepresentation a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#getSignableRepresentation"><span class="hs-identifier hs-var">getSignableRepresentation</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679204867"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-78"></span><span>         </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Signature -&gt; SigDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#SigEd448DSIGN"><span class="hs-identifier hs-var">SigEd448DSIGN</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall ba.
+ByteArrayAccess ba =&gt;
+SecretKey -&gt; PublicKey -&gt; ba -&gt; Signature
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">sign</span></a></span><span> </span><span class="annot"><span class="annottext">SecretKey
+</span><a href="#local-6989586621679204866"><span class="hs-identifier hs-var">sk</span></a></span><span> </span><span class="annot"><span class="annottext">PublicKey
+</span><a href="#local-6989586621679204865"><span class="hs-identifier hs-var">vk</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621679204864"><span class="hs-identifier hs-var">bs</span></a></span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span>    </span><span id="local-6989586621679204856"><span class="annot"><span class="annottext">verifyDSIGN :: forall a.
+(Signable Ed448DSIGN a, HasCallStack) =&gt;
+ContextDSIGN Ed448DSIGN
+-&gt; VerKeyDSIGN Ed448DSIGN
+-&gt; a
+-&gt; SigDSIGN Ed448DSIGN
+-&gt; Either String ()
+</span><a href="Cardano.Crypto.DSIGN.Class.html#verifyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">verifyDSIGN</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#VerKeyEd448DSIGN"><span class="hs-identifier hs-type">VerKeyEd448DSIGN</span></a></span><span> </span><span id="local-6989586621679204854"><span class="annot"><span class="annottext">PublicKey
+</span><a href="#local-6989586621679204854"><span class="hs-identifier hs-var">vk</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679204853"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679204853"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#SigEd448DSIGN"><span class="hs-identifier hs-type">SigEd448DSIGN</span></a></span><span> </span><span id="local-6989586621679204852"><span class="annot"><span class="annottext">Signature
+</span><a href="#local-6989586621679204852"><span class="hs-identifier hs-var">sig</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-81"></span><span>        </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">forall ba.
+ByteArrayAccess ba =&gt;
+PublicKey -&gt; ba -&gt; Signature -&gt; Bool
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">verify</span></a></span><span> </span><span class="annot"><span class="annottext">PublicKey
+</span><a href="#local-6989586621679204854"><span class="hs-identifier hs-var">vk</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. SignableRepresentation a =&gt; a -&gt; ByteString
+</span><a href="Cardano.Crypto.Util.html#getSignableRepresentation"><span class="hs-identifier hs-var">getSignableRepresentation</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679204853"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Signature
+</span><a href="#local-6989586621679204852"><span class="hs-identifier hs-var">sig</span></a></span><span>
+</span><span id="line-82"></span><span>          </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">forall a b. b -&gt; Either a b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Right</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-83"></span><span>          </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">forall a b. a -&gt; Either a b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Left</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Verification failed&quot;</span></span><span>
+</span><span id="line-84"></span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">-- Key generation</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span>    </span><span id="local-6989586621679204850"><span class="annot"><span class="annottext">genKeyDSIGN :: Seed -&gt; SignKeyDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Class.html#genKeyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">genKeyDSIGN</span></a></span></span><span> </span><span id="local-6989586621679204848"><span class="annot"><span class="annottext">Seed
+</span><a href="#local-6989586621679204848"><span class="hs-identifier hs-var">seed</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-90"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621679204847"><span class="annot"><span class="annottext">sk :: SecretKey
+</span><a href="#local-6989586621679204847"><span class="hs-identifier hs-var hs-var">sk</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Seed -&gt; (forall (m :: * -&gt; *). MonadRandom m =&gt; m a) -&gt; a
+</span><a href="Cardano.Crypto.Seed.html#runMonadRandomWithSeed"><span class="hs-identifier hs-var">runMonadRandomWithSeed</span></a></span><span> </span><span class="annot"><span class="annottext">Seed
+</span><a href="#local-6989586621679204848"><span class="hs-identifier hs-var">seed</span></a></span><span> </span><span class="annot"><span class="annottext">forall (m :: * -&gt; *). MonadRandom m =&gt; m SecretKey
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">Ed448.generateSecretKey</span></a></span><span>
+</span><span id="line-91"></span><span>         </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">SecretKey -&gt; SignKeyDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#SignKeyEd448DSIGN"><span class="hs-identifier hs-var">SignKeyEd448DSIGN</span></a></span><span> </span><span class="annot"><span class="annottext">SecretKey
+</span><a href="#local-6989586621679204847"><span class="hs-identifier hs-var">sk</span></a></span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-comment">-- raw serialise/deserialise</span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span>    </span><span id="local-6989586621679204839"><span class="annot"><span class="annottext">rawSerialiseVerKeyDSIGN :: VerKeyDSIGN Ed448DSIGN -&gt; ByteString
+</span><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseVerKeyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseVerKeyDSIGN</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+bin -&gt; bout
+</span><a href="../../../../memory/html/src"><span class="hs-identifier hs-var">BA.convert</span></a></span><span>
+</span><span id="line-98"></span><span>    </span><span id="local-6989586621679204835"><span class="annot"><span class="annottext">rawSerialiseSignKeyDSIGN :: SignKeyDSIGN Ed448DSIGN -&gt; ByteString
+</span><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseSignKeyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseSignKeyDSIGN</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+bin -&gt; bout
+</span><a href="../../../../memory/html/src"><span class="hs-identifier hs-var">BA.convert</span></a></span><span>
+</span><span id="line-99"></span><span>    </span><span id="local-6989586621679204831"><span class="annot"><span class="annottext">rawSerialiseSigDSIGN :: SigDSIGN Ed448DSIGN -&gt; ByteString
+</span><a href="Cardano.Crypto.DSIGN.Class.html#rawSerialiseSigDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawSerialiseSigDSIGN</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall bin bout.
+(ByteArrayAccess bin, ByteArray bout) =&gt;
+bin -&gt; bout
+</span><a href="../../../../memory/html/src"><span class="hs-identifier hs-var">BA.convert</span></a></span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679204826"><span class="annot"><span class="annottext">rawDeserialiseVerKeyDSIGN :: ByteString -&gt; Maybe (VerKeyDSIGN Ed448DSIGN)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseVerKeyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseVerKeyDSIGN</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">PublicKey -&gt; VerKeyDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#VerKeyEd448DSIGN"><span class="hs-identifier hs-var">VerKeyEd448DSIGN</span></a></span><span>
+</span><span id="line-102"></span><span>                               </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. CryptoFailable a -&gt; Maybe a
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#cryptoFailableToMaybe"><span class="hs-identifier hs-var">cryptoFailableToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall ba. ByteArrayAccess ba =&gt; ba -&gt; CryptoFailable PublicKey
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">Ed448.publicKey</span></a></span><span>
+</span><span id="line-103"></span><span>    </span><span id="local-6989586621679204819"><span class="annot"><span class="annottext">rawDeserialiseSignKeyDSIGN :: ByteString -&gt; Maybe (SignKeyDSIGN Ed448DSIGN)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseSignKeyDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseSignKeyDSIGN</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">SecretKey -&gt; SignKeyDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#SignKeyEd448DSIGN"><span class="hs-identifier hs-var">SignKeyEd448DSIGN</span></a></span><span>
+</span><span id="line-104"></span><span>                               </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. CryptoFailable a -&gt; Maybe a
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#cryptoFailableToMaybe"><span class="hs-identifier hs-var">cryptoFailableToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall ba. ByteArrayAccess ba =&gt; ba -&gt; CryptoFailable SecretKey
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">Ed448.secretKey</span></a></span><span>
+</span><span id="line-105"></span><span>    </span><span id="local-6989586621679204814"><span class="annot"><span class="annottext">rawDeserialiseSigDSIGN :: ByteString -&gt; Maybe (SigDSIGN Ed448DSIGN)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#rawDeserialiseSigDSIGN"><span class="hs-identifier hs-var hs-var hs-var hs-var">rawDeserialiseSigDSIGN</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">fmap</span></a></span><span> </span><span class="annot"><span class="annottext">Signature -&gt; SigDSIGN Ed448DSIGN
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#SigEd448DSIGN"><span class="hs-identifier hs-var">SigEd448DSIGN</span></a></span><span>
+</span><span id="line-106"></span><span>                               </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. CryptoFailable a -&gt; Maybe a
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#cryptoFailableToMaybe"><span class="hs-identifier hs-var">cryptoFailableToMaybe</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span> </span><span class="annot"><span class="annottext">forall ba. ByteArrayAccess ba =&gt; ba -&gt; CryptoFailable Signature
+</span><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-var">Ed448.signature</span></a></span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span>
+</span><span id="line-109"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679204804"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier hs-type">VerKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-110"></span><span>  </span><span id="local-6989586621679204801"><span class="annot"><span class="annottext">toCBOR :: VerKeyDSIGN Ed448DSIGN -&gt; Encoding
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; VerKeyDSIGN v -&gt; Encoding
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodeVerKeyDSIGN"><span class="hs-identifier hs-var">encodeVerKeyDSIGN</span></a></span><span>
+</span><span id="line-111"></span><span>  </span><span id="local-6989586621679204797"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (VerKeyDSIGN Ed448DSIGN) -&gt; Size
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; Proxy (VerKeyDSIGN v) -&gt; Size
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodedVerKeyDSIGNSizeExpr"><span class="hs-identifier hs-var">encodedVerKeyDSIGNSizeExpr</span></a></span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679204788"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#VerKeyDSIGN"><span class="hs-identifier hs-type">VerKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621679204785"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (VerKeyDSIGN Ed448DSIGN)
+</span><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. DSIGNAlgorithm v =&gt; Decoder s (VerKeyDSIGN v)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#decodeVerKeyDSIGN"><span class="hs-identifier hs-var">decodeVerKeyDSIGN</span></a></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679204775"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier hs-type">SignKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-117"></span><span>  </span><span id="local-6989586621679204773"><span class="annot"><span class="annottext">toCBOR :: SignKeyDSIGN Ed448DSIGN -&gt; Encoding
+</span><a href="#local-6989586621679204773"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; SignKeyDSIGN v -&gt; Encoding
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodeSignKeyDSIGN"><span class="hs-identifier hs-var">encodeSignKeyDSIGN</span></a></span><span>
+</span><span id="line-118"></span><span>  </span><span id="local-6989586621679204770"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (SignKeyDSIGN Ed448DSIGN) -&gt; Size
+</span><a href="#local-6989586621679204770"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; Proxy (SignKeyDSIGN v) -&gt; Size
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodedSignKeyDESIGNSizeExpr"><span class="hs-identifier hs-var">encodedSignKeyDESIGNSizeExpr</span></a></span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679204762"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SignKeyDSIGN"><span class="hs-identifier hs-type">SignKeyDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-121"></span><span>  </span><span id="local-6989586621679204760"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (SignKeyDSIGN Ed448DSIGN)
+</span><a href="#local-6989586621679204760"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. DSIGNAlgorithm v =&gt; Decoder s (SignKeyDSIGN v)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#decodeSignKeyDSIGN"><span class="hs-identifier hs-var">decodeSignKeyDSIGN</span></a></span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679204751"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">ToCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier hs-type">SigDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-124"></span><span>  </span><span id="local-6989586621679204749"><span class="annot"><span class="annottext">toCBOR :: SigDSIGN Ed448DSIGN -&gt; Encoding
+</span><a href="#local-6989586621679204749"><span class="hs-identifier hs-var hs-var hs-var hs-var">toCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; SigDSIGN v -&gt; Encoding
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodeSigDSIGN"><span class="hs-identifier hs-var">encodeSigDSIGN</span></a></span><span>
+</span><span id="line-125"></span><span>  </span><span id="local-6989586621679204746"><span class="annot"><span class="annottext">encodedSizeExpr :: (forall t. ToCBOR t =&gt; Proxy t -&gt; Size)
+-&gt; Proxy (SigDSIGN Ed448DSIGN) -&gt; Size
+</span><a href="#local-6989586621679204746"><span class="hs-identifier hs-var hs-var hs-var hs-var">encodedSizeExpr</span></a></span></span><span> </span><span class="annot"><span class="annottext">forall t. ToCBOR t =&gt; Proxy t -&gt; Size
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. DSIGNAlgorithm v =&gt; Proxy (SigDSIGN v) -&gt; Size
+</span><a href="Cardano.Crypto.DSIGN.Class.html#encodedSigDSIGNSizeExpr"><span class="hs-identifier hs-var">encodedSigDSIGNSizeExpr</span></a></span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679204738"><span class="annot"><a href="../../../../cardano-binary/html/src"><span class="hs-identifier hs-type">FromCBOR</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Cardano.Crypto.DSIGN.Class.html#SigDSIGN"><span class="hs-identifier hs-type">SigDSIGN</span></a></span><span> </span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#Ed448DSIGN"><span class="hs-identifier hs-type">Ed448DSIGN</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-128"></span><span>  </span><span id="local-6989586621679204736"><span class="annot"><span class="annottext">fromCBOR :: forall s. Decoder s (SigDSIGN Ed448DSIGN)
+</span><a href="#local-6989586621679204736"><span class="hs-identifier hs-var hs-var hs-var hs-var">fromCBOR</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v s. DSIGNAlgorithm v =&gt; Decoder s (SigDSIGN v)
+</span><a href="Cardano.Crypto.DSIGN.Class.html#decodeSigDSIGN"><span class="hs-identifier hs-var">decodeSigDSIGN</span></a></span><span>
+</span><span id="line-129"></span><span>
+</span><span id="line-130"></span><span>
+</span><span id="line-131"></span><span id="local-6989586621679205170"><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#cryptoFailableToMaybe"><span class="hs-identifier hs-type">cryptoFailableToMaybe</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">CryptoFailable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679205170"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Maybe</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679205170"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-132"></span><span id="cryptoFailableToMaybe"><span class="annot"><span class="annottext">cryptoFailableToMaybe :: forall a. CryptoFailable a -&gt; Maybe a
+</span><a href="Cardano.Crypto.DSIGN.Ed448.html#cryptoFailableToMaybe"><span class="hs-identifier hs-var hs-var">cryptoFailableToMaybe</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">CryptoPassed</span></a></span><span> </span><span id="local-6989586621679204733"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679204733"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. a -&gt; Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Just</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679204733"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-133"></span><span class="annot"><a href="Cardano.Crypto.DSIGN.Ed448.html#cryptoFailableToMaybe"><span class="hs-identifier hs-var">cryptoFailableToMaybe</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../cryptonite/html/src"><span class="hs-identifier hs-type">CryptoFailed</span></a></span><span> </span><span class="annot"><span class="annottext">CryptoError
+</span><span class="hs-identifier">_</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a. Maybe a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span></pre></body></html>

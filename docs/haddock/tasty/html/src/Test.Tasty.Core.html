@@ -1,0 +1,671 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- | Core types and definitions</span><span>
+</span><span id="line-2"></span><span class="hs-pragma">{-# LANGUAGE GeneralizedNewtypeDeriving, FlexibleContexts,
+             ExistentialQuantification, RankNTypes, DeriveDataTypeable, NoMonomorphismRestriction,
+             DeriveGeneric #-}</span><span>
+</span><span id="line-5"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Test.Tasty.Core</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-6"></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Control.Exception</span></a></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.Tasty.Providers.ConsoleFormat.html"><span class="hs-identifier">Test.Tasty.Providers.ConsoleFormat</span></a></span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html"><span class="hs-identifier">Test.Tasty.Options</span></a></span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.Tasty.Patterns.html"><span class="hs-identifier">Test.Tasty.Patterns</span></a></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="Test.Tasty.Patterns.Types.html"><span class="hs-identifier">Test.Tasty.Patterns.Types</span></a></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Foldable</span></a></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier">Data.Sequence</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Seq</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Monoid</span></a></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Data.Typeable</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier">Data.Map</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">Map</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../tagged/html/src"><span class="hs-identifier">Data.Tagged</span></a></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">GHC.Generics</span></a></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Prelude</span></a></span><span>  </span><span class="hs-comment">-- Silence AMP and FTP import warnings</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier">Text.Printf</span></a></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- | If a test failed, 'FailureReason' describes why</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">data</span><span> </span><span id="FailureReason"><span class="annot"><a href="Test.Tasty.Core.html#FailureReason"><span class="hs-identifier hs-var">FailureReason</span></a></span></span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="TestFailed"><span class="annot"><a href="Test.Tasty.Core.html#TestFailed"><span class="hs-identifier hs-var">TestFailed</span></a></span></span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-comment">-- ^ test provider indicated failure of the code to test, either because</span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-comment">-- the tested code returned wrong results, or raised an exception</span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="TestThrewException"><span class="annot"><a href="Test.Tasty.Core.html#TestThrewException"><span class="hs-identifier hs-var">TestThrewException</span></a></span></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">SomeException</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-comment">-- ^ the test code itself raised an exception. Typical cases include missing</span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-comment">-- example input or output files.</span><span>
+</span><span id="line-30"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-comment">-- Usually, providers do not have to implement this, as their 'run' method</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-comment">-- may simply raise an exception.</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="TestTimedOut"><span class="annot"><a href="Test.Tasty.Core.html#TestTimedOut"><span class="hs-identifier hs-var">TestTimedOut</span></a></span></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-bignum-1.2/src"><span class="hs-identifier hs-type">Integer</span></a></span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-comment">-- ^ test didn't complete in allotted time</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="TestDepFailed"><span class="annot"><a href="Test.Tasty.Core.html#TestDepFailed"><span class="hs-identifier hs-var">TestDepFailed</span></a></span></span><span> </span><span class="hs-comment">-- See Note [Skipped tests]</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-comment">-- ^ a dependency of this test failed, so this test was skipped.</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679077553"><span id="local-6989586621679077555"><span id="local-6989586621679077563"><span class="annot"><span class="annottext">Int -&gt; FailureReason -&gt; ShowS
+[FailureReason] -&gt; ShowS
+FailureReason -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [FailureReason] -&gt; ShowS
+$cshowList :: [FailureReason] -&gt; ShowS
+show :: FailureReason -&gt; String
+$cshow :: FailureReason -&gt; String
+showsPrec :: Int -&gt; FailureReason -&gt; ShowS
+$cshowsPrec :: Int -&gt; FailureReason -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- | Outcome of a test run</span><span>
+</span><span id="line-40"></span><span class="hs-comment">--</span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- Note: this is isomorphic to @'Maybe' 'FailureReason'@. You can use the</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- @generic-maybe@ package to exploit that.</span><span>
+</span><span id="line-43"></span><span id="local-6989586621679077550"><span id="local-6989586621679077551"></span></span><span class="hs-keyword">data</span><span> </span><span id="Outcome"><span class="annot"><a href="Test.Tasty.Core.html#Outcome"><span class="hs-identifier hs-var">Outcome</span></a></span></span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="Success"><span class="annot"><a href="Test.Tasty.Core.html#Success"><span class="hs-identifier hs-var">Success</span></a></span></span><span> </span><span class="hs-comment">-- ^ test succeeded</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="Failure"><span class="annot"><a href="Test.Tasty.Core.html#Failure"><span class="hs-identifier hs-var">Failure</span></a></span></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#FailureReason"><span class="hs-identifier hs-type">FailureReason</span></a></span><span> </span><span class="hs-comment">-- ^ test failed because of the 'FailureReason'</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679077540"><span id="local-6989586621679077542"><span id="local-6989586621679077546"><span class="annot"><span class="annottext">Int -&gt; Outcome -&gt; ShowS
+[Outcome] -&gt; ShowS
+Outcome -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Outcome] -&gt; ShowS
+$cshowList :: [Outcome] -&gt; ShowS
+show :: Outcome -&gt; String
+$cshow :: Outcome -&gt; String
+showsPrec :: Int -&gt; Outcome -&gt; ShowS
+$cshowsPrec :: Int -&gt; Outcome -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">forall x. Rep Outcome x -&gt; Outcome
+forall x. Outcome -&gt; Rep Outcome x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cto :: forall x. Rep Outcome x -&gt; Outcome
+$cfrom :: forall x. Outcome -&gt; Rep Outcome x
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var">Generic</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- | Time in seconds. Used to measure how long the tests took to run.</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">type</span><span> </span><span id="Time"><span class="annot"><a href="Test.Tasty.Core.html#Time"><span class="hs-identifier hs-var">Time</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Double</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | A test result</span><span>
+</span><span id="line-52"></span><span class="hs-keyword">data</span><span> </span><span id="Result"><span class="annot"><a href="Test.Tasty.Core.html#Result"><span class="hs-identifier hs-var">Result</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Result"><span class="annot"><a href="Test.Tasty.Core.html#Result"><span class="hs-identifier hs-var">Result</span></a></span></span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="resultOutcome"><span class="annot"><span class="annottext">Result -&gt; Outcome
+</span><a href="Test.Tasty.Core.html#resultOutcome"><span class="hs-identifier hs-var hs-var">resultOutcome</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#Outcome"><span class="hs-identifier hs-type">Outcome</span></a></span><span>
+</span><span id="line-54"></span><span>    </span><span class="hs-comment">-- ^ Did the test fail? If so, why?</span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="resultDescription"><span class="annot"><span class="annottext">Result -&gt; String
+</span><a href="Test.Tasty.Core.html#resultDescription"><span class="hs-identifier hs-var hs-var">resultDescription</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-comment">-- ^</span><span>
+</span><span id="line-57"></span><span>    </span><span class="hs-comment">-- 'resultDescription' may contain some details about the test. For</span><span>
+</span><span id="line-58"></span><span>    </span><span class="hs-comment">-- a passed test it's ok to leave it empty. Providers like SmallCheck and</span><span>
+</span><span id="line-59"></span><span>    </span><span class="hs-comment">-- QuickCheck use it to provide information about how many tests were</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-comment">-- generated.</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-comment">-- For a failed test, 'resultDescription' should typically provide more</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-comment">-- information about the failure.</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="resultShortDescription"><span class="annot"><span class="annottext">Result -&gt; String
+</span><a href="Test.Tasty.Core.html#resultShortDescription"><span class="hs-identifier hs-var hs-var">resultShortDescription</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-65"></span><span>    </span><span class="hs-comment">-- ^ The short description printed in the test run summary, usually @OK@ or</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-comment">-- @FAIL@.</span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="resultTime"><span class="annot"><span class="annottext">Result -&gt; Time
+</span><a href="Test.Tasty.Core.html#resultTime"><span class="hs-identifier hs-var hs-var">resultTime</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#Time"><span class="hs-identifier hs-type">Time</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="hs-comment">-- ^ How long it took to run the test, in seconds.</span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="resultDetailsPrinter"><span class="annot"><span class="annottext">Result -&gt; ResultDetailsPrinter
+</span><a href="Test.Tasty.Core.html#resultDetailsPrinter"><span class="hs-identifier hs-var hs-var">resultDetailsPrinter</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Providers.ConsoleFormat.html#ResultDetailsPrinter"><span class="hs-identifier hs-type">ResultDetailsPrinter</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-comment">-- ^ An action that prints additional information about a test.</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-comment">-- This is similar to 'resultDescription' except it can produce</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-comment">-- colorful/formatted output; see &quot;Test.Tasty.Providers.ConsoleFormat&quot;.</span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-comment">-- This can be used instead of or in addition to 'resultDescription'.</span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-comment">-- Usually this is set to 'noResultDetails', which does nothing.</span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-comment">-- @since 1.3.1</span><span>
+</span><span id="line-80"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-81"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679077516"><span id="local-6989586621679077518"><span id="local-6989586621679077528"><span class="annot"><span class="annottext">Int -&gt; Result -&gt; ShowS
+[Result] -&gt; ShowS
+Result -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Result] -&gt; ShowS
+$cshowList :: [Result] -&gt; ShowS
+show :: Result -&gt; String
+$cshow :: Result -&gt; String
+showsPrec :: Int -&gt; Result -&gt; ShowS
+$cshowsPrec :: Int -&gt; Result -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="hs-comment">{- Note [Skipped tests]
+   ~~~~~~~~~~~~~~~~~~~~
+   There are two potential ways to represent the tests that are skipped
+   because of their failed dependencies:
+   1. With Outcome = Failure, and FailureReason giving the specifics (TestDepFailed)
+   2. With a dedicated Outcome = Skipped
+
+   It seems to me that (1) will lead to fewer bugs (esp. in the extension packages),
+   because most of the time skipped tests should be handled in the same way
+   as failed tests.
+   But sometimes it is not obvious what the right behavior should be. E.g.
+   should --hide-successes show or hide the skipped tests?
+
+   Perhaps we should hide them, because they aren't really informative.
+   Or perhaps we shouldn't hide them, because we are not sure that they
+   will pass, and hiding them will imply a false sense of security
+   (&quot;there's at most 2 tests failing&quot;, whereas in fact there could be much more).
+
+   So I might change this in the future, but for now treating them as
+   failures seems the easiest yet reasonable approach.
+-}</span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- | 'True' for a passed test, 'False' for a failed one.</span><span>
+</span><span id="line-106"></span><span class="annot"><a href="Test.Tasty.Core.html#resultSuccessful"><span class="hs-identifier hs-type">resultSuccessful</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Bool</span></a></span><span>
+</span><span id="line-107"></span><span id="resultSuccessful"><span class="annot"><span class="annottext">resultSuccessful :: Result -&gt; Bool
+</span><a href="Test.Tasty.Core.html#resultSuccessful"><span class="hs-identifier hs-var hs-var">resultSuccessful</span></a></span></span><span> </span><span id="local-6989586621679077514"><span class="annot"><span class="annottext">Result
+</span><a href="#local-6989586621679077514"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-108"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Result -&gt; Outcome
+</span><a href="Test.Tasty.Core.html#resultOutcome"><span class="hs-identifier hs-var">resultOutcome</span></a></span><span> </span><span class="annot"><span class="annottext">Result
+</span><a href="#local-6989586621679077514"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-109"></span><span>    </span><span class="annot"><span class="annottext">Outcome
+</span><a href="Test.Tasty.Core.html#Success"><span class="hs-identifier hs-var">Success</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var">True</span></a></span><span>
+</span><span id="line-110"></span><span>    </span><span class="annot"><a href="Test.Tasty.Core.html#Failure"><span class="hs-identifier hs-type">Failure</span></a></span><span> </span><span class="hs-special">{</span><span class="hs-special">}</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var">False</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- | Shortcut for creating a 'Result' that indicates exception</span><span>
+</span><span id="line-113"></span><span class="annot"><a href="Test.Tasty.Core.html#exceptionResult"><span class="hs-identifier hs-type">exceptionResult</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">SomeException</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span>
+</span><span id="line-114"></span><span id="exceptionResult"><span class="annot"><span class="annottext">exceptionResult :: SomeException -&gt; Result
+</span><a href="Test.Tasty.Core.html#exceptionResult"><span class="hs-identifier hs-var hs-var">exceptionResult</span></a></span></span><span> </span><span id="local-6989586621679077512"><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679077512"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span>
+</span><span id="line-115"></span><span>  </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">resultOutcome :: Outcome
+</span><a href="Test.Tasty.Core.html#resultOutcome"><span class="hs-identifier hs-var">resultOutcome</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">FailureReason -&gt; Outcome
+</span><a href="Test.Tasty.Core.html#Failure"><span class="hs-identifier hs-var">Failure</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">SomeException -&gt; FailureReason
+</span><a href="Test.Tasty.Core.html#TestThrewException"><span class="hs-identifier hs-var">TestThrewException</span></a></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679077512"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-116"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">resultDescription :: String
+</span><a href="Test.Tasty.Core.html#resultDescription"><span class="hs-identifier hs-var">resultDescription</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Exception: &quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Show a =&gt; a -&gt; String
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621679077512"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-117"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">resultShortDescription :: String
+</span><a href="Test.Tasty.Core.html#resultShortDescription"><span class="hs-identifier hs-var">resultShortDescription</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;FAIL&quot;</span></span><span>
+</span><span id="line-118"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">resultTime :: Time
+</span><a href="Test.Tasty.Core.html#resultTime"><span class="hs-identifier hs-var">resultTime</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Time
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-119"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">resultDetailsPrinter :: ResultDetailsPrinter
+</span><a href="Test.Tasty.Core.html#resultDetailsPrinter"><span class="hs-identifier hs-var">resultDetailsPrinter</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ResultDetailsPrinter
+</span><a href="Test.Tasty.Providers.ConsoleFormat.html#noResultDetails"><span class="hs-identifier hs-var">noResultDetails</span></a></span><span>
+</span><span id="line-120"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-121"></span><span>
+</span><span id="line-122"></span><span class="hs-comment">-- | Test progress information.</span><span>
+</span><span id="line-123"></span><span class="hs-comment">--</span><span>
+</span><span id="line-124"></span><span class="hs-comment">-- This may be used by a runner to provide some feedback to the user while</span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- a long-running test is executing.</span><span>
+</span><span id="line-126"></span><span class="hs-keyword">data</span><span> </span><span id="Progress"><span class="annot"><a href="Test.Tasty.Core.html#Progress"><span class="hs-identifier hs-var">Progress</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Progress"><span class="annot"><a href="Test.Tasty.Core.html#Progress"><span class="hs-identifier hs-var">Progress</span></a></span></span><span>
+</span><span id="line-127"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="progressText"><span class="annot"><span class="annottext">Progress -&gt; String
+</span><a href="Test.Tasty.Core.html#progressText"><span class="hs-identifier hs-var hs-var">progressText</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-128"></span><span>    </span><span class="hs-comment">-- ^ textual information about the test's progress</span><span>
+</span><span id="line-129"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="progressPercent"><span class="annot"><span class="annottext">Progress -&gt; Float
+</span><a href="Test.Tasty.Core.html#progressPercent"><span class="hs-identifier hs-var hs-var">progressPercent</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">Float</span></a></span><span>
+</span><span id="line-130"></span><span>    </span><span class="hs-comment">-- ^</span><span>
+</span><span id="line-131"></span><span>    </span><span class="hs-comment">-- 'progressPercent' should be a value between 0 and 1. If it's impossible</span><span>
+</span><span id="line-132"></span><span>    </span><span class="hs-comment">-- to compute the estimate, use 0.</span><span>
+</span><span id="line-133"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-134"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span id="local-6989586621679077497"><span id="local-6989586621679077499"><span id="local-6989586621679077505"><span class="annot"><span class="annottext">Int -&gt; Progress -&gt; ShowS
+[Progress] -&gt; ShowS
+Progress -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [Progress] -&gt; ShowS
+$cshowList :: [Progress] -&gt; ShowS
+show :: Progress -&gt; String
+$cshow :: Progress -&gt; String
+showsPrec :: Int -&gt; Progress -&gt; ShowS
+$cshowsPrec :: Int -&gt; Progress -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span class="hs-comment">-- | The interface to be implemented by a test provider.</span><span>
+</span><span id="line-137"></span><span class="hs-comment">--</span><span>
+</span><span id="line-138"></span><span class="hs-comment">-- The type @t@ is the concrete representation of the test which is used by</span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- the provider.</span><span>
+</span><span id="line-140"></span><span class="hs-keyword">class</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077671"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="IsTest"><span class="annot"><a href="Test.Tasty.Core.html#IsTest"><span class="hs-identifier hs-var">IsTest</span></a></span></span><span> </span><span id="local-6989586621679077671"><span class="annot"><a href="#local-6989586621679077671"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-141"></span><span>  </span><span class="hs-comment">-- | Run the test</span><span>
+</span><span id="line-142"></span><span>  </span><span class="hs-comment">--</span><span>
+</span><span id="line-143"></span><span>  </span><span class="hs-comment">-- This method should cleanly catch any exceptions in the code to test, and</span><span>
+</span><span id="line-144"></span><span>  </span><span class="hs-comment">-- return them as part of the 'Result', see 'FailureReason' for an</span><span>
+</span><span id="line-145"></span><span>  </span><span class="hs-comment">-- explanation. It is ok for 'run' to raise an exception if there is a</span><span>
+</span><span id="line-146"></span><span>  </span><span class="hs-comment">-- problem with the test suite code itself (for example, if a file that</span><span>
+</span><span id="line-147"></span><span>  </span><span class="hs-comment">-- should contain example data or expected output is not found).</span><span>
+</span><span id="line-148"></span><span>  </span><span id="run"><span class="annot"><a href="Test.Tasty.Core.html#run"><span class="hs-identifier hs-type">run</span></a></span></span><span>
+</span><span id="line-149"></span><span>    </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-comment">-- ^ options</span><span>
+</span><span id="line-150"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077671"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-comment">-- ^ the test to run</span><span>
+</span><span id="line-151"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.Tasty.Core.html#Progress"><span class="hs-identifier hs-type">Progress</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- ^ a callback to report progress.</span><span>
+</span><span id="line-152"></span><span>                           </span><span class="hs-comment">-- Note: the callback is a no-op at the moment</span><span>
+</span><span id="line-153"></span><span>                           </span><span class="hs-comment">-- and there are no plans to use it;</span><span>
+</span><span id="line-154"></span><span>                           </span><span class="hs-comment">-- feel free to ignore this argument for now.</span><span>
+</span><span id="line-155"></span><span>    </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span>
+</span><span id="line-156"></span><span>
+</span><span id="line-157"></span><span>  </span><span class="hs-comment">-- | The list of options that affect execution of tests of this type</span><span>
+</span><span id="line-158"></span><span>  </span><span id="testOptions"><span class="annot"><a href="Test.Tasty.Core.html#testOptions"><span class="hs-identifier hs-type">testOptions</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../tagged/html/src"><span class="hs-identifier hs-type">Tagged</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077671"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Test.Tasty.Options.html#OptionDescription"><span class="hs-identifier hs-type">OptionDescription</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-comment">-- | The name of a test or a group of tests</span><span>
+</span><span id="line-161"></span><span class="hs-keyword">type</span><span> </span><span id="TestName"><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-var">TestName</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- | 'ResourceSpec' describes how to acquire a resource (the first field)</span><span>
+</span><span id="line-164"></span><span class="hs-comment">-- and how to release it (the second field).</span><span>
+</span><span id="line-165"></span><span class="hs-keyword">data</span><span> </span><span id="ResourceSpec"><span class="annot"><a href="Test.Tasty.Core.html#ResourceSpec"><span class="hs-identifier hs-var">ResourceSpec</span></a></span></span><span> </span><span id="local-6989586621679077492"><span class="annot"><a href="#local-6989586621679077492"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ResourceSpec"><span class="annot"><a href="Test.Tasty.Core.html#ResourceSpec"><span class="hs-identifier hs-var">ResourceSpec</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077492"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621679077492"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="hs-comment">-- | A resources-related exception</span><span>
+</span><span id="line-168"></span><span class="hs-keyword">data</span><span> </span><span id="ResourceError"><span class="annot"><a href="Test.Tasty.Core.html#ResourceError"><span class="hs-identifier hs-var">ResourceError</span></a></span></span><span>
+</span><span id="line-169"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="NotRunningTests"><span class="annot"><a href="Test.Tasty.Core.html#NotRunningTests"><span class="hs-identifier hs-var">NotRunningTests</span></a></span></span><span>
+</span><span id="line-170"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="UnexpectedState"><span class="annot"><a href="Test.Tasty.Core.html#UnexpectedState"><span class="hs-identifier hs-var">UnexpectedState</span></a></span></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span>
+</span><span id="line-171"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="UseOutsideOfTest"><span class="annot"><a href="Test.Tasty.Core.html#UseOutsideOfTest"><span class="hs-identifier hs-var">UseOutsideOfTest</span></a></span></span><span>
+</span><span id="line-172"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Typeable</span></a></span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679077483"><span id="local-6989586621679077486"><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Show</span></a></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#ResourceError"><span class="hs-identifier hs-type">ResourceError</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-175"></span><span>  </span><span id="local-6989586621679077473"><span class="annot"><span class="annottext">show :: ResourceError -&gt; String
+</span><a href="#local-6989586621679077473"><span class="hs-identifier hs-var hs-var hs-var hs-var">show</span></a></span></span><span> </span><span class="annot"><span class="annottext">ResourceError
+</span><a href="Test.Tasty.Core.html#NotRunningTests"><span class="hs-identifier hs-var">NotRunningTests</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-176"></span><span>    </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Unhandled resource. Probably a bug in the runner you're using.&quot;</span></span><span>
+</span><span id="line-177"></span><span>  </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.Tasty.Core.html#UnexpectedState"><span class="hs-identifier hs-type">UnexpectedState</span></a></span><span> </span><span id="local-6989586621679077472"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077472"><span class="hs-identifier hs-var">where_</span></a></span></span><span> </span><span id="local-6989586621679077471"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077471"><span class="hs-identifier hs-var">what</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-178"></span><span>    </span><span class="annot"><span class="annottext">forall r. PrintfType r =&gt; String -&gt; r
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">printf</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Unexpected state of the resource (%s) in %s. Report as a tasty bug.&quot;</span></span><span>
+</span><span id="line-179"></span><span>      </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077471"><span class="hs-identifier hs-var">what</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077472"><span class="hs-identifier hs-var">where_</span></a></span><span>
+</span><span id="line-180"></span><span>  </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">ResourceError
+</span><a href="Test.Tasty.Core.html#UseOutsideOfTest"><span class="hs-identifier hs-var">UseOutsideOfTest</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-181"></span><span>    </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;It looks like you're attempting to use a resource outside of its test. Don't do that!&quot;</span></span><span>
+</span><span id="line-182"></span><span>
+</span><span id="line-183"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679077460"><span id="local-6989586621679077462"><span id="local-6989586621679077464"><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Exception</span></a></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#ResourceError"><span class="hs-identifier hs-type">ResourceError</span></a></span></span></span></span><span>
+</span><span id="line-184"></span><span>
+</span><span id="line-185"></span><span class="hs-comment">-- | These are the two ways in which one test may depend on the others.</span><span>
+</span><span id="line-186"></span><span class="hs-comment">--</span><span>
+</span><span id="line-187"></span><span class="hs-comment">-- This is the same distinction as the</span><span>
+</span><span id="line-188"></span><span class="hs-comment">-- &lt;http://testng.org/doc/documentation-main.html#dependent-methods hard vs soft dependencies in TestNG&gt;.</span><span>
+</span><span id="line-189"></span><span class="hs-comment">--</span><span>
+</span><span id="line-190"></span><span class="hs-comment">-- @since 1.2</span><span>
+</span><span id="line-191"></span><span class="hs-keyword">data</span><span> </span><span id="DependencyType"><span class="annot"><a href="Test.Tasty.Core.html#DependencyType"><span class="hs-identifier hs-var">DependencyType</span></a></span></span><span>
+</span><span id="line-192"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="AllSucceed"><span class="annot"><a href="Test.Tasty.Core.html#AllSucceed"><span class="hs-identifier hs-var">AllSucceed</span></a></span></span><span>
+</span><span id="line-193"></span><span>    </span><span class="hs-comment">-- ^ The current test tree will be executed after its dependencies finish, and only</span><span>
+</span><span id="line-194"></span><span>    </span><span class="hs-comment">-- if all of the dependencies succeed.</span><span>
+</span><span id="line-195"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="AllFinish"><span class="annot"><a href="Test.Tasty.Core.html#AllFinish"><span class="hs-identifier hs-var">AllFinish</span></a></span></span><span>
+</span><span id="line-196"></span><span>    </span><span class="hs-comment">-- ^ The current test tree will be executed after its dependencies finish,</span><span>
+</span><span id="line-197"></span><span>    </span><span class="hs-comment">-- regardless of whether they succeed or not.</span><span>
+</span><span id="line-198"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679077453"><span id="local-6989586621679077455"><span class="annot"><span class="annottext">DependencyType -&gt; DependencyType -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+/= :: DependencyType -&gt; DependencyType -&gt; Bool
+$c/= :: DependencyType -&gt; DependencyType -&gt; Bool
+== :: DependencyType -&gt; DependencyType -&gt; Bool
+$c== :: DependencyType -&gt; DependencyType -&gt; Bool
+</span><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></a></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679077446"><span id="local-6989586621679077448"><span id="local-6989586621679077450"><span class="annot"><span class="annottext">Int -&gt; DependencyType -&gt; ShowS
+[DependencyType] -&gt; ShowS
+DependencyType -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [DependencyType] -&gt; ShowS
+$cshowList :: [DependencyType] -&gt; ShowS
+show :: DependencyType -&gt; String
+$cshow :: DependencyType -&gt; String
+showsPrec :: Int -&gt; DependencyType -&gt; ShowS
+$cshowsPrec :: Int -&gt; DependencyType -&gt; ShowS
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></a></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>
+</span><span id="line-200"></span><span class="hs-comment">-- | The main data structure defining a test suite.</span><span>
+</span><span id="line-201"></span><span class="hs-comment">--</span><span>
+</span><span id="line-202"></span><span class="hs-comment">-- It consists of individual test cases and properties, organized in named</span><span>
+</span><span id="line-203"></span><span class="hs-comment">-- groups which form a tree-like hierarchy.</span><span>
+</span><span id="line-204"></span><span class="hs-comment">--</span><span>
+</span><span id="line-205"></span><span class="hs-comment">-- There is no generic way to create a test case. Instead, every test</span><span>
+</span><span id="line-206"></span><span class="hs-comment">-- provider (tasty-hunit, tasty-smallcheck etc.) provides a function to</span><span>
+</span><span id="line-207"></span><span class="hs-comment">-- turn a test case into a 'TestTree'.</span><span>
+</span><span id="line-208"></span><span class="hs-comment">--</span><span>
+</span><span id="line-209"></span><span class="hs-comment">-- Groups can be created using 'testGroup'.</span><span>
+</span><span id="line-210"></span><span class="hs-keyword">data</span><span> </span><span id="TestTree"><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-var">TestTree</span></a></span></span><span>
+</span><span id="line-211"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679077445"><span class="annot"><a href="#local-6989586621679077445"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#IsTest"><span class="hs-identifier hs-type">IsTest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077445"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="SingleTest"><span class="annot"><a href="Test.Tasty.Core.html#SingleTest"><span class="hs-identifier hs-var">SingleTest</span></a></span></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-type">TestName</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077445"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-212"></span><span>    </span><span class="hs-comment">-- ^ A single test of some particular type</span><span>
+</span><span id="line-213"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="TestGroup"><span class="annot"><a href="Test.Tasty.Core.html#TestGroup"><span class="hs-identifier hs-var">TestGroup</span></a></span></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-type">TestName</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-214"></span><span>    </span><span class="hs-comment">-- ^ Assemble a number of tests into a cohesive group</span><span>
+</span><span id="line-215"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="PlusTestOptions"><span class="annot"><a href="Test.Tasty.Core.html#PlusTestOptions"><span class="hs-identifier hs-var">PlusTestOptions</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span>
+</span><span id="line-216"></span><span>    </span><span class="hs-comment">-- ^ Add some options to child tests</span><span>
+</span><span id="line-217"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679077441"><span class="annot"><a href="#local-6989586621679077441"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span id="WithResource"><span class="annot"><a href="Test.Tasty.Core.html#WithResource"><span class="hs-identifier hs-var">WithResource</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.Tasty.Core.html#ResourceSpec"><span class="hs-identifier hs-type">ResourceSpec</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077441"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077441"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-218"></span><span>    </span><span class="hs-comment">-- ^ Acquire the resource before the tests in the inner tree start and</span><span>
+</span><span id="line-219"></span><span>    </span><span class="hs-comment">-- release it after they finish. The tree gets an `IO` action which</span><span>
+</span><span id="line-220"></span><span>    </span><span class="hs-comment">-- yields the resource, although the resource is shared across all the</span><span>
+</span><span id="line-221"></span><span>    </span><span class="hs-comment">-- tests.</span><span>
+</span><span id="line-222"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="AskOptions"><span class="annot"><a href="Test.Tasty.Core.html#AskOptions"><span class="hs-identifier hs-var">AskOptions</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-223"></span><span>    </span><span class="hs-comment">-- ^ Ask for the options and customize the tests based on them</span><span>
+</span><span id="line-224"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="After"><span class="annot"><a href="Test.Tasty.Core.html#After"><span class="hs-identifier hs-var">After</span></a></span></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#DependencyType"><span class="hs-identifier hs-type">DependencyType</span></a></span><span> </span><span class="annot"><a href="Test.Tasty.Patterns.Types.html#Expr"><span class="hs-identifier hs-type">Expr</span></a></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span>
+</span><span id="line-225"></span><span>    </span><span class="hs-comment">-- ^ Only run after all tests that match a given pattern finish</span><span>
+</span><span id="line-226"></span><span>    </span><span class="hs-comment">-- (and, depending on the 'DependencyType', succeed)</span><span>
+</span><span id="line-227"></span><span>
+</span><span id="line-228"></span><span class="hs-comment">-- | Create a named group of test cases or other groups</span><span>
+</span><span id="line-229"></span><span class="annot"><a href="Test.Tasty.Core.html#testGroup"><span class="hs-identifier hs-type">testGroup</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-type">TestName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span>
+</span><span id="line-230"></span><span id="testGroup"><span class="annot"><span class="annottext">testGroup :: String -&gt; [TestTree] -&gt; TestTree
+</span><a href="Test.Tasty.Core.html#testGroup"><span class="hs-identifier hs-var hs-var">testGroup</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; [TestTree] -&gt; TestTree
+</span><a href="Test.Tasty.Core.html#TestGroup"><span class="hs-identifier hs-var">TestGroup</span></a></span><span>
+</span><span id="line-231"></span><span>
+</span><span id="line-232"></span><span class="hs-comment">-- | Like 'after', but accepts the pattern as a syntax tree instead</span><span>
+</span><span id="line-233"></span><span class="hs-comment">-- of a string. Useful for generating a test tree programmatically.</span><span>
+</span><span id="line-234"></span><span class="hs-comment">--</span><span>
+</span><span id="line-235"></span><span class="hs-comment">-- ==== __Examples__</span><span>
+</span><span id="line-236"></span><span class="hs-comment">--</span><span>
+</span><span id="line-237"></span><span class="hs-comment">-- Only match on the test's own name, ignoring the group names:</span><span>
+</span><span id="line-238"></span><span class="hs-comment">--</span><span>
+</span><span id="line-239"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-240"></span><span class="hs-comment">-- 'after_' 'AllFinish' ('Test.Tasty.Patterns.Types.EQ' ('Field' 'NF') ('StringLit' \&quot;Bar\&quot;)) $</span><span>
+</span><span id="line-241"></span><span class="hs-comment">--    'testCase' \&quot;A test that depends on Foo.Bar\&quot; $ ...</span><span>
+</span><span id="line-242"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-243"></span><span class="hs-comment">--</span><span>
+</span><span id="line-244"></span><span class="hs-comment">-- @since 1.2</span><span>
+</span><span id="line-245"></span><span class="annot"><a href="Test.Tasty.Core.html#after_"><span class="hs-identifier hs-type">after_</span></a></span><span>
+</span><span id="line-246"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#DependencyType"><span class="hs-identifier hs-type">DependencyType</span></a></span><span> </span><span class="hs-comment">-- ^ whether to run the tests even if some of the dependencies fail</span><span>
+</span><span id="line-247"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Patterns.Types.html#Expr"><span class="hs-identifier hs-type">Expr</span></a></span><span> </span><span class="hs-comment">-- ^ the pattern</span><span>
+</span><span id="line-248"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span> </span><span class="hs-comment">-- ^ the subtree that depends on other tests</span><span>
+</span><span id="line-249"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span> </span><span class="hs-comment">-- ^ the subtree annotated with dependency information</span><span>
+</span><span id="line-250"></span><span id="after_"><span class="annot"><span class="annottext">after_ :: DependencyType -&gt; Expr -&gt; TestTree -&gt; TestTree
+</span><a href="Test.Tasty.Core.html#after_"><span class="hs-identifier hs-var hs-var">after_</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DependencyType -&gt; Expr -&gt; TestTree -&gt; TestTree
+</span><a href="Test.Tasty.Core.html#After"><span class="hs-identifier hs-var">After</span></a></span><span>
+</span><span id="line-251"></span><span>
+</span><span id="line-252"></span><span class="hs-comment">-- | The 'after' combinator declares dependencies between tests.</span><span>
+</span><span id="line-253"></span><span class="hs-comment">--</span><span>
+</span><span id="line-254"></span><span class="hs-comment">-- If a 'TestTree' is wrapped in 'after', the tests in this tree will not run</span><span>
+</span><span id="line-255"></span><span class="hs-comment">-- until certain other tests (&#171;dependencies&#187;) have finished. These</span><span>
+</span><span id="line-256"></span><span class="hs-comment">-- dependencies are specified using an AWK pattern (see the &#171;Patterns&#187; section</span><span>
+</span><span id="line-257"></span><span class="hs-comment">-- in the README).</span><span>
+</span><span id="line-258"></span><span class="hs-comment">--</span><span>
+</span><span id="line-259"></span><span class="hs-comment">-- Moreover, if the 'DependencyType' argument is set to 'AllSucceed' and</span><span>
+</span><span id="line-260"></span><span class="hs-comment">-- at least one dependency has failed, this test tree will not run at all.</span><span>
+</span><span id="line-261"></span><span class="hs-comment">--</span><span>
+</span><span id="line-262"></span><span class="hs-comment">-- Tasty does not check that the pattern matches any tests (let alone the</span><span>
+</span><span id="line-263"></span><span class="hs-comment">-- correct set of tests), so it is on you to supply the right pattern.</span><span>
+</span><span id="line-264"></span><span class="hs-comment">--</span><span>
+</span><span id="line-265"></span><span class="hs-comment">-- ==== __Examples__</span><span>
+</span><span id="line-266"></span><span class="hs-comment">--</span><span>
+</span><span id="line-267"></span><span class="hs-comment">-- The following test will be executed only after all tests that contain</span><span>
+</span><span id="line-268"></span><span class="hs-comment">-- @Foo@ anywhere in their path finish.</span><span>
+</span><span id="line-269"></span><span class="hs-comment">--</span><span>
+</span><span id="line-270"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-271"></span><span class="hs-comment">-- 'after' 'AllFinish' \&quot;Foo\&quot; $</span><span>
+</span><span id="line-272"></span><span class="hs-comment">--    'testCase' \&quot;A test that depends on Foo.Bar\&quot; $ ...</span><span>
+</span><span id="line-273"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-274"></span><span class="hs-comment">--</span><span>
+</span><span id="line-275"></span><span class="hs-comment">-- Note, however, that our test also happens to contain @Foo@ as part of its name,</span><span>
+</span><span id="line-276"></span><span class="hs-comment">-- so it also matches the pattern and becomes a dependency of itself. This</span><span>
+</span><span id="line-277"></span><span class="hs-comment">-- will result in a 'DependencyLoop' exception. To avoid this, either</span><span>
+</span><span id="line-278"></span><span class="hs-comment">-- change the test name so that it doesn't mention @Foo@ or make the</span><span>
+</span><span id="line-279"></span><span class="hs-comment">-- pattern more specific.</span><span>
+</span><span id="line-280"></span><span class="hs-comment">--</span><span>
+</span><span id="line-281"></span><span class="hs-comment">-- You can use AWK patterns, for instance, to specify the full path to the dependency.</span><span>
+</span><span id="line-282"></span><span class="hs-comment">--</span><span>
+</span><span id="line-283"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-284"></span><span class="hs-comment">-- 'after' 'AllFinish' \&quot;$0 == \\\&quot;Tests.Foo.Bar\\\&quot;\&quot; $</span><span>
+</span><span id="line-285"></span><span class="hs-comment">--    'testCase' \&quot;A test that depends on Foo.Bar\&quot; $ ...</span><span>
+</span><span id="line-286"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-287"></span><span class="hs-comment">--</span><span>
+</span><span id="line-288"></span><span class="hs-comment">-- Or only specify the dependency's own name, ignoring the group names:</span><span>
+</span><span id="line-289"></span><span class="hs-comment">--</span><span>
+</span><span id="line-290"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-291"></span><span class="hs-comment">-- 'after' 'AllFinish' \&quot;$NF == \\\&quot;Bar\\\&quot;\&quot; $</span><span>
+</span><span id="line-292"></span><span class="hs-comment">--    'testCase' \&quot;A test that depends on Foo.Bar\&quot; $ ...</span><span>
+</span><span id="line-293"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-294"></span><span class="hs-comment">--</span><span>
+</span><span id="line-295"></span><span class="hs-comment">-- @since 1.2</span><span>
+</span><span id="line-296"></span><span class="annot"><a href="Test.Tasty.Core.html#after"><span class="hs-identifier hs-type">after</span></a></span><span>
+</span><span id="line-297"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#DependencyType"><span class="hs-identifier hs-type">DependencyType</span></a></span><span> </span><span class="hs-comment">-- ^ whether to run the tests even if some of the dependencies fail</span><span>
+</span><span id="line-298"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span class="hs-comment">-- ^ the pattern</span><span>
+</span><span id="line-299"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span> </span><span class="hs-comment">-- ^ the subtree that depends on other tests</span><span>
+</span><span id="line-300"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span> </span><span class="hs-comment">-- ^ the subtree annotated with dependency information</span><span>
+</span><span id="line-301"></span><span id="after"><span class="annot"><span class="annottext">after :: DependencyType -&gt; String -&gt; TestTree -&gt; TestTree
+</span><a href="Test.Tasty.Core.html#after"><span class="hs-identifier hs-var hs-var">after</span></a></span></span><span> </span><span id="local-6989586621679077434"><span class="annot"><span class="annottext">DependencyType
+</span><a href="#local-6989586621679077434"><span class="hs-identifier hs-var">deptype</span></a></span></span><span> </span><span id="local-6989586621679077433"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077433"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-302"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">String -&gt; Maybe Expr
+</span><a href="Test.Tasty.Patterns.html#parseExpr"><span class="hs-identifier hs-var">parseExpr</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077433"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-303"></span><span>    </span><span class="annot"><span class="annottext">Maybe Expr
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Nothing</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. HasCallStack =&gt; String -&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">error</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Could not parse pattern &quot;</span></span><span> </span><span class="annot"><span class="annottext">forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">++</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Show a =&gt; a -&gt; String
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">show</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077433"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-304"></span><span>    </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Just</span></a></span><span> </span><span id="local-6989586621679077430"><span class="annot"><span class="annottext">Expr
+</span><a href="#local-6989586621679077430"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">DependencyType -&gt; Expr -&gt; TestTree -&gt; TestTree
+</span><a href="Test.Tasty.Core.html#after_"><span class="hs-identifier hs-var">after_</span></a></span><span> </span><span class="annot"><span class="annottext">DependencyType
+</span><a href="#local-6989586621679077434"><span class="hs-identifier hs-var">deptype</span></a></span><span> </span><span class="annot"><span class="annottext">Expr
+</span><a href="#local-6989586621679077430"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-305"></span><span>
+</span><span id="line-306"></span><span class="hs-comment">-- | An algebra for folding a `TestTree`.</span><span>
+</span><span id="line-307"></span><span class="hs-comment">--</span><span>
+</span><span id="line-308"></span><span class="hs-comment">-- Instead of constructing fresh records, build upon `trivialFold`</span><span>
+</span><span id="line-309"></span><span class="hs-comment">-- instead. This way your code won't break when new nodes/fields are</span><span>
+</span><span id="line-310"></span><span class="hs-comment">-- indroduced.</span><span>
+</span><span id="line-311"></span><span class="hs-keyword">data</span><span> </span><span id="TreeFold"><span class="annot"><a href="Test.Tasty.Core.html#TreeFold"><span class="hs-identifier hs-var">TreeFold</span></a></span></span><span> </span><span id="local-6989586621679077655"><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="TreeFold"><span class="annot"><a href="Test.Tasty.Core.html#TreeFold"><span class="hs-identifier hs-var">TreeFold</span></a></span></span><span>
+</span><span id="line-312"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="foldSingle"><span class="annot"><span class="annottext">forall b.
+TreeFold b -&gt; forall t. IsTest t =&gt; OptionSet -&gt; String -&gt; t -&gt; b
+</span><a href="Test.Tasty.Core.html#foldSingle"><span class="hs-identifier hs-var hs-var">foldSingle</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679077653"><span class="annot"><a href="#local-6989586621679077653"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#IsTest"><span class="hs-identifier hs-type">IsTest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077653"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-type">TestName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077653"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-313"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="foldGroup"><span class="annot"><span class="annottext">forall b. TreeFold b -&gt; OptionSet -&gt; String -&gt; b -&gt; b
+</span><a href="Test.Tasty.Core.html#foldGroup"><span class="hs-identifier hs-var hs-var">foldGroup</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-type">TestName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-314"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="foldResource"><span class="annot"><span class="annottext">forall b.
+TreeFold b
+-&gt; forall a. OptionSet -&gt; ResourceSpec a -&gt; (IO a -&gt; b) -&gt; b
+</span><a href="Test.Tasty.Core.html#foldResource"><span class="hs-identifier hs-var hs-var">foldResource</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679077649"><span class="annot"><a href="#local-6989586621679077649"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#ResourceSpec"><span class="hs-identifier hs-type">ResourceSpec</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077649"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../ghc/html/libraries/ghc-prim-0.8.0/src"><span class="hs-identifier hs-type">IO</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077649"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-315"></span><span>  </span><span class="hs-special">,</span><span> </span><span id="foldAfter"><span class="annot"><span class="annottext">forall b.
+TreeFold b -&gt; OptionSet -&gt; DependencyType -&gt; Expr -&gt; b -&gt; b
+</span><a href="Test.Tasty.Core.html#foldAfter"><span class="hs-identifier hs-var hs-var">foldAfter</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#DependencyType"><span class="hs-identifier hs-type">DependencyType</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Patterns.Types.html#Expr"><span class="hs-identifier hs-type">Expr</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077655"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-316"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-317"></span><span>
+</span><span id="line-318"></span><span class="hs-comment">-- | 'trivialFold' can serve as the basis for custom folds. Just override</span><span>
+</span><span id="line-319"></span><span class="hs-comment">-- the fields you need.</span><span>
+</span><span id="line-320"></span><span class="hs-comment">--</span><span>
+</span><span id="line-321"></span><span class="hs-comment">-- Here's what it does:</span><span>
+</span><span id="line-322"></span><span class="hs-comment">--</span><span>
+</span><span id="line-323"></span><span class="hs-comment">-- * single tests are mapped to `mempty` (you probably do want to override that)</span><span>
+</span><span id="line-324"></span><span class="hs-comment">--</span><span>
+</span><span id="line-325"></span><span class="hs-comment">-- * test groups are returned unmodified</span><span>
+</span><span id="line-326"></span><span class="hs-comment">--</span><span>
+</span><span id="line-327"></span><span class="hs-comment">-- * for a resource, an IO action that throws an exception is passed (you</span><span>
+</span><span id="line-328"></span><span class="hs-comment">-- want to override this for runners/ingredients that execute tests)</span><span>
+</span><span id="line-329"></span><span id="local-6989586621679077645"><span class="annot"><a href="Test.Tasty.Core.html#trivialFold"><span class="hs-identifier hs-type">trivialFold</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077645"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TreeFold"><span class="hs-identifier hs-type">TreeFold</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077645"><span class="hs-identifier hs-type">b</span></a></span></span><span>
+</span><span id="line-330"></span><span id="trivialFold"><span class="annot"><span class="annottext">trivialFold :: forall b. Monoid b =&gt; TreeFold b
+</span><a href="Test.Tasty.Core.html#trivialFold"><span class="hs-identifier hs-var hs-var">trivialFold</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TreeFold"><span class="hs-identifier hs-type">TreeFold</span></a></span><span>
+</span><span id="line-331"></span><span>  </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">foldSingle :: forall t. IsTest t =&gt; OptionSet -&gt; String -&gt; t -&gt; b
+</span><a href="Test.Tasty.Core.html#foldSingle"><span class="hs-identifier hs-var">foldSingle</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">OptionSet
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">t
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. Monoid a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-332"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">foldGroup :: OptionSet -&gt; String -&gt; b -&gt; b
+</span><a href="Test.Tasty.Core.html#foldGroup"><span class="hs-identifier hs-var">foldGroup</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">OptionSet
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679077416"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679077416"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679077416"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-333"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">foldResource :: forall a. OptionSet -&gt; ResourceSpec a -&gt; (IO a -&gt; b) -&gt; b
+</span><a href="Test.Tasty.Core.html#foldResource"><span class="hs-identifier hs-var">foldResource</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">OptionSet
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ResourceSpec a
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679077414"><span class="annot"><span class="annottext">IO a -&gt; b
+</span><a href="#local-6989586621679077414"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">IO a -&gt; b
+</span><a href="#local-6989586621679077414"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall e a. Exception e =&gt; e -&gt; IO a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">throwIO</span></a></span><span> </span><span class="annot"><span class="annottext">ResourceError
+</span><a href="Test.Tasty.Core.html#NotRunningTests"><span class="hs-identifier hs-var">NotRunningTests</span></a></span><span>
+</span><span id="line-334"></span><span>  </span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">foldAfter :: OptionSet -&gt; DependencyType -&gt; Expr -&gt; b -&gt; b
+</span><a href="Test.Tasty.Core.html#foldAfter"><span class="hs-identifier hs-var">foldAfter</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">OptionSet
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">DependencyType
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Expr
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621679077412"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679077412"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621679077412"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-335"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-336"></span><span>
+</span><span id="line-337"></span><span class="hs-comment">-- | Fold a test tree into a single value.</span><span>
+</span><span id="line-338"></span><span class="hs-comment">--</span><span>
+</span><span id="line-339"></span><span class="hs-comment">-- The fold result type should be a monoid. This is used to fold multiple</span><span>
+</span><span id="line-340"></span><span class="hs-comment">-- results in a test group. In particular, empty groups get folded into 'mempty'.</span><span>
+</span><span id="line-341"></span><span class="hs-comment">--</span><span>
+</span><span id="line-342"></span><span class="hs-comment">-- Apart from pure convenience, this function also does the following</span><span>
+</span><span id="line-343"></span><span class="hs-comment">-- useful things:</span><span>
+</span><span id="line-344"></span><span class="hs-comment">--</span><span>
+</span><span id="line-345"></span><span class="hs-comment">-- 1. Keeping track of the current options (which may change due to</span><span>
+</span><span id="line-346"></span><span class="hs-comment">-- `PlusTestOptions` nodes)</span><span>
+</span><span id="line-347"></span><span class="hs-comment">--</span><span>
+</span><span id="line-348"></span><span class="hs-comment">-- 2. Filtering out the tests which do not match the patterns</span><span>
+</span><span id="line-349"></span><span class="hs-comment">--</span><span>
+</span><span id="line-350"></span><span class="hs-comment">-- Thus, it is preferred to an explicit recursive traversal of the tree.</span><span>
+</span><span id="line-351"></span><span class="hs-comment">--</span><span>
+</span><span id="line-352"></span><span class="hs-comment">-- Note: right now, the patterns are looked up only once, and won't be</span><span>
+</span><span id="line-353"></span><span class="hs-comment">-- affected by the subsequent option changes. This shouldn't be a problem</span><span>
+</span><span id="line-354"></span><span class="hs-comment">-- in practice; OTOH, this behaviour may be changed later.</span><span>
+</span><span id="line-355"></span><span class="annot"><a href="Test.Tasty.Core.html#foldTestTree"><span class="hs-identifier hs-type">foldTestTree</span></a></span><span>
+</span><span id="line-356"></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679077638"><span class="annot"><a href="#local-6989586621679077638"><span class="hs-identifier hs-type">b</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">Monoid</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077638"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-357"></span><span>  </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TreeFold"><span class="hs-identifier hs-type">TreeFold</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077638"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-358"></span><span>     </span><span class="hs-comment">-- ^ the algebra (i.e. how to fold a tree)</span><span>
+</span><span id="line-359"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span>
+</span><span id="line-360"></span><span>     </span><span class="hs-comment">-- ^ initial options</span><span>
+</span><span id="line-361"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span>
+</span><span id="line-362"></span><span>     </span><span class="hs-comment">-- ^ the tree to fold</span><span>
+</span><span id="line-363"></span><span>  </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077638"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-364"></span><span id="foldTestTree"><span class="annot"><span class="annottext">foldTestTree :: forall b. Monoid b =&gt; TreeFold b -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="Test.Tasty.Core.html#foldTestTree"><span class="hs-identifier hs-var hs-var">foldTestTree</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Test.Tasty.Core.html#TreeFold"><span class="hs-identifier hs-type">TreeFold</span></a></span><span> </span><span id="local-6989586621679077405"><span class="annot"><span class="annottext">forall t. IsTest t =&gt; OptionSet -&gt; String -&gt; t -&gt; b
+</span><a href="#local-6989586621679077405"><span class="hs-identifier hs-var">fTest</span></a></span></span><span> </span><span id="local-6989586621679077404"><span class="annot"><span class="annottext">OptionSet -&gt; String -&gt; b -&gt; b
+</span><a href="#local-6989586621679077404"><span class="hs-identifier hs-var">fGroup</span></a></span></span><span> </span><span id="local-6989586621679077403"><span class="annot"><span class="annottext">forall a. OptionSet -&gt; ResourceSpec a -&gt; (IO a -&gt; b) -&gt; b
+</span><a href="#local-6989586621679077403"><span class="hs-identifier hs-var">fResource</span></a></span></span><span> </span><span id="local-6989586621679077402"><span class="annot"><span class="annottext">OptionSet -&gt; DependencyType -&gt; Expr -&gt; b -&gt; b
+</span><a href="#local-6989586621679077402"><span class="hs-identifier hs-var">fAfter</span></a></span></span><span class="hs-special">)</span><span> </span><span id="local-6989586621679077401"><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077401"><span class="hs-identifier hs-var">opts0</span></a></span></span><span> </span><span id="local-6989586621679077400"><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077400"><span class="hs-identifier hs-var">tree0</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-365"></span><span>  </span><span class="annot"><span class="annottext">Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Monoid a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077401"><span class="hs-identifier hs-var">opts0</span></a></span><span> </span><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077400"><span class="hs-identifier hs-var">tree0</span></a></span><span>
+</span><span id="line-366"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-367"></span><span>    </span><span class="annot"><a href="#local-6989586621679077399"><span class="hs-identifier hs-type">go</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Seq.Seq</span></a></span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestName"><span class="hs-identifier hs-type">TestName</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Options.html#OptionSet"><span class="hs-identifier hs-type">OptionSet</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077638"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-368"></span><span>    </span><span id="local-6989586621679077399"><span class="annot"><span class="annottext">go :: Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621679077398"><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span id="local-6989586621679077397"><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span></span><span> </span><span id="local-6989586621679077396"><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077396"><span class="hs-identifier hs-var">tree1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-369"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077396"><span class="hs-identifier hs-var">tree1</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-370"></span><span>        </span><span class="annot"><a href="Test.Tasty.Core.html#SingleTest"><span class="hs-identifier hs-type">SingleTest</span></a></span><span> </span><span id="local-6989586621679077392"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077392"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span id="local-6989586621679077391"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679077391"><span class="hs-identifier hs-var">test</span></a></span></span><span>
+</span><span id="line-371"></span><span>          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">TestPattern -&gt; Seq String -&gt; Bool
+</span><a href="Test.Tasty.Patterns.html#testPatternMatches"><span class="hs-identifier hs-var">testPatternMatches</span></a></span><span> </span><span class="annot"><span class="annottext">TestPattern
+</span><a href="#local-6989586621679077389"><span class="hs-identifier hs-var">pat</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Seq a -&gt; a -&gt; Seq a
+</span><a href="../../../../containers/html/src"><span class="hs-operator hs-var">Seq.|&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077392"><span class="hs-identifier hs-var">name</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-372"></span><span>            </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall t. IsTest t =&gt; OptionSet -&gt; String -&gt; t -&gt; b
+</span><a href="#local-6989586621679077405"><span class="hs-identifier hs-var">fTest</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077392"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679077391"><span class="hs-identifier hs-var">test</span></a></span><span>
+</span><span id="line-373"></span><span>          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">otherwise</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. Monoid a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-374"></span><span>        </span><span class="annot"><a href="Test.Tasty.Core.html#TestGroup"><span class="hs-identifier hs-type">TestGroup</span></a></span><span> </span><span id="local-6989586621679077387"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077387"><span class="hs-identifier hs-var">name</span></a></span></span><span> </span><span id="local-6989586621679077386"><span class="annot"><span class="annottext">[TestTree]
+</span><a href="#local-6989586621679077386"><span class="hs-identifier hs-var">trees</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-375"></span><span>          </span><span class="annot"><span class="annottext">OptionSet -&gt; String -&gt; b -&gt; b
+</span><a href="#local-6989586621679077404"><span class="hs-identifier hs-var">fGroup</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077387"><span class="hs-identifier hs-var">name</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">foldMap</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="annot"><span class="annottext">forall a. Seq a -&gt; a -&gt; Seq a
+</span><a href="../../../../containers/html/src"><span class="hs-operator hs-var">Seq.|&gt;</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679077387"><span class="hs-identifier hs-var">name</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[TestTree]
+</span><a href="#local-6989586621679077386"><span class="hs-identifier hs-var">trees</span></a></span><span>
+</span><span id="line-376"></span><span>        </span><span class="annot"><a href="Test.Tasty.Core.html#PlusTestOptions"><span class="hs-identifier hs-type">PlusTestOptions</span></a></span><span> </span><span id="local-6989586621679077384"><span class="annot"><span class="annottext">OptionSet -&gt; OptionSet
+</span><a href="#local-6989586621679077384"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621679077383"><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077383"><span class="hs-identifier hs-var">tree</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OptionSet -&gt; OptionSet
+</span><a href="#local-6989586621679077384"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077383"><span class="hs-identifier hs-var">tree</span></a></span><span>
+</span><span id="line-377"></span><span>        </span><span class="annot"><a href="Test.Tasty.Core.html#WithResource"><span class="hs-identifier hs-type">WithResource</span></a></span><span> </span><span id="local-6989586621679077382"><span class="annot"><span class="annottext">ResourceSpec a
+</span><a href="#local-6989586621679077382"><span class="hs-identifier hs-var">res0</span></a></span></span><span> </span><span id="local-6989586621679077381"><span class="annot"><span class="annottext">IO a -&gt; TestTree
+</span><a href="#local-6989586621679077381"><span class="hs-identifier hs-var">tree</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall a. OptionSet -&gt; ResourceSpec a -&gt; (IO a -&gt; b) -&gt; b
+</span><a href="#local-6989586621679077403"><span class="hs-identifier hs-var">fResource</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="annot"><span class="annottext">ResourceSpec a
+</span><a href="#local-6989586621679077382"><span class="hs-identifier hs-var">res0</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621679077380"><span class="annot"><span class="annottext">IO a
+</span><a href="#local-6989586621679077380"><span class="hs-identifier hs-var">res</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IO a -&gt; TestTree
+</span><a href="#local-6989586621679077381"><span class="hs-identifier hs-var">tree</span></a></span><span> </span><span class="annot"><span class="annottext">IO a
+</span><a href="#local-6989586621679077380"><span class="hs-identifier hs-var">res</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-378"></span><span>        </span><span class="annot"><a href="Test.Tasty.Core.html#AskOptions"><span class="hs-identifier hs-type">AskOptions</span></a></span><span> </span><span id="local-6989586621679077379"><span class="annot"><span class="annottext">OptionSet -&gt; TestTree
+</span><a href="#local-6989586621679077379"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">OptionSet -&gt; TestTree
+</span><a href="#local-6989586621679077379"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-379"></span><span>        </span><span class="annot"><a href="Test.Tasty.Core.html#After"><span class="hs-identifier hs-type">After</span></a></span><span> </span><span id="local-6989586621679077378"><span class="annot"><span class="annottext">DependencyType
+</span><a href="#local-6989586621679077378"><span class="hs-identifier hs-var">deptype</span></a></span></span><span> </span><span id="local-6989586621679077377"><span class="annot"><span class="annottext">Expr
+</span><a href="#local-6989586621679077377"><span class="hs-identifier hs-var">dep</span></a></span></span><span> </span><span id="local-6989586621679077376"><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077376"><span class="hs-identifier hs-var">tree</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">OptionSet -&gt; DependencyType -&gt; Expr -&gt; b -&gt; b
+</span><a href="#local-6989586621679077402"><span class="hs-identifier hs-var">fAfter</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="annot"><span class="annottext">DependencyType
+</span><a href="#local-6989586621679077378"><span class="hs-identifier hs-var">deptype</span></a></span><span> </span><span class="annot"><span class="annottext">Expr
+</span><a href="#local-6989586621679077377"><span class="hs-identifier hs-var">dep</span></a></span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span> </span><span class="annot"><span class="annottext">Seq String -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="#local-6989586621679077399"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Seq String
+</span><a href="#local-6989586621679077398"><span class="hs-identifier hs-var">path</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="annot"><span class="annottext">TestTree
+</span><a href="#local-6989586621679077376"><span class="hs-identifier hs-var">tree</span></a></span><span>
+</span><span id="line-380"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-381"></span><span>        </span><span id="local-6989586621679077389"><span class="annot"><span class="annottext">pat :: TestPattern
+</span><a href="#local-6989586621679077389"><span class="hs-identifier hs-var hs-var">pat</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall v. IsOption v =&gt; OptionSet -&gt; v
+</span><a href="Test.Tasty.Options.html#lookupOption"><span class="hs-identifier hs-var">lookupOption</span></a></span><span> </span><span class="annot"><span class="annottext">OptionSet
+</span><a href="#local-6989586621679077397"><span class="hs-identifier hs-var">opts</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Patterns.html#TestPattern"><span class="hs-identifier hs-type">TestPattern</span></a></span><span>
+</span><span id="line-382"></span><span>
+</span><span id="line-383"></span><span class="hs-comment">-- | Get the list of options that are relevant for a given test tree</span><span>
+</span><span id="line-384"></span><span class="annot"><a href="Test.Tasty.Core.html#treeOptions"><span class="hs-identifier hs-type">treeOptions</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#TestTree"><span class="hs-identifier hs-type">TestTree</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Test.Tasty.Options.html#OptionDescription"><span class="hs-identifier hs-type">OptionDescription</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-385"></span><span id="treeOptions"><span class="annot"><span class="annottext">treeOptions :: TestTree -&gt; [OptionDescription]
+</span><a href="Test.Tasty.Core.html#treeOptions"><span class="hs-identifier hs-var hs-var">treeOptions</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-386"></span><span>
+</span><span id="line-387"></span><span>  </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) a. Foldable t =&gt; t [a] -&gt; [a]
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">Prelude.concat</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span>
+</span><span id="line-388"></span><span>  </span><span class="annot"><span class="annottext">forall k a. Map k a -&gt; [a]
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Map.elems</span></a></span><span> </span><span class="annot"><span class="annottext">forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">.</span></a></span><span>
+</span><span id="line-389"></span><span>
+</span><span id="line-390"></span><span>  </span><span class="annot"><span class="annottext">forall b. Monoid b =&gt; TreeFold b -&gt; OptionSet -&gt; TestTree -&gt; b
+</span><a href="Test.Tasty.Core.html#foldTestTree"><span class="hs-identifier hs-var">foldTestTree</span></a></span><span>
+</span><span id="line-391"></span><span>    </span><span class="annot"><span class="annottext">forall b. Monoid b =&gt; TreeFold b
+</span><a href="Test.Tasty.Core.html#trivialFold"><span class="hs-identifier hs-var">trivialFold</span></a></span><span> </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">foldSingle :: forall t.
+IsTest t =&gt;
+OptionSet -&gt; String -&gt; t -&gt; Map TypeRep [OptionDescription]
+</span><a href="Test.Tasty.Core.html#foldSingle"><span class="hs-identifier hs-var">foldSingle</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">OptionSet
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">forall t. IsTest t =&gt; t -&gt; Map TypeRep [OptionDescription]
+</span><a href="#local-6989586621679077366"><span class="hs-identifier hs-var">getTestOptions</span></a></span><span> </span><span class="hs-special">}</span><span>
+</span><span id="line-392"></span><span>    </span><span class="annot"><span class="annottext">forall a. Monoid a =&gt; a
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">mempty</span></a></span><span>
+</span><span id="line-393"></span><span>
+</span><span id="line-394"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-395"></span><span>    </span><span class="annot"><a href="#local-6989586621679077366"><span class="hs-identifier hs-type">getTestOptions</span></a></span><span>
+</span><span id="line-396"></span><span>      </span><span class="hs-glyph">::</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621679077617"><span class="annot"><a href="#local-6989586621679077617"><span class="hs-identifier hs-type">t</span></a></span></span><span> </span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="Test.Tasty.Core.html#IsTest"><span class="hs-identifier hs-type">IsTest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621679077617"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-397"></span><span>      </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621679077617"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="../../../../containers/html/src"><span class="hs-identifier hs-type">Map.Map</span></a></span><span> </span><span class="annot"><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-type">TypeRep</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Test.Tasty.Options.html#OptionDescription"><span class="hs-identifier hs-type">OptionDescription</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-398"></span><span>    </span><span id="local-6989586621679077366"><span class="annot"><span class="annottext">getTestOptions :: forall t. IsTest t =&gt; t -&gt; Map TypeRep [OptionDescription]
+</span><a href="#local-6989586621679077366"><span class="hs-identifier hs-var hs-var">getTestOptions</span></a></span></span><span> </span><span id="local-6989586621679077361"><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679077361"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-399"></span><span>      </span><span class="annot"><span class="annottext">forall k a. k -&gt; a -&gt; Map k a
+</span><a href="../../../../containers/html/src"><span class="hs-identifier hs-var">Map.singleton</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. Typeable a =&gt; a -&gt; TypeRep
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-identifier hs-var">typeOf</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679077361"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><a href="../../../../ghc/html/libraries/base-4.16.3.0/src"><span class="hs-operator hs-var">$</span></a></span><span>
+</span><span id="line-400"></span><span>          </span><span class="annot"><span class="annottext">forall a b. Tagged a b -&gt; a -&gt; b
+</span><a href="../../../../tagged/html/src"><span class="hs-identifier hs-var">witness</span></a></span><span> </span><span class="annot"><span class="annottext">forall t. IsTest t =&gt; Tagged t [OptionDescription]
+</span><a href="Test.Tasty.Core.html#testOptions"><span class="hs-identifier hs-var">testOptions</span></a></span><span> </span><span class="annot"><span class="annottext">t
+</span><a href="#local-6989586621679077361"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-401"></span></pre></body></html>
