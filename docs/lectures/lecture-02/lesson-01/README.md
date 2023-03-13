@@ -1,25 +1,24 @@
-# Lesson 1.4: The EUTxO Model
+# Lesson 2.1: Low-Level, Untyped Validation Scripts
 
-Welcome to Lesson 1.4! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
+Welcome to Lesson 2.1! In this lesson, you'll learn about how untyped validation scripts works.
 
-{% embed url="https://youtu.be/ulYDNaEKf4g" %}
+{% embed url="https://youtu.be/3tcWCZV6L_w" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Describe the EUTxO model.
-* Exemplify how transactions work on Cardano using EUTxO.
-* Explain the advantages that EUTxO adds to Cardano for securing transactions.
+* Describe how on-chain validation works.
+* Launch and explore the Plutus documentation from the Docker Container and Demeter terminal.
+* Code and compile a simple smart contract.
 {% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Essential Cardano Glossary - EUTXO: extended unspent transaction output](https://www.essentialcardano.io/glossary/eutxo)
-* [Understanding the Extended UTxO model](https://docs.cardano.org/learn/eutxo-explainer)
-* [EUTXO v Account-based models](https://www.essentialcardano.io/infographic/eutxo-v-account-based-models)
-* [The EUTxO Handbook](https://www.essentialcardano.io/article/the-eutxo-handbook)
+* [What is a smart contract?](https://docs.cardano.org/new-to-cardano/what-is-a-smart-contract)
+* [What's the difference between "on-chain" and "off-chain" in plutus smart contracts?](https://cardano.stackexchange.com/questions/219/whats-the-difference-between-on-chain-and-off-chain-in-plutus-smart-contrac)
+* [Concurrency and all that: Cardano smart contracts and the EUTXO model](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/)
 {% endtab %}
 {% endtabs %}
 

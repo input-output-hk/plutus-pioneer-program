@@ -1,25 +1,25 @@
-# Lesson 1.4: The EUTxO Model
+# Lesson 2.4: Lesson 2 Summary
 
-Welcome to Lesson 1.4! In this lesson, you'll learn about the EUTxO model and how it operates on Cardano.
+Welcome to Lesson 2.4! We'll be reviewing and reinforcing the concepts you learned in the previous lesson. Let's get started by refreshing your memory on the material you've already covered.
 
-{% embed url="https://youtu.be/ulYDNaEKf4g" %}
+{% embed url="https://youtu.be/F5ewN65Mn4I" %}
 
 {% tabs %}
-{% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
+{% tab title="Concepts Recap" %}
+Congratulations on finishing all the lessons! Now, you are able to:
 
-* Describe the EUTxO model.
-* Exemplify how transactions work on Cardano using EUTxO.
-* Explain the advantages that EUTxO adds to Cardano for securing transactions.
+* Explain what validators are.
+* Differentiate between typed and untyped scripts.
+* Execute and inspect validators' code to identify code issues.
+* Employ built-in and custom data types.
+* Use the cardano-cli to interact with validators.
 {% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Essential Cardano Glossary - EUTXO: extended unspent transaction output](https://www.essentialcardano.io/glossary/eutxo)
-* [Understanding the Extended UTxO model](https://docs.cardano.org/learn/eutxo-explainer)
-* [EUTXO v Account-based models](https://www.essentialcardano.io/infographic/eutxo-v-account-based-models)
-* [The EUTxO Handbook](https://www.essentialcardano.io/article/the-eutxo-handbook)
+* [Writing basic validator scripts](https://plutus.readthedocs.io/en/latest/tutorials/basic-validators.html)
+* [Plutus language changes](https://plutus.readthedocs.io/en/latest/reference/cardano/language-changes.html)
 {% endtab %}
 {% endtabs %}
 

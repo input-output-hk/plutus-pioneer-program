@@ -18,6 +18,7 @@ import           Utilities            (wrap)
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
 {-# INLINABLE mkParameterizedVestingValidator #-}
+-- This should validate if the transaction has a signature from the parameterized beneficiary and the deadline has passed.
 mkParameterizedVestingValidator :: PubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
 mkParameterizedVestingValidator _beneficiary _deadline () _ctx = False -- FIX ME!
 
