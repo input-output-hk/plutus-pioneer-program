@@ -43,22 +43,12 @@ RUN git clone https://github.com/bitcoin-core/secp256k1 &&\
   make && \
   make install  && cd .. && rm -rf ./secp256k1
 
-# install nix
-# RUN curl -L -o install.sh https://nixos.org/nix/install \
-#   && bash install.sh --daemon
-
 FROM system_deps as haskell
-
-#SHELL ["bash", "-lc"]
 
 # haskell args
 ARG CABAL_VERSION=3.6.2.0
 ARG GHC_VERSION=8.10.7
 ARG HLS_VERSION=1.7.0.0
-
-
-#RUN nix-env -iA niv -f https://github.com/nmattia/niv/tarball/master --substituters https://niv.cachix.org --trusted-public-keys niv.cachix.org-1:X32PCg2e/zAm3/uD1ScqW2z/K0LtDyNV7RdaxIuLgQM=
-#  && niv add mlabs-haskell/plutus-simple-model -r 64dd3fee4caff9472e0dcc2e14cc587452c80e77
 
 # install libsodium from sources with prefix '/'
 RUN git clone https://github.com/input-output-hk/libsodium.git &&\
@@ -78,63 +68,48 @@ RUN wget --secure-protocol=TLSv1_2 \
   && mkdir -p ${HOME:-/root}/.ghcup/bin \
   && mv $(arch)-linux-ghcup ${HOME:-/root}/.ghcup/bin/ghcup 
 
+# install ghc, caball, and hls
 RUN ghcup config set downloader Wget \
   &&  ghcup install ghc ${GHC_VERSION} \
   &&  ghcup install cabal ${CABAL_VERSION}
 RUN ghcup set ghc ${GHC_VERSION}
 RUN ghcup install hls ${HLS_VERSION}
 
-ENV PATH=${PATH}:${HOME:-/root}/.cabal/bin
-#RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
-#RUN cabal update
+# Update cabal
+RUN cabal update
 
-FROM haskell as cardano_node
+# Add cabal to PATH
+RUN echo "export PATH=$PATH:/root/.cabal/bin" >> ~/.bashrc
 
-# install cardano-node binaries
-RUN wget https://update-cardano-mainnet.iohk.io/cardano-node-releases/cardano-node-1.35.5-linux.tar.gz \
-  && tar -xf cardano-node-1.35.5-linux.tar.gz -C /usr/bin \
-  && cardano-cli --version
+FROM haskell as cardano_cli
+
+# install cardano-cli (we use a different docker container for the actual node)
+# (These have to be the same version as the cardano-node image specified at `docker-compose.yml`)
+RUN wget https://github.com/rober-m/cardano-node/releases/download/1.35.5/$(arch)-linux-cardano-cli
+RUN chmod +x $(arch)-linux-cardano-cli
+RUN mv $(arch)-linux-cardano-cli /usr/bin/cardano-cli
 
 # node socket
-RUN echo "export CARDANO_NODE_SOCKET_PATH=/ipc/node.socket" >> ~/.bashrc
-RUN mkdir -p ${HOME:-/root}/node-config
+RUN echo "export CARDANO_NODE_SOCKET_PATH=/root/.cardano/preview/node.socket" >> ~/.bashrc
+RUN echo "export NETWORK=preview" >> ~/.bashrc
 
-# Download cardano-node config
-RUN mkdir -p /ipc
-
-RUN  wget https://book.world.dev.cardano.org/environments/preview/config.json \
-  && wget https://book.world.dev.cardano.org/environments/preview/db-sync-config.json \
-  && wget https://book.world.dev.cardano.org/environments/preview/submit-api-config.json \
-  && wget https://book.world.dev.cardano.org/environments/preview/topology.json \
-  && wget https://book.world.dev.cardano.org/environments/preview/byron-genesis.json \
-  && wget https://book.world.dev.cardano.org/environments/preview/alonzo-genesis.json \
-  && wget https://book.world.dev.cardano.org/environments/preview/shelley-genesis.json \
-  && mv ./*.json ${HOME:-/root}/node-config/
-
-# start-node alias
-RUN echo "alias start-node='cardano-node run \
-	     --config ${HOME:-/root}/node-config/config.json \
-	     --topology ${HOME:-/root}/node-config/topology.json \
-	     --database-path ${HOME:-/root}/preview-db \
-	     --socket-path /ipc/node.socket'" >> ~/.bashrc
-
-FROM cardano_node as kuber
-
-# In case we need to build from source
-# install kuber
-#RUN git clone https://github.com/dQuadrant/kuber \
-#  && cd kuber \
-#  && cabal update \
-#  && cd server \
-#  && cabal build \
-#  && cabal install
+FROM cardano_cli as kuber
 
 # install kuber
-RUN wget https://github.com/rober-m/kuber/releases/download/babbage-era/$(arch)-linux-kuber \
-  && chmod +x $(arch)-linux-kuber \
-  && mv $(arch)-linux-kuber /usr/bin/kuber \
-  && echo "export NETWORK=preview" >> ~/.bashrc
+RUN wget https://github.com/rober-m/kuber/releases/download/babbage-era/$(arch)-linux-kuber
+RUN chmod +x $(arch)-linux-kuber
+RUN mv $(arch)-linux-kuber /usr/bin/kuber
 
+
+FROM kuber as stylish_haskell
+
+# install stylish-haskell (FIXME: couldn't compile a bin for arm64)
+# RUN wget https://github.com/rober-m/stylish-haskell/releases/download/v0.14.3.0/$(arch)-linux-stylish-haskell
+# RUN chmod +x $(arch)-linux-stylish-haskell
+# RUN mv $(arch)-linux-stylish-haskell /usr/bin/stylish-haskell
+RUN wget https://github.com/rober-m/stylish-haskell/releases/download/v0.14.3.0/x86_64-linux-stylish-haskell
+RUN chmod +x x86_64-linux-stylish-haskell
+RUN mv x86_64-linux-stylish-haskell /usr/bin/stylish-haskell
 
 FROM kuber as nodejs
 
@@ -148,13 +123,11 @@ ENV PATH="/root/.nvm/versions/node/v${NODE_VERSION}/bin/:${PATH}"
 RUN node --version
 RUN npm --version
 
- 
 FROM nodejs as plutus
 
-RUN git clone https://github.com/input-output-hk/plutus-pioneer-program \
-  && cd plutus-pioneer-program/code \
-  && cabal update \
-  && cabal build all \
-  && cabal install stylish-haskell
+RUN git clone https://github.com/input-output-hk/plutus-pioneer-program
+RUN cd plutus-pioneer-program/code && cabal update
+RUN cd plutus-pioneer-program/code && cabal build all
 
-RUN echo "alias serve-docs='python3 -m http.server -d /workspaces/plutus-pioneer-program/docs/plutus-docs/haddock/'" >> ~/.bashrc
+RUN echo "alias serve-docs='python3 -m http.server -d /workspace/docs/plutus-docs/haddock/'" >> ~/.bashrc
+
