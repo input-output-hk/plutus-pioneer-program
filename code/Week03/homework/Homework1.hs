@@ -7,11 +7,11 @@
 
 module Homework1 where
 
-import           Plutus.V2.Ledger.Api (BuiltinData, POSIXTime, PubKeyHash,
-                                       ScriptContext, Validator,
-                                       mkValidatorScript)
+import Plutus.V2.Ledger.Api
+import Plutus.V2.Ledger.Contexts ( txSignedBy )
+import Plutus.V1.Ledger.Interval
 import           PlutusTx             (compile, unstableMakeIsData)
-import           PlutusTx.Prelude     (Bool (..))
+import           PlutusTx.Prelude     (traceIfFalse, Bool (..), (||), (&&), (+))
 import           Utilities            (wrap)
 
 ---------------------------------------------------------------------------------------------------
@@ -29,7 +29,23 @@ unstableMakeIsData ''VestingDatum
 -- This should validate if either beneficiary1 has signed the transaction and the current slot is before or at the deadline
 -- or if beneficiary2 has signed the transaction and the deadline has passed.
 mkVestingValidator :: VestingDatum -> () -> ScriptContext -> Bool
-mkVestingValidator _dat () _ctx = False -- FIX ME!
+mkVestingValidator dat () ctx = 
+    traceIfFalse "Benificiary1 did not sign or to late" checkCondition1 || 
+    traceIfFalse "Benificiary2 did not sign or is to early" checkCondition2
+    where
+        txInfo :: TxInfo
+        txInfo = scriptContextTxInfo ctx
+
+        txValidRange :: POSIXTimeRange
+        txValidRange  = txInfoValidRange txInfo
+
+        checkCondition1 :: Bool
+        checkCondition1 = txSignedBy txInfo (beneficiary1 dat) &&
+                          contains (to (deadline dat)) txValidRange
+
+        checkCondition2 :: Bool
+        checkCondition2 = txSignedBy txInfo (beneficiary2 dat) &&
+                          contains (from (1 + deadline dat)) txValidRange
 
 {-# INLINABLE  mkWrappedVestingValidator #-}
 mkWrappedVestingValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
