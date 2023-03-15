@@ -24,3 +24,13 @@
   * [Lesson 2.3: High-Level, Typed Validation Scripts](lectures/lecture-02/lesson-03/README.md)
   * [Lesson 2.4: Lesson 2 Summary](lectures/lecture-02/lesson-04/README.md)
   * [Lecture 2 Homework Assignment](lectures/lecture-02/lesson-05/README.md)
+
+* [Lecture 3](lectures/lecture-03/README.md)
+  * [Lesson 3.1: Script Contexts](lectures/lecture-03/lesson-01/README.md)
+  * [Lesson 3.2: Handling Time](lectures/lecture-03/lesson-02/README.md)
+  * [Lesson 3.3: A Vesting Example](lectures/lecture-03/lesson-03/README.md)
+  * [Lesson 3.4: Parameterized Contracts](lectures/lecture-03/lesson-04/README.md)
+  * [Lesson 3.5: Off-Chain Code with Lucid](lectures/lecture-03/lesson-05/README.md)
+  * [Lesson 3.6: Reference Scripts](lectures/lecture-03/lesson-06/README.md)  
+  * [Lesson 3.7: Lesson 3 Summary](lectures/lecture-03/lesson-07/README.md)
+  * [Lecture 3 Homework Assignment](lectures/lecture-03/lesson-08/README.md)

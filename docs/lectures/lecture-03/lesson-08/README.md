@@ -1,8 +1,8 @@
-# Lecture 2 Homework Assignment: Implementing Validators Using Plutus
+# Lecture 3 Homework Assignment: Implementing a Vesting Smart Contract
 
-Congratulations on finishing Lecture 2! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
+Congratulations on finishing Lecture 3! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% embed url="https://youtu.be/OR2IfD4oDjw" %}
+{% embed url="https://youtu.be/hdt4XqFeEyg" %}
 
 {% hint style="info" %}
 This homework assignment is intended to reinforce the skills you learned in this lesson; pushing your solutions to the PPP repository is not required.
@@ -20,10 +20,9 @@ However, if you have any questions, please contact the IOG's Education Team on [
 {% tab title="Learning Objectives" %}
 After completing this homework assignment, you'll be able to:
 
-* Create an on-chain validator.
-* Inspect a validator's code to find and correct code bugs.
-* Employ custom data types.
-* Interact with validators using the cardano-cli to test them.
+* Create a smart contract using Lucid.
+* Handle time ranges in smart contracts.
+* Employ parametrized scripts.
 {% endtab %}
 {% endtabs %}
 
