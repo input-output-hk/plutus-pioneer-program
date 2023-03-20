@@ -4,6 +4,7 @@ module Utilities.Conversions
   , validatorAddressBech32
   , posixTimeFromIso8601
   , posixTimeToIso8601
+  , bytesFromHex
   ) where
 
 import qualified Cardano.Api               as Api
@@ -16,6 +17,8 @@ import qualified Data.Time.Clock.POSIX     as Time
 import qualified Data.Time.Format.ISO8601  as Time
 import           Plutus.V2.Ledger.Api      (POSIXTime, Validator)
 import           Utilities.Serialise       (validatorToScript)
+import qualified Data.ByteString           as BS
+import qualified Plutus.V1.Ledger.Bytes    as P
 
 validatorHash :: Validator -> Api.ScriptHash
 validatorHash v = Api.hashScript $ Api.PlutusScript Api.PlutusScriptV2 $ validatorToScript v
@@ -39,3 +42,8 @@ posixTimeFromIso8601 s = do
 posixTimeToIso8601 :: POSIXTime -> String
 posixTimeToIso8601 t = Time.formatShow Time.iso8601Format $ Time.posixSecondsToUTCTime $ fromRational $ toRational t / 1000
 
+bytesFromHex :: BS.ByteString -> BS.ByteString
+bytesFromHex = P.bytes . fromEither . P.fromHex
+  where
+    fromEither (Left e)  = Prelude.error $ show e
+    fromEither (Right b) = b
