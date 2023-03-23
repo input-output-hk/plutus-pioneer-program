@@ -131,3 +131,13 @@ RUN cd plutus-pioneer-program/code && cabal build all
 
 RUN echo "alias serve-docs='python3 -m http.server -d /workspace/docs/plutus-docs/haddock/'" >> ~/.bashrc
 RUN echo "source <(cardano-cli --bash-completion-script cardano-cli)" >> ~/.bashrc
+
+FROM plutus as cargo
+
+RUN curl https://sh.rustup.rs -sSfo rustup-init
+RUN chmod +x rustup-init
+RUN ./rustup-init -y
+
+FROM cargo as deno
+
+RUN /root/.cargo/bin/cargo install deno --locked

@@ -30,7 +30,6 @@ HINT: If you get stuck, take a look at Week03's lecture
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
 {-# INLINABLE mkParameterizedMisteryValidator #-}
--- This should validate if the transaction has a signature from the parameterized beneficiary and the deadline has passed.
 mkParameterizedMisteryValidator :: PubKeyHash -> POSIXTime -> () -> ScriptContext -> Bool
 mkParameterizedMisteryValidator beneficiary deadline () ctx =
     traceIfFalse "not signed by beneficiary" checkSig &&
