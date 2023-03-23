@@ -39,6 +39,14 @@ This documentation looks better in GitBook at the following link: <https://iog-a
   * [Homework](https://youtu.be/hdt4XqFeEyg)
   * [Summary](https://youtu.be/gxan_u2pStE)
 
+* [Lecture 4](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2j587Ox_nwEzmCO-elk8BG)
+  * [On-chain VS Off-chain](https://youtu.be/pTc_BJby5GU)
+  * [Off-chain Code with Cardano CLI and GUI](https://youtu.be/gsgQ-xmzbpA)
+  * [Off-chain Code with Kuber](https://youtu.be/fzib9ALlL2M)
+  * [Off-chain Code with Lucid](https://youtu.be/BXz5V2rjbiE)
+  * [Homework](https://youtu.be/2Qm2xgmtbk4)
+
+
 ## Repository Structure
 
 The most relevant directories of this repository are structured as follows:
