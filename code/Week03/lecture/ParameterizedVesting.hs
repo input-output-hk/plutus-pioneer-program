@@ -17,7 +17,7 @@ import           PlutusTx                  (applyCode, compile, liftCode,
                                             makeLift)
 import           PlutusTx.Prelude          (Bool, traceIfFalse, ($), (&&), (.))
 import           Prelude                   (IO)
-import           Utilities                 (wrap, writeValidatorToFile)
+import           Utilities                 (wrapValidator, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -45,7 +45,7 @@ mkParameterizedVestingValidator params () () ctx =
 
 {-# INLINABLE  mkWrappedParameterizedVestingValidator #-}
 mkWrappedParameterizedVestingValidator :: VestingParams -> BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedParameterizedVestingValidator = wrap . mkParameterizedVestingValidator
+mkWrappedParameterizedVestingValidator = wrapValidator . mkParameterizedVestingValidator
 
 validator :: VestingParams -> Validator
 validator params = mkValidatorScript ($$(compile [|| mkWrappedParameterizedVestingValidator ||]) `applyCode` liftCode params)

@@ -7,13 +7,13 @@
 
 module Homework2 where
 
+import           Plutus.V1.Ledger.Interval (contains)
 import           Plutus.V2.Ledger.Api
-import           Plutus.V2.Ledger.Contexts  (txSignedBy)
-import           Plutus.V1.Ledger.Interval  (contains)
-import           PlutusTx                   (applyCode, compile, liftCode)
-import           PlutusTx.Prelude           (Bool (..), (.), traceIfFalse, (&&))
-import           Utilities                  (wrap, writeValidatorToFile)
-import           Prelude                    (IO)
+import           Plutus.V2.Ledger.Contexts (txSignedBy)
+import           PlutusTx                  (applyCode, compile, liftCode)
+import           PlutusTx.Prelude          (Bool (..), traceIfFalse, (&&), (.))
+import           Prelude                   (IO)
+import           Utilities                 (wrapValidator, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------------ PROMPT -------------------------------------------------
@@ -49,7 +49,7 @@ mkParameterizedMisteryValidator beneficiary deadline () ctx =
 
 {-# INLINABLE  mkWrappedParameterizedMisteryValidator #-}
 mkWrappedParameterizedMisteryValidator :: PubKeyHash -> BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedParameterizedMisteryValidator = wrap . mkParameterizedMisteryValidator
+mkWrappedParameterizedMisteryValidator = wrapValidator . mkParameterizedMisteryValidator
 
 validator :: PubKeyHash -> Validator
 validator beneficiary = mkValidatorScript ($$(compile [|| mkWrappedParameterizedMisteryValidator ||]) `applyCode` liftCode beneficiary)

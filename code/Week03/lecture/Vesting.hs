@@ -17,8 +17,8 @@ import           PlutusTx.Prelude          (Bool, traceIfFalse, ($), (&&))
 import           Prelude                   (IO, String)
 import           Utilities                 (Network, posixTimeFromIso8601,
                                             printDataToJSON,
-                                            validatorAddressBech32, wrap,
-                                            writeValidatorToFile)
+                                            validatorAddressBech32,
+                                            wrapValidator, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -46,7 +46,7 @@ mkVestingValidator dat () ctx = traceIfFalse "beneficiary's signature missing" s
 
 {-# INLINABLE  mkWrappedVestingValidator #-}
 mkWrappedVestingValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedVestingValidator = wrap mkVestingValidator
+mkWrappedVestingValidator = wrapValidator mkVestingValidator
 
 validator :: Validator
 validator = mkValidatorScript $$(compile [|| mkWrappedVestingValidator ||])

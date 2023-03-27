@@ -7,20 +7,22 @@
 
 module Homework1 where
 
-import           Data.Maybe                 (fromJust)
-import           Plutus.V2.Ledger.Api       (BuiltinData, POSIXTime, PubKeyHash,
+import           Data.Maybe                (fromJust)
+import           Plutus.V1.Ledger.Interval (contains, to)
+import           Plutus.V2.Ledger.Api      (BuiltinData, POSIXTime,
+                                            POSIXTimeRange, PubKeyHash,
                                             ScriptContext (scriptContextTxInfo),
                                             TxInfo (txInfoValidRange),
-                                            Validator, from, mkValidatorScript, POSIXTimeRange)
-import           Plutus.V2.Ledger.Contexts  (txSignedBy)
-import           Plutus.V1.Ledger.Interval  (to, contains)
-import           PlutusTx                   (compile, unstableMakeIsData)
-import           PlutusTx.Prelude           (Bool, traceIfFalse, ($), (&&), (||), (+))
-import           Prelude                    (IO, String)
-import           Utilities                  (Network, posixTimeFromIso8601,
-                                             printDataToJSON,
-                                             validatorAddressBech32, wrap,
-                                             writeValidatorToFile)
+                                            Validator, from, mkValidatorScript)
+import           Plutus.V2.Ledger.Contexts (txSignedBy)
+import           PlutusTx                  (compile, unstableMakeIsData)
+import           PlutusTx.Prelude          (Bool, traceIfFalse, ($), (&&), (+),
+                                            (||))
+import           Prelude                   (IO, String)
+import           Utilities                 (Network, posixTimeFromIso8601,
+                                            printDataToJSON,
+                                            validatorAddressBech32,
+                                            wrapValidator, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------------ PROMPT -------------------------------------------------
@@ -46,8 +48,8 @@ unstableMakeIsData ''MisteryDatum
 
 {-# INLINABLE mkMisteryValidator #-}
 mkMisteryValidator :: MisteryDatum -> () -> ScriptContext -> Bool
-mkMisteryValidator dat () ctx = 
-    traceIfFalse "Benificiary1 did not sign or to late" checkCondition1 || 
+mkMisteryValidator dat () ctx =
+    traceIfFalse "Benificiary1 did not sign or to late" checkCondition1 ||
     traceIfFalse "Benificiary2 did not sign or is to early" checkCondition2
     where
         txInfo :: TxInfo
@@ -66,7 +68,7 @@ mkMisteryValidator dat () ctx =
 
 {-# INLINABLE  mkWrappedMisteryValidator #-}
 mkWrappedMisteryValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedMisteryValidator = wrap mkMisteryValidator
+mkWrappedMisteryValidator = wrapValidator mkMisteryValidator
 
 validator :: Validator
 validator = mkValidatorScript $$(compile [|| mkWrappedMisteryValidator ||])
