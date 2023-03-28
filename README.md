@@ -14,7 +14,7 @@ This documentation looks better in GitBook at the following link: <https://iog-a
 
 ## Lectures
 
-* [Lecture 1](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3xFHJJKdyfo9eB0Iw-OQDd)
+### [Lecture 1](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3xFHJJKdyfo9eB0Iw-OQDd)
   * [Welcome and Introduction](https://youtu.be/g4fBo4QPir0)
   * [Setting up Our Development Environment](https://youtu.be/-cmIqKCzzOU)
   * [Kuber Marketplace Demo](https://youtu.be/ZaB-7ZYBi3g)
@@ -22,14 +22,14 @@ This documentation looks better in GitBook at the following link: <https://iog-a
   * [The EUTxO-Model](https://youtu.be/ulYDNaEKf4g)
   * [Homework](https://youtu.be/Ey903I-R1KY)
 
-* [Lecture 2](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x1-oF7NDy0MhXxG7k5O6ZOA)
+### [Lecture 2](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x1-oF7NDy0MhXxG7k5O6ZOA)
   * [Low-Level, Untyped Validation Scripts](https://youtu.be/3tcWCZV6L_w)
   * [Using the Cardano CLI to Interact with Plutus](https://youtu.be/2MbzKzoBiak)
   * [High-Level, Typed Validation Scripts](https://youtu.be/GT8OjOzsOb4)
   * [Summary](https://youtu.be/F5ewN65Mn4I)
   * [Homework](https://youtu.be/OR2IfD4oDjw)
 
-* [Lecture 3](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2zXSjHRKLSc5Jn9vJFA3_O)
+### [Lecture 3](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2zXSjHRKLSc5Jn9vJFA3_O)
   * [Script Contexts](https://youtu.be/dcoYrIyEI4o)
   * [Handling Time](https://youtu.be/LPzwMqOnWvk)
   * [A Vesting Example](https://youtu.be/5D0O7q9UPJA)
@@ -38,6 +38,14 @@ This documentation looks better in GitBook at the following link: <https://iog-a
   * [Reference Scripts](https://youtu.be/Rnyc5YXVXew)
   * [Homework](https://youtu.be/hdt4XqFeEyg)
   * [Summary](https://youtu.be/gxan_u2pStE)
+
+### [Lecture 4](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2j587Ox_nwEzmCO-elk8BG)
+  * [On-chain VS Off-chain](https://youtu.be/pTc_BJby5GU)
+  * [Off-chain Code with Cardano CLI and GUI](https://youtu.be/gsgQ-xmzbpA)
+  * [Off-chain Code with Kuber](https://youtu.be/fzib9ALlL2M)
+  * [Off-chain Code with Lucid](https://youtu.be/BXz5V2rjbiE)
+  * [Homework](https://youtu.be/2Qm2xgmtbk4)
+
 
 ## Repository Structure
 

@@ -11,7 +11,7 @@ import           PlutusTx             (BuiltinData, compile, unstableMakeIsData)
 import           PlutusTx.Prelude     (Bool, Eq ((==)), Integer, traceIfFalse,
                                        ($))
 import           Prelude              (IO)
-import           Utilities            (wrap, writeValidatorToFile)
+import           Utilities            (wrapValidator, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -27,7 +27,7 @@ mkCTValidator _ (MkMySillyRedeemer r) _ = traceIfFalse "expected 42" $ r == 42
 {-# INLINABLE mkCTValidator #-}
 
 wrappedMkVal :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-wrappedMkVal = wrap mkCTValidator
+wrappedMkVal = wrapValidator mkCTValidator
 {-# INLINABLE wrappedMkVal #-}
 
 validator :: PlutusV2.Validator

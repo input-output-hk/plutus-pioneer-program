@@ -11,7 +11,7 @@ import           PlutusTx             (compile)
 import           PlutusTx.Prelude     (Bool, Eq ((==)), Integer, traceIfFalse,
                                        ($))
 import           Prelude              (IO)
-import           Utilities            (wrap, writeValidatorToFile)
+import           Utilities            (wrapValidator, writeValidatorToFile)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -23,7 +23,7 @@ mk42Validator _ r _ = traceIfFalse "expected 42" $ r == 42
 {-# INLINABLE mk42Validator #-}
 
 validator :: PlutusV2.Validator
-validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| wrap mk42Validator ||])
+validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| wrapValidator mk42Validator ||])
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------- HELPER FUNCTIONS --------------------------------------------
