@@ -39,5 +39,5 @@
   * [Lesson 4.1: On-Chain Vs. Off-Chain Code](lectures/lecture-04/lesson-01/README.md)
   * [Lesson 4.2: Off-Chain Code with Cardano CLI and GUI](lectures/lecture-04/lesson-02/README.md)
   * [Lesson 4.3: Off-chain Code with Kuber](lectures/lecture-04/lesson-03/README.md)
-  * [Lesson 4.4: Parameterized Contracts](lectures/lecture-04/lesson-04/README.md)
+  * [Lesson 4.4: Off-Chain Code with Lucid](lectures/lecture-04/lesson-04/README.md)
   * [Lecture 4 Homework Assignment](lectures/lecture-04/lesson-05/README.md)
