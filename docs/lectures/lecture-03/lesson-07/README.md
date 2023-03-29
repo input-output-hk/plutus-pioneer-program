@@ -16,7 +16,7 @@ Congratulations on finishing all the lessons! Now, you are able to:
 * Define parameters to provide information to a smart contract.
 * Explain the differences between using the datum or parameters to define values in smart contracts.
 * Understand how to create off-chain code by using Lucid.
-* Relate how a simple dApp for Cardano can be created  using Lucid.
+* Relate how a simple dApp for Cardano can be created using Lucid.
 * Understand how reference scripts work in the Vasil hard fork.
 * Restate the benefits of using reference scripts.
 

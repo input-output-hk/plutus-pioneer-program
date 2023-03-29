@@ -34,3 +34,10 @@
   * [Lesson 3.6: Reference Scripts](lectures/lecture-03/lesson-06/README.md)  
   * [Lesson 3.7: Lesson 3 Summary](lectures/lecture-03/lesson-07/README.md)
   * [Lecture 3 Homework Assignment](lectures/lecture-03/lesson-08/README.md)
+
+* [Lecture 4](lectures/lecture-04/README.md)
+  * [Lesson 4.1: On-Chain Vs. Off-Chain Code](lectures/lecture-04/lesson-01/README.md)
+  * [Lesson 4.2: Off-Chain Code with Cardano CLI and GUI](lectures/lecture-04/lesson-02/README.md)
+  * [Lesson 4.3: Off-chain Code with Kuber](lectures/lecture-04/lesson-03/README.md)
+  * [Lesson 4.4: Off-Chain Code with Lucid](lectures/lecture-04/lesson-04/README.md)
+  * [Lecture 4 Homework Assignment](lectures/lecture-04/lesson-05/README.md)
