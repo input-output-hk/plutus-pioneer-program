@@ -46,6 +46,9 @@ This documentation looks better in GitBook at the following link: <https://iog-a
   * [Off-chain Code with Lucid](https://youtu.be/BXz5V2rjbiE)
   * [Homework](https://youtu.be/2Qm2xgmtbk4)
 
+### [Lecture 5](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x2T1lIR4XnDILKukj3rPapi)
+  * [Introduction](https://youtu.be/HgXYsMFqnb4)
+  * [Values](https://youtu.be/ThYByMLC0EI)
 
 ## Repository Structure
 
