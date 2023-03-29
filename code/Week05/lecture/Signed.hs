@@ -18,12 +18,12 @@ import           Utilities                 (currencySymbol, wrapPolicy,
                                             writeCodeToFile, writePolicyToFile)
 
 {-# INLINABLE mkSignedPolicy #-}
-mkSignedPolicy :: BuiltinData -> () -> ScriptContext -> Bool
-mkSignedPolicy pkh () ctx = traceIfFalse "missing signature" $ txSignedBy (scriptContextTxInfo ctx) $ PlutusTx.unsafeFromBuiltinData pkh
+mkSignedPolicy :: PubKeyHash -> () -> ScriptContext -> Bool
+mkSignedPolicy pkh () ctx = traceIfFalse "missing signature" $ txSignedBy (scriptContextTxInfo ctx) pkh
 
 {-# INLINABLE mkWrappedSignedPolicy #-}
 mkWrappedSignedPolicy :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedSignedPolicy = wrapPolicy . mkSignedPolicy
+mkWrappedSignedPolicy pkh = wrapPolicy (mkSignedPolicy $ PlutusTx.unsafeFromBuiltinData pkh)
 
 signedCode :: PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> ())
 signedCode = $$(PlutusTx.compile [|| mkWrappedSignedPolicy ||])

@@ -27,20 +27,12 @@ import           Utilities                  (bytesToHex, currencySymbol,
                                              writePolicyToFile)
 
 {-# INLINABLE mkNFTPolicy #-}
-mkNFTPolicy :: BuiltinData -> BuiltinData -> BuiltinData -> () -> ScriptContext -> Bool
-mkNFTPolicy tid ix tn' () ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
-                                traceIfFalse "wrong amount minted" checkMintedAmount
+mkNFTPolicy :: TxOutRef -> TokenName -> () -> ScriptContext -> Bool
+mkNFTPolicy oref tn () ctx = traceIfFalse "UTxO not consumed"   hasUTxO           &&
+                             traceIfFalse "wrong amount minted" checkMintedAmount
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
-
-    oref :: TxOutRef
-    oref = TxOutRef
-        (TxId $ PlutusTx.unsafeFromBuiltinData tid)
-        (PlutusTx.unsafeFromBuiltinData ix)
-
-    tn :: TokenName
-    tn = PlutusTx.unsafeFromBuiltinData tn'
 
     hasUTxO :: Bool
     hasUTxO = any (\i -> txInInfoOutRef i == oref) $ txInfoInputs info
@@ -52,7 +44,15 @@ mkNFTPolicy tid ix tn' () ctx = traceIfFalse "UTxO not consumed"   hasUTxO      
 
 {-# INLINABLE mkWrappedNFTPolicy #-}
 mkWrappedNFTPolicy :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedNFTPolicy tid ix tn = wrapPolicy $ mkNFTPolicy tid ix tn
+mkWrappedNFTPolicy tid ix tn' = wrapPolicy $ mkNFTPolicy oref tn
+  where
+    oref :: TxOutRef
+    oref = TxOutRef
+        (TxId $ PlutusTx.unsafeFromBuiltinData tid)
+        (PlutusTx.unsafeFromBuiltinData ix)
+
+    tn :: TokenName
+    tn = PlutusTx.unsafeFromBuiltinData tn'
 
 nftCode :: PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
 nftCode = $$(PlutusTx.compile [|| mkWrappedNFTPolicy ||])
