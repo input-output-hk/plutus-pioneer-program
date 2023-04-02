@@ -17,6 +17,7 @@ import           Utilities            (currencySymbol, wrapPolicy,
 mkFreePolicy :: () -> ScriptContext -> Bool
 mkFreePolicy () _ = True
 
+{-# INLINABLE mkWrappedFreePolicy #-}
 mkWrappedFreePolicy :: BuiltinData -> BuiltinData -> ()
 mkWrappedFreePolicy = wrapPolicy mkFreePolicy
 
