@@ -62,12 +62,12 @@ lockingTx usp val =
     , payToScript valScript (HashDatum ()) val
     ]
 
--- Create transaction that spends "giftRef" to unlock "giftVal" from the "valScript" validator
+-- Create transaction that spends "oRef" to unlock "val" from the "valScript" validator
 consumingTx :: Integer -> PubKeyHash -> TxOutRef -> Value -> Tx
-consumingTx redeemer usr giftRef giftVal =
+consumingTx redeemer usr oRef val =
   mconcat
-    [ spendScript valScript giftRef (mkI redeemer) ()
-    , payToKey usr giftVal
+    [ spendScript valScript oRef (mkI redeemer) ()
+    , payToKey usr val
     ]
 
 ---------------------------------------------------------------------------------------------------
@@ -94,8 +94,8 @@ testValue v = do
   submitTx u1 $ lockingTx sp val            -- User 1 submits "lockingTx" transaction
   -- USER 2 TAKES "val" FROM VALIDATOR
   utxos <- utxoAt valScript                 -- Query blockchain to get all UTxOs at script
-  let [(giftRef, giftOut)] = utxos          -- We know there is only one UTXO (the one we created before)
-  submitTx u2 $ consumingTx 0 u2 giftRef (txOutValue giftOut) -- User 2 submits "consumingTx" transaction
+  let [(oRef, oOut)] = utxos                -- We know there is only one UTXO (the one we created before)
+  submitTx u2 $ consumingTx 0 u2 oRef (txOutValue oOut)           -- User 2 submits "consumingTx" transaction
   -- CHECK THAT FINAL BALANCES MATCH EXPECTED BALANCES
   [v1, v2] <- mapM valueAt [u1, u2]                               -- Get final balances  
   return $ v1 == adaValue (1000 - v) && v2 == adaValue (1000 + v) -- Check that final balances match expected balances
@@ -132,8 +132,8 @@ testRedeemer shouldConsume redeemer = do
   submitTx u1 $ lockingTx sp val            -- User 1 submits "lockingTx" transaction
   -- USER 2 TAKES "val" FROM VALIDATOR
   utxos <- utxoAt valScript                 -- Query blockchain to get all UTxOs at script
-  let [(giftRef, giftOut)] = utxos          -- We know there is only one UTXO (the one we created before)
-      tx = consumingTx redeemer u2 giftRef (txOutValue giftOut)            -- Define transaction to be submitted
+  let [(oRef, oOut)] = utxos                -- We know there is only one UTXO (the one we created before)
+      tx = consumingTx redeemer u2 oRef (txOutValue oOut)                  -- Define transaction to be submitted
       v2Expected = if shouldConsume then adaValue 1100 else adaValue 1000  -- Define expected balance for user 2
   if shouldConsume then submitTx u2 tx else mustFail . submitTx u2 $ tx    -- User 2 submits "consumingTx" transaction
   -- CHECK THAT FINAL BALANCES MATCH EXPECTED BALANCES
