@@ -9,18 +9,18 @@ module Main where
 import qualified NegativeR as OnChain
 import           Plutus.V2.Ledger.Api (PubKeyHash, Value
                                       , TxOut (txOutValue), TxOutRef)
-import           PlutusTx.Prelude     (($), Eq ((==)), (&&), (.), Bool, Ord ((<=)), return)
+import           PlutusTx.Prelude     (($), Eq ((==)), (&&), (.), Bool (..), Ord ((<=)), return)
 import           Prelude             (IO, mconcat, Ord ((>), (<)), Num ((-), (+)))
 import           Control.Monad        (replicateM, mapM)
 import           Plutus.Model         ( ada, adaValue,
                                        newUser, payToKey, payToScript, spend, spendScript, submitTx, userSpend, valueAt, toV2,
                                        utxoAt, defaultBabbage, Ada(Lovelace),
                                        DatumMode(HashDatum), UserSpend, Tx,
-                                       TypedValidator(TypedValidator), runMock, initMock, Run )
+                                       TypedValidator(TypedValidator), runMock, initMock, Run, mustFail )
 import           Test.Tasty           ( defaultMain, testGroup )
 import PlutusTx.Builtins (mkI, Integer)
 import Test.QuickCheck
-    ( (==>), collect, expectFailure, Property, Testable(property) )
+    ( (==>), collect, Property, Testable(property) )
 import Test.Tasty.QuickCheck as QC ( testProperty )
 import Test.QuickCheck.Monadic (assert, run, monadic, PropertyM)
 
@@ -69,7 +69,7 @@ consumingTx redeemer usr giftRef giftVal =
     [ spendScript valScript giftRef (mkI redeemer) ()
     , payToKey usr giftVal
     ]
-      
+
 ---------------------------------------------------------------------------------------------------
 ------------------------------------- TESTING VALUES ----------------------------------------------
 
@@ -89,51 +89,53 @@ testValue v = do
   -- SETUP USERS
   [u1, u2] <- setupUsers
   -- USER 1 LOCKS 100 ADA ("val") IN VALIDATOR
-  let val = adaValue v                    -- Define value to be transfered
+  let val = adaValue v                      -- Define value to be transfered
   sp <- spend u1 val                        -- Get user's UTXO that we should spend
   submitTx u1 $ lockingTx sp val            -- User 1 submits "lockingTx" transaction
   -- USER 2 TAKES "val" FROM VALIDATOR
   utxos <- utxoAt valScript                 -- Query blockchain to get all UTxOs at script
   let [(giftRef, giftOut)] = utxos          -- We know there is only one UTXO (the one we created before)
-  submitTx u2 $ consumingTx 0 u2 giftRef (txOutValue giftOut)   -- User 2 submits "consumingTx" transaction
+  submitTx u2 $ consumingTx 0 u2 giftRef (txOutValue giftOut) -- User 2 submits "consumingTx" transaction
   -- CHECK THAT FINAL BALANCES MATCH EXPECTED BALANCES
-  [v1, v2] <- mapM valueAt [u1, u2]
-  return $ v1 == adaValue (1000 - v) && v2 == adaValue (1000 + v)
+  [v1, v2] <- mapM valueAt [u1, u2]                               -- Get final balances  
+  return $ v1 == adaValue (1000 - v) && v2 == adaValue (1000 + v) -- Check that final balances match expected balances
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------- TESTING REDEEMERS -------------------------------------------
 
 -- | The validator should have the property that all positive values fail
 prop_failIfPositive :: Integer -> Property
-prop_failIfPositive r = (r > 0) ==> collect r . expectFailure $ monadic property $ checkRedeemers r
+prop_failIfPositive r = (r > 0) ==> monadic property $ checkRedeemers False r
 
 -- | The validator should have the property that only negative values succeed
 prop_successIfNegative :: Integer -> Property
-prop_successIfNegative r = (r < 0) ==> monadic property $ checkRedeemers r
+prop_successIfNegative r = (r < 0) ==> monadic property $ checkRedeemers True r
 
 -- | Same as prop_successIfNeg but collecting the redeemer value for further analysis
 prop_successIfNegative' :: Integer -> Property
-prop_successIfNegative' r = (r <= 0) ==> collect r $ monadic property $ checkRedeemers r
+prop_successIfNegative' r = (r <= 0) ==> collect r $ monadic property $ checkRedeemers True r
 
 -- | Check that the expected and real balances match after using the validator with different redeemers
-checkRedeemers :: Integer -> PropertyM Run ()
-checkRedeemers redeemer = do
-  balancesMatch <- run $ testRedeemer redeemer
+checkRedeemers :: Bool -> Integer -> PropertyM Run ()
+checkRedeemers shouldConsume redeemer = do
+  balancesMatch <- run $ testRedeemer shouldConsume redeemer
   assert balancesMatch
 
 -- Function to test if both creating an consuming script UTxOs works properly 
-testRedeemer :: Integer -> Run Bool
-testRedeemer r = do
+testRedeemer :: Bool -> Integer -> Run Bool
+testRedeemer shouldConsume redeemer = do
   -- SETUP USERS
   [u1, u2] <- setupUsers
   -- USER 1 LOCKS 100 ADA ("val") IN VALIDATOR
   let val = adaValue 100                    -- Define value to be transfered
-  sp <- spend u1 val                        -- Get user's UTXO that we should spend
+  sp <- spend u1 val                        -- Get user's UTXOs that we should spend
   submitTx u1 $ lockingTx sp val            -- User 1 submits "lockingTx" transaction
   -- USER 2 TAKES "val" FROM VALIDATOR
   utxos <- utxoAt valScript                 -- Query blockchain to get all UTxOs at script
   let [(giftRef, giftOut)] = utxos          -- We know there is only one UTXO (the one we created before)
-  submitTx u2 $ consumingTx r u2 giftRef (txOutValue giftOut)   -- User 2 submits "consumingTx" transaction
+      tx = consumingTx redeemer u2 giftRef (txOutValue giftOut)            -- Define transaction to be submitted
+      v2Expected = if shouldConsume then adaValue 1100 else adaValue 1000  -- Define expected balance for user 2
+  if shouldConsume then submitTx u2 tx else mustFail . submitTx u2 $ tx    -- User 2 submits "consumingTx" transaction
   -- CHECK THAT FINAL BALANCES MATCH EXPECTED BALANCES
-  [v1, v2] <- mapM valueAt [u1, u2]
-  return $ v1 == adaValue 900 && v2 == adaValue 1100
+  [v1, v2] <- mapM valueAt [u1, u2]               -- Get final balances
+  return $ v1 == adaValue 900 && v2 == v2Expected -- Check if final balances match expected balances
