@@ -6,13 +6,16 @@
 
 module NegativeRTimed where
 
-import qualified Plutus.V2.Ledger.Api as PlutusV2
-import           PlutusTx             (compile, unstableMakeIsData)
-import PlutusTx.Builtins ( Integer, BuiltinData )
-import PlutusTx.Prelude ( Bool, ($), traceIfFalse, Ord((<=)), (&&) ) 
-import Plutus.V2.Ledger.Api (ScriptContext (scriptContextTxInfo), POSIXTime, TxInfo (txInfoValidRange), from)
-import Utilities (wrapValidator)
-import Plutus.V1.Ledger.Interval (contains)
+import           Plutus.V1.Ledger.Interval (contains)
+import           Plutus.V2.Ledger.Api      (POSIXTime,
+                                            ScriptContext (scriptContextTxInfo),
+                                            TxInfo (txInfoValidRange), from)
+import qualified Plutus.V2.Ledger.Api      as PlutusV2
+import           PlutusTx                  (compile, unstableMakeIsData)
+import           PlutusTx.Builtins         (BuiltinData, Integer)
+import           PlutusTx.Prelude          (Bool, Ord ((<=)), traceIfFalse, ($),
+                                            (&&))
+import           Utilities                 (wrapValidator)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------

@@ -1,7 +1,7 @@
 
 module State where
 
-import Control.Monad.State (State, get, put, runState)
+import           Control.Monad.State (State, get, put, runState)
 
 ---------------------------------------------------------------------------------------------------
 --------------------------------- HELPER FUNCTIONS/TYPES ------------------------------------------
@@ -22,15 +22,15 @@ initialMockS = Mock [ UTxO "Alice" 1000 , UTxO "Bob" 2000 ]
 ------------------------------------ WITHOUT STATE MONAD ------------------------------------------
 
 sendValue :: String -> Integer -> String -> Mock -> (Bool, Mock)
-sendValue from amount to currMock =
-    let senderUtxos = filter ((== from) . owner) (utxos currMock)
-        blockchainWithoutSenderUtxos = filter ((/= from) . owner) (utxos currMock)
+sendValue from amount to mockS =
+    let senderUtxos = filter ((== from) . owner) (utxos mockS)
+        blockchainWithoutSenderUtxos = filter ((/= from) . owner) (utxos mockS)
         totalSenderFunds = sum (map value senderUtxos)
         receiverUtxo = UTxO to amount
         senderChange = UTxO from (totalSenderFunds - amount)
     in if totalSenderFunds >= amount
         then (True, Mock $ [receiverUtxo] ++ [senderChange] ++ blockchainWithoutSenderUtxos)
-        else (False, currMock)
+        else (False, mockS)
 
 
 multipleTx :: (Bool, Mock)
@@ -47,9 +47,9 @@ multipleTx =
 
 sendValue' :: String -> Integer -> String -> State Mock Bool
 sendValue' from amount to = do
-    currMock <- get
-    let senderUtxos = filter ((== from) . owner) (utxos currMock)
-        blockchainWithoutSenderUtxos = filter ((/= from) . owner) (utxos currMock)
+    mockS <- get
+    let senderUtxos = filter ((== from) . owner) (utxos mockS)
+        blockchainWithoutSenderUtxos = filter ((/= from) . owner) (utxos mockS)
         totalSenderFunds = sum (map value senderUtxos)
         receiverUtxo = UTxO to amount
         senderChange = UTxO from (totalSenderFunds - amount)
@@ -64,7 +64,7 @@ multipleTx' = runState (do
     isOk  <- sendValue' "Alice" 100 "Bob"
     isOk2 <- sendValue' "Alice" 300 "Bob"
     isOk3 <- sendValue' "Bob"   200 "Alice"
-    return (isOk && isOk2 && isOk3)) 
+    return (isOk && isOk2 && isOk3))
     initialMockS
 
 

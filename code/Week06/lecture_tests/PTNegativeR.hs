@@ -1,28 +1,33 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Main where
 
-import qualified NegativeR as OnChain
-import           Plutus.V2.Ledger.Api (PubKeyHash, Value
-                                      , TxOut (txOutValue), TxOutRef)
-import           PlutusTx.Prelude     (($), Eq ((==)), (&&), (.), Bool (..), Ord ((<=)), return)
-import           Prelude             (IO, mconcat, Ord ((>), (<)), Num ((-), (+)))
-import           Control.Monad        (replicateM, mapM)
-import           Plutus.Model         ( ada, adaValue,
-                                       newUser, payToKey, payToScript, spend, spendScript, submitTx, userSpend, valueAt, toV2,
-                                       utxoAt, defaultBabbage, Ada(Lovelace),
-                                       DatumMode(HashDatum), UserSpend, Tx,
-                                       TypedValidator(TypedValidator), runMock, initMock, Run, mustFail )
-import           Test.Tasty           ( defaultMain, testGroup )
-import PlutusTx.Builtins (mkI, Integer)
-import Test.QuickCheck
-    ( (==>), collect, Property, Testable(property) )
-import Test.Tasty.QuickCheck as QC ( testProperty )
-import Test.QuickCheck.Monadic (assert, run, monadic, PropertyM)
+import           Control.Monad           (mapM, replicateM)
+import qualified NegativeR               as OnChain
+import           Plutus.Model            (Ada (Lovelace), DatumMode (HashDatum),
+                                          Run, Tx,
+                                          TypedValidator (TypedValidator),
+                                          UserSpend, ada, adaValue,
+                                          defaultBabbage, initMock, mustFail,
+                                          newUser, payToKey, payToScript,
+                                          runMock, spend, spendScript, submitTx,
+                                          toV2, userSpend, utxoAt, valueAt)
+import           Plutus.V2.Ledger.Api    (PubKeyHash, TxOut (txOutValue),
+                                          TxOutRef, Value)
+import           PlutusTx.Builtins       (Integer, mkI)
+import           PlutusTx.Prelude        (Bool (..), Eq ((==)), Ord ((<=)),
+                                          return, ($), (&&), (.))
+import           Prelude                 (IO, Num ((+), (-)), Ord ((<), (>)),
+                                          mconcat)
+import           Test.QuickCheck         (Property, Testable (property),
+                                          collect, (==>))
+import           Test.QuickCheck.Monadic (PropertyM, assert, monadic, run)
+import           Test.Tasty              (defaultMain, testGroup)
+import           Test.Tasty.QuickCheck   as QC (testProperty)
 
 ---------------------------------------------------------------------------------------------------
 --------------------------------------- TESTING MAIN ----------------------------------------------
@@ -83,7 +88,7 @@ checkValues value = do
   balancesMatch <- run $ testValue value
   assert balancesMatch
 
--- Function to test if both creating an consuming script UTxOs works properly 
+-- Function to test if both creating an consuming script UTxOs works properly
 testValue :: Integer -> Run Bool
 testValue v = do
   -- SETUP USERS
@@ -97,7 +102,7 @@ testValue v = do
   let [(oRef, oOut)] = utxos                -- We know there is only one UTXO (the one we created before)
   submitTx u2 $ consumingTx 0 u2 oRef (txOutValue oOut)           -- User 2 submits "consumingTx" transaction
   -- CHECK THAT FINAL BALANCES MATCH EXPECTED BALANCES
-  [v1, v2] <- mapM valueAt [u1, u2]                               -- Get final balances  
+  [v1, v2] <- mapM valueAt [u1, u2]                               -- Get final balances
   return $ v1 == adaValue (1000 - v) && v2 == adaValue (1000 + v) -- Check that final balances match expected balances
 
 ---------------------------------------------------------------------------------------------------
@@ -121,7 +126,7 @@ checkRedeemers shouldConsume redeemer = do
   balancesMatch <- run $ testRedeemer shouldConsume redeemer
   assert balancesMatch
 
--- Function to test if both creating an consuming script UTxOs works properly 
+-- Function to test if both creating an consuming script UTxOs works properly
 testRedeemer :: Bool -> Integer -> Run Bool
 testRedeemer shouldConsume redeemer = do
   -- SETUP USERS

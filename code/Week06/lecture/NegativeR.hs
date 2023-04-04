@@ -6,12 +6,12 @@
 
 module NegativeR where
 
+import           Plutus.V2.Ledger.Api (ScriptContext)
 import qualified Plutus.V2.Ledger.Api as PlutusV2
 import           PlutusTx             (compile)
-import PlutusTx.Builtins ( Integer, BuiltinData )
-import PlutusTx.Prelude ( Bool, ($), traceIfFalse, Ord((<=)) ) 
-import Plutus.V2.Ledger.Api (ScriptContext)
-import Utilities (wrapValidator)
+import           PlutusTx.Builtins    (BuiltinData, Integer)
+import           PlutusTx.Prelude     (Bool, Ord ((<=)), traceIfFalse, ($))
+import           Utilities            (wrapValidator)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------

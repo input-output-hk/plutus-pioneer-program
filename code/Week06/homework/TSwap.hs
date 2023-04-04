@@ -1,18 +1,28 @@
 {-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
 module Main where
 
-import           Plutus.Model
-import qualified Swap as OC
+import qualified Mint
+import           Plutus.Model         (Ada (Lovelace), DatumMode (HashDatum),
+                                       MockConfig, Run, Tx,
+                                       TypedPolicy (TypedPolicy),
+                                       TypedValidator (TypedValidator), ada,
+                                       adaValue, checkBalance, defaultBabbage,
+                                       mintValue, mustFail, newUser, owns,
+                                       payToKey, payToScript,
+                                       scriptCurrencySymbol, spendPubKey,
+                                       spendScript, submitTx, testNoErrors,
+                                       toV2, utxoAt, waitNSlots)
+import           Plutus.V2.Ledger.Api (PubKeyHash, TokenName, TxOutRef, Value,
+                                       singleton)
 import           PlutusTx.Prelude     (($))
-import           Prelude             (IO, (.), mconcat, (<>), Integer)
-import           Test.Tasty           ( defaultMain, testGroup, TestTree )
-import           Plutus.V2.Ledger.Api
-import qualified Mint as Mint
+import           Prelude              (IO, Integer, mconcat, (.), (<>))
+import qualified Swap                 as OC
+import           Test.Tasty           (TestTree, defaultMain, testGroup)
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------------ TESTING ------------------------------------------------
@@ -77,7 +87,7 @@ doubleSpending = do
       [(refU2,_)] = utxosU2
   submitTx user2 $ doubleRetrieve user1 user2 ref1 ref2 refU2 100 mintingValue
 
-mintingTx :: (TypedPolicy ()) -> Value -> PubKeyHash -> Integer -> Tx
+mintingTx :: TypedPolicy () -> Value -> PubKeyHash -> Integer -> Tx
 mintingTx tp val pkh price =
   mconcat
     [ mintValue tp () val

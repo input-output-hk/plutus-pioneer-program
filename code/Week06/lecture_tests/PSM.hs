@@ -2,24 +2,16 @@
 
 module Main where
 
-import Test.Tasty ( defaultMain, testGroup )
-import Prelude
+import           Prelude
+import           Test.Tasty           (defaultMain, testGroup)
 
-import Data.Functor (void)
-import Plutus.Model
-    ( ada,
-      adaValue,
-      mustFail,
-      newUser,
-      noErrors,
-      sendValue,
-      testNoErrors,
-      valueAt,
-      defaultBabbage,
-      Ada(Lovelace),
-      Run )
-import Plutus.V1.Ledger.Api (PubKeyHash)
-import Control.Monad (replicateM)
+import           Control.Monad        (replicateM)
+import           Data.Functor         (void)
+import           Plutus.Model         (Ada (Lovelace), Run, ada, adaValue,
+                                       defaultBabbage, mustFail, newUser,
+                                       noErrors, sendValue, testNoErrors,
+                                       valueAt)
+import           Plutus.V1.Ledger.Api (PubKeyHash)
 
 ---------------------------------------------------------------------------------------------------
 --------------------------------------- TESTING MAIN ----------------------------------------------

@@ -6,13 +6,13 @@
 
 module Swap where
 
-import qualified Plutus.V2.Ledger.Api as PlutusV2
-import           PlutusTx             (compile, unstableMakeIsData)
-import PlutusTx.Builtins ( BuiltinData , Integer )
-import PlutusTx.Prelude ( Bool (..), (==) )
-import Plutus.V2.Ledger.Api (ScriptContext)
-import Plutus.V2.Ledger.Contexts (valuePaidTo)
-import Utilities (wrapValidator)
+import           Plutus.V2.Ledger.Api      (ScriptContext)
+import qualified Plutus.V2.Ledger.Api      as PlutusV2
+import           Plutus.V2.Ledger.Contexts (valuePaidTo)
+import           PlutusTx                  (compile, unstableMakeIsData)
+import           PlutusTx.Builtins         (BuiltinData, Integer)
+import           PlutusTx.Prelude          (Bool (..), (==))
+import           Utilities                 (wrapValidator)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------

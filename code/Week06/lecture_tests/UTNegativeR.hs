@@ -1,23 +1,24 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE NumericUnderscores #-}
 
 module Main where
 
-import qualified NegativeR as OnChain
-import           Plutus.V2.Ledger.Api (PubKeyHash, Value
-                                      , TxOut (txOutValue), TxOutRef)
-import           PlutusTx.Prelude     (($), Eq ((==)), (&&), (.))
+import           Control.Monad        (mapM, replicateM, unless)
+import qualified NegativeR            as OnChain
+import           Plutus.Model         (Ada (Lovelace), DatumMode (HashDatum),
+                                       Run, Tx, TypedValidator (TypedValidator),
+                                       UserSpend, ada, adaValue, defaultBabbage,
+                                       logError, mustFail, newUser, payToKey,
+                                       payToScript, spend, spendScript,
+                                       submitTx, testNoErrors, toV2, userSpend,
+                                       utxoAt, valueAt)
+import           Plutus.V2.Ledger.Api (PubKeyHash, TxOut (txOutValue), TxOutRef,
+                                       Value)
+import           PlutusTx.Builtins    (Integer, mkI)
+import           PlutusTx.Prelude     (Eq ((==)), ($), (&&), (.))
 import           Prelude              (IO, mconcat)
-import           Control.Monad        (replicateM, mapM, unless)
-import           Plutus.Model         ( ada, adaValue, mustFail,
-                                       newUser, payToKey, payToScript, spend, spendScript, submitTx,
-                                       testNoErrors, userSpend, valueAt, toV2, logError,
-                                       utxoAt, defaultBabbage, Ada(Lovelace),
-                                       DatumMode(HashDatum), UserSpend, Tx, Run,
-                                       TypedValidator(TypedValidator) )
-import           Test.Tasty           ( defaultMain, testGroup )
-import PlutusTx.Builtins (mkI, Integer)
+import           Test.Tasty           (defaultMain, testGroup)
 
 ---------------------------------------------------------------------------------------------------
 --------------------------------------- TESTING MAIN ----------------------------------------------
@@ -44,11 +45,11 @@ setupUsers = replicateM 2 $ newUser $ ada (Lovelace 1000)
 
 -- Validator's script
 valScript :: TypedValidator datum redeemer
-valScript = TypedValidator $ toV2 OnChain.validator 
+valScript = TypedValidator $ toV2 OnChain.validator
 
 -- Create transaction that spends "usp" to lock "val" in "valScript"
 lockingTx :: UserSpend -> Value -> Tx
-lockingTx usp val = 
+lockingTx usp val =
   mconcat
     [ userSpend usp
     , payToScript valScript (HashDatum ()) val
@@ -65,7 +66,7 @@ consumingTx redeemer usr oRef val =
 ---------------------------------------------------------------------------------------------------
 ------------------------------------- TESTING REDEEMERS -------------------------------------------
 
--- Function to test if both creating and consuming script UTxOs works properly 
+-- Function to test if both creating and consuming script UTxOs works properly
 testScript :: Integer -> Run ()
 testScript r = do
   -- SETUP USERS

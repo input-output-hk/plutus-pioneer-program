@@ -1,23 +1,25 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE NumericUnderscores #-}
 
 module Main where
 
-import qualified NegativeRTimed as OnChain
-import           Plutus.V2.Ledger.Api (PubKeyHash, Value
-                                      , TxOut (txOutValue), TxOutRef, POSIXTime)
-import           PlutusTx.Prelude     (($), Eq ((==)), (&&), (.))
+import           Control.Monad        (mapM, replicateM, unless)
+import qualified NegativeRTimed       as OnChain
+import           Plutus.Model         (Ada (Lovelace), DatumMode (HashDatum),
+                                       Run, Tx, TypedValidator (TypedValidator),
+                                       UserSpend, ada, adaValue, currentTimeRad,
+                                       defaultBabbage, logError, mustFail,
+                                       newUser, payToKey, payToScript, spend,
+                                       spendScript, submitTx, testNoErrors,
+                                       toV2, userSpend, utxoAt, validateIn,
+                                       valueAt, waitUntil)
+import           Plutus.V2.Ledger.Api (POSIXTime, PubKeyHash,
+                                       TxOut (txOutValue), TxOutRef, Value)
+import           PlutusTx.Builtins    (Integer, mkI)
+import           PlutusTx.Prelude     (Eq ((==)), ($), (&&), (.))
 import           Prelude              (IO, mconcat)
-import           Control.Monad        (replicateM, mapM, unless)
-import           Plutus.Model         ( ada, adaValue, mustFail,
-                                       newUser, payToKey, payToScript, spend, spendScript, submitTx,
-                                       testNoErrors, userSpend, valueAt, toV2, logError,
-                                       utxoAt, defaultBabbage, Ada(Lovelace),
-                                       DatumMode(HashDatum), UserSpend, Tx, Run,
-                                       TypedValidator(TypedValidator), waitUntil, validateIn, currentTimeRad )
-import           Test.Tasty           ( defaultMain, testGroup )
-import PlutusTx.Builtins (mkI, Integer)
+import           Test.Tasty           (defaultMain, testGroup)
 
 ---------------------------------------------------------------------------------------------------
 --------------------------------------- TESTING MAIN ----------------------------------------------
@@ -50,11 +52,11 @@ setupUsers = replicateM 2 $ newUser $ ada (Lovelace 1000)
 
 -- Validator's script
 valScript :: TypedValidator datum redeemer
-valScript = TypedValidator $ toV2 OnChain.validator 
+valScript = TypedValidator $ toV2 OnChain.validator
 
 -- Create transaction that spends "usp" to lock "val" in "giftScript"
 lockingTx :: POSIXTime -> UserSpend -> Value -> Tx
-lockingTx dl usp val = 
+lockingTx dl usp val =
   mconcat
     [ userSpend usp
     , payToScript valScript (HashDatum (OnChain.MkCustomDatum dl)) val
@@ -71,7 +73,7 @@ consumingTx dl redeemer usr giftRef giftVal =
 ---------------------------------------------------------------------------------------------------
 ------------------------------------- TESTING REDEEMERS -------------------------------------------
 
--- Function to test if both creating and consuming script UTxOs works properly 
+-- Function to test if both creating and consuming script UTxOs works properly
 testScript :: POSIXTime -> Integer -> Run ()
 testScript d r = do
   -- SETUP USERS

@@ -1,16 +1,16 @@
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TemplateHaskell   #-}
 module Mint where
 
 -- import qualified Cardano.Ledger.Alonzo.Language as C
-import qualified PlutusTx.Prelude as PlutusTx
+import           Plutus.V1.Ledger.Value
+import           Plutus.V2.Ledger.Api
+import           Plutus.V2.Ledger.Contexts
 import qualified PlutusTx
-import PlutusTx.Prelude
-import Plutus.V2.Ledger.Api
-import Plutus.V1.Ledger.Value
-import Plutus.V2.Ledger.Contexts
-import Utilities (wrapPolicy)
+import           PlutusTx.Prelude
+import qualified PlutusTx.Prelude          as PlutusTx
+import           Utilities                 (wrapPolicy)
 
 fakeMintingPolicy :: TokenName -> MintingPolicy
 fakeMintingPolicy mintParams =
