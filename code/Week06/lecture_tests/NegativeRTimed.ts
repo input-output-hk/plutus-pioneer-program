@@ -77,25 +77,27 @@ async function runTest(dtm: NegativeRTimedDatum, r: NegativeRTimedRedeemer, n: n
   // gets added to the first block in the emulator
   await sendToScript(lucid,user1,dtm);
 
-  // wait n blocks
-  emulator.awaitBlock(n);
+  // wait n slots
+  emulator.awaitSlot(n);
 
   // gets added to the (n+1)th block
   await grabFunds(lucid,emulator,user2,dtm,r);
 
   emulator.awaitBlock(10);
+
+  //console.log(await emulator.getUtxos(address2));
 }
-//await runTest({deadline:BigInt(Date.now()+20000*5)},-10n,5);
+//await runTest({deadline:BigInt(Date.now()+20000*5+1000)},-42n,5*20+1);
 
 // UNIT tests
 
 Deno.test("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds", async () => { 
   // redeemer used
   const r: NegativeRTimedRedeemer = -42n;
-  // datum used, note that a block is 20000 milliseconds.
+  // datum used, note that there is a block each 20000 milliseconds.
   const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
   // after which block will user 2 grab the funds.
-  const n: number = 7
+  const n: number = 7*20
   await runTest(d,r,n);
 });
 
@@ -106,7 +108,7 @@ Deno.test("UT: User 1 locks and user 2 takes with R = 0 after dealine; succeeds"
   // datum used, note that a block is 20000 milliseconds.
   const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
   // after which block will user 2 grab the funds.
-  const n: number = 7
+  const n: number = 7*20
   await runTest(d,r,n);
 });
 
@@ -117,7 +119,7 @@ Deno.test("UT: User 1 locks and user 2 takes with R = 42  after dealine; fails",
   // datum used, note that a block is 20000 milliseconds.
   const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
   // after which block will user 2 grab the funds.
-  const n: number = 7
+  const n: number = 7*20
   let errorThrown = false;
 
   try {
@@ -138,7 +140,7 @@ Deno.test("UT: User 1 locks and user 2 takes with R = -42 before dealine; fails"
   // datum used, note that a block is 20000 milliseconds.
   const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
   // after which block will user 2 grab the funds.
-  const n: number = 3
+  const n: number = 3*20
   let errorThrown = false;
 
   try {
@@ -157,9 +159,9 @@ Deno.test("UT: User 1 locks and user 2 takes with R = 0 before dealine; fails", 
   // redeemer used
   const r: NegativeRTimedRedeemer = 0n;
   // datum used, note that a block is 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
+  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)};
   // after which block will user 2 grab the funds.
-  const n: number = 3
+  const n: number = 3*20;
   let errorThrown = false;
 
   try {
@@ -180,7 +182,7 @@ Deno.test("UT: User 1 locks and user 2 takes with R = 42 before dealine fails", 
   // datum used, note that a block is 20000 milliseconds.
   const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
   // after which block will user 2 grab the funds.
-  const n: number = 3
+  const n: number = 3*20
   let errorThrown = false;
 
   try {
@@ -195,4 +197,3 @@ Deno.test("UT: User 1 locks and user 2 takes with R = 42 before dealine fails", 
   );
 });
 // Property test
-
