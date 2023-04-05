@@ -25,10 +25,9 @@ import           Test.Tasty           (defaultMain, testGroup)
 --------------------------------------- TESTING MAIN ----------------------------------------------
 
 main :: IO ()
-main = do
-  defaultMain $ do
+main = defaultMain $ do
     testGroup
-      "Testing Homework1"
+      "Testing validator with some sensible values"
       [ good "User 1 locks and user 2 takes with R = -42 after dealine succeeds" $ testScript 50 (-42)
       , good "User 1 locks and user 2 takes with R = 0   after dealine succeeds" $ testScript 50 0
       , bad  "User 1 locks and user 2 takes with R = 42  after dealine fails   " $ testScript 50 42
@@ -54,7 +53,7 @@ setupUsers = replicateM 2 $ newUser $ ada (Lovelace 1000)
 valScript :: TypedValidator datum redeemer
 valScript = TypedValidator $ toV2 OnChain.validator
 
--- Create transaction that spends "usp" to lock "val" in "giftScript"
+-- Create transaction that spends "usp" to lock "val" in "valScript"
 lockingTx :: POSIXTime -> UserSpend -> Value -> Tx
 lockingTx dl usp val =
   mconcat
@@ -62,12 +61,12 @@ lockingTx dl usp val =
     , payToScript valScript (HashDatum (OnChain.MkCustomDatum dl)) val
     ]
 
--- Create transaction that spends "giftRef" to unlock "giftVal" from the "valScript" validator
+-- Create transaction that spends "ref" to unlock "val" from the "valScript" validator
 consumingTx :: POSIXTime -> Integer -> PubKeyHash -> TxOutRef -> Value -> Tx
-consumingTx dl redeemer usr giftRef giftVal =
+consumingTx dl redeemer usr ref val =
   mconcat
-    [ spendScript valScript giftRef (mkI redeemer) (OnChain.MkCustomDatum dl)
-    , payToKey usr giftVal
+    [ spendScript valScript ref (mkI redeemer) (OnChain.MkCustomDatum dl)
+    , payToKey usr val
     ]
 
 ---------------------------------------------------------------------------------------------------
@@ -81,15 +80,15 @@ testScript d r = do
   -- USER 1 LOCKS 100 ADA ("val") IN VALIDATOR
   let val = adaValue 100                    -- Define value to be transfered
   sp <- spend u1 val                        -- Get user's UTXO that we should spend
-  submitTx u1 $ lockingTx d sp val            -- User 1 submits "lockingTx" transaction
+  submitTx u1 $ lockingTx d sp val          -- User 1 submits "lockingTx" transaction
   -- WAIT FOR A BIT
   waitUntil waitBeforeConsumingTx
   -- USER 2 TAKES "val" FROM VALIDATOR
   utxos <- utxoAt valScript                 -- Query blockchain to get all UTxOs at script
-  let [(giftRef, giftOut)] = utxos          -- We know there is only one UTXO (the one we created before)
-  ct <- currentTimeRad 100
-  tx <- validateIn ct $ consumingTx d r u2 giftRef (txOutValue giftOut)  -- User 2 submits "consumingTx" transaction
-  submitTx u2 tx
+  let [(ref, out)] = utxos                  -- We know there is only one UTXO (the one we created before)
+  ct <- currentTimeRad 100                  -- Create time interval with equal radius around current time
+  tx <- validateIn ct $ consumingTx d r u2 ref (txOutValue out)  -- Build Tx
+  submitTx u2 tx                            -- User 2 submits "consumingTx" transaction
   -- CHECK THAT FINAL BALANCES MATCH EXPECTED BALANCES
   [v1, v2] <- mapM valueAt [u1, u2]                     -- Get final balances of both users
   unless (v1 == adaValue 900 && v2 == adaValue 1100) $  -- Check if final balances match expected balances
