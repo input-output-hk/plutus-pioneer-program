@@ -91,109 +91,47 @@ async function runTest(dtm: NegativeRTimedDatum, r: NegativeRTimedRedeemer, n: n
 
 // UNIT tests
 
-Deno.test("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds", async () => { 
-  // redeemer used
-  const r: NegativeRTimedRedeemer = -42n;
-  // datum used, note that there is a block each 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
-  // after which block will user 2 grab the funds.
-  const n: number = 7*20
-  await runTest(d,r,n);
-});
+// str is 
+function testSuccess(
+  str: string, // the string to display of the test
+  r: bigint,   // the redeemer number
+  d: bigint,   // the deadline in seconds from now
+  n:number     // the number of slots user 2 waits
+) {
+  Deno.test(str, async () => {await runTest({deadline:BigInt(Date.now())+d},r,n)})
+}
 
+async function testFails(
+  str: string, // the string to display of the test
+  r: bigint,   // the redeemer number
+  d: bigint,   // the deadline in seconds from now
+  n:number     // the number of slots user 2 waits
+) {
+  Deno.test(str,async () => {
+    let errorThrown = false;
+    try {
+      await runTest({deadline:BigInt(Date.now())+d},r,n);
+    } catch (error) {
+      errorThrown = true;
+    }
+    assert(
+      errorThrown,
+      "Expected to throw an error, but it completed successfully"
+    );
+  });
+}
 
-Deno.test("UT: User 1 locks and user 2 takes with R = 0 after dealine; succeeds", async () => {
-  // redeemer used
-  const r: NegativeRTimedRedeemer = 0n;
-  // datum used, note that a block is 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
-  // after which block will user 2 grab the funds.
-  const n: number = 7*20
-  await runTest(d,r,n);
-});
+// deadline is slot 100 and user 2 claims at slot 120
+testSuccess("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds",-42n,BigInt(1000*100),120);
+// deadline is slot 100 and user 2 claims at slot 120
+testSuccess("UT: User 1 locks and user 2 takes with R = 0 after dealine; succeeds",0n,BigInt(1000*100),120);
+// deadline is slot 100 and user 2 claims at slot 120
+testFails("UT: User 1 locks and user 2 takes with R = 42 after dealine; fails",42n,BigInt(1000*100),120);
+// deadline is slot 100 and user 2 claims at slot 80
+testFails("UT: User 1 locks and user 2 takes with R = -42 before dealine; fails",-42n,BigInt(1000*100),80);
+// deadline is slot 100 and user 2 claims at slot 80
+testFails("UT: User 1 locks and user 2 takes with R = 0 before dealine; fails",-0n,BigInt(1000*100),80);
+// deadline is slot 100 and user 2 claims at slot 80
+testFails("UT: User 1 locks and user 2 takes with R = 42 before dealine; fails",42n,BigInt(1000*100),80);
 
-
-Deno.test("UT: User 1 locks and user 2 takes with R = 42  after dealine; fails", async () => {
-  // redeemer used
-  const r: NegativeRTimedRedeemer = 42n;
-  // datum used, note that a block is 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
-  // after which block will user 2 grab the funds.
-  const n: number = 7*20
-  let errorThrown = false;
-
-  try {
-    await runTest(d,r,n);
-  } catch (error) {
-    errorThrown = true;
-  }
-
-  assert(
-    errorThrown,
-    "Expected to throw an error, but it completed successfully"
-  );
-});
-
-Deno.test("UT: User 1 locks and user 2 takes with R = -42 before dealine; fails", async () => {
-  // redeemer used
-  const r: NegativeRTimedRedeemer = -42n;
-  // datum used, note that a block is 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
-  // after which block will user 2 grab the funds.
-  const n: number = 3*20
-  let errorThrown = false;
-
-  try {
-    await runTest(d,r,n);
-  } catch (error) {
-    errorThrown = true;
-  }
-
-  assert(
-    errorThrown,
-    "Expected to throw an error, but it completed successfully"
-  );
-});
-
-Deno.test("UT: User 1 locks and user 2 takes with R = 0 before dealine; fails", async () => {
-  // redeemer used
-  const r: NegativeRTimedRedeemer = 0n;
-  // datum used, note that a block is 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)};
-  // after which block will user 2 grab the funds.
-  const n: number = 3*20;
-  let errorThrown = false;
-
-  try {
-    await runTest(d,r,n);
-  } catch (error) {
-    errorThrown = true;
-  }
-
-  assert(
-    errorThrown,
-    "Expected to throw an error, but it completed successfully"
-  );
-});
-
-Deno.test("UT: User 1 locks and user 2 takes with R = 42 before dealine fails", async () => {
-  // redeemer used
-  const r: NegativeRTimedRedeemer = 42n;
-  // datum used, note that a block is 20000 milliseconds.
-  const d: NegativeRTimedDatum = {deadline:BigInt(Date.now()+20000*5)}
-  // after which block will user 2 grab the funds.
-  const n: number = 3*20
-  let errorThrown = false;
-
-  try {
-    await runTest(d,r,n);
-  } catch (error) {
-    errorThrown = true;
-  }
-
-  assert(
-    errorThrown,
-    "Expected to throw an error, but it completed successfully"
-  );
-});
 // Property test
