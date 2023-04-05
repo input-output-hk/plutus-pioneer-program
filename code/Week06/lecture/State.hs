@@ -16,7 +16,7 @@ newtype Mock = Mock { utxos :: [UTxO] }
 
 -- Initial blockchain state
 initialMockS :: Mock
-initialMockS = Mock [ UTxO "Alice" 1000 , UTxO "Bob" 2000 ]
+initialMockS = Mock [ UTxO "Alice" 1000 ]
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------ WITHOUT STATE MONAD ------------------------------------------
@@ -37,7 +37,7 @@ multipleTx :: (Bool, Mock)
 multipleTx =
     let (isOk,  mockS1) = sendValue "Alice" 100 "Bob"   initialMockS
         (isOk2, mockS2) = sendValue "Alice" 300 "Bob"   mockS1
-        (isOk3, mockS3) = sendValue "Bob"   200 "Alice" mockS2
+        (isOk3, mockS3) = sendValue "Bob"   200 "Rick"  mockS2
     in (isOk && isOk2 && isOk3, mockS3)
 
 ---------------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ multipleTx' :: (Bool, Mock)
 multipleTx' = runState (do
     isOk  <- sendValue' "Alice" 100 "Bob"
     isOk2 <- sendValue' "Alice" 300 "Bob"
-    isOk3 <- sendValue' "Bob"   200 "Alice"
+    isOk3 <- sendValue' "Bob"   200 "Rick"
     return (isOk && isOk2 && isOk3))
     initialMockS
 

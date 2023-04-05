@@ -34,8 +34,7 @@ import           Test.Tasty.QuickCheck   as QC (testProperty)
 
 -- | Test the validator script
 main :: IO ()
-main = do
-  defaultMain $ do
+main = defaultMain $ do
     testGroup
       "Testing script properties"
       [ testProperty "Anything before the deadline always fails       " prop_Before_Fails
@@ -50,11 +49,13 @@ main = do
 instance Testable a => Testable (Run a) where
   property rp = let (a,_) = runMock rp $ initMock defaultBabbage (adaValue 10_000_000) in property a
 
+-- Make POSIXTime an instance of Arbitrary so QuickCheck can generate random values to test
 instance Arbitrary POSIXTime where
   arbitrary = do
     n <- choose (0, 2000)
     return (POSIXTime n)
 
+-- Time to wait before consumming UTxO from script
 waitBeforeConsumingTx :: POSIXTime
 waitBeforeConsumingTx = 1000
 
@@ -87,15 +88,15 @@ consumingTx dl redeemer usr ref val =
 ------------------------------------- TESTING PROPERTIES ------------------------------------------
 
 
--- Positive redeemer before deadline always fails
+-- All redeemers fail before deadline 
 prop_Before_Fails :: POSIXTime -> Integer -> Property
 prop_Before_Fails d r = (d > 1001) ==> runChecks False d r
 
--- Positive redeemer after  deadline always fails
+-- Positive redeemer always fail after deadline
 prop_PositiveAfter_Fails :: POSIXTime -> Integer -> Property
 prop_PositiveAfter_Fails d r = (r > 0 && d < 999) ==> runChecks False d r
 
--- Negative redeemer after deadline always succeeds
+-- Negative redeemers always succeed after deadline
 prop_NegativeAfter_Succeeds :: POSIXTime -> Integer -> Property
 prop_NegativeAfter_Succeeds d r = (r < 0 && d < 999) ==> runChecks True d r
 
@@ -106,7 +107,8 @@ prop_NegativeAfter_Succeeds d r = (r < 0 && d < 999) ==> runChecks True d r
 
 -- | Check that the expected and real balances match after using the validator with different redeemers
 runChecks :: Bool -> POSIXTime -> Integer -> Property
-runChecks shouldConsume deadline redeemer = collect (redeemer, getPOSIXTime deadline) $ monadic property check
+runChecks shouldConsume deadline redeemer = 
+  collect (redeemer, getPOSIXTime deadline) $ monadic property check
     where check = do
             balancesMatch <- run $ testValues shouldConsume deadline redeemer
             assert balancesMatch
