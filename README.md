@@ -63,6 +63,15 @@ This documentation looks better in GitBook at the following link:
 - [NFT's](https://youtu.be/9kW-z_RuwEY)
 - [Homework](https://youtu.be/nQC_GNPIRT8)
 
+### [Lecture 6](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x08fHgl_ZTlowVO8bjqITEh)
+
+- [The State Monad in practice](https://www.youtube.com/watch?v=8tWzG0ML6Z4&list=PLNEK_Ejlx3x08fHgl_ZTlowVO8bjqITEh&index=1)
+- [Introduction to the Plutus Simple Model library](https://youtu.be/Sft02LeXA_U)
+- [Unit Testing a Smart Contract](https://youtu.be/vB8hyVq3HVo)
+- [Property Testing a Smart Contract](https://youtu.be/pF8HpKmaQi4)
+- [Testing Smart Contracts with Lucid](https://youtu.be/aUrIuDQgg5c)
+- [Double Spending and Homework](https://youtu.be/AZVpkwRhEaY)
+
 ## Repository Structure
 
 The most relevant directories of this repository are structured as follows:
