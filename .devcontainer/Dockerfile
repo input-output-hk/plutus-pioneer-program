@@ -141,3 +141,8 @@ RUN ./rustup-init -y
 FROM cargo as deno
 
 RUN /root/.cargo/bin/cargo install deno --locked
+
+FROM deno as testing-docs
+
+RUN /root/.cargo/bin/cargo install mdbook
+RUN echo "alias serve-testing-docs='mdbook serve /workspace/docs/psm-docs'" >> ~/.bashrc
