@@ -118,7 +118,7 @@ async function testFails(
       "Expected to throw an error, but it completed successfully"
     );
   });
-}
+};
 
 // deadline is slot 100 and user 2 claims at slot 120
 testSucceed("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds",-42n,BigInt(1000*100),120);
@@ -134,3 +134,54 @@ testFails("UT: User 1 locks and user 2 takes with R = 0 before dealine; fails",-
 testFails("UT: User 1 locks and user 2 takes with R = 42 before dealine; fails",42n,BigInt(1000*100),80);
 
 // Property test
+// set up a fixed deadline at slot 100
+const dl: number = 100*1000;
+// create only random 256 bit negative big integers for r.
+const negativeBigIntArbitrary = fc.bigIntN(256).filter((n:bigint) => n <= 0n);
+// create only random 256 bit positive big integers for r.
+const positiveBigIntArbitrary = fc.bigIntN(256).filter((n:bigint) => n > 0n); 
+// create only random integers that represent claiming after the deadline
+const afterDeadlineWaits = fc.integer().filter((n: number) => n >= dl);
+// create only random integers that represent claiming before the deadline
+const beforeDeadlineWaits = fc.integer().filter((n: number) => n < dl);
+
+Deno.test("PT: Negative redeemer after deadline always succeeds", () => {
+  fc.assert(fc.asyncProperty(
+    negativeBigIntArbitrary, afterDeadlineWaits, async (r: bigint,n: number) => {
+      try {
+        await runTest({deadline:BigInt(Date.now()+dl)},r,n);
+      } catch (error) {
+        console.error('Test failed for r= ${r} with error: ${error.message}');
+        throw error
+      };
+    }
+  ),{numRuns: 100});
+});
+
+Deno.test("PT: Positive redeemer after deadline always fails", () => {
+  fc.assert(fc.asyncProperty(
+    positiveBigIntArbitrary, afterDeadlineWaits,async (r:bigint, n: number) => {
+      let errorThrown = false;
+      try {
+        await runTest({deadline:BigInt(Date.now()+dl)},r,n);
+      } catch (error) {
+        errorThrown = true;
+      }
+      assert(errorThrown,'Test failed for r=${r} and n=$(n)');      
+    }
+  ),{numRuns:100});
+})
+
+Deno.test("PT: Anything before the deadline always fails", () => {
+  fc.assert(fc.asyncProperty(
+    fc.bigIntN(256), beforeDeadlineWaits,async (r:bigint, n: number) => {
+      let errorThrown = false;
+      try {
+        await runTest({deadline:BigInt(Date.now()+dl)},r,n);
+      } catch (error) {
+        errorThrown = true;
+      }
+      assert(errorThrown,'Test failed for r=${r} and n=$(n)');      
+    }
+  ),{numRuns:100});
+})
