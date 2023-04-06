@@ -91,8 +91,7 @@ async function runTest(dtm: NegativeRTimedDatum, r: NegativeRTimedRedeemer, n: n
 
 // UNIT tests
 
-// str is 
-function testSuccess(
+function testSucceed(
   str: string, // the string to display of the test
   r: bigint,   // the redeemer number
   d: bigint,   // the deadline in seconds from now
@@ -122,9 +121,9 @@ async function testFails(
 }
 
 // deadline is slot 100 and user 2 claims at slot 120
-testSuccess("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds",-42n,BigInt(1000*100),120);
+testSucceed("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds",-42n,BigInt(1000*100),120);
 // deadline is slot 100 and user 2 claims at slot 120
-testSuccess("UT: User 1 locks and user 2 takes with R = 0 after dealine; succeeds",0n,BigInt(1000*100),120);
+testSucceed("UT: User 1 locks and user 2 takes with R = 0 after dealine; succeeds",0n,BigInt(1000*100),120);
 // deadline is slot 100 and user 2 claims at slot 120
 testFails("UT: User 1 locks and user 2 takes with R = 42 after dealine; fails",42n,BigInt(1000*100),120);
 // deadline is slot 100 and user 2 claims at slot 80
