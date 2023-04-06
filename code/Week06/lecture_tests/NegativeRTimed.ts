@@ -87,7 +87,7 @@ async function runTest(dtm: NegativeRTimedDatum, r: NegativeRTimedRedeemer, n: n
 
   //console.log(await emulator.getUtxos(address2));
 }
-//await runTest({deadline:BigInt(Date.now()+20000*5+1000)},-42n,5*20+1);
+//await runTest({deadline:BigInt(Date.now()+20000*5+1000)},-42n,5*20);
 
 // UNIT tests
 
@@ -121,7 +121,7 @@ async function testFails(
 };
 
 // deadline is slot 100 and user 2 claims at slot 120
-testSucceed("UT: User 1 locks and user 2 takes with R = -42 after dealine succeeds",-42n,BigInt(1000*100),120);
+testSucceed("UT: User 1 locks and user 2 takes with R = -42 after dealine; succeeds",-42n,BigInt(1000*100),120);
 // deadline is slot 100 and user 2 claims at slot 120
 testSucceed("UT: User 1 locks and user 2 takes with R = 0 after dealine; succeeds",0n,BigInt(1000*100),120);
 // deadline is slot 100 and user 2 claims at slot 120
@@ -151,7 +151,7 @@ Deno.test("PT: Negative redeemer after deadline always succeeds", () => {
       try {
         await runTest({deadline:BigInt(Date.now()+dl)},r,n);
       } catch (error) {
-        console.error('Test failed for r= ${r} with error: ${error.message}');
+        console.error('Test failed for r= '+ r +' with error: ' + error.message);
         throw error
       };
     }
@@ -167,7 +167,7 @@ Deno.test("PT: Positive redeemer after deadline always fails", () => {
       } catch (error) {
         errorThrown = true;
       }
-      assert(errorThrown,'Test failed for r=${r} and n=$(n)');      
+      assert(errorThrown,'Test failed for r= ' + r + ' and n= '+ n);      
     }
   ),{numRuns:100});
 })
@@ -181,7 +181,7 @@ Deno.test("PT: Anything before the deadline always fails", () => {
       } catch (error) {
         errorThrown = true;
       }
-      assert(errorThrown,'Test failed for r=${r} and n=$(n)');      
+      assert(errorThrown,'Test failed for r= ' + r + ' and n= ' + n);      
     }
   ),{numRuns:100});
 })
