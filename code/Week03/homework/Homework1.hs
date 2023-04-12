@@ -12,7 +12,7 @@ import Plutus.V2.Ledger.Contexts ( txSignedBy )
 import Plutus.V1.Ledger.Interval
 import           PlutusTx             (compile, unstableMakeIsData)
 import           PlutusTx.Prelude     (traceIfFalse, Bool (..), (||), (&&), (+))
-import           Utilities            (wrap)
+import           Utilities            (wrapValidator)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -49,7 +49,7 @@ mkVestingValidator dat () ctx =
 
 {-# INLINABLE  mkWrappedVestingValidator #-}
 mkWrappedVestingValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-mkWrappedVestingValidator = wrap mkVestingValidator
+mkWrappedVestingValidator = wrapValidator mkVestingValidator
 
 validator :: Validator
 validator = mkValidatorScript $$(compile [|| mkWrappedVestingValidator ||])

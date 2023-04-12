@@ -11,7 +11,7 @@ module Homework2 where
 import qualified Plutus.V2.Ledger.Api as PlutusV2
 import           PlutusTx             (unstableMakeIsData,compile)
 import           PlutusTx.Prelude     (Bool, BuiltinData, traceIfFalse, ($), (/=))
-import           Utilities            (wrap)
+import           Utilities            (wrapValidator)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -29,7 +29,7 @@ mkValidator :: () -> MyRedeemer -> PlutusV2.ScriptContext -> Bool
 mkValidator _ myRed _ = traceIfFalse "flags are not different" $ flag1 myRed /= flag2 myRed
 
 wrappedVal :: BuiltinData -> BuiltinData -> BuiltinData -> ()
-wrappedVal = wrap mkValidator
+wrappedVal = wrapValidator mkValidator
 
 validator :: PlutusV2.Validator
 validator = PlutusV2.mkValidatorScript $$(PlutusTx.compile [|| wrappedVal ||])
