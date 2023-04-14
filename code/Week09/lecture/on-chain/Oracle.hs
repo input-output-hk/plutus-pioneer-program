@@ -65,7 +65,7 @@ data OracleRedeemer = Use | Update | Redeem
 
 PlutusTx.unstableMakeIsData ''OracleRedeemer
 
-type Ratio = Integer
+type Rate = Integer
 
 {-# INLINABLE oracleValue #-}
 oracleValue :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe Integer
@@ -77,7 +77,7 @@ oracleValue o f = case txOutDatum o of
                         PlutusTx.fromBuiltinData d
 
 {-# INLINABLE mkValidator #-}
-mkValidator :: OracleParams -> Ratio -> OracleRedeemer -> ScriptContext -> Bool
+mkValidator :: OracleParams -> Rate-> OracleRedeemer -> ScriptContext -> Bool
 mkValidator oracle x r ctx =
     case r of
         Use    -> traceIfFalse "token missing from input"  inputHasToken  &&

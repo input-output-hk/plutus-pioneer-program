@@ -101,14 +101,14 @@ type OracleValidator = TypedValidator Integer Oracle.OracleRedeemer
 oracleScript :: Oracle.OracleParams -> OracleValidator
 oracleScript oracle = TypedValidator . toV2 $ Oracle.validator oracle
 
-deployOracleTx :: UserSpend -> Oracle.OracleParams -> Oracle.Ratio -> Tx
+deployOracleTx :: UserSpend -> Oracle.OracleParams -> Oracle.Rate-> Tx
 deployOracleTx sp op dat =
   mconcat
     [ userSpend sp
     , payToScript (oracleScript op) (InlineDatum dat) (adaValue 1)
     ]
 
-deployOracle :: Oracle.Ratio -> Run OracleValidator
+deployOracle :: Oracle.Rate-> Run OracleValidator
 deployOracle or = do
   [u1, _] <- setupUsers
   -- Mint NFT
