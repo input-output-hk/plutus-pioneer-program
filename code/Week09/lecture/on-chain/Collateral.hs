@@ -19,87 +19,126 @@ import           Cardano.Api.Shelley            (PlutusScript (..), PlutusScript
 import           Codec.Serialise                (serialise)
 import qualified Data.ByteString.Lazy           as LBS
 import qualified Data.ByteString.Short          as SBS
-import           Plutus.V2.Ledger.Api
-import           Plutus.V1.Ledger.Value
-import qualified Plutus.V2.Ledger.Contexts      as V2
-import qualified PlutusTx
-import           PlutusTx.Prelude
+import Plutus.V2.Ledger.Api
+    ( unValidatorScript,
+      mkValidatorScript,
+      Script,
+      Validator,
+      Datum(Datum),
+      OutputDatum(OutputDatumHash, NoOutputDatum, OutputDatum),
+      TxOut(txOutDatum),
+      ScriptContext(scriptContextTxInfo),
+      TxInfo(txInfoMint),
+      BuiltinData,
+      PubKeyHash,
+      CurrencySymbol,
+      TokenName(TokenName) )
+import Plutus.V1.Ledger.Value ( assetClassValueOf, AssetClass(AssetClass))
+import Plutus.V2.Ledger.Contexts ( findDatum, getContinuingOutputs, txSignedBy )
+import PlutusTx ( compile, unstableMakeIsData, FromData(fromBuiltinData) )
+import PlutusTx.Prelude ( Bool(..),
+      Integer,
+      Maybe(..),
+      (.),
+      negate,
+      traceError,
+      (&&),
+      traceIfFalse,
+      encodeUtf8,
+      ($),
+      Ord((>)),
+      Eq(..) )
 import qualified Prelude
 import           Utilities            (wrapValidator)
 
-tus :: BuiltinString
-tus = "TUS"
+
+---------------------------------------------------------------------------------------------------
+----------------------------- ON-CHAIN: HELPER FUNCTIONS/TYPES ------------------------------------
 
 stablecoinTokenName :: TokenName 
-stablecoinTokenName = TokenName $ encodeUtf8 tus
-
-
--- Change to inline datum so people will be able to liquidate.
+stablecoinTokenName = TokenName $ encodeUtf8 "USDP"
 
 data CollateralLock = Unlocked | Locked
     deriving Prelude.Show
 
 instance Eq CollateralLock where
+  (==) Locked   Locked   = True
   (==) Unlocked Unlocked = True
-  (==) Locked Unlocked   = False
-  (==) Unlocked Locked   = False
-  (==) Locked Locked     = True
+  (==) _      _          = False
+unstableMakeIsData ''CollateralLock
 
+---------------------------------------------------------------------------------------------------
+------------------------------------ ON-CHAIN: VALIDATOR ------------------------------------------
+
+-- Datum containing all the relevant information 
 data CollateralDatum = CollateralDatum
     { colMintingPolicyId  :: CurrencySymbol 
     , colOwner            :: PubKeyHash
     , colStablecoinAmount :: Integer
     , colLock             :: CollateralLock
     } deriving Prelude.Show
+unstableMakeIsData ''CollateralDatum
 
-PlutusTx.unstableMakeIsData ''CollateralLock
-PlutusTx.unstableMakeIsData ''CollateralDatum
-
+-- We can lock or redeem our own collateral or liquidate someone else's
 data CollateralRedeemer = Lock | Redeem | Liquidate
+unstableMakeIsData ''CollateralRedeemer
 
-PlutusTx.unstableMakeIsData ''CollateralRedeemer
-
-{-# INLINABLE signedByCollateralOwner #-}
-signedByCollateralOwner :: TxInfo -> CollateralDatum -> Bool
-signedByCollateralOwner info dat = V2.txSignedBy info $ colOwner dat
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: CollateralDatum -> CollateralRedeemer -> ScriptContext -> Bool
-mkValidator dat Lock ctx =
-    traceIfFalse "collateral owner's signature missing" (signedByCollateralOwner info dat) &&
-    traceIfFalse "initial stablecoin amount must be 0" checkInitialAmount &&
-    traceIfFalse "collateral must be unlocked" checkCollateralLock &&
-    traceIfFalse "minted amount must be positive" checkMintPositive &&
-    traceIfFalse "invalid new output's datum" checkOutputDatum
+mkValidator dat r ctx = case r of
+    Lock      -> traceIfFalse "collateral owner's signature missing" checkSignedByCollOwner &&
+                 traceIfFalse "initial stablecoin amount must be 0" checkInitialAmount &&
+                 traceIfFalse "collateral must be unlocked" checkCollateralLock &&
+                 traceIfFalse "minted amount must be positive" checkMintPositive &&
+                 traceIfFalse "invalid new output's datum" checkOutputDatum
+    Redeem    -> traceIfFalse "collateral owner's signature missing" checkSignedByCollOwner &&
+                 case colLock dat of
+                     Unlocked -> True
+                     Locked   -> traceIfFalse "burned stablecoin amount mismatch" checkStablecoinAmount
+    Liquidate -> traceIfFalse "burned stablecoin amount mismatch" checkStablecoinAmount
+
   where
+
     info :: TxInfo
     info = scriptContextTxInfo ctx
 
+    -- Check if the transaction is signed by the collateral owner
+    checkSignedByCollOwner :: Bool
+    checkSignedByCollOwner = txSignedBy info $ colOwner dat
+
+    -- Check if the initial stablecoin amount is 0
     checkInitialAmount :: Bool
     checkInitialAmount = colStablecoinAmount dat == 0
 
+    -- Check if the collateral is unlocked
     checkCollateralLock :: Bool
     checkCollateralLock = colLock dat == Unlocked
 
+    -- Amount of stablecoins minted in this transaction
     mintedAmount :: Integer
     mintedAmount = assetClassValueOf (txInfoMint info) (AssetClass (colMintingPolicyId dat, stablecoinTokenName))
 
+    -- Check if the minted amount is positive
     checkMintPositive :: Bool
     checkMintPositive = mintedAmount > 0
 
+    -- Get the collateral script's output
     ownOutput :: TxOut
-    ownOutput = case V2.getContinuingOutputs ctx of
+    ownOutput = case getContinuingOutputs ctx of
         [o] -> o
         _   -> traceError "expected exactly one collateral output"
     
+    -- Get the new datum from the collateral script's output
     outputDatum :: Maybe CollateralDatum
     outputDatum = case txOutDatum ownOutput of
                     NoOutputDatum -> Nothing
-                    OutputDatum (Datum d) -> PlutusTx.fromBuiltinData d
+                    OutputDatum (Datum d) -> fromBuiltinData d
                     OutputDatumHash dh -> do 
-                                        Datum d <- V2.findDatum dh info
-                                        PlutusTx.fromBuiltinData d
+                                        Datum d <- findDatum dh info
+                                        fromBuiltinData d
 
+    -- Check if the new output's datum has the correct values
     checkOutputDatum :: Bool
     checkOutputDatum = case outputDatum of
         Nothing     -> False
@@ -108,41 +147,19 @@ mkValidator dat Lock ctx =
                        colStablecoinAmount newDat == mintedAmount &&
                        colLock newDat == Locked
 
-mkValidator dat Redeem ctx =
-    traceIfFalse "collateral owner's signature missing" (signedByCollateralOwner info dat) &&
-    case colLock dat of
-        Unlocked -> True
-        Locked   -> traceIfFalse "minted stablecoin amount mismatch" checkStablecoinAmount
-  where
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
-
-    forgeValue :: Value
-    forgeValue = txInfoMint info
-
+    -- Check that the amount of stablecoins burned matches the amont at the collateral's datum
     checkStablecoinAmount :: Bool
-    checkStablecoinAmount = negate (colStablecoinAmount dat) == assetClassValueOf forgeValue (AssetClass (colMintingPolicyId dat, stablecoinTokenName))
+    checkStablecoinAmount = negate (colStablecoinAmount dat) == mintedAmount
 
-mkValidator dat Liquidate ctx =
-    traceIfFalse "minted stablecoin amount mismatch" checkStablecoinAmount
-  where
-    info :: TxInfo
-    info = scriptContextTxInfo ctx
-
-    forgeValue :: Value
-    forgeValue = txInfoMint info
-
-    checkStablecoinAmount :: Bool
-    checkStablecoinAmount = negate (colStablecoinAmount dat) == assetClassValueOf forgeValue (AssetClass (colMintingPolicyId dat, stablecoinTokenName))
-
+---------------------------------------------------------------------------------------------------
+------------------------------ COMPILE AND SERIALIZE VALIDATOR ------------------------------------
 
 {-# INLINABLE  mkWrappedValidator #-}
 mkWrappedValidator :: BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkWrappedValidator = wrapValidator mkValidator
 
 validator :: Validator
-validator = mkValidatorScript 
-    $$(PlutusTx.compile [|| mkWrappedValidator ||])
+validator = mkValidatorScript $$(compile [|| mkWrappedValidator ||])
 
 script :: Script
 script = unValidatorScript validator
