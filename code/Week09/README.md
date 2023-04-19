@@ -1,4 +1,4 @@
-> To have the best experience with the diagrams, install the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension in VSCode.
+> Navigate to this file in GitHub or install the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension in VSCode to be able to see the diagrams.
 
 ## How the stablecoin works
 
@@ -26,11 +26,10 @@ These are the transactions to deploy the oracle to the blockchain (square means 
 flowchart LR
     subgraph Deploy [Deploy Oracle]
     direction LR
-    A1((Stablecoin developer)) --> A2(Mint NFT)
-    A2 --> A3((Stablecoin developer <br> <sub>NFT</sub>))
-    A3 -->|<sub>NFT <br> + <br> USD/ADA Rate</sub>| A4(Deploy Oracle)
-    A4 --> A5((Stablecoin developer))
-    A4 --> A6(("Oracle Validator <br> <sub>NFT <br> Datum: USD/ADA rate</sub>"))
+    A1((<b>Stablecoin developer</b>)) --> A2(Mint NFT)
+    A2 --> A3((<b>Stablecoin developer</b> <br> <sub>NFT</sub>))
+    A3 -->|"<sub>NFT <br> + <br> USD/ADA Rate  &#8199 &#8199</sub>"| A4(Deploy Oracle)
+    A4 --> A5((<b>Stablecoin developer</b>))
     end
 ```
 To deploy the "Collateral" and "Minting" validators, we need to submit a single transaction to attach them as reference scripts to the "Always False" validator (or a developer-controlled) address.
@@ -39,9 +38,9 @@ To deploy the "Collateral" and "Minting" validators, we need to submit a single 
 flowchart LR
     subgraph Deploy [Deploy Collateral and Minting validators]
     direction LR
-    A1((Stablecoin developer)) --> A7(Deploy Collateral Validator <br> and Minting Policy <br> as reference scripts)
-    A7 --> A8((Always False Validator <br> <sub>Collateral Validator</sub>))
-    A7 --> A9((Always False Validator <br> <sub>Minting Policy</sub>))
+    A1((<b>Stablecoin developer</b>)) --> A7(&#8199 Deploy Collateral Validator &#8199 <br> and Minting Policy <br> as reference scripts)
+    A7 --> A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
+    A7 --> A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
     end
 ```
 
@@ -57,10 +56,10 @@ As soon as the real rate differs from ours, our backend will automatically creat
 flowchart LR
     subgraph Deploy [Update Oracle]
     direction LR
-    A1((Stablecoin developer)) --> A3(Update oracle)
-    A2(("Oracle Validator <br> <sub>NFT <br> Datum: <b>OLD</b> USD/ADA rate</sub>")) --> A3
-    A3 --> A4((Stablecoin developer))
-    A3 --> A5(("Oracle Validator <br> <sub>NFT <br> Datum: <b>NEW</b> USD/ADA rate</sub>"))
+    A1((<b>Stablecoin developer</b>)) --> A3(Update oracle)
+    A2(("&#8199 &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199 &#8199 <br> <sub>NFT <br> Datum: <b>OLD</b> USD/ADA rate</sub>")) --> A3
+    A3 --> A4((<b>Stablecoin developer</b>))
+    A3 --> A5(("&#8199 &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199 &#8199 <br> <sub>NFT <br> Datum: <b>NEW</b> USD/ADA rate</sub>"))
     end
 ```
 
@@ -74,17 +73,17 @@ These are the transactions to mint some stablecoins:
 flowchart LR
     subgraph Mint [Mint Stablecoin]
     direction LR
-    A6(("Oracle Validator <br> <sub>NFT <br> Datum: USD/ADA rate</sub>"))
-    A8((Always False Validator <br> <sub>Collateral Validator</sub>))
-    A9((Always False Validator <br> <sub>Minting Policy</sub>))
+    A6(("&#8199 &#8199 <b>Oracle Validator</b>&#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate</sub>"))
+    A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
+    A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
 
-    M1((User 1<br> <sub>Collateral</sub>)) --> |Locks ADA as collateral| M4(Lock Collateral <br> + <br> Mint stablecoin)
+    M1((&#8199 &#8199 <b>User 1</b> &#8199 &#8199<br> <sub>Collateral</sub>)) --> |Locks ADA as collateral| M4(Lock Collateral <br> + <br> Mint stablecoin)
     A9 --> |As reference script| M4
     A8 --> |As reference script| M4
     A6 --> |As reference Input|M4
 
-    M4 --> M5(("<b>Collateral Validator</b> <br> <sub>Collateral <br> <b>Datum has:</b> <br> Collateral owner  <br> Amount of stablecoin minted"))
-    M4 --> M6((User 1 <br> <sub>Stablecoins</sub>))
+    M4 --> M5(("&#8199 &#8199&#8199 &#8199 <b>Collateral Validator</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner  <br> Amount of stablecoin minted"))
+    M4 --> M6((&#8199 &#8199 <b>User 1</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>))
     end
 ```
 
@@ -97,14 +96,14 @@ We (the user that minted the stablecoins) burn the stablecoins to unlock our col
 flowchart LR
     subgraph Burn [Burn Stablecoin]
     direction LR
-    A9((Always False Validator <br> <sub>Minting Policy</sub>))
-    M5(("<b>Collateral Validator</b> <br> <sub>Collateral <br> <b>Datum has:</b> <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
-    M6((User 1 <br> <sub>Stablecoins</sub>))
+    A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
+    M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
+    M6((&#8199 &#8199 <b>User 1</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>))
 
-    M6 --> |Provides stablecoins| B4(Unlock Collateral <br> + <br> Mint stablecoin)
+    M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
     A9 --> |As reference script| B4
     M5 --> B4
-    B4 --> B6((User 1<br> <sub>Collateral</sub> ))
+    B4 --> B6((&#8199 &#8199 <b>User 1</b> &#8199 &#8199<br> <sub>Collateral</sub> ))
     end
 ```
 
@@ -120,16 +119,16 @@ This means that if the total value of the locked collateral is between 101% and 
 flowchart LR
     subgraph Burn [Liquidate Stablecoin]
     direction LR
-    A6(("Oracle Validator <br> <sub>NFT <br> Datum: USD/ADA rate </sub>"))
-    A9((Always False Validator <br> <sub>Minting Policy</sub>))
-    M5(("<b>Collateral Validator</b> <br> <sub>Collateral <br> <b>Datum has:</b> <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
-    M6((User 2 <br> <sub>Stablecoins</sub>))
+    A6((" &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate </sub>"))
+    A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
+    M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b> &#8199 &#8199 &#8199 &#8199  <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
+    M6(("&#8199 &#8199 <b>User 2</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>"))
 
-    M6 --> |Provides stablecoins| B4(Unlock Collateral <br> + <br> Mint stablecoin)
+    M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
     A9 -->|As reference script| B4
     M5 --> B4
-    A6 --> |Provides rate as reference Input|B4
-    B4 --> B6((User 2<br> <sub>User's 1 Collateral</sub> ))
+    A6 --> |As reference Input|B4
+    B4 --> B6(("&#8199 &#8199 &#8199 &#8199 <b>User 2</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>User's 1 Collateral</sub>"))
     end
 ```
 
@@ -143,9 +142,9 @@ Transaction to shut down the stablecoin:
 flowchart LR
     subgraph Deploy [Delete Oracle]
     direction LR
-    A1((Stablecoin developer)) --> A3(Delete oracle)
-    A2(("Oracle Validator <br> <sub>NFT <br> Datum: USD/ADA rate</sub>")) --> A3
-    A3 --> A4((Stablecoin developer <br> <sub>NFT</sub>))
+    A1((<b>Stablecoin developer</b>)) --> A3(Delete oracle)
+    A2(("&#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199 <br> <sub>NFT <br> Datum: USD/ADA rate</sub>")) --> A3
+    A3 --> A4((<b>Stablecoin developer</b> <br> <sub>NFT</sub>))
     end
 ```
 
