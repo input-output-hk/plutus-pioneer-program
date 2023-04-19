@@ -1,3 +1,5 @@
+> To have the best experience with the diagrams, install the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension in VSCode.
+
 ## How the stablecoin works
 
 This is a collateralized stablecoin. That means the value of the stablecoin depends on collateral. In our case, we'll use a validator called "Collateral" to lock this collateral (in ADA) and a validator called "Minting" that will mint, at most, the number of stablecoins equivalent to a bit less of the value we locked.
