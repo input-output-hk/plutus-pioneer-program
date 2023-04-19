@@ -119,7 +119,7 @@ testValues :: Bool -> POSIXTime -> Integer -> Run Bool
 testValues shouldConsume datum redeemer = do
   -- SETUP USERS
   [u1, u2] <- setupUsers
-  -- USER 1 LOCKS 100 ADA ("val") IN VALIDATOR
+  -- USER 1 LOCKS 100 Lovelaces ("val") IN VALIDATOR
   let val = adaValue 100                    -- Define value to be transfered
   sp <- spend u1 val                        -- Get user's UTXOs that we should spend
   submitTx u1 $ lockingTx datum sp val      -- User 1 submits "lockingTx" transaction

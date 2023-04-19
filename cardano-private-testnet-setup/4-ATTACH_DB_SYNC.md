@@ -15,20 +15,51 @@ for easy retrieval of information.
 
 ## Run the script to start up the cardano-db-sync process
 
-- Make sure the nodes are running
-- If necessary, please modify the `SCHEMA_DIR` environment variable below based on the location of your cloned copy of cardano-db-sync project
-- In **terminal 3**, start the db sync process.  This will install the database schema and sync blockchain data to the Postgres database.
+- Make sure the private network node processes are running
+- In a new termimal, create the db-sync database using the script file utility in `cardano-db-sync`
   ```shell
-  # navigate to project root folder
+  # set session variable to the root directory of your cardano-db-sync project sources 
+  CARDANO_DB_SYNC_HOME=$HOME/src/cardano-db-sync
+
+  # navigate to top level folder of this project
   cd $HOME/src/cardano-private-testnet-setup
-  # set environment variable needed by `./scripts/db-sync-start.sh`
-  export SCHEMA_DIR=$HOME/src/cardano-db-sync/schema  
+  
+  # set the permissions of the postgres password file
+  chmod 0600 postgres-conn/pgpass-privatenet
+  
+  # create a database named privatenet
+  PGPASSFILE=postgres-conn/pgpass-privatenet $CARDANO_DB_SYNC_HOME/scripts/postgresql-setup.sh --createdb              
+  ```
+- Verify the empty database has been created
+  ```shell
+  # open psql command prompt as sudo user
+  sudo -u postgres psql
+  
+  # list databases
+  \l
+  
+  # verify privatenet database is listed
+  # quit psql 
+  \q    
+  ```
+- Start the db sync process.  This will install the database schema in the privatenet database and sync blockchain data to the Postgres database.
+  ```shell
+  # set the SCHEMA_DIR session variable to the schema folder from the cardano-db-sync project sources
+  export SCHEMA_DIR=$CARDANO_DB_SYNC_HOME/schema  
+  
   # run script file
+  cd $HOME/src/cardano-private-testnet-setup
   ./scripts/db-sync-start.sh  
   # output
   # verify the output does not show any errors
   # in a steady state, you should see logs of SQL insert statements into slot_leader and block tables   
   ```
+- Troubleshooting
+  - You may want to drop the `privatenet` database to get a clean start
+    ```shell
+    cd $HOME/src/cardano-private-testnet-setup
+    PGPASSFILE=postgres-conn/pgpass-privatenet $CARDANO_DB_SYNC_HOME/scripts/postgresql-setup.sh --dropdb
+    ```
 ---
 
 Continue to next guide: [5. Run transaction](5-RUN_TRANSACTION.md)

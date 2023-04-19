@@ -4,14 +4,11 @@
 
 ---
 
-This project provides instructions and shell scripts to bootstrap a private Cardano testnet and connect a `cardano-db-sync` process to it.
+This project provides instructions and shell scripts to bootstrap a private Cardano testnet in the `babbage` era and connect a `cardano-db-sync` process to it.
 If you don't want to bother with setting up `cardano-db-sync`, you can easily skip over the sections of this project that are not relevant.
 
-**Note: If you want to run a private testnet in the `babbage` era, you can check out the [babbage branch](https://github.com/woofpool/cardano-private-testnet-setup/tree/babbage) and follow these instructions instead.** 
-**The babbage instructions do not include instructions for running smart contract transactions yet, but the network will support the new Plutus V2.**
-
 The scripts used by this project to create the private Cardano testnet are taken from the IOHK `cardano-node` project and have been modified as needed.
-You may find the original script files in the IOHK git repository: [cardano-node scripts](https://github.com/input-output-hk/cardano-node/tree/master/scripts/byron-to-alonzo).
+You may find the original script files in the IOHK git repository: [cardano-node scripts](https://github.com/input-output-hk/cardano-node/tree/master/scripts/babbage).
 In particular, running `cardano-db-sync` to sync to the private testnet required a few changes to the original scripts provided by IOHK.
 
 Hopefully, this documentation provides a lot of value for others. I welcome your feedback both good and bad!
@@ -73,13 +70,7 @@ For an additional overview of this project, please check out this [medium articl
 
     * Set up a new wallet for user2 and make a payment from user1 to user2. Query the database to confirm the transaction.
     * Please refer to the [Run transaction guide](5-RUN_TRANSACTION.md) for instructions.
-
-6. **Run Plutus script transactions**
-
-    * Build the project code for a simple vesting script, which sets User2 as the beneficiary with a vesting deadline
-    * Set up transaction to give ADA from User1 to the script address and a transaction to grab ADA from the script by User2    
-    * Please refer to the [Run Plutus Script transactions guide](6-RUN_PLUTUS_SCRIPT_TXS.md) for instructions.
-
+    
 ## Contributors
 
 This project is provided free of charge to the Cardano community. The author of this project is a fan of Cardano, as well as a Cardano stake pool operator.

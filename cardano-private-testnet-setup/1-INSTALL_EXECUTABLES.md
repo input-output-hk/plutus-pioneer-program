@@ -1,6 +1,6 @@
 # Install Cardano Executables
 
-This guide covers installing `cardano-node`, `cardano-cli` and optionally `cardano-db-sync` into `$HOME/.local/bin`.
+This guide covers installing `cardano-node`, `cardano-cli` and optionally `secp256k1` & `cardano-db-sync` into `$HOME/.local/bin`.
 
 #### Assumptions
 - This guide assumes you are running a Debian/Ubuntu linux OS.
@@ -17,8 +17,6 @@ This guide covers installing `cardano-node`, `cardano-cli` and optionally `carda
   cp cardano-cli $HOME/.local/bin/
   cp cardano-node $HOME/.local/bin/
   ```
-Continue to guide: [3. Run Network Scripts](./3-RUN_NETWORK_SCRIPTS.md)
-
 
 If you don't plan on using `cardano-db-sync`, you can continue to guide: [3. Run Network Scripts](./3-RUN_NETWORK_SCRIPTS.md).
 
@@ -68,14 +66,54 @@ from Haskell sources. **You may skip the rest of this readme, if db-sync is not 
   ghc --version
   ```
 
-### 2. Install latest release tags of Cardano db-sync executables including some patches necessary to make things work in private testnet  
+### 2. Install Libsodium library as pre-requisite for building cardano-db-sync
+
+```shell
+  # Clone the secp256k1 source
+  cd $HOME/src
+  git clone https://github.com/input-output-hk/libsodium
+  
+  # change directory
+  cd libsodium
+  
+  # checkout specific branch    
+  git checkout 66f017f1
+  
+  # apply configuration scripts and make project
+  ./autogen.sh
+  ./configure
+  make
+  sudo make install
+```
+
+### 3. Install secp256k1 library as pre-requisite for building cardano-db-sync
+These directions are based on the script code found here: [Cardano-db-sync script file to setup secp256k1](https://github.com/input-output-hk/cardano-db-sync/blob/master/scripts/secp256k1-setup.sh)
+
+  ```shell
+  # Clone the secp256k1 source
+  cd $HOME/src
+  git clone https://github.com/bitcoin-core/secp256k1.git secp256k1
+  
+  # change directory
+  cd secp256k1
+  
+  # reset the branch to appropriate commit    
+  git reset --hard ac83be33d0956faf6b7f61a60ab524ef7d6a473a
+  
+  # apply configuration scripts and make project
+  ./autogen.sh
+  ./configure --prefix=/usr --enable-module-schnorrsig --enable-experimental
+  make
+  make check
+
+  # install library
+  sudo make install
+  ```
+### 4. Install latest release tags of Cardano db-sync executables  
 
 **Note**: The directions below are to build `cardano-db-sync` from Haskell sources using cabal and GHC.  If you want to explore other options to build
 or deploy, e.g. using `nix-build` or `docker`,
 please see the [IOHK cardano-db-sync README](https://github.com/input-output-hk/cardano-db-sync#readme) for more info.
-
-**Note2**: The directions below include applying some cherry-pick commits, which are necessary to allow `cardano-db-sync`
-to work with a private testnet. If you want to understand the issue, please visit: [issue](https://github.com/input-output-hk/cardano-db-sync/issues/1046). 
 
 - Clone the IOHK cardano-db-sync repo
   ```shell
@@ -85,24 +123,14 @@ to work with a private testnet. If you want to understand the issue, please visi
   # fetch the list of tags and check out the latest release tag name  
   git fetch --tags --all
   
-  # checkout the latest release (currently 12.0.2 as of 3/27/22) of db-sync
+  # checkout the latest release (currently 13.0.4 as of 8/22/22) of db-sync
   git checkout $(curl -s https://api.github.com/repos/input-output-hk/cardano-db-sync/releases/latest | jq -r .tag_name)
-
-  # cherry pick the following 2 commits (using -n to avoid auto committing into local git repo)
-
-  # cherry-pick #1 - change to Genesis.hs
-  git cherry-pick -n bff6e182cf41f6f7a9ff3d08bb1fc9984e2d0f66
-
-  # cherry-pick #2 - change to Block.hs
-  git cherry-pick -n 132f569bcd297ce73bca407a52acee513aa75389
   ```
 
 - Fetch postgres `libpq-dev` package, update dependencies and build the cardano-db-sync project.  This can take 20 minutes+
-  
   **Note**: Building `cardano-db-sync` project from source, depends on finding the postgres `libpq-dev` package on the host OS.
 
   ```shell
-
   sudo apt-get install libpq-dev
   cabal update
 
@@ -112,15 +140,13 @@ to work with a private testnet. If you want to understand the issue, please visi
 
 - Copy db-sync executables to local user default path location
   ```shell
-  cp -p $(find dist-newstyle/build -type f -name "cardano-db-sync") $HOME/.local/bin/cardano-db-sync
-  cp -p $(find dist-newstyle/build -type f -name "cardano-db-sync-extended") $HOME/.local/bin/cardano-db-sync-extended  
+  cp -p $(find dist-newstyle/build -type f -name "cardano-db-sync") $HOME/.local/bin/cardano-db-sync  
   ```
 
 - Verify the versions of the db-sync executables
   ```shell
   cardano-db-sync --version
-  cardano-db-sync-extended --version
-  # when this document was written, the current version for each is 12.0.2 on linux-x86_64
+  # when this document was written, the current version for each is 13.0.4 on linux-x86_64
   ```
 ---
 Continue to next guide: [2. Install PostgreSQL instructions](./2-INSTALL_POSTGRESQL.md)
