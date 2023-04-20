@@ -9,7 +9,9 @@
 
 module Minting
     ( MintParams (..)
+    , MintRedeemer (..)
     , apiMintScript
+    , policy
     ) where
 
 import Cardano.Api.Shelley                      (PlutusScript (..), PlutusScriptV2)
@@ -32,7 +34,9 @@ import Plutus.V2.Ledger.Api
       adaSymbol,
       MintingPolicy,
       TxInInfo(txInInfoResolved),
-      ValidatorHash )
+      ValidatorHash,
+      txInfoInputs,
+      txOutDatum)
 import Plutus.V1.Ledger.Value
     ( assetClassValueOf,
       AssetClass(AssetClass),
@@ -198,15 +202,32 @@ mkPolicy mp r ctx = case r of
                    colLock d             == Locked &&
                    txSignedBy info (colOwner d)
 
+    collateralInputs :: [TxOut]
+    collateralInputs = [ o
+                       | i <- txInfoInputs info
+                       , let o = txInInfoResolved i
+                       , txOutAddress o == scriptHashAddress (mpCollateralValidator mp)
+                       ]
+
+    collateralInputDatum :: Maybe CollateralDatum
+    collateralInputDatum = case collateralInputs of
+      [o] -> case txOutDatum o of
+        NoOutputDatum -> Nothing
+        OutputDatum (Datum d) -> fromBuiltinData d
+        OutputDatumHash dh    -> do
+          Datum d <- findDatum dh info
+          fromBuiltinData d
+      _  -> Nothing
+
     -- Check that the amount of stablecoins burned matches the amont at the collateral's datum
     checkBurnAmountMatchesColDatum :: Bool
-    checkBurnAmountMatchesColDatum = case collateralDatum of
+    checkBurnAmountMatchesColDatum = case collateralInputDatum of
         Nothing -> False
         Just d  -> negate (colStablecoinAmount d) == mintedAmount
 
     -- Check that the owner's signature is present
     checkColOwner :: Bool
-    checkColOwner = case collateralDatum of
+    checkColOwner = case collateralInputDatum of
         Nothing -> False
         Just d  -> txSignedBy info (colOwner d)
 
