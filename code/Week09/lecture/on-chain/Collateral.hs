@@ -11,8 +11,10 @@ module Collateral
   ( apiCollateralScript
   , collateralScriptAsShortBs
   , CollateralDatum (..)
+  , CollateralRedeemer (..)
   , CollateralLock (..)
   , stablecoinTokenName
+  , validator
   ) where
 
 import           Cardano.Api.Shelley            (PlutusScript (..), PlutusScriptV2)
