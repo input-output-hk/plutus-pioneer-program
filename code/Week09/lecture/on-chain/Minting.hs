@@ -77,22 +77,20 @@ import           Utilities            (wrapPolicy)
 
 
 ---------------------------------------------------------------------------------------------------
-------------------------------- ON-CHAIN: HELPER FUNCTIONS/TYPES ----------------------------------
-
--- | collateralMinPercent = 150 means that locked collateral has to be at least 150% the minted amount
-collateralMinPercent :: Integer
-collateralMinPercent = 150
-
-
----------------------------------------------------------------------------------------------------
 ------------------------------------ ON-CHAIN: VALIDATOR ------------------------------------------
 
 -- Oracle and collateral validator hashes are passed as parameters
 data MintParams = MintParams
-    { mpOracleValidator     :: ValidatorHash
-    , mpCollateralValidator :: ValidatorHash
+    { mpOracleValidator      :: ValidatorHash
+    , mpCollateralValidator  :: ValidatorHash
+    , mpCollateralMinPercent :: Integer
     } deriving Prelude.Show
 makeLift ''MintParams
+
+{-
+mpCollateralMinPercent = 150 means that the value of the locked collateral has to be at least 150%
+of the minted amount value
+-}
 
 -- We can mint or burn our own stablecoins and liquidate someone else's.
 data MintRedeemer = Mint | Burn | Liquidate
@@ -138,10 +136,10 @@ mkPolicy mp r ctx = case r of
                     [o] -> o
                     _   -> traceError "expected exactly one oracle input"
 
-    -- Get the oracle's value
-    oracleValue :: Integer
-    oracleValue = case parseOracleDatum getOracleInput (`findDatum` info) of
-        Nothing -> traceError "oracle value not found"
+    -- Get the rate (Datum) from the Oracle
+    rate :: Integer
+    rate = case parseOracleDatum getOracleInput (`findDatum` info) of
+        Nothing -> traceError "Oracle's datum not found"
         Just x  -> x
 
 
@@ -158,13 +156,24 @@ mkPolicy mp r ctx = case r of
     {-
     maxMint calculates the maximum amount of stablecoins that can be minted with the given collateral.
 
-    Oracle has ada price in cents so $1 is 100 in oracle's data. So rate needs to be divided by 100.
-    Also, collateralAmount is in lovelaces, so final calculation needs to be divided by 1_000_000.
-    Without reductions: (collateralAmount `divide` collateralMinPercent * 100) * rate `divide` 100 `divide` 1_000_000
-    With reductions:
+    Oracle has ada price in USD cents [USD¢] ($1 is ¢100 in the oracle's datum). So rate needs to be divided by 100.
+    Also, collateralAmount is in lovelaces [L], so final calculation needs to be divided by 1_000_000.
+
+    ca = collateralAmount
+    CMP = mpCollateralMinPercent
+
+
+                      ca [L]        rate [USD¢/ADA]                 ca [L]       
+                 --------------- * ------------------           --------------- * rate [USD/ADA]
+                      CMP [%]        100 [USD¢/USD]                   CMP                         
+                    ---------                                               
+                      100 [%]                                               
+    maxMint = ------------------------------------------- =  ------------------------------------- = [USD]
+                        1_000_000 [L/A]                                1_000_000 [L/A]
+    
     -}
     maxMint :: Integer
-    maxMint = (collateralAmount `divide` collateralMinPercent * oracleValue) `divide` 1_000_000
+    maxMint = (collateralAmount `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
 
     -- Check that the amount of stablecoins minted does not exceed the maximum
     checkMaxMint :: Bool
