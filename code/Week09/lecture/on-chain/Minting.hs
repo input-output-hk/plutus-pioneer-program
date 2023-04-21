@@ -36,7 +36,8 @@ import Plutus.V2.Ledger.Api
       TxInInfo(txInInfoResolved),
       ValidatorHash,
       txInfoInputs,
-      txOutDatum)
+      txOutDatum,
+      txOutValue )
 import Plutus.V1.Ledger.Value
     ( assetClassValueOf,
       AssetClass(AssetClass),
@@ -231,9 +232,22 @@ mkPolicy mp r ctx = case r of
         Nothing -> False
         Just d  -> txSignedBy info (colOwner d)
 
+    
+    collateralInputAmount :: Maybe Integer
+    collateralInputAmount = case collateralInputs of
+      [o] -> Just $ valueOf (txOutValue o) adaSymbol adaToken
+      _   -> Nothing
+
+    maxInputMint :: Maybe Integer
+    maxInputMint = case collateralInputAmount of
+      Nothing  -> Nothing
+      Just cia -> Just $ (cia `divide` collateralMinPercent * oracleValue) `divide` 1_000_000
+
     -- Check that the collateral's value is low enough to liquidate
     checkLiquidation :: Bool
-    checkLiquidation = maxMint < negate mintedAmount
+    checkLiquidation = case maxInputMint of
+      Nothing -> False
+      Just mInputMint -> mInputMint < negate mintedAmount
 
 
 ---------------------------------------------------------------------------------------------------

@@ -11,7 +11,7 @@ import qualified Oracle
 import qualified Collateral
 import qualified Minting
 import           Control.Monad          (replicateM, unless, Monad (return), void)
-import           Plutus.Model           (Ada (Lovelace), DatumMode (InlineDatum),
+import           Plutus.Model           (Ada (Lovelace), DatumMode (..),
                                          Run, Tx, TypedValidator (TypedValidator),
                                          UserSpend, ada, adaValue,
                                          defaultBabbage, logError, mustFail,
@@ -20,9 +20,11 @@ import           Plutus.Model           (Ada (Lovelace), DatumMode (InlineDatum)
                                          valueAt, TypedPolicy (TypedPolicy), mintValue, spendPubKey, scriptCurrencySymbol, datumAt,
                                           spendScript, signTx, refInputInline)
 import           Plutus.V2.Ledger.Api   (PubKeyHash,
-                                         TxOut (txOutValue), TxOutRef, Value, singleton, TokenName)
+                                         TxOut (txOutValue), TxOutRef, Value, singleton,
+                                         TokenName, txOutDatum, OutputDatum (..), fromBuiltinData,
+                                         getDatum)
 import           PlutusTx.Builtins      (Integer)
-import           PlutusTx.Prelude       (Eq ((==)), ($), (.), Maybe (Just), negate)
+import           PlutusTx.Prelude       (Eq ((==)), ($), (.), Maybe (..), negate)
 import           Prelude                (IO, mconcat, Semigroup ((<>)))
 import           Test.Tasty             (defaultMain, testGroup)
 import           Plutus.V1.Ledger.Value (assetClass, AssetClass (), assetClassValue)
@@ -148,14 +150,14 @@ updateOracleTx op last new oRef nft =
     , payToScript (oracleScript op) (InlineDatum new) (adaValue 1 <> nft)
     ]
 
-updateOracle :: PubKeyHash -> Oracle.Rate ->  Oracle.Rate -> OracleValidator -> AssetClass -> Run OracleValidator
+updateOracle :: PubKeyHash -> Oracle.Rate ->  Oracle.Rate -> OracleValidator -> AssetClass -> Run ()
 updateOracle u last new ov nftAC = do
   [(ref,_)] <- utxoAt ov
   let oracle = Oracle.OracleParams nftAC u
       oracleTx = updateOracleTx oracle last new ref (assetClassValue nftAC 1)
   signed <- signTx u oracleTx
   submitTx u signed
-  return $ oracleScript oracle
+  --return $ oracleScript oracle
 
 testUpdateOracle :: Run ()
 testUpdateOracle = do
@@ -163,9 +165,9 @@ testUpdateOracle = do
   -- Deploy Oracle
   (ov, ac) <- deployOracle u1 25
   -- Update Oracle
-  ov' <-  updateOracle u1 25 26 ov ac
+  updateOracle u1 25 26 ov ac
   -- Check that the oracle updated correctly
-  [(ref,_)] <- utxoAt ov'
+  [(ref,_)] <- utxoAt ov
   dat <- datumAt ref :: Run (Maybe Oracle.Rate)
   case dat of
     Just r -> unless (r == 26) $ logError "Datum doesn't match!"
@@ -230,6 +232,15 @@ burnStablecoinTx us user policy ref dat burnVal = mconcat
                    , userSpend us
                    ]
 
+liquidateStablecoinTx :: UserSpend -> PubKeyHash -> TypedPolicy Minting.MintRedeemer -> TxOutRef -> TxOutRef -> Collateral.CollateralDatum -> Value -> Tx
+liquidateStablecoinTx us user policy oracleRef ref dat burnVal = mconcat
+                   [ spendScript collateralScript ref Collateral.Liquidate dat
+                   , payToKey user (adaValue 6000000)
+                   , refInputInline oracleRef
+                   , mintValue policy Minting.Liquidate (negate burnVal)
+                   , userSpend us
+                   ]
+
 mintStablecoin :: TxOutRef -> PubKeyHash -> Value -> Collateral.CollateralDatum -> Oracle.OracleParams -> Run ()
 mintStablecoin oRef user mintingVal datum op = do
   sp <- spend user $ adaValue 3000000
@@ -240,6 +251,18 @@ mintStablecoin oRef user mintingVal datum op = do
       -- Get Stablecoin minting policy
       stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
       tx = mintStablecoinTx user stablecoinMP mintingVal oRef datum sp
+  submitTx user tx
+
+liquidateStablecoin :: TxOutRef -> TxOutRef -> PubKeyHash -> Value -> Collateral.CollateralDatum -> Oracle.OracleParams -> Run ()
+liquidateStablecoin oRef ref user mintingVal datum op = do
+  sp <- spend user $ adaValue 3000000 <> mintingVal
+  let oracleVH = validatorHash' $ Oracle.validator op
+
+      -- Get Collateral validatorhash
+      collateralVH = validatorHash' Collateral.validator
+      -- Get Stablecoin minting policy
+      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
+      tx = liquidateStablecoinTx sp user stablecoinMP oRef ref datum mintingVal
   submitTx user tx
 
 burnStablecoin :: TxOutRef -> TypedPolicy Minting.MintRedeemer -> Collateral.CollateralDatum -> PubKeyHash -> Value -> Run ()
@@ -260,17 +283,39 @@ testE2E = do
 
       stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
       currSymbol = scriptCurrencySymbol stablecoinMP
-      datum = Collateral.CollateralDatum currSymbol u2 amountToMint Collateral.Locked
+      datumU1 = Collateral.CollateralDatum currSymbol u1 amountToMint Collateral.Locked
+      datumU2 = Collateral.CollateralDatum currSymbol u2 amountToMint Collateral.Locked
       mintingValue = singleton currSymbol Collateral.stablecoinTokenName amountToMint
 
   -- Update Oracle
-  ov' <-  updateOracle u1 200 100 ov ac
-  [(ref,_)] <- utxoAt ov'
+  updateOracle u1 200 100 ov ac
+  [(ref,_)] <- utxoAt ov
   -- Mint stablecoin
-  mintStablecoin ref u2 mintingValue datum oracleParams
-  [(colRef,_)] <- utxoAt collateralScript
+  mintStablecoin ref u1 mintingValue datumU1 oracleParams
+  [u1Collateral] <- findCollateralFor u1
   -- Burn stablecoin
-  burnStablecoin colRef stablecoinMP datum u2 mintingValue
+  burnStablecoin u1Collateral stablecoinMP datumU1 u1 mintingValue
+  -- Liquidate stablecoin
+  mintStablecoin ref u1 mintingValue datumU1 oracleParams
+  mintStablecoin ref u2 mintingValue datumU2 oracleParams
+  [u2Collateral] <- findCollateralFor u2
+  -- Update Oracle
+  updateOracle u1 200 50 ov ac
+  [(ref',_)] <- utxoAt ov
+  liquidateStablecoin ref' u2Collateral u1 mintingValue datumU2 oracleParams
+
+findCollateralFor :: PubKeyHash -> Run [TxOutRef]
+findCollateralFor user = do
+  utxos <- utxoAt collateralScript
+  let refs' = [ ref | (ref,o) <- utxos, getOwner o == Just user]
+  return refs'
+
+getOwner :: TxOut -> Maybe PubKeyHash
+getOwner oRef = case txOutDatum oRef of
+   OutputDatum od -> case fromBuiltinData (getDatum od) of
+     Nothing              -> Nothing
+     Just collateralDatum -> Just $ Collateral.colOwner collateralDatum
+   _ -> Nothing
 
 testMintStableCoin :: Run ()
 testMintStableCoin = do
@@ -278,8 +323,8 @@ testMintStableCoin = do
   -- Deploy Oracle
   (ov, ac) <- deployOracle u1 200
   -- Update Oracle
-  ov' <-  updateOracle u1 200 100 ov ac
-  [(ref,_)] <- utxoAt ov'
+  updateOracle u1 200 100 ov ac
+  [(ref,_)] <- utxoAt ov
       -- get Oracle validatorHash
 
   sp <- spend u1 $ adaValue 3000000
