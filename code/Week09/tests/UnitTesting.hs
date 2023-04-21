@@ -2,13 +2,12 @@
 {-# LANGUAGE NoImplicitPrelude  #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings  #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 
 module Main where
 
 import qualified NFT
 import qualified Oracle
-import qualified Collateral
-import qualified Minting
 import           Control.Monad          (replicateM, unless, Monad (return), void)
 import           Plutus.Model           (Ada (Lovelace), DatumMode (InlineDatum),
                                          Run, Tx, TypedValidator (TypedValidator),
@@ -16,14 +15,15 @@ import           Plutus.Model           (Ada (Lovelace), DatumMode (InlineDatum)
                                          defaultBabbage, logError, mustFail,
                                          newUser, payToKey, payToScript, spend, submitTx, testNoErrors,
                                          toV2, userSpend, utxoAt,
-                                         valueAt, TypedPolicy (TypedPolicy), mintValue, spendPubKey, scriptCurrencySymbol, datumAt)
+                                         valueAt, TypedPolicy (TypedPolicy), mintValue, spendPubKey, scriptCurrencySymbol, datumAt,
+                                         spendScript, signTx)
 import           Plutus.V2.Ledger.Api   (PubKeyHash,
                                          TxOut (txOutValue), TxOutRef, Value, singleton, TokenName)
 import           PlutusTx.Builtins      (Integer)
 import           PlutusTx.Prelude       (Eq ((==)), ($), (.), Maybe (Just))
-import           Prelude                (IO, mconcat, Semigroup ((<>)), undefined)
+import           Prelude                (IO, mconcat, Semigroup ((<>)))
 import           Test.Tasty             (defaultMain, testGroup)
-import           Plutus.V1.Ledger.Value (assetClass, AssetClass (AssetClass))
+import           Plutus.V1.Ledger.Value (assetClass, AssetClass (), assetClassValue)
 
 ---------------------------------------------------------------------------------------------------
 --------------------------------------- TESTING MAIN ----------------------------------------------
@@ -35,6 +35,7 @@ main = defaultMain $ do
       [ good "Minting NFT works               " testMintNFT
       , bad  "Minting the same NFT twice fails" testMintNFTTwice
       , good "Deploying the Oracle works      " testDeployOracle
+      , good "Updating the Oracle works       " testUpdateOracle 
       ]
     where
       bad msg = good msg . mustFail
@@ -101,41 +102,66 @@ type OracleValidator = TypedValidator Integer Oracle.OracleRedeemer
 oracleScript :: Oracle.OracleParams -> OracleValidator
 oracleScript oracle = TypedValidator . toV2 $ Oracle.validator oracle
 
-deployOracleTx :: UserSpend -> Oracle.OracleParams -> Oracle.Rate-> Tx
-deployOracleTx sp op dat =
+deployOracleTx :: UserSpend -> Oracle.OracleParams -> Oracle.Rate -> Value -> Tx
+deployOracleTx sp op dat val =
   mconcat
     [ userSpend sp
-    , payToScript (oracleScript op) (InlineDatum dat) (adaValue 1)
+    , payToScript (oracleScript op) (InlineDatum dat) (adaValue 1 <> val)
     ]
 
-deployOracle :: Oracle.Rate-> Run OracleValidator
-deployOracle or = do
-  [u1, _] <- setupUsers
+deployOracle :: PubKeyHash -> Oracle.Rate-> Run (OracleValidator, AssetClass)
+deployOracle u or = do
   -- Mint NFT
-  AssetClass (cs,tn) <- mintNFT u1
+  nftAC <- mintNFT u
   -- Deploy Oracle
-  sp <- spend u1 $ adaValue 1
-  let nftAC = assetClass cs tn
-      oracle = Oracle.OracleParams nftAC u1
-      oracleTx = deployOracleTx sp oracle or
-  submitTx u1 oracleTx
-  return $ oracleScript oracle
+  let nftV  = assetClassValue nftAC 1
+  sp <- spend u $ adaValue 1 <> nftV
+  let
+      oracle = Oracle.OracleParams nftAC u
+      oracleTx = deployOracleTx sp oracle or nftV
+  submitTx u oracleTx
+  return (oracleScript oracle, nftAC)
 
 testDeployOracle :: Run ()
 testDeployOracle = do
+  [u1,_] <- setupUsers
   -- Deploy Oracle
-  ov <- deployOracle 25
+  (ov, _) <- deployOracle u1 25
   -- Check that the oracle deployed correctly
   [(ref,_)] <- utxoAt ov
-  dat <- datumAt ref :: Run (Maybe Oracle.Ratio)
+  dat <- datumAt ref :: Run (Maybe Oracle.Rate)
   case dat of
     Just r -> unless (r == 25) $ logError "Datum doesn't match!"
     _ -> logError "Oracle is not deployed correctly: Could not find datum"
 
 
+updateOracleTx :: Oracle.OracleParams -> Oracle.Rate -> Oracle.Rate -> TxOutRef -> Value -> Tx
+updateOracleTx op last new oRef nft =
+  mconcat
+    [ spendScript (oracleScript op) oRef Oracle.Update last
+    , payToScript (oracleScript op) (InlineDatum new) (adaValue 1 <> nft)
+    ]
+
+updateOracle :: PubKeyHash -> Oracle.Rate ->  Oracle.Rate -> OracleValidator -> AssetClass -> Run OracleValidator
+updateOracle u last new ov nftAC = do
+  [(ref,_)] <- utxoAt ov
+  let oracle = Oracle.OracleParams nftAC u
+      oracleTx = updateOracleTx oracle last new ref (assetClassValue nftAC 1)
+  signed <- signTx u oracleTx
+  submitTx u signed
+  return $ oracleScript oracle
+
 testUpdateOracle :: Run ()
 testUpdateOracle = do
+  [u1, _] <- setupUsers
   -- Deploy Oracle
-  ov <- deployOracle 25
+  (ov, ac) <- deployOracle u1 25
   -- Update Oracle
-  undefined -- TODO
+  ov' <-  updateOracle u1 25 26 ov ac
+  -- Check that the oracle updated correctly
+  [(ref,_)] <- utxoAt ov'
+  dat <- datumAt ref :: Run (Maybe Oracle.Rate)
+  case dat of
+    Just r -> unless (r == 26) $ logError "Datum doesn't match!"
+    _ -> logError "Oracle is not deployed correctly: Could not find datum"
+  return ()
