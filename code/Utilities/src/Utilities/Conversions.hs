@@ -1,6 +1,7 @@
 module Utilities.Conversions
   ( Network (..)
   , validatorHash
+  , validatorHash'
   , policyHash
   , currencySymbol
   , validatorAddressBech32
@@ -22,7 +23,7 @@ import qualified Data.Time.Clock.POSIX      as Time
 import qualified Data.Time.Format.ISO8601   as Time
 import           Plutus.V2.Ledger.Api       (CurrencySymbol (CurrencySymbol),
                                              MintingPolicy,
-                                             MintingPolicyHash (MintingPolicyHash),
+                                             MintingPolicyHash (MintingPolicyHash), ValidatorHash (ValidatorHash),
                                              POSIXTime, Validator)
 import           PlutusTx.Builtins.Internal (BuiltinByteString (..))
 import           Utilities.Serialise        (policyToScript, validatorToScript)
@@ -32,6 +33,9 @@ hashScript = Api.hashScript . Api.PlutusScript Api.PlutusScriptV2
 
 validatorHash :: Validator -> Api.ScriptHash
 validatorHash = hashScript . validatorToScript
+
+validatorHash' :: Validator -> ValidatorHash
+validatorHash' = ValidatorHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . validatorToScript
 
 policyHash :: MintingPolicy -> MintingPolicyHash
 policyHash = MintingPolicyHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . policyToScript
