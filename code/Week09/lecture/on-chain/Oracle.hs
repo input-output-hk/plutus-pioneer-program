@@ -20,7 +20,7 @@ import Plutus.V2.Ledger.Api
       TxInInfo(txInInfoResolved),
       TxInfo,
       OutputDatum(OutputDatumHash, NoOutputDatum, OutputDatum),
-      TxOut(txOutDatum, txOutValue) )
+      TxOut(txOutDatum, txOutValue), UnsafeFromData (unsafeFromBuiltinData) )
 import Plutus.V2.Ledger.Contexts
     ( findDatum,
       getContinuingOutputs,
@@ -32,7 +32,7 @@ import PlutusTx
       FromData(fromBuiltinData),
       liftCode,
       applyCode,
-      makeLift )
+      makeLift, CompiledCode )
 import PlutusTx.Prelude
     ( Bool,
       Integer,
@@ -52,7 +52,7 @@ import qualified  Prelude               ((/=) )
 import Data.String ( IsString(fromString), String )
 import Plutus.V1.Ledger.Value
     ( assetClassValueOf, AssetClass(AssetClass) )
-import           Utilities            (wrapValidator, writeValidatorToFile)
+import           Utilities            (wrapValidator, writeValidatorToFile, writeCodeToFile, printDataToJSON)
 import Text.Printf (printf)
 
 ---------------------------------------------------------------------------------------------------
@@ -135,6 +135,7 @@ mkValidator oracle _ r ctx =
 mkWrappedValidator :: OracleParams -> BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkWrappedValidator = wrapValidator . mkValidator
 
+
 validator :: OracleParams -> Validator
 validator oracle = mkValidatorScript $
     $$(PlutusTx.compile [|| mkWrappedValidator ||])
@@ -142,8 +143,24 @@ validator oracle = mkValidatorScript $
     PlutusTx.liftCode oracle
 
 
+{-# INLINABLE  mkWrappedValidatorLucid #-}
+--                            nft          operator        rate          redeemer       context
+mkWrappedValidatorLucid :: BuiltinData ->  BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedValidatorLucid cs tn pkh = wrapValidator $ mkValidator op
+    where
+        op = OracleParams
+            { oNFT = AssetClass (unsafeFromBuiltinData cs, unsafeFromBuiltinData tn)
+            , oOperator   = unsafeFromBuiltinData pkh
+            }
+
+validatorCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
+validatorCode = $$( compile [|| mkWrappedValidatorLucid ||])
+
 ---------------------------------------------------------------------------------------------------
 ------------------------------------- HELPER FUNCTIONS --------------------------------------------
+
+saveOracleCode :: IO ()
+saveOracleCode = writeCodeToFile "assets/oracle.plutus" validatorCode
 
 saveOracleScript :: String -> PubKeyHash -> IO ()
 saveOracleScript symbol pkh = do
