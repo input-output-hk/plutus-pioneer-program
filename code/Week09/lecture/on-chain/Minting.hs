@@ -7,36 +7,24 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
 
-module Minting
-    ( MintParams (..)
-    , MintRedeemer (..)
-    , apiMintScript
-    , policy
-    ) where
+module Minting where
 
-import Cardano.Api.Shelley                      (PlutusScript (..), PlutusScriptV2)
-import           Codec.Serialise                (serialise)
-import qualified Data.ByteString.Lazy           as LBS
-import qualified Data.ByteString.Short          as SBS
 import Plutus.V2.Ledger.Api
-    ( Script,
-      Validator(Validator),
-      Datum(Datum),
+    ( Datum(Datum),
       OutputDatum(..),
       TxOut(txOutAddress),
       Value,
       ScriptContext(scriptContextTxInfo),
       TxInfo(txInfoReferenceInputs, txInfoMint),
       BuiltinData,
-      unMintingPolicyScript,
       mkMintingPolicyScript,
       adaToken,
       adaSymbol,
       MintingPolicy,
       TxInInfo(txInInfoResolved),
-      ValidatorHash,
+      ValidatorHash (ValidatorHash),
       txInfoInputs,
-      txOutDatum)
+      txOutDatum, UnsafeFromData (unsafeFromBuiltinData))
 import Plutus.V1.Ledger.Value
     ( assetClassValueOf,
       AssetClass(AssetClass),
@@ -53,7 +41,7 @@ import PlutusTx
       FromData(fromBuiltinData),
       liftCode,
       applyCode,
-      makeLift )
+      makeLift, CompiledCode )
 import PlutusTx.Prelude
     ( Bool(False),
       Integer,
@@ -69,10 +57,10 @@ import PlutusTx.Prelude
       length,
       divide,
       MultiplicativeSemigroup((*)) )
-import qualified Prelude                        (Show)
+import qualified Prelude                        (Show, IO)
 import           Oracle              (parseOracleDatum)
 import           Collateral          (CollateralDatum (..), CollateralLock (..), stablecoinTokenName)
-import           Utilities            (wrapPolicy)
+import           Utilities            (wrapPolicy, writeCodeToFile)
 
 
 ---------------------------------------------------------------------------------------------------
@@ -258,14 +246,20 @@ policy np = mkMintingPolicyScript $
     `applyCode`
     liftCode np
 
-script :: MintParams -> Script
-script = unMintingPolicyScript . policy
+{-# INLINABLE  mkWrappedPolicyLucid #-}
+--                     oracle ValHash   coll ValHash   minPercent      redeemer       context
+mkWrappedPolicyLucid :: BuiltinData ->  BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedPolicyLucid ov cv p = wrapPolicy $ mkPolicy mp
+    where
+        mp = MintParams
+            { mpOracleValidator  = ValidatorHash (unsafeFromBuiltinData ov)
+            , mpCollateralValidator = ValidatorHash (unsafeFromBuiltinData cv)
+            , mpCollateralMinPercent = unsafeFromBuiltinData p
+            }
 
-validator :: MintParams -> Validator
-validator = Validator . script
+policyCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
+policyCode = $$( compile [|| mkWrappedPolicyLucid ||])
 
-scriptAsCbor :: MintParams -> LBS.ByteString
-scriptAsCbor = serialise . validator
 
-apiMintScript :: MintParams -> PlutusScript PlutusScriptV2
-apiMintScript = PlutusScriptSerialised . SBS.toShort . LBS.toStrict . scriptAsCbor
+saveMintingCode :: Prelude.IO ()
+saveMintingCode = writeCodeToFile "assets/minting.plutus" policyCode

@@ -1,10 +1,9 @@
 import { AppStateContext } from "@/pages/_app";
+import { signAndSubmitTx } from "@/utilities/utilities";
 import {
-    Address,
     PaymentKeyHash,
     SpendingValidator,
     UTxO,
-    Unit,
     getAddressDetails,
 } from "lucid-cardano";
 import { applyParamsToScript, Data } from "lucid-cardano";
@@ -20,7 +19,7 @@ export default function Oracle() {
     const { appState, setAppState } = useContext(AppStateContext);
     const {
         lucid,
-        addr,
+        wAddr,
         nftPolicyIdHex,
         nftTokenNameHex,
         nftAssetClassHex,
@@ -36,20 +35,30 @@ export default function Oracle() {
         setTimeout(() => setCount(count + 1), 3e3);
     }, [count]);
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////////
+
     const getOracleNftUtxO = async () => {
-        if (lucid && addr && oracleAddress) {
-            const oracUtxO = await lucid.utxosAt(oracleAddress);
-            const oracUtxOWithNFT = oracUtxO.find((utxo: UTxO) => {
-                return Object.keys(utxo.assets).some((key) => {
-                    return key == nftAssetClassHex;
+        if (lucid && wAddr && oracleAddress) {
+            try {
+                const oracUtxO = await lucid.utxosAt(oracleAddress);
+                const oracUtxOWithNFT = oracUtxO.find((utxo: UTxO) => {
+                    return Object.keys(utxo.assets).some((key) => {
+                        return key == nftAssetClassHex;
+                    });
                 });
-            });
-            if (
-                oracUtxOWithNFT == undefined ||
-                oracUtxOWithNFT == oracleUTxOWithNFT
-            )
-                return;
-            setAppState({ ...appState, oracleUTxOWithNFT: oracUtxOWithNFT });
+                if (
+                    oracUtxOWithNFT == undefined ||
+                    oracUtxOWithNFT == oracleUTxOWithNFT
+                )
+                    return;
+                setAppState({
+                    ...appState,
+                    oracleUTxOWithNFT: oracUtxOWithNFT,
+                });
+            } catch (err) {
+                console.log("Couldn't find Oracle with NFT");
+            }
         }
     };
 
@@ -82,13 +91,16 @@ export default function Oracle() {
         return oracleScript;
     };
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////// DEPLOY ORACLE ///////////////////////////////////////////
+
     const deployOracle = async () => {
-        if (!lucid || !addr) {
+        if (!lucid || !wAddr) {
             alert("Please connect account and mint NFT!");
             return;
         }
         const pkh: string =
-            getAddressDetails(addr).paymentCredential?.hash || "";
+            getAddressDetails(wAddr).paymentCredential?.hash || "";
         const oracle = await getFinalScript(pkh);
         if (!oracle || !nftAssetClassHex) {
             alert("Please mint NFT first!");
@@ -112,14 +124,15 @@ export default function Oracle() {
             )
             .addSignerKey(pkh)
             .complete();
-        const signedTx = await tx.sign().complete();
-        const txHash = await signedTx.submit();
-        console.log("tid: " + txHash);
+        await signAndSubmitTx(tx);
     };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////// UPDATE ORACLE ///////////////////////////////////////////
 
     const updateOracle = async () => {
         if (
-            addr &&
+            wAddr &&
             lucid &&
             nftAssetClassHex &&
             oracleScript &&
@@ -127,7 +140,7 @@ export default function Oracle() {
             oracleAddress
         ) {
             const pkh: string =
-                getAddressDetails(addr).paymentCredential?.hash || "";
+                getAddressDetails(wAddr).paymentCredential?.hash || "";
 
             const tx = await lucid!
                 .newTx()
@@ -144,101 +157,53 @@ export default function Oracle() {
                 .addSignerKey(pkh)
                 .complete();
 
-            const signedTx = await tx.sign().complete();
-            const txHash = await signedTx.submit();
-            console.log("tid: " + txHash);
+            await signAndSubmitTx(tx);
         } else {
             alert("Please, deploy the oracle before updating it!");
         }
     };
 
-    //////////////////////////////////////////////////////////////////////////////////////////
-    /////////////////////////////////////// ORACLE TESTS /////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////// DELETE ORACLE ///////////////////////////////////////////
 
-    const tFinalOracleScript: SpendingValidator = {
-        type: "PlutusV2",
-        script: "590c72590c6f010000333232332232332232323233223232323232323232323232323232323232323232323223232222322323253353232323232325335004153353301250023500622001102813357389211a6f70657261746f72207369676e6174757265206d697373696e6700027153355335333573466e1cd4d40188800888ccc04cd54cd4c05801484d4004880044c98c80b8cd5ce249146f7261636c6520696e707574206d697373696e67000332222003002001480080a009c40a04cd5ce24918746f6b656e206d697373696e672066726f6d20696e70757400027153355335333573466e1cd4d40188800888ccc04cd5400c888800c008005200202802710281335738920119746f6b656e206d697373696e672066726f6d206f75747075740002715335533533012500235006220011028133573892011a6f70657261746f72207369676e6174757265206d697373696e67000271533553355333535500122220021502f213019001232153353235001222222222222300e002500421301b00115031320013550332253350011503222135002225335333573466e3c00801c0bc0b84d40dc0044c01800c840a4409c40a04cd5ce24914696e76616c6964206f757470757420646174756d000271027102710271533553353013002213500122350012222350092235002222222222222333553027120012235002222253353501822350062232335005233500425335333573466e3c0080041241205400c412081208cd4010812094cd4ccd5cd19b8f002001049048150031048153350032153350022133500223350022335002233500223303b002001204b2335002204b23303b00200122204b222335004204b2225335333573466e1c01800c13813454cd4ccd5cd19b8700500204e04d1333573466e1c01000413813441344134411854cd40048411841184cd4118018014401541040284c98c80accd5ce2481024c6600030130294988854cd40044008884c0b526135001220023333573466e1cd55cea802a4000466442466002006004646464646464646464646464646666ae68cdc39aab9d500c480008cccccccccccc88888888888848cccccccccccc00403403002c02802402001c01801401000c008cd4094098d5d0a80619a8128131aba1500b33502502735742a014666aa052eb940a0d5d0a804999aa814bae502835742a01066a04a05c6ae85401cccd540a40bdd69aba150063232323333573466e1cd55cea801240004664424660020060046464646666ae68cdc39aab9d5002480008cc8848cc00400c008cd40e5d69aba15002303a357426ae8940088c98c8100cd5ce01e82281f09aab9e5001137540026ae854008c8c8c8cccd5cd19b8735573aa004900011991091980080180119a81cbad35742a00460746ae84d5d1280111931902019ab9c03d04503e135573ca00226ea8004d5d09aba2500223263203c33573807208207426aae7940044dd50009aba1500533502575c6ae854010ccd540a40ac8004d5d0a801999aa814bae200135742a004605a6ae84d5d1280111931901c19ab9c03503d036135744a00226ae8940044d5d1280089aba25001135744a00226ae8940044d5d1280089aba25001135744a00226ae8940044d55cf280089baa00135742a00a603a6ae84d5d1280291931901519ab9c02702f0283333573466e1d40192002212200223333573466e1d401d2000212200123263202a33573804e05e05004e6eb401ccc8848cc00400c008cccd5cd19b8735573aa0129000119aa8149bae35742a0126eb8d5d09aba2500923263202733573804805804a6eb801c40ac4c98c8098cd5ce2481035054350002b135573ca00226ea80044d55ce9baa001135573ca00226ea8004888c8c8c004014c8004d5409488cd400520002235002225335333573466e3c0080240840804c01c0044c01800cc8004d5409088cd400520002235002225335333573466e3c00801c08007c40044c01800c88d40088888888888894cd4ccd54c04848005404494cd4ccd5cd19b8f00e00102502413502d0011502c0042102510233200135501f221122253350011002221330050023335530071200100500400123500122350022222222222223333500d2502b2502b2502b23335530121200150112350012253355335333573466e3cd400888008d40108800809c0984ccd5cd19b8735002220013500422001027026102613502f0031502e00d1321233001225335002210031001002501a3200135501c221122253350011350032200122133350052200230040023335530071200100500400122333573466e3c00800404c0488ccccccd5d20009280c9280c9280c91a80d1bad0022501901a1232230023758002640026aa034446666aae7c004940608cd405cc010d5d080118019aba200201b232323333573466e1cd55cea8012400046644246600200600460146ae854008c014d5d09aba2500223263201633573802603602826aae7940044dd50009191919191999ab9a3370e6aae75401120002333322221233330010050040030023232323333573466e1cd55cea8012400046644246600200600460266ae854008cd4034048d5d09aba2500223263201b33573803004003226aae7940044dd50009aba150043335500875ca00e6ae85400cc8c8c8cccd5cd19b875001480108c84888c008010d5d09aab9e500323333573466e1d4009200223212223001004375c6ae84d55cf280211999ab9a3370ea00690001091100191931900e99ab9c01a02201b01a019135573aa00226ea8004d5d0a80119a804bae357426ae8940088c98c805ccd5ce00a00e00a89aba25001135744a00226aae7940044dd5000899aa800bae75a224464460046eac004c8004d5405c88c8cccd55cf8011280b119a80a99aa80b98031aab9d5002300535573ca00460086ae8800c0644d5d080089119191999ab9a3370ea002900011a80b98029aba135573ca00646666ae68cdc3a801240044a02e464c6402866ae700440640480444d55cea80089baa001232323333573466e1d400520062321222230040053007357426aae79400c8cccd5cd19b875002480108c848888c008014c024d5d09aab9e500423333573466e1d400d20022321222230010053007357426aae7940148cccd5cd19b875004480008c848888c00c014dd71aba135573ca00c464c6402866ae7004406404804404003c4d55cea80089baa001232323333573466e1cd55cea80124000466442466002006004600a6ae854008dd69aba135744a004464c6402066ae700340540384d55cf280089baa0012323333573466e1cd55cea800a400046eb8d5d09aab9e500223263200e33573801602601826ea80048c8c8c8c8c8cccd5cd19b8750014803084888888800c8cccd5cd19b875002480288488888880108cccd5cd19b875003480208cc8848888888cc004024020dd71aba15005375a6ae84d5d1280291999ab9a3370ea00890031199109111111198010048041bae35742a00e6eb8d5d09aba2500723333573466e1d40152004233221222222233006009008300c35742a0126eb8d5d09aba2500923333573466e1d40192002232122222223007008300d357426aae79402c8cccd5cd19b875007480008c848888888c014020c038d5d09aab9e500c23263201733573802803802a02802602402202001e26aae7540104d55cf280189aab9e5002135573ca00226ea80048c8c8c8c8cccd5cd19b875001480088ccc888488ccc00401401000cdd69aba15004375a6ae85400cdd69aba135744a00646666ae68cdc3a80124000464244600400660106ae84d55cf280311931900819ab9c00d01500e00d135573aa00626ae8940044d55cf280089baa001232323333573466e1d400520022321223001003375c6ae84d55cf280191999ab9a3370ea004900011909118010019bae357426aae7940108c98c8034cd5ce00500900580509aab9d50011375400224464646666ae68cdc3a800a40084244400246666ae68cdc3a8012400446424446006008600c6ae84d55cf280211999ab9a3370ea00690001091100111931900719ab9c00b01300c00b00a135573aa00226ea80048c8cccd5cd19b8750014800880148cccd5cd19b8750024800080148c98c8028cd5ce00380780400389aab9d375400224400424400292103505431002326320033357389212265787065637465642065786163746c79206f6e65206f7261636c65206f7574707574000084984488008488488cc00401000c448848cc00400c00848488c00800c448800448004448c8c00400488cc00cc00800800530012a58284fa08b764e74a89e520738b2718f64037718726eb4a4e9e33184b4eb4f7261636c652773204e4654004c011e581ce48dea1ea0c60cfeed371d456419c10e83c72d772ec4631c73a4991e0001",
-    };
-    const tFinalScriptAddress: Address =
-        "addr_test1wrj6st0kk6qddldzwyawduj7dmsgylddajl829zgfgpzudqptxnaz";
-
-    const tNFT: Unit =
-        "4fa08b764e74a89e520738b2718f64037718726eb4a4e9e33184b4eb4f7261636c652773204e4654";
-
-    const tNftUtxo: UTxO = {
-        txHash: "8bfeb1a3ddce25df4ac4424f7a356c4c8b74a07cc8ccaebeffa0bc1528c1a802",
-        outputIndex: 0,
-        assets: { [tNFT]: 1n, lovelace: 1090430n },
-        address: tFinalScriptAddress,
-        datum: "0a",
-        datumHash: undefined,
-        scriptRef: null,
-    };
-
-    const testUpdateOracle = async () => {
-        if (addr) {
+    const deleteOracle = async () => {
+        if (
+            wAddr &&
+            lucid &&
+            nftAssetClassHex &&
+            oracleScript &&
+            oracleUTxOWithNFT &&
+            oracleAddress
+        ) {
             const pkh: string =
-                getAddressDetails(addr).paymentCredential?.hash || "";
-
-            const redJSON = {
-                constructor: 0,
-                fields: [],
-            };
+                getAddressDetails(wAddr).paymentCredential?.hash || "";
 
             const tx = await lucid!
                 .newTx()
                 .collectFrom(
-                    [tNftUtxo], // UTXO to spend
-                    Data.to<OracleRedeemer>("Update", OracleRedeemer) // Redeemer
-                )
-                .payToContract(
-                    tFinalScriptAddress,
-                    { inline: Data.to(rate, Data.Integer()) },
-                    { [tNFT]: 1n }
-                )
-                .attachSpendingValidator(tFinalOracleScript)
-                .addSignerKey(pkh)
-                .complete();
-
-            const signedTx = await tx.sign().complete();
-            const txHash = await signedTx.submit();
-            console.log("tid: " + txHash);
-        } else {
-            alert("Please connect account and mint NFT!");
-        }
-    };
-
-    const testDeleteOracle = async () => {
-        if (addr && lucid && tNFT && tFinalOracleScript && tNftUtxo) {
-            const pkh: string =
-                getAddressDetails(addr).paymentCredential?.hash || "";
-
-            const tx = await lucid!
-                .newTx()
-                .collectFrom(
-                    [tNftUtxo], // UTXO to spend
+                    [oracleUTxOWithNFT], // UTXO to spend
                     Data.to<OracleRedeemer>("Delete", OracleRedeemer) // Redeemer
                 )
-                .attachSpendingValidator(tFinalOracleScript)
+                .payToAddress(wAddr, { [nftAssetClassHex]: 1n })
+                .attachSpendingValidator(oracleScript)
                 .addSignerKey(pkh)
-                .payToAddress(addr, { [tNFT]: 1n })
                 .complete();
 
-            const signedTx = await tx.sign().complete();
-            const txHash = await signedTx.submit();
-            console.log("tid: " + txHash);
+            await signAndSubmitTx(tx);
         } else {
-            alert("Please connect account and mint NFT!");
+            alert(
+                "You have to deploy the oracle before being able to delete it!"
+            );
         }
     };
 
-    //////////////////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////// UI /////////////////////////////////////////////////
 
     return (
         <div className="">
             <div className="flex flex-row">
-                <p>Current USD/ADA:</p>
+                <p>Current price of ADA (in USD cents):</p>
                 <input
                     type="number"
                     value={Number(rate)}
@@ -247,7 +212,7 @@ export default function Oracle() {
             </div>
             <button
                 onClick={deployOracle}
-                disabled={!lucid || !addr || !nftAssetClassHex || rate === 0n}
+                disabled={!lucid || !wAddr || !nftAssetClassHex || rate === 0n}
                 className="m-3 p-3 disabled:bg-slate-400 bg-violet-400"
             >
                 {" "}
@@ -257,7 +222,7 @@ export default function Oracle() {
                 onClick={updateOracle}
                 disabled={
                     !lucid ||
-                    !addr ||
+                    !wAddr ||
                     !nftAssetClassHex ||
                     rate === 0n ||
                     !oracleUTxOWithNFT
@@ -267,20 +232,19 @@ export default function Oracle() {
                 {" "}
                 Update Oracle
             </button>
-
             <button
-                onClick={testUpdateOracle}
+                onClick={deleteOracle}
+                disabled={
+                    !lucid ||
+                    !wAddr ||
+                    !nftAssetClassHex ||
+                    rate === 0n ||
+                    !oracleUTxOWithNFT
+                }
                 className="m-3 p-3 disabled:bg-slate-400 bg-red-400"
             >
                 {" "}
-                Update Test Oracle
-            </button>
-            <button
-                onClick={testDeleteOracle}
-                className="m-3 p-3 disabled:bg-slate-400 bg-red-400"
-            >
-                {" "}
-                Delete Test Oracle
+                Delete Oracle
             </button>
         </div>
     );

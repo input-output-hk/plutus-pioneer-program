@@ -52,7 +52,7 @@ import qualified  Prelude               ((/=) )
 import Data.String ( IsString(fromString), String )
 import Plutus.V1.Ledger.Value
     ( assetClassValueOf, AssetClass(AssetClass) )
-import           Utilities            (wrapValidator, writeValidatorToFile, writeCodeToFile, printDataToJSON)
+import           Utilities            (wrapValidator, writeValidatorToFile, writeCodeToFile)
 import Text.Printf (printf)
 
 ---------------------------------------------------------------------------------------------------
