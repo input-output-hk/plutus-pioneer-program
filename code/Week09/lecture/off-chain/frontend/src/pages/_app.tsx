@@ -6,6 +6,7 @@ import {
     MintingPolicy,
     PolicyId,
     SpendingValidator,
+    TxHash,
     UTxO,
     Unit,
 } from "lucid-cardano";
@@ -45,6 +46,7 @@ export type AppState = {
     collatealAddr: Address;
     collateralRefScrUTxO?: UTxO;
     mpRefScrUTxO?: UTxO;
+    txScripsDeployment?: TxHash;
 };
 
 const initialAppState: AppState = {

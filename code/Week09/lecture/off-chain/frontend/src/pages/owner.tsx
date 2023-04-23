@@ -16,6 +16,7 @@ export default function Home() {
         oracleUTxOWithNFT,
         oracleAddress,
         minPercent,
+        txScripsDeployment,
     } = appState;
 
     return (
@@ -64,6 +65,11 @@ export default function Home() {
                             ? Data.from(oracleUTxOWithNFT.datum)
                             : ""
                     }
+                />
+                <ExplorerLink
+                    message="Tx that deployed the scripts: "
+                    type="tx"
+                    value={txScripsDeployment || ""}
                 />
                 <div>
                     <b>Depoyed with Minimum Percentage of Collateral:</b>{" "}

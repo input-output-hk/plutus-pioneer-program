@@ -11,7 +11,8 @@ import { signAndSubmitTx } from "@/utilities/utilities";
 
 export default function DeployScripts() {
     const { appState, setAppState } = useContext(AppStateContext);
-    const { lucid, wAddr, oracleScript, collateralScript } = appState;
+    const { lucid, wAddr, oracleScript, collateralScript, txScripsDeployment } =
+        appState;
     const [mPerc, setMPerc] = useState(150n);
 
     const parseMinPerc = (r: string) => {
@@ -62,7 +63,7 @@ export default function DeployScripts() {
     };
 
     const deployBothScriptsInOneTx = async () => {
-        if (!lucid || !wAddr) return;
+        if (!lucid || !wAddr || txScripsDeployment) return;
         console.log("deploying both scripts in one tx");
         const scPolicy = await getFinalMintingPolicy();
         if (!scPolicy) return;
@@ -72,7 +73,8 @@ export default function DeployScripts() {
             .payToAddressWithData(wAddr, { scriptRef: scPolicy }, {})
             .complete();
 
-        await signAndSubmitTx(tx);
+        const pid = await signAndSubmitTx(tx);
+        setAppState({ ...appState, txScripsDeployment: pid });
     };
 
     return (
@@ -87,7 +89,9 @@ export default function DeployScripts() {
             </div>
             <button
                 onClick={deployBothScriptsInOneTx}
-                disabled={!wAddr || !oracleScript || !mPerc}
+                disabled={
+                    !wAddr || !oracleScript || !mPerc || !!txScripsDeployment
+                }
                 className="bg-blue-500 disabled:bg-slate-300 hover:bg-orange-700 text-white font-bold p-2 m-4 rounded"
             >
                 {" "}
