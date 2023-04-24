@@ -1,4 +1,4 @@
-import { PolicyId, SpendingValidator, UTxO, Unit } from "lucid-cardano";
+import { PolicyId, Unit } from "lucid-cardano";
 import React, { useContext, useState } from "react";
 import {
     applyParamsToScript,
@@ -11,8 +11,15 @@ import { signAndSubmitTx } from "@/utilities/utilities";
 
 export default function DeployScripts() {
     const { appState, setAppState } = useContext(AppStateContext);
-    const { lucid, wAddr, oracleScript, collateralScript, txScripsDeployment } =
-        appState;
+    const {
+        lucid,
+        wAddr,
+        oracleScript,
+        collateralScript,
+        txScriptsDeployment,
+        txCollScriptDeployment,
+        txMintingPolScriptDeployment,
+    } = appState;
     const [mPerc, setMPerc] = useState(150n);
 
     const parseMinPerc = (r: string) => {
@@ -63,18 +70,27 @@ export default function DeployScripts() {
     };
 
     const deployBothScriptsInOneTx = async () => {
-        if (!lucid || !wAddr || txScripsDeployment) return;
-        console.log("deploying both scripts in one tx");
+        if (!lucid || !wAddr || txScriptsDeployment) return;
+        console.log("deployBothScriptsInOneTx -> appState: ", appState);
         const scPolicy = await getFinalMintingPolicy();
         if (!scPolicy) return;
         const tx = await lucid
             .newTx()
-            .payToAddressWithData(wAddr, { scriptRef: collateralScript }, {})
-            .payToAddressWithData(wAddr, { scriptRef: scPolicy }, {})
+            .payToAddressWithData(
+                wAddr,
+                { inline: Data.void(), scriptRef: collateralScript },
+                {}
+            )
+            .payToAddressWithData(
+                wAddr,
+                { inline: Data.void(), scriptRef: scPolicy },
+                {}
+            )
             .complete();
 
         const pid = await signAndSubmitTx(tx);
-        setAppState({ ...appState, txScripsDeployment: pid });
+        console.log("Deployed both scripts: ", pid);
+        setAppState({ ...appState, txScriptsDeployment: pid });
     };
 
     return (
@@ -90,7 +106,11 @@ export default function DeployScripts() {
             <button
                 onClick={deployBothScriptsInOneTx}
                 disabled={
-                    !wAddr || !oracleScript || !mPerc || !!txScripsDeployment
+                    !wAddr ||
+                    !oracleScript ||
+                    !mPerc ||
+                    !!txCollScriptDeployment ||
+                    !!txMintingPolScriptDeployment
                 }
                 className="bg-blue-500 disabled:bg-slate-300 hover:bg-orange-700 text-white font-bold p-2 m-4 rounded"
             >

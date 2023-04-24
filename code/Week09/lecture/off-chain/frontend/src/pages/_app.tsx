@@ -28,25 +28,38 @@ const collateralAddr: Address =
     "addr_test1wpwra8ssewfzlftpfx50wt4vfl4989gzuhy6werfztlmrug4qshwn";
 
 export type AppState = {
+    // Global
     lucid?: Lucid;
     wAddr?: Address;
+    // NFT Policy
     nftPolicyIdHex?: PolicyId;
     nftTokenNameHex?: string;
     nftAssetClassHex?: Unit;
     nftPolicy?: MintingPolicy;
+    // Stablecoin Policy
     scPolicyIdHex?: PolicyId;
     scTokenNameHex?: string;
     scAssetClassHex?: Unit;
     scPolicy?: MintingPolicy;
+    minPercent?: number;
+    mintingPolRefScrUTxO?: UTxO;
+    mintingPolRefScrUTxORef?: string;
+    // Oracle
     oracleScript?: SpendingValidator;
     oracleAddress?: Address;
-    oracleUTxOWithNFT?: UTxO;
-    minPercent?: number;
+    oracleWithNftUTxO?: UTxO;
+    oracleUtxoWithNFTRef?: string;
+    // Collateral
     collateralScript: SpendingValidator;
     collatealAddr: Address;
     collateralRefScrUTxO?: UTxO;
-    mpRefScrUTxO?: UTxO;
-    txScripsDeployment?: TxHash;
+    collateralRefScrUTxORef?: string;
+    collateralToUnlockUTxO?: UTxO;
+    collateralToUnlockUTxORef?: string;
+    // Reference Scripts
+    txScriptsDeployment?: TxHash;
+    txCollScriptDeployment?: TxHash;
+    txMintingPolScriptDeployment?: TxHash;
 };
 
 const initialAppState: AppState = {

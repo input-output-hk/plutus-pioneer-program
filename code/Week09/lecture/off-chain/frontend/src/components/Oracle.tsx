@@ -23,7 +23,7 @@ export default function Oracle() {
         nftPolicyIdHex,
         nftTokenNameHex,
         nftAssetClassHex,
-        oracleUTxOWithNFT,
+        oracleWithNftUTxO,
         oracleScript,
         oracleAddress,
     } = appState;
@@ -49,12 +49,12 @@ export default function Oracle() {
                 });
                 if (
                     oracUtxOWithNFT == undefined ||
-                    oracUtxOWithNFT == oracleUTxOWithNFT
+                    oracUtxOWithNFT == oracleWithNftUTxO
                 )
                     return;
                 setAppState({
                     ...appState,
-                    oracleUTxOWithNFT: oracUtxOWithNFT,
+                    oracleWithNftUTxO: oracUtxOWithNFT,
                 });
             } catch (err) {
                 console.log("Couldn't find Oracle with NFT");
@@ -136,7 +136,7 @@ export default function Oracle() {
             lucid &&
             nftAssetClassHex &&
             oracleScript &&
-            oracleUTxOWithNFT &&
+            oracleWithNftUTxO &&
             oracleAddress
         ) {
             const pkh: string =
@@ -145,7 +145,7 @@ export default function Oracle() {
             const tx = await lucid!
                 .newTx()
                 .collectFrom(
-                    [oracleUTxOWithNFT], // UTXO to spend
+                    [oracleWithNftUTxO], // UTXO to spend
                     Data.to<OracleRedeemer>("Update", OracleRedeemer) // Redeemer
                 )
                 .payToContract(
@@ -172,7 +172,7 @@ export default function Oracle() {
             lucid &&
             nftAssetClassHex &&
             oracleScript &&
-            oracleUTxOWithNFT &&
+            oracleWithNftUTxO &&
             oracleAddress
         ) {
             const pkh: string =
@@ -181,7 +181,7 @@ export default function Oracle() {
             const tx = await lucid!
                 .newTx()
                 .collectFrom(
-                    [oracleUTxOWithNFT], // UTXO to spend
+                    [oracleWithNftUTxO], // UTXO to spend
                     Data.to<OracleRedeemer>("Delete", OracleRedeemer) // Redeemer
                 )
                 .payToAddress(wAddr, { [nftAssetClassHex]: 1n })
@@ -225,7 +225,7 @@ export default function Oracle() {
                     !wAddr ||
                     !nftAssetClassHex ||
                     rate === 0n ||
-                    !oracleUTxOWithNFT
+                    !oracleWithNftUTxO
                 }
                 className="m-3 p-3 disabled:bg-slate-400 bg-green-400"
             >
@@ -239,7 +239,7 @@ export default function Oracle() {
                     !wAddr ||
                     !nftAssetClassHex ||
                     rate === 0n ||
-                    !oracleUTxOWithNFT
+                    !oracleWithNftUTxO
                 }
                 className="m-3 p-3 disabled:bg-slate-400 bg-red-400"
             >

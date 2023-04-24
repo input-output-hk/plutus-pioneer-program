@@ -2,7 +2,6 @@ import MintNFTButton from "../components/MintNFTButton";
 import { useContext } from "react";
 import { AppStateContext } from "./_app";
 import Oracle from "@/components/Oracle";
-import { Data, toText } from "lucid-cardano";
 import { ExplorerLink, ExplorerLinkPrime } from "@/components/ExplorerLinks";
 import DeployScripts from "@/components/DeployScripts";
 
@@ -10,13 +9,13 @@ export default function Home() {
     const { appState } = useContext(AppStateContext);
     const {
         wAddr,
-        nftPolicyIdHex,
-        nftTokenNameHex,
-        nftAssetClassHex,
-        oracleUTxOWithNFT,
+        scPolicyIdHex,
+        scAssetClassHex,
+        oracleWithNftUTxO,
         oracleAddress,
         minPercent,
-        txScripsDeployment,
+        txCollScriptDeployment,
+        txMintingPolScriptDeployment,
     } = appState;
 
     return (
@@ -28,20 +27,6 @@ export default function Home() {
                     value={wAddr || ""}
                 />
                 <ExplorerLink
-                    message="NFT PolicyId in Hex:"
-                    type="policy"
-                    value={nftPolicyIdHex || ""}
-                />
-                <div>
-                    <b>NFT TokenName in Hex: </b> {nftTokenNameHex}
-                </div>
-                <ExplorerLink
-                    message="NFT AssetClass in Hex:"
-                    type="asset"
-                    value={nftAssetClassHex || ""}
-                />
-
-                <ExplorerLink
                     message="Oracle address: "
                     type="address"
                     value={oracleAddress || ""}
@@ -51,26 +36,46 @@ export default function Home() {
                     message="Oracle UTxO with NFT: "
                     type="tx"
                     value={
-                        oracleUTxOWithNFT?.txHash
-                            ? `${oracleUTxOWithNFT?.txHash}#${oracleUTxOWithNFT?.outputIndex}`
+                        oracleWithNftUTxO?.txHash
+                            ? `${oracleWithNftUTxO?.txHash}#${oracleWithNftUTxO?.outputIndex}`
                             : ""
                     }
                 />
                 <ExplorerLinkPrime
                     message="Oracle's Datum (Price of ADA in cents): "
                     type="datum"
-                    link={oracleUTxOWithNFT?.txHash || ""}
+                    link={
+                        oracleWithNftUTxO?.txHash
+                            ? oracleWithNftUTxO?.txHash
+                            : "No TxHash"
+                    }
                     value={
-                        oracleUTxOWithNFT?.datum
-                            ? Data.from(oracleUTxOWithNFT.datum)
-                            : ""
+                        oracleWithNftUTxO?.datum
+                            ? oracleWithNftUTxO?.datum
+                            : "No Datum"
                     }
                 />
                 <ExplorerLink
-                    message="Tx that deployed the scripts: "
+                    message="Tx that deployed the Collateral script: "
                     type="tx"
-                    value={txScripsDeployment || ""}
+                    value={txCollScriptDeployment || ""}
                 />
+                <ExplorerLink
+                    message="Tx that deployed the Minting script: "
+                    type="tx"
+                    value={txMintingPolScriptDeployment || ""}
+                />
+                <ExplorerLink
+                    message="Stablecoin PolicyId in Hex:"
+                    type="policy"
+                    value={scPolicyIdHex || ""}
+                />
+                <ExplorerLink
+                    message="Stablecoin AssetClass in Hex:"
+                    type="asset"
+                    value={scAssetClassHex || ""}
+                />
+
                 <div>
                     <b>Depoyed with Minimum Percentage of Collateral:</b>{" "}
                     {minPercent}
