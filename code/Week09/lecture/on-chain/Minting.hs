@@ -9,58 +9,25 @@
 
 module Minting where
 
-import Plutus.V2.Ledger.Api
-    ( Datum(Datum),
-      OutputDatum(..),
-      TxOut(txOutAddress),
-      Value,
-      ScriptContext(scriptContextTxInfo),
-      TxInfo(txInfoReferenceInputs, txInfoMint),
-      BuiltinData,
-      mkMintingPolicyScript,
-      adaToken,
-      adaSymbol,
-      MintingPolicy,
-      TxInInfo(txInInfoResolved),
-      ValidatorHash (ValidatorHash),
-      txInfoInputs,
-      txOutDatum, UnsafeFromData (unsafeFromBuiltinData))
-import Plutus.V1.Ledger.Value
-    ( assetClassValueOf,
-      AssetClass(AssetClass),
-      valueOf )
-import Plutus.V1.Ledger.Address ( scriptHashAddress )
-import Plutus.V2.Ledger.Contexts
-    ( findDatum,
-      txSignedBy,
-      scriptOutputsAt,
-      ownCurrencySymbol )
-import PlutusTx
-    ( compile,
-      unstableMakeIsData,
-      FromData(fromBuiltinData),
-      liftCode,
-      applyCode,
-      makeLift, CompiledCode )
-import PlutusTx.Prelude
-    ( Bool(False),
-      Integer,
-      Maybe(..),
-      (.),
-      negate,
-      traceError,
-      (&&),
-      traceIfFalse,
-      ($),
-      Ord((<), (>), (>=)),
-      Eq((==)),
-      length,
-      divide,
-      MultiplicativeSemigroup((*)) )
-import qualified Prelude                        (Show, IO)
-import           Oracle              (parseOracleDatum)
-import           Collateral          (CollateralDatum (..), CollateralLock (..), stablecoinTokenName)
-import           Utilities            (wrapPolicy, writeCodeToFile)
+import Plutus.V2.Ledger.Api      ( Datum(Datum), OutputDatum(..), TxOut(txOutAddress),
+                                   Value, ScriptContext(scriptContextTxInfo),
+                                   TxInfo(txInfoReferenceInputs, txInfoMint),
+                                   BuiltinData, mkMintingPolicyScript, adaToken,
+                                   adaSymbol, MintingPolicy, TxInInfo(txInInfoResolved),
+                                   txInfoInputs, txOutDatum, UnsafeFromData (unsafeFromBuiltinData),
+                                   ValidatorHash)
+import Plutus.V1.Ledger.Value    ( assetClassValueOf, AssetClass(AssetClass), valueOf )
+import Plutus.V1.Ledger.Address  ( scriptHashAddress )
+import Plutus.V2.Ledger.Contexts ( findDatum, txSignedBy, scriptOutputsAt, ownCurrencySymbol )
+import PlutusTx                  ( compile, unstableMakeIsData, FromData(fromBuiltinData),
+                                   liftCode, applyCode, makeLift, CompiledCode )
+import PlutusTx.Prelude          ( Bool(False), Integer, Maybe(..), (.), negate, traceError,
+                                   (&&), traceIfFalse, ($), Ord((<), (>), (>=)), Eq((==)),
+                                   length, divide, MultiplicativeSemigroup((*)) )
+import qualified Prelude         ( Show, IO)
+import           Oracle          ( parseOracleDatum)
+import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName)
+import           Utilities       (wrapPolicy, writeCodeToFile)
 
 
 ---------------------------------------------------------------------------------------------------
@@ -252,14 +219,13 @@ mkWrappedPolicyLucid :: BuiltinData ->  BuiltinData -> BuiltinData -> BuiltinDat
 mkWrappedPolicyLucid ov cv p = wrapPolicy $ mkPolicy mp
     where
         mp = MintParams
-            { mpOracleValidator  = ValidatorHash (unsafeFromBuiltinData ov)
-            , mpCollateralValidator = ValidatorHash (unsafeFromBuiltinData cv)
+            { mpOracleValidator  = unsafeFromBuiltinData ov
+            , mpCollateralValidator = unsafeFromBuiltinData cv
             , mpCollateralMinPercent = unsafeFromBuiltinData p
             }
 
-policyCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
-policyCode = $$( compile [|| mkWrappedPolicyLucid ||])
-
+policyCodeLucid :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
+policyCodeLucid = $$( compile [|| mkWrappedPolicyLucid ||])
 
 saveMintingCode :: Prelude.IO ()
-saveMintingCode = writeCodeToFile "assets/minting.plutus" policyCode
+saveMintingCode = writeCodeToFile "assets/minting.plutus" policyCodeLucid

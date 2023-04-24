@@ -5,6 +5,7 @@ import {
     Lucid,
     MintingPolicy,
     PolicyId,
+    ScriptHash,
     SpendingValidator,
     TxHash,
     UTxO,
@@ -46,11 +47,13 @@ export type AppState = {
     mintingPolRefScrUTxORef?: string;
     // Oracle
     oracleScript?: SpendingValidator;
+    oracleScriptHash?: ScriptHash;
     oracleAddress?: Address;
     oracleWithNftUTxO?: UTxO;
     oracleUtxoWithNFTRef?: string;
     // Collateral
     collateralScript: SpendingValidator;
+    collateralScriptHash?: ScriptHash;
     collatealAddr: Address;
     collateralRefScrUTxO?: UTxO;
     collateralRefScrUTxORef?: string;
@@ -74,6 +77,13 @@ export const AppStateContext = createContext<{
 
 export default function App({ Component, pageProps }: AppProps) {
     const [appState, setAppState] = useState<AppState>(initialAppState);
+    const [currAppState, setCurrAppState] = useState<AppState>(initialAppState);
+
+    useEffect(() => {
+        if (appState === currAppState) return;
+        setCurrAppState(appState);
+        console.log("appState changed: ", appState);
+    }, [appState]);
 
     const connectLucidAndNami = async () => {
         const lucid = await Lucid.new(

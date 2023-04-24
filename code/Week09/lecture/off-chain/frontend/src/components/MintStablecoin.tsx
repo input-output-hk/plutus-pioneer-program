@@ -58,15 +58,15 @@ export default function MintStablecoin() {
             setAppState({
                 ...appState,
                 oracleUtxoWithNFTRef:
-                    "6f899568d8364b604f947d3a820da3107209cca2dce5c4ff621680d10c99227f#0",
+                    "215d8d5ad71a05699d2d395f59ec722a0a5fd464f6026cac4e0ddae77c43c309#0",
                 collateralRefScrUTxORef:
-                    "a0395a46f1c1bc213e5ff3d86d83df89cf278231411fe99914950c417f351a62#0",
+                    "889f1dd145c4842f4ae94cf5011f4b877e37aa44f3c768488012e86036ca17a6#0",
                 mintingPolRefScrUTxORef:
-                    "a0395a46f1c1bc213e5ff3d86d83df89cf278231411fe99914950c417f351a62#1",
+                    "889f1dd145c4842f4ae94cf5011f4b877e37aa44f3c768488012e86036ca17a6#1",
                 scPolicyIdHex:
-                    "df48c58179f0cc201c3a32686923396c07ed68c23442d612f5bdc662",
+                    "d164834f314baccf0de36b7898609464511e19f6d89e0e8507ea5219",
                 scAssetClassHex:
-                    "df48c58179f0cc201c3a32686923396c07ed68c23442d612f5bdc66255534450",
+                    "d164834f314baccf0de36b7898609464511e19f6d89e0e8507ea521955534450",
             });
         }
     }, [appState]);
