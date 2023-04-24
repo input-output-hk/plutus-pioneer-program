@@ -41,3 +41,11 @@
   * [Lesson 4.3: Off-chain Code with Kuber](lectures/lecture-04/lesson-03/README.md)
   * [Lesson 4.4: Off-Chain Code with Lucid](lectures/lecture-04/lesson-04/README.md)
   * [Lecture 4 Homework Assignment](lectures/lecture-04/lesson-05/README.md)
+
+* [Lecture 5](lectures/lecture-05/README.md)
+  * [Lesson 5.1: Introduction to Native Tokens in Cardano](lectures/lecture-05/lesson-01/README.md)
+  * [Lesson 5.2: The Value Type](lectures/lecture-05/lesson-02/README.md)
+  * [Lesson 5.3: A Simple Minting Policy](lectures/lecture-05/lesson-03/README.md)
+  * [Lesson 5.4: A More Realistic Minting Policy](lectures/lecture-05/lesson-04/README.md)
+  * [Lesson 5.5: Non-Fungible Tokens (NFTs) in Cardano](lectures/lecture-05/lesson-05/README.md)
+  * [Lecture 5 Homework Assignment](lectures/lecture-05/lesson-06/README.md)
