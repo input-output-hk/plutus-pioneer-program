@@ -249,7 +249,7 @@ mintStablecoin oRef user mintingVal datum op = do
       -- Get Collateral validatorhash
       collateralVH = validatorHash' Collateral.validator
       -- Get Stablecoin minting policy
-      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
+      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       tx = mintStablecoinTx user stablecoinMP mintingVal oRef datum sp
   submitTx user tx
 
@@ -261,7 +261,7 @@ liquidateStablecoin oRef ref user mintingVal datum op = do
       -- Get Collateral validatorhash
       collateralVH = validatorHash' Collateral.validator
       -- Get Stablecoin minting policy
-      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
+      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       tx = liquidateStablecoinTx sp user stablecoinMP oRef ref datum mintingVal
   submitTx user tx
 
@@ -281,7 +281,7 @@ testE2E = do
       oracleVH     = validatorHash' $ Oracle.validator oracleParams
       collateralVH = validatorHash' Collateral.validator
 
-      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
+      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       currSymbol = scriptCurrencySymbol stablecoinMP
       datumU1 = Collateral.CollateralDatum currSymbol u1 amountToMint Collateral.Locked
       datumU2 = Collateral.CollateralDatum currSymbol u2 amountToMint Collateral.Locked
@@ -333,7 +333,7 @@ testMintStableCoin = do
       -- get Collateral validatorhash
       collateralVH = validatorHash' Collateral.validator
 
-      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH
+      stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       currSymbol = scriptCurrencySymbol stablecoinMP
       datum = Collateral.CollateralDatum currSymbol u1 2 Collateral.Locked
       mintingValue = singleton currSymbol Collateral.stablecoinTokenName 2

@@ -85,6 +85,14 @@ This documentation looks better in GitBook at the following link:
 - [Marlowe Starter Kit: Escrow using the Marlowe Runtime's REST API](https://youtu.be/E8m-PKbS9TI)
 - [Marlowe Starter Kit: Swap contract using the Marlowe Runtime's REST API](https://youtu.be/sSrVCRNoytU)
 
+### [Lecture 8](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x09VdtQTw_UpxUa0bRcrVPI)
+
+- [Introduction](https://youtu.be/07ATzubeHjo)
+- [The Private Testnet](https://youtu.be/BBqOZAuMx1c)
+- [Plutus & Staking](https://youtu.be/1Hs6bU9pXi4)
+- [Trying it on the Testnet](https://youtu.be/fzYXwdrfu44)
+- [Homework](https://youtu.be/rO3FVGsuzUg)
+
 ## Repository Structure
 
 The most relevant directories of this repository are structured as follows:

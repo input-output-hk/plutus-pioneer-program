@@ -7,6 +7,7 @@ module Utilities.Serialise
   , writeCodeToFile
   , writeValidatorToFile
   , writePolicyToFile
+  , writeStakeValidatorToFile
   , dataToJSON
   , printDataToJSON
   , writeDataToFile
@@ -43,6 +44,10 @@ validatorToScript = serializableToScript
 policyToScript :: PlutusV2.MintingPolicy -> PlutusScript PlutusScriptV2
 policyToScript = serializableToScript
 
+-- Serialize stake validator
+stakeValidatorToScript :: PlutusV2.StakeValidator -> PlutusScript PlutusScriptV2
+stakeValidatorToScript = serializableToScript
+
 -- Create file with Plutus script
 writeScriptToFile :: FilePath -> PlutusScript PlutusScriptV2 -> IO ()
 writeScriptToFile filePath script =
@@ -61,6 +66,10 @@ writeValidatorToFile filePath = writeScriptToFile filePath . validatorToScript
 -- Create file with compiled Plutus minting policy
 writePolicyToFile :: FilePath -> PlutusV2.MintingPolicy -> IO ()
 writePolicyToFile filePath = writeScriptToFile filePath . policyToScript
+
+-- Create file with compiled Plutus stake validator
+writeStakeValidatorToFile :: FilePath -> PlutusV2.StakeValidator -> IO ()
+writeStakeValidatorToFile filePath = writeScriptToFile filePath . stakeValidatorToScript
 
 dataToJSON :: ToData a => a -> Value
 dataToJSON = scriptDataToJsonDetailedSchema . fromPlutusData . PlutusV2.toData

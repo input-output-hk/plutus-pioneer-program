@@ -7,51 +7,35 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Collateral 
-  ( apiCollateralScript
-  , collateralScriptAsShortBs
-  , CollateralDatum (..)
-  , CollateralRedeemer (..)
-  , CollateralLock (..)
-  , stablecoinTokenName
-  , validator
-  ) where
+module Collateral where
 
-import           Cardano.Api.Shelley            (PlutusScript (..), PlutusScriptV2)
-import           Codec.Serialise                (serialise)
-import qualified Data.ByteString.Lazy           as LBS
-import qualified Data.ByteString.Short          as SBS
-import Plutus.V2.Ledger.Api
-    ( unValidatorScript,
-      mkValidatorScript,
-      Script,
-      Validator,
-      Datum(Datum),
-      OutputDatum(OutputDatumHash, NoOutputDatum, OutputDatum),
-      TxOut(txOutDatum),
-      ScriptContext(scriptContextTxInfo),
-      TxInfo(txInfoMint),
-      BuiltinData,
-      PubKeyHash,
-      CurrencySymbol,
-      TokenName(TokenName) )
-import Plutus.V1.Ledger.Value ( assetClassValueOf, AssetClass(AssetClass))
+import Plutus.V2.Ledger.Api     ( mkValidatorScript,
+                                   Validator,
+                                   Datum(Datum),
+                                   OutputDatum(OutputDatumHash, NoOutputDatum, OutputDatum),
+                                   TxOut(txOutDatum),
+                                   ScriptContext(scriptContextTxInfo),
+                                   TxInfo(txInfoMint),
+                                   BuiltinData,
+                                   PubKeyHash,
+                                   CurrencySymbol,
+                                   TokenName(TokenName) )
+import Plutus.V1.Ledger.Value    ( assetClassValueOf, AssetClass(AssetClass))
 import Plutus.V2.Ledger.Contexts ( findDatum, getContinuingOutputs, txSignedBy )
-import PlutusTx ( compile, unstableMakeIsData, FromData(fromBuiltinData) )
-import PlutusTx.Prelude ( Bool(..),
-      Integer,
-      Maybe(..),
-      (.),
-      negate,
-      traceError,
-      (&&),
-      traceIfFalse,
-      encodeUtf8,
-      ($),
-      Ord((>)),
-      Eq(..) )
+import PlutusTx                  ( compile, unstableMakeIsData, FromData(fromBuiltinData) )
+import PlutusTx.Prelude          ( Bool(..),
+                                   Integer,
+                                   Maybe(..),
+                                   negate,
+                                   traceError,
+                                   (&&),
+                                   traceIfFalse,
+                                   encodeUtf8,
+                                   ($),
+                                   Ord((>)),
+                                   Eq(..) )
+import           Utilities        (wrapValidator, writeValidatorToFile)
 import qualified Prelude
-import           Utilities            (wrapValidator)
 
 
 ---------------------------------------------------------------------------------------------------
@@ -163,11 +147,5 @@ mkWrappedValidator = wrapValidator mkValidator
 validator :: Validator
 validator = mkValidatorScript $$(compile [|| mkWrappedValidator ||])
 
-script :: Script
-script = unValidatorScript validator
-
-collateralScriptAsShortBs :: SBS.ShortByteString
-collateralScriptAsShortBs = SBS.toShort . LBS.toStrict $ serialise script
-
-apiCollateralScript :: PlutusScript PlutusScriptV2
-apiCollateralScript = PlutusScriptSerialised collateralScriptAsShortBs
+saveCollateralScript :: Prelude.IO ()
+saveCollateralScript = writeValidatorToFile "assets/collateral.plutus" validator
