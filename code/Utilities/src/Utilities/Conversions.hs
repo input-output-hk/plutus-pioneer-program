@@ -35,7 +35,7 @@ import           Plutus.V1.Ledger.Crypto     as Plutus
 import           Plutus.V2.Ledger.Api        (CurrencySymbol (CurrencySymbol),
                                               MintingPolicy,
                                               MintingPolicyHash (MintingPolicyHash),
-                                              POSIXTime, Validator)
+                                              POSIXTime, Validator, ValidatorHash (ValidatorHash))
 import qualified Plutus.V2.Ledger.Api        as Plutus
 import           PlutusTx.Builtins           (toBuiltin)
 import           PlutusTx.Builtins.Internal  (BuiltinByteString (..))

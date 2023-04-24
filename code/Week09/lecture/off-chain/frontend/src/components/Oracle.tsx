@@ -27,12 +27,12 @@ export default function Oracle() {
         oracleScript,
         oracleAddress,
     } = appState;
-    const [rate, setRate] = useState(10n);
+    const [rate, setRate] = useState(100n);
     const [count, setCount] = useState(0);
 
     useEffect(() => {
         getOracleNftUtxO();
-        setTimeout(() => setCount(count + 1), 3e3);
+        setTimeout(() => setCount(count + 1), 5e3);
     }, [count]);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,25 +40,24 @@ export default function Oracle() {
 
     const getOracleNftUtxO = async () => {
         if (lucid && wAddr && oracleAddress) {
-            try {
-                const oracUtxO = await lucid.utxosAt(oracleAddress);
-                const oracUtxOWithNFT = oracUtxO.find((utxo: UTxO) => {
-                    return Object.keys(utxo.assets).some((key) => {
-                        return key == nftAssetClassHex;
-                    });
+            const oracUtxO = await lucid.utxosAt(oracleAddress).catch((err) => {
+                console.log("Can't find Oracle UtxO");
+            });
+            if (!oracUtxO) return;
+            const oracUtxOWithNFT = oracUtxO.find((utxo: UTxO) => {
+                return Object.keys(utxo.assets).some((key) => {
+                    return key == nftAssetClassHex;
                 });
-                if (
-                    oracUtxOWithNFT == undefined ||
-                    oracUtxOWithNFT == oracleWithNftUTxO
-                )
-                    return;
-                setAppState({
-                    ...appState,
-                    oracleWithNftUTxO: oracUtxOWithNFT,
-                });
-            } catch (err) {
-                console.log("Couldn't find Oracle with NFT");
-            }
+            });
+            if (
+                oracUtxOWithNFT == undefined ||
+                oracUtxOWithNFT == oracleWithNftUTxO
+            )
+                return;
+            setAppState({
+                ...appState,
+                oracleWithNftUTxO: oracUtxOWithNFT,
+            });
         }
     };
 

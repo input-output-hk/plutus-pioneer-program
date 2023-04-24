@@ -49,7 +49,8 @@ export default function MintStablecoin() {
         mintingPolRefScrUTxORef,
     } = appState;
     const [amountToMint, setAmountToMint] = useState(10n);
-    const [amountToBurn, setAmountToBurn] = useState(10n);
+    const [amountToBurnOrLiq, setAmountToBurnOrLiq] = useState(10n);
+    const [burnOrLiq, setBurnOrLiq] = useState(true); // Burn = true
     const [collValueToLock, setCollValueToLock] = useState(15n);
 
     ////// TESTING DATA. REMOVE BEFORE RECORDING /////
@@ -58,15 +59,15 @@ export default function MintStablecoin() {
             setAppState({
                 ...appState,
                 oracleUtxoWithNFTRef:
-                    "215d8d5ad71a05699d2d395f59ec722a0a5fd464f6026cac4e0ddae77c43c309#0",
+                    "3caa7a48ef453a41151f72784684dd8b8b58bdb83eee159d60985b9ec6f32391#0",
                 collateralRefScrUTxORef:
-                    "889f1dd145c4842f4ae94cf5011f4b877e37aa44f3c768488012e86036ca17a6#0",
+                    "660db8503ed1e04b6d6f600b886591ccc24fd695afe1677b59c7ea2f74600c1d#0",
                 mintingPolRefScrUTxORef:
-                    "889f1dd145c4842f4ae94cf5011f4b877e37aa44f3c768488012e86036ca17a6#1",
+                    "660db8503ed1e04b6d6f600b886591ccc24fd695afe1677b59c7ea2f74600c1d#1",
                 scPolicyIdHex:
-                    "d164834f314baccf0de36b7898609464511e19f6d89e0e8507ea5219",
+                    "d1b7e0beb9906068a2227dba8ae2f28b7c8fe967dfb5c26fdc65bfa5",
                 scAssetClassHex:
-                    "d164834f314baccf0de36b7898609464511e19f6d89e0e8507ea521955534450",
+                    "d1b7e0beb9906068a2227dba8ae2f28b7c8fe967dfb5c26fdc65bfa555534450",
             });
         }
     }, [appState]);
@@ -85,6 +86,7 @@ export default function MintStablecoin() {
         setCollValueToLock(BigInt(minColl));
     };
 
+    // TODO: Minting doesn't find reference UTxOs when updating updating oracle
     const getReferenceUTxOs = async () => {
         if (
             !lucid ||
@@ -108,24 +110,23 @@ export default function MintStablecoin() {
     };
 
     const getColateralUTxOToUnlock = async () => {
-        // TODO: after minting works
-        // if (
-        //     !lucid ||
-        //     !oracleUtxoWithNFTRef ||
-        //     !collateralRefScrUTxORef ||
-        //     !mintingPolRefScrUTxORef
-        // )
-        //     return;
-        // const oracUTxOWithNFT = await findUTxO(lucid, oracleUtxoWithNFTRef);
-        // const collRefScrUTxO = await findUTxO(lucid, collateralRefScrUTxORef);
-        // const mpRefScrUTxO = await findUTxO(lucid, mintingPolRefScrUTxORef);
-        // console.log("UTxOs: ", oracUTxOWithNFT, collRefScrUTxO, mpRefScrUTxO);
-        // setAppState({
-        //     ...appState,
-        //     oracleWithNftUTxO: oracUTxOWithNFT,
-        //     collateralRefScrUTxO: collRefScrUTxO,
-        //     mintingPolRefScrUTxO: mpRefScrUTxO,
-        // });
+        if (
+            !lucid ||
+            !oracleWithNftUTxO ||
+            !collateralRefScrUTxO ||
+            !mintingPolRefScrUTxO ||
+            !collateralToUnlockUTxORef
+        )
+            return;
+        const colToUnlockUTxO = await findUTxO(
+            lucid,
+            collateralToUnlockUTxORef
+        );
+        console.log("Collateral to unlock UTxOs: ", colToUnlockUTxO);
+        setAppState({
+            ...appState,
+            collateralToUnlockUTxO: colToUnlockUTxO,
+        });
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,7 +171,6 @@ export default function MintStablecoin() {
                     },
                     { lovelace: collValueToLock * 1000000n }
                 )
-                // FIXME: minting doesn't work.
                 .mintAssets(
                     { [scAssetClassHex]: amountToMint },
                     Data.to<MintRedeemer>("Mint", MintRedeemer)
@@ -189,21 +189,30 @@ export default function MintStablecoin() {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////// BURN STABLECOINS /////////////////////////////////////////
 
-    const burnSC = async () => {
-        console.log("mintSC -> appState: ", appState);
+    //collToUnlock: 78af5bef37f19317b19b5e33bb2e8bc358b69a9c61b328f5029df8b7a7ad1a33#0
+    const burnOrLiqSC = async () => {
+        console.log("burnSC -> appState: ", appState);
         if (
             wAddr &&
             lucid &&
             scPolicyIdHex &&
-            amountToBurn > 0n &&
             scAssetClassHex &&
             oracleWithNftUTxO &&
             collateralRefScrUTxO &&
             mintingPolRefScrUTxO &&
-            collateralToUnlockUTxO
+            collateralToUnlockUTxO &&
+            amountToBurnOrLiq > 0n
         ) {
+            console.log(
+                `{-amountToBurnOrLiq: ${-amountToBurnOrLiq}, burn: ${burnOrLiq}}`
+            );
             const pkh: string =
                 getAddressDetails(wAddr).paymentCredential?.hash || "";
+
+            const colRed: CollateralRedeemer = burnOrLiq
+                ? "Redeem"
+                : "Liquidate";
+            const mpRed: MintRedeemer = burnOrLiq ? "Burn" : "Liquidate";
 
             const tx = await lucid!
                 .newTx()
@@ -214,14 +223,15 @@ export default function MintStablecoin() {
                 ])
                 .collectFrom(
                     [collateralRefScrUTxO],
-                    Data.to<CollateralRedeemer>("Redeem", CollateralRedeemer)
+                    Data.to<CollateralRedeemer>(colRed, CollateralRedeemer)
                 )
                 .mintAssets(
-                    { [scAssetClassHex]: -amountToMint },
-                    Data.to<MintRedeemer>("Mint", MintRedeemer)
+                    // { [scAssetClassHex]: -amountToBurnOrLiq },
+                    { [scAssetClassHex]: -10n },
+                    Data.to<MintRedeemer>(mpRed, MintRedeemer)
                 )
                 .addSignerKey(pkh)
-                .complete();
+                .complete({ nativeUplc: false });
 
             console.log("minting tx: ", tx.txComplete.to_js_value());
 
@@ -364,28 +374,51 @@ export default function MintStablecoin() {
             </div>
 
             <div className="flex flex-row">
-                <p>Stablecoins to burn (units):</p>
+                <p>Stablecoins to burn/liquidate (units):</p>
                 <input
                     type="number"
-                    value={Number(amountToBurn)}
+                    value={Number(amountToBurnOrLiq)}
                     onChange={(e) => {
                         const am = safeStringToBigInt(e.target.value);
                         if (!am) return;
-                        setAmountToBurn(am);
+                        setAmountToBurnOrLiq(am);
                     }}
                 />
             </div>
-
+            <div className="flex flex-col">
+                <div className="flex flex-row">
+                    <p>Burn:</p>
+                    <input
+                        type="radio"
+                        checked={burnOrLiq}
+                        onChange={() => setBurnOrLiq(!burnOrLiq)}
+                    />
+                </div>
+                <div className="flex flex-row">
+                    <p>Liquidate:</p>
+                    <input
+                        type="radio"
+                        checked={!burnOrLiq}
+                        onChange={() => setBurnOrLiq(!burnOrLiq)}
+                    />
+                </div>
+            </div>
             <button
                 onClick={getColateralUTxOToUnlock}
-                disabled={!lucid || !wAddr || !amountToMint || !collValueToLock}
+                disabled={
+                    !lucid ||
+                    !wAddr ||
+                    !amountToMint ||
+                    !collValueToLock ||
+                    !collateralToUnlockUTxORef
+                }
                 className="m-3 p-3 disabled:bg-slate-400 bg-violet-400"
             >
                 {" "}
                 Get Collateral UTxO to unlock
             </button>
             <button
-                onClick={burnSC}
+                onClick={burnOrLiqSC}
                 disabled={
                     !lucid ||
                     !wAddr ||
@@ -399,7 +432,7 @@ export default function MintStablecoin() {
                 className="m-3 p-3 disabled:bg-slate-400 bg-violet-400"
             >
                 {" "}
-                Burn Stablecoins
+                Burn/Liquidate Stablecoins
             </button>
         </div>
     );

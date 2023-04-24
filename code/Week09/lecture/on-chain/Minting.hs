@@ -23,7 +23,7 @@ import PlutusTx                  ( compile, unstableMakeIsData, FromData(fromBui
                                    liftCode, applyCode, makeLift, CompiledCode )
 import PlutusTx.Prelude          ( Bool(False), Integer, Maybe(..), (.), negate, traceError,
                                    (&&), traceIfFalse, ($), Ord((<), (>), (>=)), Eq((==)),
-                                   length, divide, MultiplicativeSemigroup((*)) )
+                                   length, divide, MultiplicativeSemigroup((*)))
 import qualified Prelude         ( Show, IO)
 import           Oracle          ( parseOracleDatum)
 import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName)
@@ -59,10 +59,10 @@ mkPolicy mp r ctx = case r of
                  traceIfFalse "minted amount exceeds max" checkMaxMint &&
                  traceIfFalse "invalid datum at collateral output" checkDatum
 
-    Burn      -> traceIfFalse "invalid burn amount" checkBurnAmountMatchesColDatum &&
+    Burn      -> traceIfFalse "invalid burning amount" checkBurnAmountMatchesColDatum &&
                  traceIfFalse "owner's signature missing" checkColOwner
 
-    Liquidate -> traceIfFalse "invalid burn amount" checkBurnAmountMatchesColDatum &&
+    Liquidate -> traceIfFalse "invalid liquidating amount" checkBurnAmountMatchesColDatum &&
                  traceIfFalse "liquidation threshold not reached" checkLiquidation
                  -- We check the oracle's input implicitly using `getOracleInput` while checking for liquidation
                  
@@ -151,7 +151,7 @@ mkPolicy mp r ctx = case r of
     -- | Helper function to extract the value from the collateral datum
     collateralDatum :: Maybe CollateralDatum
     collateralDatum = case collateralOutDat of
-                NoOutputDatum         -> Nothing
+                NoOutputDatum         -> traceError "Found Collateral output but NoOutputDatum"
                 OutputDatum (Datum d) -> fromBuiltinData d
                 OutputDatumHash dh    -> do 
                                         Datum d <- findDatum dh info
@@ -176,12 +176,12 @@ mkPolicy mp r ctx = case r of
     collateralInputDatum :: Maybe CollateralDatum
     collateralInputDatum = case collateralInputs of
       [o] -> case txOutDatum o of
-        NoOutputDatum -> Nothing
+        NoOutputDatum -> traceError "Found Collateral Input but NoOutputDatum"
         OutputDatum (Datum d) -> fromBuiltinData d
         OutputDatumHash dh    -> do
           Datum d <- findDatum dh info
           fromBuiltinData d
-      _  -> Nothing
+      _  -> traceError "Missing colateral Input"
 
     -- Check that the amount of stablecoins burned matches the amont at the collateral's datum
     checkBurnAmountMatchesColDatum :: Bool
@@ -228,4 +228,4 @@ policyCodeLucid :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> Bu
 policyCodeLucid = $$( compile [|| mkWrappedPolicyLucid ||])
 
 saveMintingCode :: Prelude.IO ()
-saveMintingCode = writeCodeToFile "assets/minting.plutus" policyCodeLucid
+saveMintingCode = writeCodeToFile "assets/minting1.plutus" policyCodeLucid
