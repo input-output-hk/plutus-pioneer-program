@@ -6,6 +6,7 @@ import { ExplorerLink, ExplorerLinkPrime } from "@/components/ExplorerLinks";
 import DeployScripts from "@/components/DeployScripts";
 import { HiUserCircle } from "react-icons/hi";
 import { IoReloadCircleSharp } from "react-icons/io5";
+import MintStablecoin from "@/components/MintStablecoin";
 
 export default function Home() {
     const { appState, setAppState } = useContext(AppStateContext);
@@ -124,7 +125,7 @@ export default function Home() {
             </div>
 
             {/* ACTIONS SECTION */}
-            <div className="flex flex-col justify-center items-center gap-8 bg-zinc-50 w-4/5 h-full rounded-2xl">
+            <div className="flex flex-col items-center gap-8 overflow-scroll h-full py-20 bg-zinc-50 w-4/5 rounded-2xl">
                 <div className="shadow-[0_4px_0px_0px_rgba(0,0,0,0.25)] w-[664px] bg-zinc-50 border border-zinc-600 rounded-xl p-9">
                     <MintNFTButton />
                     <Oracle />
@@ -133,6 +134,7 @@ export default function Home() {
                 <div className="shadow-[0_4px_0px_0px_rgba(0,0,0,0.25)] w-[664px] bg-zinc-50 border border-zinc-600 rounded-xl px-9 pb-9">
                     <DeployScripts />
                 </div>
+                <MintStablecoin />
             </div>
         </main>
     );

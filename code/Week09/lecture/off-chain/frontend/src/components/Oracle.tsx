@@ -214,7 +214,11 @@ export default function Oracle() {
                 <button
                     onClick={deployOracle}
                     disabled={
-                        !lucid || !wAddr || !nftAssetClassHex || rate === 0n
+                        !lucid ||
+                        !wAddr ||
+                        !nftAssetClassHex ||
+                        rate === 0n ||
+                        !!oracleWithNftUTxO
                     }
                     className="w-full rounded-lg p-3 text-zinc-50 bg-zinc-800 shadow-[0_5px_0px_0px_rgba(0,0,0,0.6)] disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:bg-zinc-200  disabled:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:text-zinc-600 font-quicksand font-bold active:translate-y-[2px] active:shadow-[0_4px_0px_0px_rgba(0,0,0,0.6)]"
                 >
