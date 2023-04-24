@@ -6,7 +6,7 @@ import {
 } from "@/utilities/utilities";
 import { getAddressDetails } from "lucid-cardano";
 import { Data } from "lucid-cardano";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useState } from "react";
 
 const CollateralDatum = Data.Object({
     colMintingPolicyId: Data.Bytes(),
@@ -53,25 +53,6 @@ export default function MintStablecoin() {
     const [burnOrLiq, setBurnOrLiq] = useState(true); // Burn = true
     const [collValueToLock, setCollValueToLock] = useState(15n);
 
-    ////// TESTING DATA. REMOVE BEFORE RECORDING /////
-    useEffect(() => {
-        if (!appState.oracleUtxoWithNFTRef) {
-            setAppState({
-                ...appState,
-                oracleUtxoWithNFTRef:
-                    "3caa7a48ef453a41151f72784684dd8b8b58bdb83eee159d60985b9ec6f32391#0",
-                collateralRefScrUTxORef:
-                    "660db8503ed1e04b6d6f600b886591ccc24fd695afe1677b59c7ea2f74600c1d#0",
-                mintingPolRefScrUTxORef:
-                    "660db8503ed1e04b6d6f600b886591ccc24fd695afe1677b59c7ea2f74600c1d#1",
-                scPolicyIdHex:
-                    "d1b7e0beb9906068a2227dba8ae2f28b7c8fe967dfb5c26fdc65bfa5",
-                scAssetClassHex:
-                    "d1b7e0beb9906068a2227dba8ae2f28b7c8fe967dfb5c26fdc65bfa555534450",
-            });
-        }
-    }, [appState]);
-
     ///////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////////
 
@@ -86,7 +67,6 @@ export default function MintStablecoin() {
         setCollValueToLock(BigInt(minColl));
     };
 
-    // TODO: Minting doesn't find reference UTxOs when updating updating oracle
     const getReferenceUTxOs = async () => {
         if (
             !lucid ||
@@ -189,7 +169,6 @@ export default function MintStablecoin() {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////// BURN STABLECOINS /////////////////////////////////////////
 
-    //collToUnlock: 78af5bef37f19317b19b5e33bb2e8bc358b69a9c61b328f5029df8b7a7ad1a33#0
     const burnOrLiqSC = async () => {
         console.log("burnSC -> appState: ", appState);
         if (
@@ -222,12 +201,11 @@ export default function MintStablecoin() {
                     mintingPolRefScrUTxO,
                 ])
                 .collectFrom(
-                    [collateralRefScrUTxO],
+                    [collateralToUnlockUTxO],
                     Data.to<CollateralRedeemer>(colRed, CollateralRedeemer)
                 )
                 .mintAssets(
-                    // { [scAssetClassHex]: -amountToBurnOrLiq },
-                    { [scAssetClassHex]: -10n },
+                    { [scAssetClassHex]: -amountToBurnOrLiq },
                     Data.to<MintRedeemer>(mpRed, MintRedeemer)
                 )
                 .addSignerKey(pkh)
@@ -235,7 +213,7 @@ export default function MintStablecoin() {
 
             console.log("minting tx: ", tx.txComplete.to_js_value());
 
-            // await signAndSubmitTx(tx);
+            await signAndSubmitTx(tx);
         } else {
             alert("Please, provide the reference scripts!");
         }
