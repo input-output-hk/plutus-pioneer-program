@@ -31,7 +31,8 @@ flowchart LR
     A1((<b>Stablecoin developer</b>)) --> A2(Mint NFT)
     A2 --> A3((<b>Stablecoin developer</b> <br> <sub>NFT</sub>))
     A3 -->|"<sub>NFT <br> + <br> USD/ADA Rate  &#8199 &#8199</sub>"| A4(Deploy Oracle)
-    A4 --> A5((<b>Stablecoin developer</b>))
+    A4 --> A5(("&#8199 &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199 &#8199 <br> <sub>NFT <br> Datum: USD/ADA rate</sub>"))
+    A4 --> A6((<b>Stablecoin developer</b>))
     end
 ```
 To deploy the "Collateral" and "Minting" validators, we need to submit a single transaction to attach them as reference scripts to the "Always False" validator (or a developer-controlled) address.
