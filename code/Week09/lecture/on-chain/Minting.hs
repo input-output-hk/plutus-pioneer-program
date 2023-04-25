@@ -15,7 +15,7 @@ import Plutus.V2.Ledger.Api      ( OutputDatum(..), TxOut(txOutAddress, txOutVal
                                    BuiltinData, mkMintingPolicyScript, adaToken,
                                    adaSymbol, MintingPolicy, TxInInfo(txInInfoResolved),
                                    txInfoInputs, txOutDatum, UnsafeFromData (unsafeFromBuiltinData),
-                                   ValidatorHash)
+                                   ValidatorHash, txOutValue)
 import Plutus.V1.Ledger.Value    ( assetClassValueOf, AssetClass(AssetClass), valueOf )
 import Plutus.V1.Ledger.Address  ( scriptHashAddress )
 import Plutus.V2.Ledger.Contexts ( txSignedBy, scriptOutputsAt, ownCurrencySymbol )
@@ -28,7 +28,6 @@ import qualified Prelude         ( Show, IO)
 import           Oracle          ( parseOracleDatum)
 import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName, parseCollateralDatum)
 import           Utilities       (wrapPolicy, writeCodeToFile)
-
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------ ON-CHAIN: VALIDATOR ------------------------------------------
@@ -194,10 +193,19 @@ mkPolicy mp r ctx = case r of
         Nothing -> False
         Just d  -> txSignedBy info (colOwner d)
 
+    
+    -- collateralInputAmount :: Maybe Integer
+    -- collateralInputAmount = case collateralInputs of
+    --   [o] -> Just $ valueOf (txOutValue o) adaSymbol adaToken
+    --   _   -> Nothing
+
+    maxInputMint :: Integer
+    maxInputMint = (collateralInputAmount  `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
+
     -- Check that the collateral's value is low enough to liquidate
     checkLiquidation :: Bool
-    checkLiquidation = maxMint collateralInputAmount < negate mintedAmount
 
+    checkLiquidation = maxInputMint < negate mintedAmount
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------ COMPILE AND SERIALIZE VALIDATOR ------------------------------------

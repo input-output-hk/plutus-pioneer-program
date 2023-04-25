@@ -47,8 +47,8 @@ hashScript = Api.hashScript . Api.PlutusScript Api.PlutusScriptV2
 validatorHash :: Validator -> Api.ScriptHash
 validatorHash = hashScript . validatorToScript
 
-validatorHash' :: Validator -> ValidatorHash
-validatorHash' = ValidatorHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . validatorToScript
+validatorHash' :: Validator -> Plutus.ValidatorHash
+validatorHash' = Plutus.ValidatorHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . validatorToScript
 
 policyHash :: MintingPolicy -> MintingPolicyHash
 policyHash = MintingPolicyHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . policyToScript
