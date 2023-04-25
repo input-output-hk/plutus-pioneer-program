@@ -9,7 +9,7 @@
 
 module Minting where
 
-import Plutus.V2.Ledger.Api      ( Datum(Datum), OutputDatum(..), TxOut(txOutAddress),
+import Plutus.V2.Ledger.Api      ( OutputDatum(..), TxOut(txOutAddress, txOutValue),
                                    Value, ScriptContext(scriptContextTxInfo),
                                    TxInfo(txInfoReferenceInputs, txInfoMint),
                                    BuiltinData, mkMintingPolicyScript, adaToken,
@@ -18,15 +18,15 @@ import Plutus.V2.Ledger.Api      ( Datum(Datum), OutputDatum(..), TxOut(txOutAdd
                                    ValidatorHash, txOutValue)
 import Plutus.V1.Ledger.Value    ( assetClassValueOf, AssetClass(AssetClass), valueOf )
 import Plutus.V1.Ledger.Address  ( scriptHashAddress )
-import Plutus.V2.Ledger.Contexts ( findDatum, txSignedBy, scriptOutputsAt, ownCurrencySymbol )
-import PlutusTx                  ( compile, unstableMakeIsData, FromData(fromBuiltinData),
+import Plutus.V2.Ledger.Contexts ( txSignedBy, scriptOutputsAt, ownCurrencySymbol )
+import PlutusTx                  ( compile, unstableMakeIsData,
                                    liftCode, applyCode, makeLift, CompiledCode )
 import PlutusTx.Prelude          ( Bool(False), Integer, Maybe(..), (.), negate, traceError,
                                    (&&), traceIfFalse, ($), Ord((<), (>), (>=)), Eq((==)),
                                    length, divide, MultiplicativeSemigroup((*)))
 import qualified Prelude         ( Show, IO)
 import           Oracle          ( parseOracleDatum)
-import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName)
+import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName, parseCollateralDatum)
 import           Utilities       (wrapPolicy, writeCodeToFile)
 
 ---------------------------------------------------------------------------------------------------
@@ -91,7 +91,7 @@ mkPolicy mp r ctx = case r of
 
     -- Get the rate (Datum) from the Oracle
     rate :: Integer
-    rate = case parseOracleDatum getOracleInput (`findDatum` info) of
+    rate = case parseOracleDatum getOracleInput info of
         Nothing -> traceError "Oracle's datum not found"
         Just x  -> x
 
@@ -110,9 +110,9 @@ mkPolicy mp r ctx = case r of
     maxMint calculates the maximum amount of stablecoins that can be minted with the given collateral.
 
     Oracle has ada price in USD cents [USD¢] ($1 is ¢100 in the oracle's datum). So rate needs to be divided by 100.
-    Also, collateralAmount is in lovelaces [L], so final calculation needs to be divided by 1_000_000.
+    Also, collateralOutputAmount is in lovelaces [L], so final calculation needs to be divided by 1_000_000.
 
-    ca = collateralAmount
+    ca = collAmount
     CMP = mpCollateralMinPercent
 
 
@@ -125,12 +125,12 @@ mkPolicy mp r ctx = case r of
                         1_000_000 [L/A]                                1_000_000 [L/A]
     
     -}
-    maxMint :: Integer
-    maxMint = (collateralAmount `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
+    maxMint :: Integer -> Integer
+    maxMint collAmount = (collAmount `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
 
     -- Check that the amount of stablecoins minted does not exceed the maximum
     checkMaxMint :: Bool
-    checkMaxMint = maxMint >= mintedAmount
+    checkMaxMint = maxMint collateralOutputAmount >= mintedAmount
 
     --------- COLLATERAL-RELATED FUNCTIONS ------------
 
@@ -140,47 +140,46 @@ mkPolicy mp r ctx = case r of
                         [(h, v)] -> (h, v)
                         _        -> traceError "expected exactly one collateral output"
 
-    -- Name the collateral's output datum and value
-    (collateralOutDat, collateralValue) = collateralOutput
+    -- Get the collateral's output datum
+    collateralOutputDatum :: Maybe CollateralDatum
+    collateralOutputDatum = parseCollateralDatum d info
+        where
+            (d,_) = collateralOutput
 
-    -- Get the collateral's amount as an integer
-    collateralAmount :: Integer
-    collateralAmount = valueOf collateralValue adaSymbol adaToken
+    -- Get the collateral's output amount as an integer
+    collateralOutputAmount :: Integer
+    collateralOutputAmount = valueOf v adaSymbol adaToken
+        where
+            (_,v) = collateralOutput
 
-    -- | Helper function to extract the value from the collateral datum
-    collateralDatum :: Maybe CollateralDatum
-    collateralDatum = case collateralOutDat of
-                NoOutputDatum         -> traceError "Found Collateral output but NoOutputDatum"
-                OutputDatum (Datum d) -> fromBuiltinData d
-                OutputDatumHash dh    -> do 
-                                        Datum d <- findDatum dh info
-                                        fromBuiltinData d
-
-    -- Check that the collateral's datum has the correct values
+    -- Check that the collateral's output datum has the correct values
     checkDatum :: Bool
-    checkDatum = case collateralDatum of
+    checkDatum = case collateralOutputDatum of
         Nothing -> False
         Just d  -> colMintingPolicyId d  == ownCurrencySymbol ctx &&
                    colStablecoinAmount d == mintedAmount &&
                    colLock d             == Locked &&
                    txSignedBy info (colOwner d)
 
-    collateralInputs :: [TxOut]
-    collateralInputs = [ o
-                       | i <- txInfoInputs info
-                       , let o = txInInfoResolved i
-                       , txOutAddress o == scriptHashAddress (mpCollateralValidator mp)
-                       ]
+    -- Get the collateral's input
+    collateralInput :: TxOut
+    collateralInput = case collateralInputs of
+                        [o] -> o
+                        _   -> traceError "expected exactly one collateral input"
+        where
+         collateralInputs = [ o
+                            | i <- txInfoInputs info
+                            , let o = txInInfoResolved i
+                            , txOutAddress o == scriptHashAddress (mpCollateralValidator mp)
+                            ]
 
+    -- Get the collateral's input datum
     collateralInputDatum :: Maybe CollateralDatum
-    collateralInputDatum = case collateralInputs of
-      [o] -> case txOutDatum o of
-        NoOutputDatum -> traceError "Found Collateral Input but NoOutputDatum"
-        OutputDatum (Datum d) -> fromBuiltinData d
-        OutputDatumHash dh    -> do
-          Datum d <- findDatum dh info
-          fromBuiltinData d
-      _  -> traceError "Missing colateral Input"
+    collateralInputDatum = parseCollateralDatum (txOutDatum collateralInput) info
+
+    -- Get the collateral's input amount
+    collateralInputAmount :: Integer
+    collateralInputAmount = valueOf (txOutValue collateralInput) adaSymbol adaToken
 
     -- Check that the amount of stablecoins burned matches the amont at the collateral's datum
     checkBurnAmountMatchesColDatum :: Bool
@@ -195,22 +194,18 @@ mkPolicy mp r ctx = case r of
         Just d  -> txSignedBy info (colOwner d)
 
     
-    collateralInputAmount :: Maybe Integer
-    collateralInputAmount = case collateralInputs of
-      [o] -> Just $ valueOf (txOutValue o) adaSymbol adaToken
-      _   -> Nothing
+    -- collateralInputAmount :: Maybe Integer
+    -- collateralInputAmount = case collateralInputs of
+    --   [o] -> Just $ valueOf (txOutValue o) adaSymbol adaToken
+    --   _   -> Nothing
 
-    maxInputMint :: Maybe Integer
-    maxInputMint = case collateralInputAmount of
-      Nothing  -> Nothing
-      Just cia -> Just $ (cia `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
+    maxInputMint :: Integer
+    maxInputMint = (collateralInputAmount  `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
 
     -- Check that the collateral's value is low enough to liquidate
     checkLiquidation :: Bool
-    checkLiquidation = case maxInputMint of
-      Nothing -> False
-      Just mInputMint -> mInputMint < negate mintedAmount
 
+    checkLiquidation = maxInputMint < negate mintedAmount
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------ COMPILE AND SERIALIZE VALIDATOR ------------------------------------
@@ -240,4 +235,4 @@ policyCodeLucid :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> Bu
 policyCodeLucid = $$( compile [|| mkWrappedPolicyLucid ||])
 
 saveMintingCode :: Prelude.IO ()
-saveMintingCode = writeCodeToFile "assets/minting1.plutus" policyCodeLucid
+saveMintingCode = writeCodeToFile "assets/mintingNN.plutus" policyCodeLucid
