@@ -44,6 +44,7 @@ import qualified Prelude
 stablecoinTokenName :: TokenName 
 stablecoinTokenName = TokenName $ encodeUtf8 "USDP"
 
+
 data CollateralLock = Unlocked | Locked
     deriving Prelude.Show
 
@@ -52,6 +53,16 @@ instance Eq CollateralLock where
   (==) Unlocked Unlocked = True
   (==) _      _          = False
 unstableMakeIsData ''CollateralLock
+
+
+{-# INLINABLE parseCollateralDatum #-}
+parseCollateralDatum :: OutputDatum -> TxInfo -> Maybe CollateralDatum
+parseCollateralDatum o info = case o of
+    NoOutputDatum         -> traceError "Found Collateral output but NoOutputDatum"
+    OutputDatum (Datum d) -> PlutusTx.fromBuiltinData d
+    OutputDatumHash dh    -> do
+                           Datum d <- findDatum dh info
+                           PlutusTx.fromBuiltinData d
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------------ ON-CHAIN: VALIDATOR ------------------------------------------
@@ -117,12 +128,7 @@ mkValidator dat r ctx = case r of
     
     -- Get the new datum from the collateral script's output
     outputDatum :: Maybe CollateralDatum
-    outputDatum = case txOutDatum ownOutput of
-                    NoOutputDatum -> Nothing
-                    OutputDatum (Datum d) -> fromBuiltinData d
-                    OutputDatumHash dh -> do 
-                                        Datum d <- findDatum dh info
-                                        fromBuiltinData d
+    outputDatum = parseCollateralDatum (txOutDatum ownOutput) info
 
     -- Check if the new output's datum has the correct values
     checkOutputDatum :: Bool
@@ -148,4 +154,4 @@ validator :: Validator
 validator = mkValidatorScript $$(compile [|| mkWrappedValidator ||])
 
 saveCollateralScript :: Prelude.IO ()
-saveCollateralScript = writeValidatorToFile "assets/collateral.plutus" validator
+saveCollateralScript = writeValidatorToFile "assets/collateralN.plutus" validator

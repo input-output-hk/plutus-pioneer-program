@@ -15,7 +15,6 @@ import Plutus.V2.Ledger.Api
       mkValidatorScript,
       PubKeyHash,
       Datum(Datum),
-      DatumHash,
       Validator,
       TxInInfo(txInInfoResolved),
       TxInfo,
@@ -56,33 +55,35 @@ import           Utilities            (wrapValidator, writeValidatorToFile, writ
 import Text.Printf (printf)
 
 ---------------------------------------------------------------------------------------------------
+----------------------------- ON-CHAIN: HELPER FUNCTIONS/TYPES ------------------------------------
+
+{-# INLINABLE parseOracleDatum #-}
+parseOracleDatum :: TxOut -> TxInfo -> Maybe Integer
+parseOracleDatum o info = case txOutDatum o of
+    NoOutputDatum -> Nothing
+    OutputDatum (Datum d) -> PlutusTx.fromBuiltinData d
+    OutputDatumHash dh -> do
+                        Datum d <- findDatum dh info
+                        PlutusTx.fromBuiltinData d
+
+
+---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
 
 -- It provides the price of the Collateral coin in ada. In the Datum.
 
 data OracleParams = OracleParams
-    { oNFT :: AssetClass
+    { oNFT        :: AssetClass
     , oOperator   :: PubKeyHash
     } 
-    -- deriving (Show, Generic, Eq, Ord)
-
 PlutusTx.makeLift ''OracleParams
 
 data OracleRedeemer = Update | Delete
     deriving Prelude.Show
-
 PlutusTx.unstableMakeIsData ''OracleRedeemer
 
 type Rate = Integer
 
-{-# INLINABLE parseOracleDatum #-}
-parseOracleDatum :: TxOut -> (DatumHash -> Maybe Datum) -> Maybe Integer
-parseOracleDatum o f = case txOutDatum o of
-    NoOutputDatum -> Nothing
-    OutputDatum (Datum d) -> PlutusTx.fromBuiltinData d
-    OutputDatumHash dh -> do
-                        Datum d <- f dh
-                        PlutusTx.fromBuiltinData d
 
 {-# INLINABLE mkValidator #-}
 mkValidator :: OracleParams -> Rate-> OracleRedeemer -> ScriptContext -> Bool
@@ -124,7 +125,7 @@ mkValidator oracle _ r ctx =
 
     -- Check that the oracle output contains a valid datum.
     validOutputDatum :: Bool
-    validOutputDatum = isJust $ parseOracleDatum ownOutput (`findDatum` info)
+    validOutputDatum = isJust $ parseOracleDatum ownOutput info
 
 
 ---------------------------------------------------------------------------------------------------
@@ -160,7 +161,7 @@ validatorCode = $$( compile [|| mkWrappedValidatorLucid ||])
 ------------------------------------- HELPER FUNCTIONS --------------------------------------------
 
 saveOracleCode :: IO ()
-saveOracleCode = writeCodeToFile "assets/oracle.plutus" validatorCode
+saveOracleCode = writeCodeToFile "assets/oraclenN.plutus" validatorCode
 
 saveOracleScript :: String -> PubKeyHash -> IO ()
 saveOracleScript symbol pkh = do
