@@ -27,12 +27,12 @@ export default function Oracle() {
         oracleScript,
         oracleAddress,
     } = appState;
-    const [rate, setRate] = useState(10n);
+    const [rate, setRate] = useState(100n);
     const [count, setCount] = useState(0);
 
     useEffect(() => {
         getOracleNftUtxO();
-        setTimeout(() => setCount(count + 1), 3e3);
+        setTimeout(() => setCount(count + 1), 5e3);
     }, [count]);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,25 +40,24 @@ export default function Oracle() {
 
     const getOracleNftUtxO = async () => {
         if (lucid && wAddr && oracleAddress) {
-            try {
-                const oracUtxO = await lucid.utxosAt(oracleAddress);
-                const oracUtxOWithNFT = oracUtxO.find((utxo: UTxO) => {
-                    return Object.keys(utxo.assets).some((key) => {
-                        return key == nftAssetClassHex;
-                    });
+            const oracUtxO = await lucid.utxosAt(oracleAddress).catch((err) => {
+                console.log("Can't find Oracle UtxO");
+            });
+            if (!oracUtxO) return;
+            const oracUtxOWithNFT = oracUtxO.find((utxo: UTxO) => {
+                return Object.keys(utxo.assets).some((key) => {
+                    return key == nftAssetClassHex;
                 });
-                if (
-                    oracUtxOWithNFT == undefined ||
-                    oracUtxOWithNFT == oracleWithNftUTxO
-                )
-                    return;
-                setAppState({
-                    ...appState,
-                    oracleWithNftUTxO: oracUtxOWithNFT,
-                });
-            } catch (err) {
-                console.log("Couldn't find Oracle with NFT");
-            }
+            });
+            if (
+                oracUtxOWithNFT == undefined ||
+                oracUtxOWithNFT == oracleWithNftUTxO
+            )
+                return;
+            setAppState({
+                ...appState,
+                oracleWithNftUTxO: oracUtxOWithNFT,
+            });
         }
     };
 
@@ -201,51 +200,60 @@ export default function Oracle() {
     ////////////////////////////////////////// UI /////////////////////////////////////////////////
 
     return (
-        <div className="">
-            <div className="flex flex-row">
+        <div className="w-full">
+            <div className="flex flex-row w-full justify-center items-center my-8 text-lg text-zinc-800 font-quicksand ">
                 <p>Current price of ADA (in USD cents):</p>
                 <input
                     type="number"
                     value={Number(rate)}
                     onChange={(e) => parseRate(e.target.value)}
+                    className="w-16 py-1 px-2 ml-2 border border-zinc-700 rounded"
                 />
             </div>
-            <button
-                onClick={deployOracle}
-                disabled={!lucid || !wAddr || !nftAssetClassHex || rate === 0n}
-                className="m-3 p-3 disabled:bg-slate-400 bg-violet-400"
-            >
-                {" "}
-                Deploy Oracle
-            </button>
-            <button
-                onClick={updateOracle}
-                disabled={
-                    !lucid ||
-                    !wAddr ||
-                    !nftAssetClassHex ||
-                    rate === 0n ||
-                    !oracleWithNftUTxO
-                }
-                className="m-3 p-3 disabled:bg-slate-400 bg-green-400"
-            >
-                {" "}
-                Update Oracle
-            </button>
-            <button
-                onClick={deleteOracle}
-                disabled={
-                    !lucid ||
-                    !wAddr ||
-                    !nftAssetClassHex ||
-                    rate === 0n ||
-                    !oracleWithNftUTxO
-                }
-                className="m-3 p-3 disabled:bg-slate-400 bg-red-400"
-            >
-                {" "}
-                Delete Oracle
-            </button>
+            <div className="w-full flex flex-row gap-4">
+                <button
+                    onClick={deployOracle}
+                    disabled={
+                        !lucid ||
+                        !wAddr ||
+                        !nftAssetClassHex ||
+                        rate === 0n ||
+                        !!oracleWithNftUTxO
+                    }
+                    className="w-full rounded-lg p-3 text-zinc-50 bg-zinc-800 shadow-[0_5px_0px_0px_rgba(0,0,0,0.6)] disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:bg-zinc-200  disabled:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:text-zinc-600 font-quicksand font-bold active:translate-y-[2px] active:shadow-[0_4px_0px_0px_rgba(0,0,0,0.6)]"
+                >
+                    {" "}
+                    Deploy Oracle
+                </button>
+                <button
+                    onClick={updateOracle}
+                    disabled={
+                        !lucid ||
+                        !wAddr ||
+                        !nftAssetClassHex ||
+                        rate === 0n ||
+                        !oracleWithNftUTxO
+                    }
+                    className="w-full rounded-lg p-3 text-zinc-50 bg-zinc-800 shadow-[0_5px_0px_0px_rgba(0,0,0,0.6)] disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:bg-zinc-200  disabled:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:text-zinc-600 font-quicksand font-bold active:translate-y-[2px] active:shadow-[0_4px_0px_0px_rgba(0,0,0,0.6)]"
+                >
+                    {" "}
+                    Update Oracle
+                </button>
+                <button
+                    onClick={deleteOracle}
+                    disabled={
+                        !lucid ||
+                        !wAddr ||
+                        !nftAssetClassHex ||
+                        rate === 0n ||
+                        !oracleWithNftUTxO
+                    }
+                    className="w-full rounded-lg p-3 text-zinc-50 disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:bg-zinc-200 shadow-[0_5px_0px_0px_rgba(0,0,0,0.6)] disabled:shadow-[0_5px_0px_0px_rgba(0,0,0,0.2)] disabled:text-zinc-600 font-quicksand font-bold bg-red-400 active:translate-y-[2px] active:shadow-[0_4px_0px_0px_rgba(0,0,0,0.6)]"
+                >
+                    {" "}
+                    Delete Oracle
+                </button>
+            </div>
         </div>
     );
 }
