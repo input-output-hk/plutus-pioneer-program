@@ -39,7 +39,7 @@ To deploy the "Collateral" and "Minting" validators, we need to submit a single 
 
 ```mermaid
 flowchart LR
-    subgraph Deploy [Deploy Collateral and Minting validators]
+    subgraph Deploy [Deploy Collateral validator and Minting policy]
     direction LR
     A1((<b>Stablecoin developer</b>)) --> A7(&#8199 Deploy Collateral Validator &#8199 <br> and Minting Policy <br> as reference scripts)
     A7 --> A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
@@ -99,11 +99,13 @@ We (the user that minted the stablecoins) burn the stablecoins to unlock our col
 flowchart LR
     subgraph Burn [Burn Stablecoin]
     direction LR
+    A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
     A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
     M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
     M6((&#8199 &#8199 <b>User 1</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>))
 
     M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
+    A8 --> |As reference script| B4
     A9 --> |As reference script| B4
     M5 --> B4
     B4 --> B6((&#8199 &#8199 <b>User 1</b> &#8199 &#8199<br> <sub>Collateral</sub> ))
@@ -123,11 +125,13 @@ flowchart LR
     subgraph Burn [Liquidate Stablecoin]
     direction LR
     A6((" &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate </sub>"))
+    A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
     A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
     M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b> &#8199 &#8199 &#8199 &#8199  <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
     M6(("&#8199 &#8199 <b>User 2</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>"))
 
     M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
+    A8 --> |As reference script| B4
     A9 -->|As reference script| B4
     M5 --> B4
     A6 --> |As reference Input|B4
