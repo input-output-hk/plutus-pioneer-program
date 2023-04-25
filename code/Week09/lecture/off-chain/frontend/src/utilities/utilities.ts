@@ -1,9 +1,11 @@
-import { Lucid, TxComplete, TxHash } from "lucid-cardano";
+import { AppState } from "@/pages/_app";
+import { Lucid, Script, Tx, TxComplete, TxHash } from "lucid-cardano";
 
 export const signAndSubmitTx = async (tx: TxComplete): Promise<TxHash> => {
     const signedTx = await tx.sign().complete();
     const txHash = await signedTx.submit();
-    console.log("Submited Tx with ID: " + txHash);
+    console.log(`Transaction submitted: ${txHash}`);
+    alert(`Transaction submitted: ${txHash}`);
     return txHash;
 };
 
