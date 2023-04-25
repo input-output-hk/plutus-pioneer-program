@@ -1,12 +1,14 @@
 > Navigate to this file in GitHub or install the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension in VSCode to be able to see the diagrams.
 
-## How the stablecoin works
+## How our stablecoin works
 
-This is a collateralized stablecoin. That means the value of the stablecoin depends on collateral. In our case, we'll use a validator called "Collateral" to lock this collateral (in ADA) and a validator called "Minting" that will mint, at most, the number of stablecoins equivalent to a bit less of the value we locked.
+Depending on the stablecoin, you might see different mechanisms to (try to) maintain the peg. In this lecture, we’ll implement an over-collateralized algorithmic stablecoin that uses a liquidation mechanism to incentivize stability.
 
-This extra value that is locked but can't be minted is the reward someone gets when liquidating someone else's position. Liquidating means burning the same number of stablecoins someone else minted to get their collateral. This is the mechanism we use to keep the stablecoin stable. If the price of ADA goes up, you can mint more. If it goes down, you have to add more collateral or burn stablecoin; If you don't, someone else will liquidate your position and get that extra value at your expense.
+As the name suggests, we need to provide collateral to be able to mint the stablecoin. We will use a validator called "Collateral" to lock and release collateral (in ADA) and a minting policy called "Minting" to manage the minting and burning of stablecoins. These two will always run together—in a single transaction—as minting or burning stablecoins require locking or releasing collateral, respectively. Because we use smart contracts to enforce an algorithm that tries to control the price of the stablecoin, it's an algorithmic stablecoin.
 
-Because the collateral is in ADA, if we only do this with the two previously mentioned validators, we'll be pegged to the value of ADA. To peg our stablecoin to a fiat currency, we use an oracle that keeps the USD/ADA rate up-to-date and use it to calculate the amount of collateral needed. That way, the collateral depends on the price of USD, and so does our stablecoin.
+The value of the collateral must exceed the value of the coins minted. This extra value that is locked but can't be minted is the reward someone gets when liquidating someone else's position. Liquidating means burning the same number of stablecoins someone else minted to get their collateral. You can liquidate someone else's position only if the relation between the value of their locked collateral and the coins they minted with it is below a certain pre-defined threshold (e.g., 150%). This is the mechanism we use to keep the stablecoin pegged. If the price of ADA goes up, you can mint more. If it goes down, you have to add more collateral or burn stablecoins; If you don't, someone else will liquidate your position and get that extra value at your expense.
+
+This mechanism makes it so the value of the stablecoin is dependent on the locked collateral. Because the collateral is in ADA, if we only do this with the two previously mentioned validators, we'll be pegged to the value of ADA. To peg our stablecoin to a fiat currency, we use an oracle that keeps the USD/ADA rate up-to-date to calculate the amount of collateral needed. That way, the collateral depends on the price of USD, and so does our stablecoin.
 
 Let's see how all this works in practice:
 
