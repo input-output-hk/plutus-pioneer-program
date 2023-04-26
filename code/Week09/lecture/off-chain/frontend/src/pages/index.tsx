@@ -170,7 +170,7 @@ export default function Home() {
             </div>
 
             {/* ACTIONS SECTION */}
-            <div className="flex flex-col items-center gap-8  h-full py-12 bg-zinc-50 w-4/5 rounded-2xl">
+            <div className="flex flex-col items-center gap-8  h-full py-10 bg-zinc-50 w-4/5 rounded-2xl">
                 {/* ORACLE ACTIONS */}
                 {isPerson == "oracle" && (
                     <div className="shadow-[0_4px_0px_0px_rgba(0,0,0,0.25)] w-[664px] bg-zinc-50 border border-zinc-600 rounded-xl p-9">
