@@ -66,11 +66,8 @@ parseOracleDatum o info = case txOutDatum o of
                         Datum d <- findDatum dh info
                         PlutusTx.fromBuiltinData d
 
-
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
-
--- It provides the price of the Collateral coin in ada. In the Datum.
 
 data OracleParams = OracleParams
     { oNFT        :: AssetClass
@@ -82,15 +79,15 @@ data OracleRedeemer = Update | Delete
     deriving Prelude.Show
 PlutusTx.unstableMakeIsData ''OracleRedeemer
 
+-- Oracle Datum
 type Rate = Integer
 
-
 {-# INLINABLE mkValidator #-}
-mkValidator :: OracleParams -> Rate-> OracleRedeemer -> ScriptContext -> Bool
+mkValidator :: OracleParams -> Rate -> OracleRedeemer -> ScriptContext -> Bool
 mkValidator oracle _ r ctx =
     case r of
-        Update -> traceIfFalse "token missing from input"  inputHasToken  &&
-                  traceIfFalse "token missing from output" outputHasToken &&
+        Update -> traceIfFalse "token missing from input"   inputHasToken  &&
+                  traceIfFalse "token missing from output"  outputHasToken &&
                   traceIfFalse "operator signature missing" checkOperatorSignature &&
                   traceIfFalse "invalid output datum"       validOutputDatum
         Delete -> traceIfFalse "operator signature missing" checkOperatorSignature
@@ -158,10 +155,10 @@ validatorCode :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> Buil
 validatorCode = $$( compile [|| mkWrappedValidatorLucid ||])
 
 ---------------------------------------------------------------------------------------------------
-------------------------------------- HELPER FUNCTIONS --------------------------------------------
+------------------------------------- SAVE VALIDATOR -------------------------------------------
 
 saveOracleCode :: IO ()
-saveOracleCode = writeCodeToFile "assets/oraclenN.plutus" validatorCode
+saveOracleCode = writeCodeToFile "assets/oracle.plutus" validatorCode
 
 saveOracleScript :: String -> PubKeyHash -> IO ()
 saveOracleScript symbol pkh = do

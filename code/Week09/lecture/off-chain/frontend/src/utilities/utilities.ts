@@ -1,5 +1,4 @@
-import { AppState } from "@/pages/_app";
-import { Lucid, Script, Tx, TxComplete, TxHash } from "lucid-cardano";
+import { Lucid, TxComplete, TxHash } from "lucid-cardano";
 
 export const signAndSubmitTx = async (tx: TxComplete): Promise<TxHash> => {
     const signedTx = await tx.sign().complete();
