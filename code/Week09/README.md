@@ -1,5 +1,7 @@
 > Navigate to this file in GitHub or install the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension in VSCode to be able to see the diagrams.
 
+>This implementation is for learning purposes only and has some issues introduced for the pioneers to solve as homework. It's not the only way to implement an over-collateralized stablecoin, and we don't recommend using this algorithm in production.
+
 ## How our stablecoin works
 
 Depending on the stablecoin, you might see different mechanisms to (try to) maintain the peg. In this lecture, we’ll implement an over-collateralized algorithmic stablecoin that uses a liquidation mechanism to incentivize stability.
