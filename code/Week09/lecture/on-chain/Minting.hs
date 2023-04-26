@@ -22,8 +22,8 @@ import Plutus.V2.Ledger.Contexts ( txSignedBy, scriptOutputsAt, ownCurrencySymbo
 import PlutusTx                  ( compile, unstableMakeIsData,
                                    liftCode, applyCode, makeLift, CompiledCode )
 import PlutusTx.Prelude          ( Bool(False), Integer, Maybe(..), (.), negate, traceError,
-                                   (&&), traceIfFalse, ($), Ord((<), (>), (>=)), Eq((==)),
-                                   length, divide, MultiplicativeSemigroup((*)))
+                                   (&&), traceIfFalse, ($), Ord((<), (>), (>=)), Eq((==)), divide,
+                                   MultiplicativeSemigroup((*)))
 import qualified Prelude         ( Show, IO)
 import           Oracle          ( parseOracleDatum)
 import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName, parseCollateralDatum)
@@ -53,9 +53,8 @@ unstableMakeIsData ''MintRedeemer
 {-# INLINABLE mkPolicy #-}
 mkPolicy :: MintParams -> MintRedeemer -> ScriptContext -> Bool
 mkPolicy mp r ctx = case r of
-    Mint      -> traceIfFalse "oracle input missing" checkOracleInput &&
-                 traceIfFalse "minted amount must be positive" checkMintPositive &&
-                 traceIfFalse "minted amount exceeds max" checkMaxMint &&
+    Mint      -> traceIfFalse "minted amount must be positive" checkMintPositive &&
+                 traceIfFalse "minted amount exceeds max" checkMaxMintOut &&
                  traceIfFalse "invalid datum at collateral output" checkDatum
 
     Burn      -> traceIfFalse "invalid burning amount" checkBurnAmountMatchesColDatum &&
@@ -63,7 +62,6 @@ mkPolicy mp r ctx = case r of
 
     Liquidate -> traceIfFalse "invalid liquidating amount" checkBurnAmountMatchesColDatum &&
                  traceIfFalse "liquidation threshold not reached" checkLiquidation
-                 -- We check the oracle's input implicitly using `getOracleInput` while checking for liquidation
                  
     where
     info :: TxInfo
@@ -71,23 +69,18 @@ mkPolicy mp r ctx = case r of
 
     --------- ORACLE-RELATED FUNCTIONS ------------
 
-    -- Get list with only oracle inputs
-    oracleInputs :: [TxOut]
-    oracleInputs = [ o
-                   | i <- txInfoReferenceInputs info
-                   , let o = txInInfoResolved i
-                   , txOutAddress o == scriptHashAddress (mpOracleValidator mp)
-                   ]
-
-    -- Check if there is exactly one oracle input
-    checkOracleInput :: Bool
-    checkOracleInput = length oracleInputs == 1
-
     -- Get the oracle's input
     getOracleInput :: TxOut
     getOracleInput = case oracleInputs of
                     [o] -> o
                     _   -> traceError "expected exactly one oracle input"
+        where
+            oracleInputs :: [TxOut]
+            oracleInputs = [ o
+                           | i <- txInfoReferenceInputs info
+                           , let o = txInInfoResolved i
+                           , txOutAddress o == scriptHashAddress (mpOracleValidator mp)
+                           ]
 
     -- Get the rate (Datum) from the Oracle
     rate :: Integer
@@ -129,8 +122,8 @@ mkPolicy mp r ctx = case r of
     maxMint collAmount = (collAmount `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
 
     -- Check that the amount of stablecoins minted does not exceed the maximum
-    checkMaxMint :: Bool
-    checkMaxMint = maxMint collateralOutputAmount >= mintedAmount
+    checkMaxMintOut :: Bool
+    checkMaxMintOut = maxMint collateralOutputAmount >= mintedAmount
 
     --------- COLLATERAL-RELATED FUNCTIONS ------------
 
@@ -167,11 +160,11 @@ mkPolicy mp r ctx = case r of
                         [o] -> o
                         _   -> traceError "expected exactly one collateral input"
         where
-         collateralInputs = [ o
-                            | i <- txInfoInputs info
-                            , let o = txInInfoResolved i
-                            , txOutAddress o == scriptHashAddress (mpCollateralValidator mp)
-                            ]
+            collateralInputs = [ o
+                                | i <- txInfoInputs info
+                                , let o = txInInfoResolved i
+                                , txOutAddress o == scriptHashAddress (mpCollateralValidator mp)
+                                ]
 
     -- Get the collateral's input datum
     collateralInputDatum :: Maybe CollateralDatum
@@ -193,19 +186,9 @@ mkPolicy mp r ctx = case r of
         Nothing -> False
         Just d  -> txSignedBy info (colOwner d)
 
-    
-    -- collateralInputAmount :: Maybe Integer
-    -- collateralInputAmount = case collateralInputs of
-    --   [o] -> Just $ valueOf (txOutValue o) adaSymbol adaToken
-    --   _   -> Nothing
-
-    maxInputMint :: Integer
-    maxInputMint = (collateralInputAmount  `divide` mpCollateralMinPercent mp * rate) `divide` 1_000_000
-
     -- Check that the collateral's value is low enough to liquidate
     checkLiquidation :: Bool
-
-    checkLiquidation = maxInputMint < negate mintedAmount
+    checkLiquidation = maxMint collateralInputAmount < negate mintedAmount
 
 ---------------------------------------------------------------------------------------------------
 ------------------------------ COMPILE AND SERIALIZE VALIDATOR ------------------------------------
@@ -235,4 +218,4 @@ policyCodeLucid :: CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> Bu
 policyCodeLucid = $$( compile [|| mkWrappedPolicyLucid ||])
 
 saveMintingCode :: Prelude.IO ()
-saveMintingCode = writeCodeToFile "assets/mintingNN.plutus" policyCodeLucid
+saveMintingCode = writeCodeToFile "assets/minting.plutus" policyCodeLucid

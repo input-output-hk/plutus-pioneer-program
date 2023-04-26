@@ -142,7 +142,7 @@ validator oracle = mkValidatorScript $
 
 
 {-# INLINABLE  mkWrappedValidatorLucid #-}
---                            nft          operator        rate          redeemer       context
+--                            CS              TN           operator        rate          redeemer       context
 mkWrappedValidatorLucid :: BuiltinData ->  BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
 mkWrappedValidatorLucid cs tn pkh = wrapValidator $ mkValidator op
     where
