@@ -26,7 +26,7 @@ import PlutusTx.Prelude          ( Bool(False), Integer, Maybe(..), (.), negate,
                                    MultiplicativeSemigroup((*)))
 import qualified Prelude         ( Show, IO)
 import           Oracle          ( parseOracleDatum)
-import           Collateral      ( CollateralDatum (..), CollateralLock (..), stablecoinTokenName, parseCollateralDatum)
+import           Collateral      ( CollateralDatum (..), stablecoinTokenName, parseCollateralDatum)
 import           Utilities       (wrapPolicy, writeCodeToFile)
 
 ---------------------------------------------------------------------------------------------------
@@ -151,7 +151,6 @@ mkPolicy mp r ctx = case r of
         Nothing -> False
         Just d  -> colMintingPolicyId d  == ownCurrencySymbol ctx &&
                    colStablecoinAmount d == mintedAmount &&
-                   colLock d             == Locked &&
                    txSignedBy info (colOwner d)
 
     -- Get the collateral's input

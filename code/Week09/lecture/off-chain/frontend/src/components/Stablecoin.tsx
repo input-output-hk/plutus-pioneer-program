@@ -12,12 +12,10 @@ const CollateralDatum = Data.Object({
     colMintingPolicyId: Data.Bytes(),
     colOwner: Data.Bytes(),
     colStablecoinAmount: Data.Integer(),
-    colLock: Data.Enum([Data.Literal("Unlocked"), Data.Literal("Locked")]),
 });
 type CollateralDatum = Data.Static<typeof CollateralDatum>;
 
 const CollateralRedeemer = Data.Enum([
-    Data.Literal("Lock"),
     Data.Literal("Redeem"),
     Data.Literal("Liquidate"),
 ]);
@@ -122,7 +120,6 @@ export default function Stablecoin() {
                 colMintingPolicyId: scPolicyIdHex,
                 colOwner: pkh,
                 colStablecoinAmount: amountToMint,
-                colLock: "Locked",
             };
 
             const collateralAddr =

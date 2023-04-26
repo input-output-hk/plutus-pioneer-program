@@ -286,8 +286,8 @@ testE2E = do
 
       stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       currSymbol = scriptCurrencySymbol stablecoinMP
-      datumU1 = Collateral.CollateralDatum currSymbol u1 amountToMint Collateral.Locked
-      datumU2 = Collateral.CollateralDatum currSymbol u2 amountToMint Collateral.Locked
+      datumU1 = Collateral.CollateralDatum currSymbol u1 amountToMint 
+      datumU2 = Collateral.CollateralDatum currSymbol u2 amountToMint 
       mintingValue = singleton currSymbol Collateral.stablecoinTokenName amountToMint
       collateral = adaValue 3000000
 
@@ -322,9 +322,9 @@ testLiquidationCases = do
 
       stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       currSymbol = scriptCurrencySymbol stablecoinMP
-      datumU1 = Collateral.CollateralDatum currSymbol u1 amountToMintU1 Collateral.Locked
-      datumU2 = Collateral.CollateralDatum currSymbol u2 amountToMintU2 Collateral.Locked
-      datumU3 = Collateral.CollateralDatum currSymbol u3 amountToMintU3 Collateral.Locked
+      datumU1 = Collateral.CollateralDatum currSymbol u1 amountToMintU1
+      datumU2 = Collateral.CollateralDatum currSymbol u2 amountToMintU2
+      datumU3 = Collateral.CollateralDatum currSymbol u3 amountToMintU3
       mintingValueU1 = singleton currSymbol Collateral.stablecoinTokenName amountToMintU1
       mintingValueU2 = singleton currSymbol Collateral.stablecoinTokenName amountToMintU2
       mintingValueU3 = singleton currSymbol Collateral.stablecoinTokenName amountToMintU3
@@ -380,7 +380,7 @@ testMintStableCoin = do
 
       stablecoinMP = stableCoinScript $ Minting.MintParams oracleVH collateralVH 150
       currSymbol = scriptCurrencySymbol stablecoinMP
-      datum = Collateral.CollateralDatum currSymbol u1 2 Collateral.Locked
+      datum = Collateral.CollateralDatum currSymbol u1 2
       mintingValue = singleton currSymbol Collateral.stablecoinTokenName 2
       collateral = adaValue 3000000
       tx = mintStablecoinTx collateral u1 stablecoinMP mintingValue ref datum sp
