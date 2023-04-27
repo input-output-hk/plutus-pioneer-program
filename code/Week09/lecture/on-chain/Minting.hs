@@ -58,10 +58,12 @@ mkPolicy mp r ctx = case r of
                  traceIfFalse "invalid datum at collateral output" checkDatum
 
     Burn      -> traceIfFalse "invalid burning amount" checkBurnAmountMatchesColDatum &&
-                 traceIfFalse "owner's signature missing" checkColOwner
+                 traceIfFalse "owner's signature missing" checkColOwner &&
+                 traceIfFalse "Minting instead of burning!" checkBurnNegative
 
     Liquidate -> traceIfFalse "invalid liquidating amount" checkBurnAmountMatchesColDatum &&
-                 traceIfFalse "liquidation threshold not reached" checkLiquidation
+                 traceIfFalse "liquidation threshold not reached" checkLiquidation &&
+                 traceIfFalse "Minting instead of burning!" checkBurnNegative
                  
     where
     info :: TxInfo
@@ -98,6 +100,10 @@ mkPolicy mp r ctx = case r of
     -- Check that the amount of stablecoins minted is positive
     checkMintPositive :: Bool
     checkMintPositive = mintedAmount > 0
+
+    -- Check that the amount of stablecoins burned is negative
+    checkBurnNegative :: Bool
+    checkBurnNegative = mintedAmount < 0
 
     {-
     maxMint calculates the maximum amount of stablecoins that can be minted with the given collateral.
