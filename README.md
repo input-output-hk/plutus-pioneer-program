@@ -93,6 +93,17 @@ This documentation looks better in GitBook at the following link:
 - [Trying it on the Testnet](https://youtu.be/fzYXwdrfu44)
 - [Homework](https://youtu.be/rO3FVGsuzUg)
 
+### [Lecture 9](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x3ZWTpR5lhoVs_DHkebiBcU)
+
+- [Creating our own Stablecoin Dapp](https://youtu.be/KDzyMy0WN9M)
+- [Using our Stablecoin UI](https://youtu.be/MVq51lZkutA)
+- [Stablecoin's Oracle](https://youtu.be/XfbEsFPbzCI)
+- [Deploying Stablecoin's Reference scripts](https://youtu.be/AokRj-upwlY)
+- [Minting Stablecoins](https://youtu.be/mUa9sztfPKs)
+- [Burning Stablecoins and Liquidating positions](https://youtu.be/u2cUeD72MrQ)
+- [Testing our Stablecoin's scripts](https://youtu.be/-MBebK33FOU)
+- [Homework](https://youtu.be/yfmLaLcDjtc)
+
 ## Repository Structure
 
 The most relevant directories of this repository are structured as follows:
