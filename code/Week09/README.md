@@ -106,7 +106,7 @@ flowchart LR
     M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
     M6((&#8199 &#8199 <b>User 1</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>))
 
-    M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
+    M6 --> B4(Unlock Collateral <br> + <br> Burn stablecoin)
     A8 --> |As reference script| B4
     A9 --> |As reference script| B4
     M5 --> B4
@@ -132,7 +132,7 @@ flowchart LR
    M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b> &#8199 &#8199 &#8199 &#8199  <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
    M6(("&#8199 &#8199 <b>User 2</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>"))
 
-   M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
+   M6 --> B4(Unlock Collateral <br> + <br> Burn stablecoin)
    A8 --> |As reference script| B4
    A9 -->|As reference script| B4
    M5 --> B4
