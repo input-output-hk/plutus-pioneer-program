@@ -3,6 +3,7 @@
 module Utilities.Conversions
   ( Network (..)
   , validatorHash
+  , validatorHash'
   , policyHash
   , currencySymbol
   , validatorAddressBech32
@@ -34,7 +35,7 @@ import           Plutus.V1.Ledger.Crypto     as Plutus
 import           Plutus.V2.Ledger.Api        (CurrencySymbol (CurrencySymbol),
                                               MintingPolicy,
                                               MintingPolicyHash (MintingPolicyHash),
-                                              POSIXTime, Validator)
+                                              POSIXTime, Validator, ValidatorHash (ValidatorHash))
 import qualified Plutus.V2.Ledger.Api        as Plutus
 import           PlutusTx.Builtins           (toBuiltin)
 import           PlutusTx.Builtins.Internal  (BuiltinByteString (..))
@@ -45,6 +46,9 @@ hashScript = Api.hashScript . Api.PlutusScript Api.PlutusScriptV2
 
 validatorHash :: Validator -> Api.ScriptHash
 validatorHash = hashScript . validatorToScript
+
+validatorHash' :: Validator -> Plutus.ValidatorHash
+validatorHash' = Plutus.ValidatorHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . validatorToScript
 
 policyHash :: MintingPolicy -> MintingPolicyHash
 policyHash = MintingPolicyHash . BuiltinByteString . Api.serialiseToRawBytes . hashScript . policyToScript
