@@ -83,7 +83,7 @@ flowchart LR
     A6(("&#8199 &#8199 <b>Oracle Validator</b>&#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate</sub>"))
     A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
 
-    M1((&#8199 &#8199 <b>User 1</b> &#8199 &#8199<br> <sub>Collateral</sub>)) --> |Locks ADA as collateral| M4(Lock Collateral <br> + <br> Mint stablecoin)
+    M1((&#8199 &#8199 <b>User 1</b> &#8199 &#8199<br> <sub>Collateral</sub>)) --> |Locks ADA as collateral| M4(Mint stablecoins)
     A9 --> |As reference script| M4
     A6 --> |As reference Input|M4
 
