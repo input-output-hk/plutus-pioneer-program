@@ -1,6 +1,6 @@
 > Navigate to this file in GitHub or install the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension in VSCode to be able to see the diagrams.
 
->This implementation is for learning purposes only and has some issues introduced for the pioneers to solve as homework. It's not the only way to implement an over-collateralized stablecoin, and we don't recommend using this algorithm in production.
+> This implementation is for learning purposes only and has some issues introduced for the pioneers to solve as homework. It's not the only way to implement an over-collateralized stablecoin, and we don't recommend using this algorithm in production.
 
 ## How our stablecoin works
 
@@ -17,9 +17,10 @@ Let's see how all this works in practice:
 ### Deploying the stablecoin
 
 The stablecoin developer has to provide:
-- One "Oracle" validator with the USD/ADA rate (the price of ADA in USD).
-- The "Collateral" validator that locks the collateral (ADA).
-- The "Minting" policy to mint/burn stablecoins based on the collateral.
+
+-   One "Oracle" validator with the USD/ADA rate (the price of ADA in USD).
+-   The "Collateral" validator that locks the collateral (ADA).
+-   The "Minting" policy to mint/burn stablecoins based on the collateral.
 
 These are the transactions to deploy the oracle to the blockchain (square means Tx, rounded means UTxO):
 
@@ -37,6 +38,7 @@ flowchart LR
     A4 --> A6((<b>Stablecoin developer</b>))
     end
 ```
+
 To deploy the "Collateral" and "Minting" validators, we need to submit a single transaction to attach them as reference scripts to the "Always False" validator (or a developer-controlled) address.
 
 ```mermaid
@@ -57,7 +59,7 @@ To keep the oracle up-to-date, we need a process in our backend checking the cur
 
 As soon as the real rate differs from ours, our backend will automatically create a transaction to update our oracle:
 
-```mermaid 
+```mermaid
 flowchart LR
     subgraph Deploy [Update Oracle]
     direction LR
@@ -70,7 +72,7 @@ flowchart LR
 
 ### Minting Stablecoins
 
-To obtain our stablecoins, we use the "Collateral" validator to lock our ADA and the "Minting" policy to mint the tokens. The stablecoin developer chose to overcollateralize by 50% (we have to lock 150% of the value minted). So, if the USD/ADA rate is 1, and we lock 150 ADA (150 USD), we'll be able to mint, at most, 100 stablecoins (100 USD). 
+To obtain our stablecoins, we use the "Collateral" validator to lock our ADA and the "Minting" policy to mint the tokens. The stablecoin developer chose to overcollateralize by 50% (we have to lock 150% of the value minted). So, if the USD/ADA rate is 1, and we lock 150 ADA (150 USD), we'll be able to mint, at most, 100 stablecoins (100 USD).
 
 These are the transactions to mint some stablecoins:
 
@@ -79,12 +81,10 @@ flowchart LR
     subgraph Mint [Mint Stablecoin]
     direction LR
     A6(("&#8199 &#8199 <b>Oracle Validator</b>&#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate</sub>"))
-    A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
     A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
 
     M1((&#8199 &#8199 <b>User 1</b> &#8199 &#8199<br> <sub>Collateral</sub>)) --> |Locks ADA as collateral| M4(Lock Collateral <br> + <br> Mint stablecoin)
     A9 --> |As reference script| M4
-    A8 --> |As reference script| M4
     A6 --> |As reference Input|M4
 
     M4 --> M5(("&#8199 &#8199&#8199 &#8199 <b>Collateral Validator</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner  <br> Amount of stablecoin minted"))
@@ -94,8 +94,8 @@ flowchart LR
 
 ### Burning Stablecoins
 
-We perform the same process to get rid of your stablecoins but in reverse. 
-We (the user that minted the stablecoins) burn the stablecoins to unlock our collateral and get it back:
+We (the user that minted the stablecoins) burn the stablecoins to unlock our collateral and get it back.
+In this case, because we're consuming a UTxO from the collateral validator, we have to provide it as refrence script aswell.
 
 ```mermaid
 flowchart LR
@@ -114,7 +114,7 @@ flowchart LR
     end
 ```
 
- ### Liquidating a position
+### Liquidating a position
 
 Finally, if the USD/ADA in the up-to-date oracle changes in a way that the value in our locked collateral is lower than 150% of the minted value (let's say 130%), anyone with enough stablecoins can liquidate our position.
 
@@ -122,23 +122,23 @@ When a user liquidates someone else's position, it has to burn the same amount o
 
 This means that if the total value of the locked collateral is between 101% and 149%, there's an incentive for someone else to mint their own (correctly collateralized) stablecoins and use them to liquidate that position. Maintaining the stablecoin price stable while making a profit.
 
- ```mermaid
+```mermaid
 flowchart LR
-    subgraph Burn [Liquidate Stablecoin]
-    direction LR
-    A6((" &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate </sub>"))
-    A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
-    A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
-    M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b> &#8199 &#8199 &#8199 &#8199  <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
-    M6(("&#8199 &#8199 <b>User 2</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>"))
+   subgraph Burn [Liquidate Stablecoin]
+   direction LR
+   A6((" &#8199 &#8199 <b>Oracle Validator</b> &#8199 &#8199  <br> <sub>NFT <br> Datum: USD/ADA rate </sub>"))
+   A8((<b>Always False Validator</b> <br> <sub>Collateral Validator</sub>))
+   A9((<b>Always False Validator</b> <br> <sub>Minting Policy</sub>))
+   M5(("&#8199 &#8199 &#8199 &#8199 <b>Collateral Validator</b> &#8199 &#8199 &#8199 &#8199  <br> <sub>Collateral <br> <br> Datum: <br> Collateral owner: User 1  <br> Amount of stablecoin minted"))
+   M6(("&#8199 &#8199 <b>User 2</b> &#8199 &#8199 <br> <sub>Stablecoins</sub>"))
 
-    M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
-    A8 --> |As reference script| B4
-    A9 -->|As reference script| B4
-    M5 --> B4
-    A6 --> |As reference Input|B4
-    B4 --> B6(("&#8199 &#8199 &#8199 &#8199 <b>User 2</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>User's 1 Collateral</sub>"))
-    end
+   M6 --> B4(Unlock Collateral <br> + <br> Mint stablecoin)
+   A8 --> |As reference script| B4
+   A9 -->|As reference script| B4
+   M5 --> B4
+   A6 --> |As reference Input|B4
+   B4 --> B6(("&#8199 &#8199 &#8199 &#8199 <b>User 2</b>&#8199 &#8199 &#8199 &#8199 <br> <sub>User's 1 Collateral</sub>"))
+   end
 ```
 
 ### Shutting down the stablecoin

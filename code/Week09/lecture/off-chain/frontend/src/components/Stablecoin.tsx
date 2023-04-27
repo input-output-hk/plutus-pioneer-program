@@ -127,11 +127,7 @@ export default function Stablecoin() {
 
             const tx = await lucid!
                 .newTx()
-                .readFrom([
-                    oracleWithNftUTxO,
-                    collateralRefScrUTxO,
-                    mintingPolRefScrUTxO,
-                ])
+                .readFrom([oracleWithNftUTxO, mintingPolRefScrUTxO])
                 .payToContract(
                     collateralAddr,
                     {
