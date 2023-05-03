@@ -104,6 +104,15 @@ This documentation looks better in GitBook at the following link:
 - [Testing our Stablecoin's scripts](https://youtu.be/-MBebK33FOU)
 - [Homework](https://youtu.be/yfmLaLcDjtc)
 
+### To be published: [Lecture 10](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1)
+
+- [Lesson introduction and course recap]()
+- [Developing a Dapp with MeshJS and PluTs (Typescript)](https://www.youtube.com/watch?v=tazyJWUL0nM&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=1)
+- [Developing smart contracts with PluTs (Typescript)](https://www.youtube.com/watch?v=WN4yxa-ISyk&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=5)
+- [Developing smart contracts with OpShin and PyCardano (Python)](https://www.youtube.com/watch?v=Ale01hnxZEg&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=3)
+- [Developing smart contracts with Plutarch (Haskell)](https://www.youtube.com/watch?v=2PNTJLzcP2k&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=4)
+- [Developing smart contracts with Aiken](https://www.youtube.com/watch?v=Y6x46s60bks&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=5)
+
 ## Repository Structure
 
 The most relevant directories of this repository are structured as follows:
