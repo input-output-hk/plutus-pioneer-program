@@ -49,3 +49,11 @@
   * [Lesson 5.4: A More Realistic Minting Policy](lectures/lecture-05/lesson-04/README.md)
   * [Lesson 5.5: Non-Fungible Tokens (NFTs) in Cardano](lectures/lecture-05/lesson-05/README.md)
   * [Lecture 5 Homework Assignment](lectures/lecture-05/lesson-06/README.md)
+
+* [Lecture 6](lectures/lecture-06/README.md)
+  * [Lesson 6.1: The State Monad in Practice](lectures/lecture-06/lesson-01/README.md)
+  * [Lesson 6.2: TIntroduction to the Plutus Simple Model Library](lectures/lecture-06/lesson-02/README.md)
+  * [Lesson 6.3: Unit Testing a Smart Contract](lectures/lecture-06/lesson-03/README.md)
+  * [Lesson 6.4: Property Testing a Smart Contract](lectures/lecture-06/lesson-04/README.md)
+  * [Lesson 6.5: Testing Smart Contracts with Lucid](lectures/lecture-06/lesson-05/README.md)
+  * [Lecture 6 Homework Assignment](lectures/lecture-06/lesson-06/README.md)
