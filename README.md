@@ -106,7 +106,7 @@ This documentation looks better in GitBook at the following link:
 
 ### To be published: [Lecture 10](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1)
 
-- [Lesson introduction and course recap]()
+- [Introduction](https://youtu.be/Vp4UGDUv8BM)
 - [Developing a Dapp with MeshJS and PluTs (Typescript)](https://www.youtube.com/watch?v=tazyJWUL0nM&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=1)
 - [Developing smart contracts with PluTs (Typescript)](https://www.youtube.com/watch?v=WN4yxa-ISyk&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=5)
 - [Developing smart contracts with OpShin and PyCardano (Python)](https://www.youtube.com/watch?v=Ale01hnxZEg&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=3)
