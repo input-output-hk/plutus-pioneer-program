@@ -104,7 +104,7 @@ This documentation looks better in GitBook at the following link:
 - [Testing our Stablecoin's scripts](https://youtu.be/-MBebK33FOU)
 - [Homework](https://youtu.be/yfmLaLcDjtc)
 
-### To be published: [Lecture 10](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1)
+### [Lecture 10](https://www.youtube.com/playlist?list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1)
 
 - [Introduction](https://www.youtube.com/watch?v=Vp4UGDUv8BM&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=2)
 - [Developing a Dapp with MeshJS and PluTs (Typescript)](https://www.youtube.com/watch?v=tazyJWUL0nM&list=PLNEK_Ejlx3x0ivViR3g9lAkB4Qj3iejp1&index=1)
