@@ -1,23 +1,15 @@
-# Lesson 6.3: Unit Testing a Smart Contract
+# Lecture 7 Homework Assignment: Creating Smart Contracts with Marlowe Playground
 
-Welcome to Lesson 6.3! In this lesson, you'll learn .
+Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% embed url="https://youtu.be/vB8hyVq3HVo" %}
+{% embed url="https://youtu.be/C4WWnQZOAAM" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
+After completing this homework assignment, you'll be able to:
 
-* Explain how unit test works in Cardano.
-* Define unit test for Cardano smart contracts.
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [How can I write unit tests for Plutus contracts?](https://cardano.stackexchange.com/questions/381/how-can-i-write-unit-tests-for-plutus-contracts)
-* [Testing smart contracts on Cardano](https://blog.iagon.com/testing-smart-contracts-on-cardano/)
-* [TxInfo Docs](https://input-output-hk.github.io/plutus-apps/main/plutus-script-utils/html/Plutus-Script-Utils-V2-Contexts.html#t:TxInfo)
-
+* Create a smart contract with Marlowe play.
+* Run and test a smart contract with the simulation tool.
 {% endtab %}
 {% endtabs %}
 
