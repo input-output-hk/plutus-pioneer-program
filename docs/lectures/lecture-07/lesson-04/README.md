@@ -1,23 +1,22 @@
-# Lesson 6.4: Property Testing a Smart Contract
+# Lesson 7.4: Marlowe Starter Kit - Docker
 
-Welcome to Lesson 6.4! In this lesson, you'll learn how to use property testing by using the quick check library.
+Welcome to Lesson 6.4! In this lesson, you'll learn how set-up the Marlowe runtinme environment using Docker.
 
-{% embed url="https://youtu.be/pF8HpKmaQi4" %}
+{% embed url="https://youtu.be/45F5ld8NNHM" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Describe the differences between unit and property testing.
-* Explain the benefits of using the quick check library for property testing.
-* Create property tests by using quick check to validate smart contracts.
+* Install and configure the Marlowe runtime with Docker.
+* Describe the benefits of using Docker for running a local environment.
 {% endtab %}
 
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
+{% tab title="Lesson Resources" %}
+Internet resources mentioned in the lesson's video:
 
-* [QuickCheck: Automatic testing of Haskell programs](https://hackage.haskell.org/package/QuickCheck)
-* [Introduction to QuickCheck](http://wiki.haskell.org/Introduction_to_QuickCheck2)
+* [Starter Kit for Marlowe](https://github.com/input-output-hk/marlowe-starter-kit)
+* [Nix: The Package Manager download](https://nixos.org/download)
 {% endtab %}
 {% endtabs %}
 
