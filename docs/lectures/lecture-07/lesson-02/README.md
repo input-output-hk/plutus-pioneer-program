@@ -20,7 +20,6 @@ After completing this lesson, you'll be able to:
 Internet resources mentioned in the lesson's video:
 
 * [Marlowe Playground](https://play.marlowe-finance.io/)
-* [Demeter.run website](https://demeter.run/)
 {% endtab %}
 
 {% tab title="Additional Resources" %}
