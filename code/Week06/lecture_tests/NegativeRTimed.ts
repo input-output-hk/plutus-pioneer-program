@@ -87,7 +87,7 @@ async function runTest(dtm: NegativeRTimedDatum, r: NegativeRTimedRedeemer, n: n
 
   //console.log(await emulator.getUtxos(address2));
 }
-//await runTest({deadline:BigInt(Date.now()+20000*5+1000)},-42n,5*20);
+//await runTest({deadline:BigInt(Date.now()+20000*5+1000)},-42n,5*20+1);
 
 // UNIT tests
 
