@@ -16,7 +16,7 @@ After completing this lesson, you'll be able to:
 Internet resources mentioned in the lesson's video:
 
 * [GitHub repo used in this lesson: Starter Kit for Marlowe](https://github.com/input-output-hk/marlowe-starter-kit/tree/PLT-3026)
-* [Cardanoscan](https://preprod.cardanoscan.io/))
+* [Cardanoscan](https://preprod.cardanoscan.io/)
 {% endtab %}
 {% endtabs %}
 
