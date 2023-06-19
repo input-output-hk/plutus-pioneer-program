@@ -1,16 +1,25 @@
-# Lecture 6 Homework Assignment: Testing Double Spending Contracts 
+# Lesson 7.10: Swap contract using the Marlowe Runtime's REST API
 
-Congratulations on finishing Lecture 6! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
+Welcome to Lesson 7.10! In this lesson, you'll learn how to run a swap smart contract using Marlowe Runtime's REST API.
 
-{% embed url="https://youtu.be/AZVpkwRhEaY" %}
+{% embed url="https://youtu.be/sSrVCRNoytU" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
-After completing this homework assignment, you'll be able to:
+After completing this lesson, you'll be able to:
 
-* Understand how double spending works.
-* Identify double spending vulnerabilities.
-* Define tests for catching error in double spending contracts
+* Use a Marlowe smart contract to swap Ada for Djed using Marlowe Runtime Rest API.
+* Create complex smart contracts by using Marlowe.
+* Execute a Marlowe smart contract by using the Marlowe Runtime REST API.
+* Use Marlowe Play to execute a smart contract.
+{% endtab %}
+
+{% tab title="Lesson Resources" %}
+Internet resources mentioned in the lesson's video:
+
+* [GitHub repo used in this lesson: Starter Kit for Marlowe](https://github.com/input-output-hk/marlowe-starter-kit/tree/PLT-3026)
+* [Marlowe Play](https://play.marlowe.iohk.io/)
+* [Cardanoscan](https://preprod.cardanoscan.io/))
 {% endtab %}
 {% endtabs %}
 
