@@ -1,24 +1,24 @@
-# Lesson 6.5: Testing Smart Contracts with Lucid
+# Lesson 7.5: Marlowe Starter Kit: 0. Preliminaries
 
-Welcome to Lesson 6.5! In this lesson, you'll learn how to test off-chain code with Lucid.
+Welcome to Lesson 6.5! In this lesson, you'll learn how to create signing keys and fund addresses for use with the Marlowe Starter kit.
 
-{% embed url="https://youtu.be/aUrIuDQgg5c" %}
+{% embed url="https://youtu.be/hGBmj9ZrYHs" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Explain the process of testing off-chain code with Lucid.
-* Describe how to use the emulator to run a local blockchain for testing.
-* Create and run tests by using Lucid.
+* Run Marlowe tools using Docker and Jupyter notebooks.
+* Create and setup signing keys to use the Marlowe kit.
+* Fund addresses to get starter with the Marlowe kit.
 {% endtab %}
 
 {% tab title="Lesson Resources" %}
 Internet resources mentioned in the lesson's video:
 
-* [Lucid Emulator](https://deno.land/x/lucid@0.9.8/mod.ts?=Emultator&s=Emulator)
-* [Unit Testing in Deno](https://deno.com/manual@v1.32.3/basics/testing)
-* [Fast Check](https://github.com/dubzzz/fast-check)
+* [GitHub repo used in this lesson: Starter Kit for Marlowe](https://github.com/input-output-hk/marlowe-starter-kit/tree/PLT-3026)
+* [ADA Testnets faucet](https://docs.cardano.org/cardano-testnet/tools/faucet/)
+* [Daedalus wallet for the Cardano testnets](https://docs.cardano.org/cardano-testnet/daedalus-testnet/)
 {% endtab %}
 {% endtabs %}
 
