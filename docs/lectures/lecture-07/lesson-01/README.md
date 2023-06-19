@@ -16,9 +16,8 @@ After completing this lesson, you'll be able to:
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Marlowe Website](https://marlowe-finance.io/)
+* [Marlowe Website](https://marlowe.iohk.io/)
 * [Marlowe in Cardano Docs](https://docs.cardano.org/marlowe/learn-about-marlowe)
-* [Marlowe FAQ](https://marlowe-finance.io/#faq)
 * [Marlowe explained: build low code and no code financial smart contracts on the Cardano blockchain](https://youtu.be/stbM2Zxzios)
 * [Lectures from the 1st. Cohort of Marlowe Pioneers Program](https://www.youtube.com/@iogacademy/playlists?view=50&sort=dd&shelf_id=3)
 * [Marlowe: financial contracts on blockchain (Research paper)](https://iohk.io/en/research/library/papers/marlowe-financial-contracts-on-blockchain/)
