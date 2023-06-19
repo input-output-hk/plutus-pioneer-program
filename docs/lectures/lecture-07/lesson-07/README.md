@@ -1,4 +1,4 @@
-# Lesson 7.7: Marlowe Starter Kit: 2. ZCB using the Marlowe Runtime REST API
+# Lesson 7.7: ZCB using the Marlowe Runtime REST API
 
 Welcome to Lesson 7.7! In this lesson, you'll learn how to run a zero-coupon bond smart contract using Marlowe Runtime REST API.
 
