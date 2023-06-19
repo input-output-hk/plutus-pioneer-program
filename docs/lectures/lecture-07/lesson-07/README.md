@@ -10,7 +10,7 @@ After completing this lesson, you'll be able to:
 
 * Employ the Marlowe Runtime REST API.
 * Execute a Marlowe smart contract by using the Marlowe Runtime REST API.
-* Describe the difference between running a Marlowe smart contract using the command-line and the REST API or Marlowe Runtime.
+* Describe the difference between running a Marlowe smart contract using the command-line and the REST API of Marlowe Runtime.
 {% endtab %}
 
 {% tab title="Lesson Resources" %}
