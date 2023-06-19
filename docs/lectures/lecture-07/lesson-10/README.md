@@ -19,7 +19,7 @@ Internet resources mentioned in the lesson's video:
 
 * [GitHub repo used in this lesson: Starter Kit for Marlowe](https://github.com/input-output-hk/marlowe-starter-kit/tree/PLT-3026)
 * [Marlowe Play](https://play.marlowe.iohk.io/)
-* [Cardanoscan](https://preprod.cardanoscan.io/))
+* [Cardanoscan](https://preprod.cardanoscan.io/)
 {% endtab %}
 {% endtabs %}
 
