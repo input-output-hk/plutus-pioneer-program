@@ -1,24 +1,23 @@
-# Lesson 6.5: Testing Smart Contracts with Lucid
+# Lesson 7.8: Marlowe Starter Kit: 3. ZCB using the Marlowe Runtime CLI
 
-Welcome to Lesson 6.5! In this lesson, you'll learn how to test off-chain code with Lucid.
+Welcome to Lesson 7.8! In this lesson, you'll learn how to run a zero-coupon bond smart contract using the Marlowe CLI tool.
 
-{% embed url="https://youtu.be/aUrIuDQgg5c" %}
+{% embed url="https://youtu.be/ELc72BKf7ec" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Explain the process of testing off-chain code with Lucid.
-* Describe how to use the emulator to run a local blockchain for testing.
-* Create and run tests by using Lucid.
+* Employ the Marlowe Runtime CLI.
+* Execute a Marlowe smart contract by using the Marlowe Runtime CLI.
+* Describe the differences between running a Marlowe smart contract using the command-line, the REST API, or the CLI tool of Marlowe Runtime.
 {% endtab %}
 
 {% tab title="Lesson Resources" %}
 Internet resources mentioned in the lesson's video:
 
-* [Lucid Emulator](https://deno.land/x/lucid@0.9.8/mod.ts?=Emultator&s=Emulator)
-* [Unit Testing in Deno](https://deno.com/manual@v1.32.3/basics/testing)
-* [Fast Check](https://github.com/dubzzz/fast-check)
+* [GitHub repo used in this lesson: Starter Kit for Marlowe](https://github.com/input-output-hk/marlowe-starter-kit/tree/PLT-3026)
+* [Cardanoscan](https://preprod.cardanoscan.io/)
 {% endtab %}
 {% endtabs %}
 
