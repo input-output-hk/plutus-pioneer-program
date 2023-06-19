@@ -1,6 +1,6 @@
 # Lesson 7.5: ZCB using the Marlowe Runtime command-line client
 
-Welcome to Lesson 7.6! In this lesson, you'll learn how to run a zero-coupon bond smart contract using Marlowe Runtime command-line tooling.
+Welcome to Lesson 7.5! In this lesson, you'll learn how to run a zero-coupon bond smart contract using Marlowe Runtime command-line tooling.
 
 {% embed url="https://youtu.be/pjDtuD5rimI" %}
 

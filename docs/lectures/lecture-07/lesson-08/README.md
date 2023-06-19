@@ -1,6 +1,6 @@
-# Lesson 7.8: ZCB using the Marlowe Runtime CLI
+# Lesson 7.7: ZCB using the Marlowe Runtime CLI
 
-Welcome to Lesson 7.8! In this lesson, you'll learn how to run a zero-coupon bond smart contract using the Marlowe CLI tool.
+Welcome to Lesson 7.7! In this lesson, you'll learn how to run a zero-coupon bond smart contract using the Marlowe CLI tool.
 
 {% embed url="https://youtu.be/ELc72BKf7ec" %}
 

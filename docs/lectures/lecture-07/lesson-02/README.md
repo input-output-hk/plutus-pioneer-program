@@ -19,13 +19,13 @@ After completing this lesson, you'll be able to:
 {% tab title="Lesson Resources" %}
 Internet resources mentioned in the lesson's video:
 
-* [Marlowe Playground](https://play.marlowe-finance.io/)
+* [Marlowe Playground](https://play.marlowe.iohk.io/)
 {% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
 
-* [Marlowe Tutorials](https://play.marlowe-finance.io/doc/marlowe/tutorials/index.html)
+* [Marlowe Tutorials](https://docs.marlowe.iohk.io/tutorials)
 {% endtab %}
 
 {% endtabs %}

@@ -1,6 +1,6 @@
-# Lesson 7.9: Escrow using the Marlowe Runtime's REST API
+# Lesson 7.8: Escrow using the Marlowe Runtime's REST API
 
-Welcome to Lesson 7.9! In this lesson, you'll learn how to run an escrow smart contract using Marlowe Runtime REST API.
+Welcome to Lesson 7.8! In this lesson, you'll learn how to run an escrow smart contract using Marlowe Runtime REST API.
 
 {% embed url="https://youtu.be/E8m-PKbS9TI" %}
 

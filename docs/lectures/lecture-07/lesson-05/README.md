@@ -1,6 +1,6 @@
-# Lesson 7.5: Marlowe Starter Kit: 0. Preliminaries
+# Lesson 7.4: Marlowe Starter Kit Preliminaries
 
-Welcome to Lesson 7.5! In this lesson, you'll learn how to create signing keys and fund addresses for use with the Marlowe Starter kit.
+Welcome to Lesson 7.4! In this lesson, you'll learn how to create signing keys and fund addresses for use with the Marlowe Starter kit.
 
 {% embed url="https://youtu.be/hGBmj9ZrYHs" %}
 

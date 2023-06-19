@@ -1,6 +1,6 @@
-# Lesson 7.10: Swap contract using the Marlowe Runtime's REST API
+# Lesson 7.9: Swap contract using the Marlowe Runtime's REST API
 
-Welcome to Lesson 7.10! In this lesson, you'll learn how to run a swap smart contract using Marlowe Runtime's REST API.
+Welcome to Lesson 7.9! In this lesson, you'll learn how to run a swap smart contract using Marlowe Runtime's REST API.
 
 {% embed url="https://youtu.be/sSrVCRNoytU" %}
 

@@ -1,6 +1,6 @@
-# Lesson 7.4: Marlowe Starter Kit - Docker
+# Lesson 7.3: Marlowe Starter Kit - Docker
 
-Welcome to Lesson 6.4! In this lesson, you'll learn how set-up the Marlowe runtinme environment using Docker.
+Welcome to Lesson 7.3! In this lesson, you'll learn how set-up the Marlowe runtinme environment using Docker.
 
 {% embed url="https://youtu.be/45F5ld8NNHM" %}
 
