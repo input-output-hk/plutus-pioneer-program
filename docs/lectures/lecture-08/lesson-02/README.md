@@ -1,19 +1,24 @@
-# Lesson 6.2: Introduction to the Plutus Simple Model Library
+# Lesson 8.2: The Private Testnet
 
-Welcome to Lesson 6.2! In this lesson, you'll learn how the Plutus Simple Model library works.
+Welcome to Lesson 8.2! In this lesson, you'll learn how set up and use a private Cardano testnet.
 
-{% embed url="https://youtu.be/Sft02LeXA_U" %}
+{% embed url="https://youtu.be/BBqOZAuMx1c" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Launch the Plutus Simple Model Library documentation.
-* Describe how the Plutus Simple Model library works.
-* Define tests by using the Plutus Model library.
-* Explain how tests use the state monad.
+* Explain what a testnet is.
+* Understand the benefits of using a testnet while developing and testing smart contacts.
+* Set up and execute a private Cardano testnet.
+* Interact with a private testnet by using Cardano CLI.
 {% endtab %}
 
+{% tab title="Lesson Resources" %}
+Internet resources mentioned in the lesson's video:
+
+* [Cardano private testnet repository](https://github.com/woofpool/cardano-private-testnet-setup/tree/babbage)
+{% endtab %}
 {% endtabs %}
 
 ## Collaborate with the Pioneers Community
