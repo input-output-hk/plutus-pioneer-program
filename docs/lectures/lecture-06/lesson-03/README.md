@@ -10,6 +10,7 @@ After completing this lesson, you'll be able to:
 
 * Explain how unit test works in Cardano.
 * Define unit test for Cardano smart contracts.
+{% endtab %}
 
 {% tab title="Additional Resources" %}
 To learn more about the topics covered in this lesson, we encourage you to review the following resources:
