@@ -2,7 +2,7 @@
 
 ## Welcome to Lecture 8
 
-Congratulations on completing Lecture 7 of the Plutus Pioneers Program (PPP)! In this lecture, you'll learn about staking and how it relates to Plutus. So, let's begin Lecture 6!
+Congratulations on completing Lecture 7 of the Plutus Pioneers Program (PPP)! In this lecture, you'll learn about staking and how it relates to Plutus. So, let's begin Lecture 8!
 
 Remember that you can interact with the participants of the PPP through the [IOG's technical community on Discord](https://discord.gg/inputoutput) by joining the channels under the Plutus Pioneers category. So whether you're getting started with Plutus or a veteran participant of the PPP, we encourage you to pass by the [#pioneers-lounge chanel](https://discordapp.com/channels/826816523368005654/862912746847993887) and say hello!
 
