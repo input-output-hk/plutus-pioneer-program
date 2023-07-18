@@ -68,4 +68,11 @@
   * [Lesson 7.6: ZCB using the Marlowe Runtime REST API](lectures/lecture-07/lesson-07/README.md)
   * [Lesson 7.7: ZCB using the Marlowe Runtime CLI](lectures/lecture-07/lesson-08/README.md)
   * [Lesson 7.8: Escrow using the Marlowe Runtime's REST API](lectures/lecture-07/lesson-09/README.md)
-  * [Lesson 7.9: Swap contract using the Marlowe Runtime's REST API](lectures/lecture-07/lesson-10/README.md)  
+  * [Lesson 7.9: Swap contract using the Marlowe Runtime's REST API](lectures/lecture-07/lesson-10/README.md)
+
+* [Lecture 8](lectures/lecture-08/README.md)
+  * [Lesson 8.1: Introduction to Lecture 8](lectures/lecture-08/lesson-01/README.md)
+  * [Lesson 8.2: The Private Testnet](lectures/lecture-08/lesson-02/README.md)  
+  * [Lesson 8.3: Plutus and Staking](lectures/lecture-08/lesson-03/README.md)
+  * [Lesson 8.4: Trying Stake Validators on the Private Testnet](lectures/lecture-08/lesson-04/README.md)
+  * [Lecture 8 Homework Assignment](lectures/lecture-08/lesson-05/README.md)
