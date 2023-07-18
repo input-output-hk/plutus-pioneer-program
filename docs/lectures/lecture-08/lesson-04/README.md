@@ -1,23 +1,16 @@
-# Lesson 6.4: Property Testing a Smart Contract
+# Lesson 8.4: Trying Stake Validators on the Private Testnet
 
-Welcome to Lesson 6.4! In this lesson, you'll learn how to use property testing by using the quick check library.
+Welcome to Lesson 8.4! In this lesson, you'll learn how to use property test a stake validator script on a private Cardano testnet.
 
-{% embed url="https://youtu.be/pF8HpKmaQi4" %}
+{% embed url="https://youtu.be/fzYXwdrfu44" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
 After completing this lesson, you'll be able to:
 
-* Describe the differences between unit and property testing.
-* Explain the benefits of using the quick check library for property testing.
-* Create property tests by using quick check to validate smart contracts.
-{% endtab %}
-
-{% tab title="Additional Resources" %}
-To learn more about the topics covered in this lesson, we encourage you to review the following resources:
-
-* [QuickCheck: Automatic testing of Haskell programs](https://hackage.haskell.org/package/QuickCheck)
-* [Introduction to QuickCheck](http://wiki.haskell.org/Introduction_to_QuickCheck2)
+* Set up the validation environment on a private testnet for a stake validator script.
+* Build a script stake address to test a stake validator.
+* Register and delegate a stake on a private testnet.
 {% endtab %}
 {% endtabs %}
 
