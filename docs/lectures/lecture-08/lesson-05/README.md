@@ -1,24 +1,15 @@
-# Lesson 6.5: Testing Smart Contracts with Lucid
+# Lecture 8 Homework Assignment: Creating a Realistic Stake Validator 
 
-Welcome to Lesson 6.5! In this lesson, you'll learn how to test off-chain code with Lucid.
+Congratulations on finishing Lecture 8! Please watch the following video to learn what's your homework to get your hands on the skills you learned in this lecture.
 
-{% embed url="https://youtu.be/aUrIuDQgg5c" %}
+{% embed url="https://youtu.be/rO3FVGsuzUg" %}
 
 {% tabs %}
 {% tab title="Learning Objectives" %}
-After completing this lesson, you'll be able to:
+After completing this homework assignment, you'll be able to:
 
-* Explain the process of testing off-chain code with Lucid.
-* Describe how to use the emulator to run a local blockchain for testing.
-* Create and run tests by using Lucid.
-{% endtab %}
-
-{% tab title="Lesson Resources" %}
-Internet resources mentioned in the lesson's video:
-
-* [Lucid Emulator](https://deno.land/x/lucid@0.9.8/mod.ts?=Emultator&s=Emulator)
-* [Unit Testing in Deno](https://deno.com/manual@v1.32.3/basics/testing)
-* [Fast Check](https://github.com/dubzzz/fast-check)
+* Improve a stake validator script by adding public key validation.
+* Testing a stake validator script on a private Cardano testnet.
 {% endtab %}
 {% endtabs %}
 
