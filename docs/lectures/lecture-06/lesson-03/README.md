@@ -1,6 +1,6 @@
 # Lesson 6.3: Unit Testing a Smart Contract
 
-Welcome to Lesson 6.3! In this lesson, you'll learn .
+Welcome to Lesson 6.3! In this lesson, you'll learn how to use unit testing in smart contacts.
 
 {% embed url="https://youtu.be/vB8hyVq3HVo" %}
 
