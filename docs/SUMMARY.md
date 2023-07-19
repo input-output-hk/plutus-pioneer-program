@@ -76,3 +76,13 @@
   * [Lesson 8.3: Plutus and Staking](lectures/lecture-08/lesson-03/README.md)
   * [Lesson 8.4: Trying Stake Validators on the Private Testnet](lectures/lecture-08/lesson-04/README.md)
   * [Lecture 8 Homework Assignment](lectures/lecture-08/lesson-05/README.md)
+
+* [Lecture 9](lectures/lecture-09/README.md)
+  * [Lesson 9.1: Creating our own Stablecoin Dapp](lectures/lecture-09/lesson-01/README.md)
+  * [Lesson 9.2: Using our Stablecoin Dapp UI](lectures/lecture-09/lesson-02/README.md)  
+  * [Lesson 9.3: Stablecoin's Oracle](lectures/lecture-09/lesson-03/README.md)
+  * [Lesson 9.4: Deploying Stablecoin's Reference Scripts](lectures/lecture-09/lesson-04/README.md)
+  * [Lesson 9.5: Minting Stablecoins](lectures/lecture-09/lesson-05/README.md)
+  * [Lesson 9.6: Burning Stablecoins and Liquidating Positions](lectures/lecture-09/lesson-06/README.md)
+  * [Lesson 9.7: Testing our Stablecoin's scripts](lectures/lecture-09/lesson-07/README.md)
+  * [Lecture 9 Homework Assignment](lectures/lecture-09/lesson-08/README.md)
