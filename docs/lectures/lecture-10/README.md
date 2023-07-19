@@ -2,7 +2,13 @@
 
 ## Welcome to Lecture 10
 
-Congratulations on completing Lecture 9 of the Plutus Pioneers Program (PPP)! In this lecture, you'll learn about some projects contributing to the Cardano ecosystem with a wide range of tools to create Dapps and smart contracts. So, let's begin Lecture 9!
+Congratulations on completing Lecture 9 of the Plutus Pioneers Program (PPP)! In this lecture, you'll learn about some projects contributing to the Cardano ecosystem with a wide range of tools to create Dapps and smart contracts.
+
+In the following video, Dr. Lars Brünjes, Director of Education at IOG, introduces the program's final lesson.
+
+{% embed url="https://youtu.be/Vp4UGDUv8BM" %}
+
+So, let's begin Lecture 10!
 
 Remember that you can interact with the participants of the PPP through the [IOG's technical community on Discord](https://discord.gg/inputoutput) by joining the channels under the Plutus Pioneers category. So whether you're getting started with Plutus or a veteran participant of the PPP, we encourage you to pass by the [#pioneers-lounge chanel](https://discordapp.com/channels/826816523368005654/862912746847993887) and say hello!
 
