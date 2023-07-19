@@ -86,3 +86,10 @@
   * [Lesson 9.6: Burning Stablecoins and Liquidating Positions](lectures/lecture-09/lesson-06/README.md)
   * [Lesson 9.7: Testing our Stablecoin's scripts](lectures/lecture-09/lesson-07/README.md)
   * [Lecture 9 Homework Assignment](lectures/lecture-09/lesson-08/README.md)
+
+* [Lecture 10](lectures/lecture-10/README.md)
+  * [Lesson 10.1: Developing a Dapp with MeshJS and PluTs (Typescript)](lectures/lecture-10/lesson-01/README.md)
+  * [Lesson 10.2: Developing smart contracts with Plu-Ts (Typescript)](lectures/lecture-10/lesson-02/README.md)  
+  * [Lesson 10.3: Developing smart contracts with OpShin and PyCardano (Python)](lectures/lecture-10/lesson-03/README.md)
+  * [Lesson 10.4: Developing smart contracts with Plutarch (Haskell)](lectures/lecture-10/lesson-04/README.md)
+  * [Lesson 10.5: Aiken Hello World (CLI version)](lectures/lecture-10/lesson-05/README.md)
