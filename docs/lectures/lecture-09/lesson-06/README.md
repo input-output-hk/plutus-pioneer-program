@@ -1,4 +1,4 @@
-# Lesson 9.6: Burning Stablecoins and Liquidating positions
+# Lesson 9.6: Burning Stablecoins and Liquidating Positions
 
 Welcome to Lesson 9.6! In this lesson, you'll learn how to burn and liquidate positions for stablecoins in Cardano properly.
 
