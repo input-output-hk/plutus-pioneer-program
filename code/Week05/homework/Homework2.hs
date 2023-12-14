@@ -12,13 +12,14 @@ import           Plutus.V1.Ledger.Value (flattenValue)
 import           Plutus.V2.Ledger.Contexts (ownCurrencySymbol)
 import qualified PlutusTx
 import           PlutusTx.Builtins.Internal (emptyByteString)
-import           PlutusTx.Prelude       (Bool (..), ($), (.), (&&), 
+import           PlutusTx.Prelude       (Bool (..), ($), (&&), 
                                          (==), any, traceIfFalse)
-import           Utilities              (wrapPolicy)
+import           Utilities              (wrapPolicy, writeCodeToFile)
+import           Prelude (IO)
 
-{-# INLINABLE tn #-}
-tn :: TokenName
-tn = TokenName emptyByteString
+{-# INLINABLE tnEmptyBS #-}
+tnEmptyBS :: TokenName
+tnEmptyBS = TokenName emptyByteString
 
 {-# INLINABLE mkEmptyNFTPolicy #-}
 -- Minting policy for an NFT, where the minting transaction must consume the given UTxO as input
@@ -35,15 +36,28 @@ mkEmptyNFTPolicy oref () ctx = traceIfFalse "UTxO not consumed"   hasUTxO       
 
     checkMintedAmount :: Bool
     checkMintedAmount = case flattenValue (txInfoMint info) of
-        [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tn && amt == 1
+        [(cs, tn', amt)] -> cs  == ownCurrencySymbol ctx && tn' == tnEmptyBS && amt == 1
         _                -> False
 
 {-# INLINABLE mkWrappedEmptyNFTPolicy #-}
-mkWrappedEmptyNFTPolicy :: TxOutRef -> BuiltinData -> BuiltinData -> ()
-mkWrappedEmptyNFTPolicy = wrapPolicy . mkEmptyNFTPolicy
+mkWrappedEmptyNFTPolicy :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedEmptyNFTPolicy tid ix = wrapPolicy $ mkEmptyNFTPolicy oref 
+  where
+    oref :: TxOutRef
+    oref = TxOutRef
+        (TxId $ PlutusTx.unsafeFromBuiltinData tid)
+        (PlutusTx.unsafeFromBuiltinData ix)
 
-nftPolicy :: TxOutRef -> TokenName -> MintingPolicy
-nftPolicy oref tn = mkMintingPolicyScript $ 
-    $$(PlutusTx.compile [|| mkWrappedEmptyNFTPolicy ||]) 
-        `PlutusTx.applyCode` PlutusTx.liftCode oref
+nftCode :: PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
+nftCode = $$(PlutusTx.compile [|| mkWrappedEmptyNFTPolicy ||])
 
+nftPolicy :: TxOutRef -> MintingPolicy
+nftPolicy oref = mkMintingPolicyScript $
+    nftCode
+        `PlutusTx.applyCode` PlutusTx.liftCode (PlutusTx.toBuiltinData $ getTxId $ txOutRefId oref)
+        `PlutusTx.applyCode` PlutusTx.liftCode (PlutusTx.toBuiltinData $ txOutRefIdx oref)
+
+---------------------------------------------------------------------------------
+--------------------------------- HELPER FUNCTIONS ------------------------------
+saveNFTCode :: IO ()
+saveNFTCode = writeCodeToFile "assets/nftPolicyH2.plutus" nftCode
