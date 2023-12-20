@@ -49,7 +49,7 @@ goodCases = [ Case 0 0 10000 9000 9000 10000
 wrongSigner :: [Case]
 wrongSigner = [ Case 0 1 10000 9000 9000 10000
               , Case 0 2 10000 9000 9000 10000
-              , Case 1 2 10000 9000 9000 10000
+              , Case 1 0 10000 9000 9000 10000
               , Case 1 2 10000 9000 9000 10000
               , Case 2 0 10000 9000 9000 10000
               , Case 2 1 10000 9000 9000 10000
@@ -113,8 +113,8 @@ mintingTx tp val pkh =
     ]
 
 
-script2 :: TxOutRef -> TokenName -> HomeworkScript
-script2 txOutRef tn = TypedPolicy $ toV2 $ H2.nftPolicy txOutRef tn
+script2 :: TxOutRef -> HomeworkScript
+script2 txOutRef = TypedPolicy $ toV2 $ H2.nftPolicy txOutRef 
 
 homework2 :: MockConfig -> TestTree
 homework2 cfg = do
@@ -149,7 +149,7 @@ changeSigner sig = do
 
   utxos <- utxoAt beneficiary
   let [(ref, out)] = utxos
-      typedPolicy = script2 ref ""
+      typedPolicy = script2 ref 
       mintingValue = singleton (scriptCurrencySymbol typedPolicy) "" 1
       valueInOutput = txOutValue out
   checkBalance (owns beneficiary mintingValue) $ do
@@ -162,7 +162,7 @@ changeAmount amt = do
 
   utxos <- utxoAt beneficiary
   let [(ref, out)] = utxos
-      typedPolicy = script2 ref ""
+      typedPolicy = script2 ref 
       mintingValue = singleton (scriptCurrencySymbol typedPolicy) "" amt
       valueInOutput = txOutValue out
   checkBalance (owns beneficiary mintingValue) $ do
@@ -175,7 +175,7 @@ changeTokenName tn = do
 
   utxos <- utxoAt beneficiary
   let [(ref, out)] = utxos
-      typedPolicy = script2 ref ""
+      typedPolicy = script2 ref 
       mintingValue = singleton (scriptCurrencySymbol typedPolicy) tn 1
       valueInOutput = txOutValue out
   checkBalance (owns beneficiary mintingValue) $ do
@@ -190,9 +190,9 @@ changeCurrencySymbol u = do
   utxos <- utxoAt beneficiary
   wrongUtxos <- utxoAt user
   let [(ref, out)] = utxos
-      [(wRef, wOut)] = wrongUtxos
-      typedPolicy = script2 ref ""
-      wrongTypedPolicy = script2 wRef ""
+      [(wRef, _)] = wrongUtxos
+      typedPolicy = script2 ref 
+      wrongTypedPolicy = script2 wRef 
       wrongMintingValue = singleton (scriptCurrencySymbol wrongTypedPolicy) "" 1
       valueInOutput = txOutValue out
   checkBalance (owns beneficiary wrongMintingValue) $ do
@@ -202,12 +202,12 @@ comsumeAnotherUTxO :: Run ()
 comsumeAnotherUTxO = do
   user <- newUser $ ada $ Lovelace 1000
   utxos <- utxoAt user
-  let [(ref, out)] = utxos
+  let [(ref, _)] = utxos
   submitTx user $ splitUTxOTx user ref
   utxos' <- utxoAt user
   case utxos' of
-    [(ref',out'),(wRef,wOut)] -> do
-      let typedPolicy = script2 ref' ""
+    [(ref',out'),(wRef,_)] -> do
+      let typedPolicy = script2 ref' 
           mintingValue = singleton (scriptCurrencySymbol typedPolicy) "" 1
           valueInOutput = txOutValue out'
       submitTx user $ mintingNFTTx wRef typedPolicy mintingValue valueInOutput user
@@ -217,13 +217,13 @@ twoNFTs :: Run ()
 twoNFTs = do
   user <- newUser $ ada $ Lovelace 1000
   utxos <- utxoAt user
-  let [(ref, out)] = utxos
+  let [(ref, _)] = utxos
   submitTx user $ splitUTxOTx user ref
   utxos' <- utxoAt user
   case utxos' of
     [(ref1,out1),(ref2,out2)] -> do
-      let typedPolicy1 = script2 ref1 ""
-          typedPolicy2 = script2 ref2 ""
+      let typedPolicy1 = script2 ref1 
+          typedPolicy2 = script2 ref2 
           mintingValue1 = singleton (scriptCurrencySymbol typedPolicy1) "" 1
           mintingValue2 = singleton (scriptCurrencySymbol typedPolicy2) "" 1
           valueInOutput1 = txOutValue out1
@@ -246,3 +246,4 @@ splitUTxOTx pkh txOutRef= mconcat
                 , payToKey pkh (ada (Lovelace 500))
                 , spendPubKey txOutRef
                 ]
+
