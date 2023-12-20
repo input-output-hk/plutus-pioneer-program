@@ -7,14 +7,15 @@
 
 module Homework1 where
 
-import           Plutus.V2.Ledger.Api (BuiltinData, MintingPolicy, POSIXTime,
-                                       PubKeyHash, ScriptContext,
-                                       mkMintingPolicyScript, POSIXTimeRange)
+import           Plutus.V2.Ledger.Api 
 import           Plutus.V2.Ledger.Contexts
 import           Plutus.V1.Ledger.Interval
 import qualified PlutusTx
 import           PlutusTx.Prelude     (Bool (..), ($), traceIfFalse, (&&))
-import           Utilities            (wrapPolicy)
+import           Utilities            (wrapPolicy, writeCodeToFile,
+                                       currencySymbol, writePolicyToFile)
+import           Prelude              (IO, Show (show))
+import           Text.Printf          (printf)
 
 ---------------------------------------------------------------------------------------------------
 ----------------------------------- ON-CHAIN / VALIDATOR ------------------------------------------
@@ -40,12 +41,33 @@ mkDeadlinePolicy owner deadline () ctx =
     checkDeadline = contains (to deadline) txValidRange
 
 {-# INLINABLE mkWrappedDeadlinePolicy #-}
-mkWrappedDeadlinePolicy :: PubKeyHash -> POSIXTime -> BuiltinData -> BuiltinData -> ()
-mkWrappedDeadlinePolicy pkh deadline = wrapPolicy $ mkDeadlinePolicy pkh deadline
+mkWrappedDeadlinePolicy :: BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ()
+mkWrappedDeadlinePolicy pkh deadline = wrapPolicy $ mkDeadlinePolicy pkh' deadline'
+  where 
+    pkh' :: PubKeyHash
+    pkh' = PlutusTx.unsafeFromBuiltinData pkh
+    deadline' :: POSIXTime
+    deadline' = PlutusTx.unsafeFromBuiltinData deadline
+
+deadlineCode :: PlutusTx.CompiledCode (BuiltinData -> BuiltinData -> BuiltinData -> BuiltinData -> ())
+deadlineCode = $$(PlutusTx.compile [|| mkWrappedDeadlinePolicy ||])
 
 deadlinePolicy :: PubKeyHash -> POSIXTime -> MintingPolicy
 deadlinePolicy pkh deadline = mkMintingPolicyScript $
-    $$(PlutusTx.compile [|| mkWrappedDeadlinePolicy ||])
-        `PlutusTx.applyCode` PlutusTx.liftCode pkh
-        `PlutusTx.applyCode` PlutusTx.liftCode deadline
-  
+    deadlineCode
+        `PlutusTx.applyCode` PlutusTx.liftCode (PlutusTx.toBuiltinData pkh)
+        `PlutusTx.applyCode` PlutusTx.liftCode (PlutusTx.toBuiltinData deadline)
+
+---------------------------------------------------------------------------------------------------
+------------------------------------- HELPER FUNCTIONS --------------------------------------------
+
+saveDeadlineCode :: IO ()
+saveDeadlineCode = writeCodeToFile "assets/deadline.plutus" deadlineCode
+
+saveDeadlinePolicy :: PubKeyHash -> POSIXTime -> IO ()
+saveDeadlinePolicy pkh deadline = writePolicyToFile 
+                                    (printf "assets/deadline-%s.plutus" $ show pkh) 
+                                    $ deadlinePolicy pkh deadline
+
+deadlineCurrencySymbol :: PubKeyHash -> POSIXTime -> CurrencySymbol
+deadlineCurrencySymbol pkh deadline = currencySymbol $ deadlinePolicy pkh deadline
