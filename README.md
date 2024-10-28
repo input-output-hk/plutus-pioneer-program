@@ -4,8 +4,7 @@ This branch contains a translation of the Plinth (previously called PlutusTx) on
 [4th Plutus Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program/tree/fourth-iteration). 
 They are re-writen in the Aiken smart contract language. 
 
-| :information_source: | Validators in this repository will compile only with an alpha-version of aiken. The non-alpha versions of aiken have syntax and semantic 
-  changes that are not backwards compatible. |
+| :information_source: | Validators in this repository will compile only with an alpha-version of aiken. The non-alpha versions of aiken have syntax and semantic changes that are not backwards compatible. |
 |----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 To get a basic understanding of the Aiken programming language you can check out the *Language tour* at the official documentation, that 
