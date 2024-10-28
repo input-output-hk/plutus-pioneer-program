@@ -4,6 +4,10 @@ This branch contains a translation of the Plinth (previously called PlutusTx) on
 [4th Plutus Pioneer program](https://github.com/input-output-hk/plutus-pioneer-program/tree/fourth-iteration). 
 They are re-writen in the Aiken smart contract language. 
 
+| :information_source: | Validators in this repository will compile only with an alpha-version of aiken. The non-alpha versions of aiken have syntax and semantic 
+  changes that are not backwards compatible. |
+|----------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+
 To get a basic understanding of the Aiken programming language you can check out the *Language tour* at the official documentation, that 
 starts with [Primitive types](https://aiken-lang.org/language-tour/primitive-types). Further chapters can be accessed on the left-side menu. 
 
@@ -31,8 +35,7 @@ The official docs also provide a walkthrough of creating a [Hello World project]
   ```
   Up-to-date instructions can be found at the [official page](https://aiken-lang.org/installation-instructions). 
 * Once installed you can run the command `aikup list` command that returns a list of available version for the `aiken` CLI, which is used to manage and compile projects. 
-  You should then install the latest aplha version with the command `aikup install v1.0.29-alpha`. **IMPORTANT:** The non-alpha versions of aiken have syntax and semantic 
-  changes that are not backwards compatible. Validators in this repository will compile only with an alpha-version of aiken. 
+  You should then install the latest aplha version with the command `aikup install v1.0.29-alpha`.  
 * Aiken comes with a built-in language server. The aiken docs provide [configuration instructions](https://aiken-lang.org/installation-instructions#language-server). 
 * Aiken can be integrated with the Zed, VSCode, Vim/Neovim and Emacs editors. Instructions can be found at the following [aiken docs](https://aiken-lang.org/installation-instructions#editor-integrations).  
 
