@@ -2,7 +2,7 @@
 
 ## Welcome to Lecture 1
 
-We are pleased to have you on the 4th. Cohort of the Plutus Pioneers Program (PPP). In the following video, Dr. Lars Brünjes, Director of Education at IOG, welcomes you to this program and shares the overall structure and logistics of the course.
+We are pleased to have you on the 4th cohort of the Plutus Pioneers Program (PPP). In the following video, Dr. Lars Brünjes, Director of Education at IOG, welcomes you to this program and shares the overall structure and logistics of the course.
 
 {% embed url="https://youtu.be/g4fBo4QPir0" %}
 
