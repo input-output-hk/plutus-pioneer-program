@@ -7,8 +7,8 @@
 </h1>
 
 The Plutus Pioneer Program (PPP) is a course delivered by the IOG Education team
-to recruit and train software developers in Plinth, the Haskell-embedded smart contract 
-language that compiles to Plutus. 
+to recruit and train software developers in [Plinth](https://plutus.cardano.intersectmbo.org/docs/), 
+the Haskell-embedded smart contract language that compiles to Plutus. 
 
 ## On-chain code 
 
@@ -31,9 +31,9 @@ cabal run
 ```
 
 The second command will generate the `blueprints.json` file that contains the Plutus 
-blueprints of this repo including the compiled validator code. A compiled blueprint file 
-is included in this branch. One can read more about Plutus blueprints in 
-[CIP-57](https://cips.cardano.org/cip/CIP-57). 
+blueprints of this repository which contain the compiled validator code. A compiled 
+blueprint file is included in this branch. One can read more about Plutus blueprints 
+in [CIP-57](https://cips.cardano.org/cip/CIP-57). 
 
 ## Off-chain code 
 
@@ -76,8 +76,14 @@ export const secretSeed = ["<seed1>", ..., "<seedN>"]
 export const secretSeed = "<seed1> ... <seedN>"
 ```
 
-Copy the `seed.ts` file into the folder from which you will run the off-chain code and 
-execute: 
+Copy the `seed.ts` file into the folder from which you will run the off-chain code. The 
+off-chain code uses the BlockFrost API. You will need to input a BlockFrost key for the 
+preview network into the off-chain code instead of the `<blockfrost-key>` placeholder. 
+One can get a free key at [BlockFrost](https://blockfrost.io/) web page when creating an 
+account. 
+
+After you have generated the seed and the API key, `cd` into the folder with the off-chain 
+code you want to execute and run: 
 
 ```console
 deno run -A <file_name>.ts
