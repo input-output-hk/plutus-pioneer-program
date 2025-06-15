@@ -37,10 +37,9 @@ in [CIP-57](https://cips.cardano.org/cip/CIP-57).
 
 ## Off-chain code 
 
-| :information_source: | This branch is **work-in-progress**. Off-chain code is 
-currently provided for validators up to `week05`. |
+| :information_source: | This branch is **work-in-progress**. Off-chain code is currently provided for validators up to `week05`. |
 |----------------------|
-:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| 
+:-----------------------------------------------------------------------------------------------------------------------------------| 
 
 The off-chain code can be found in the `off-chain` folder. The code works on Cardano 
 `preview` network. Comments in the code link the off-chain code to on-chain code and 
