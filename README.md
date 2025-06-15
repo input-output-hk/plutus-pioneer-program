@@ -14,8 +14,8 @@ the Haskell-embedded smart contract language that compiles to Plutus.
 
 This branch contains to PlutusV3 translated validator code from the 
 [4th iteration](https://github.com/input-output-hk/plutus-pioneer-program/tree/fourth-iteration) 
-of the Pioneer program. Some additional validator examples are added. The code 
-in this branch can be compiled with a nix shell provided by the 
+of the Pioneer program. The validator code is contained in the `src` folder.  
+The code in this branch can be compiled with a nix shell provided by the 
 [plinth-template](https://github.com/IntersectMBO/plinth-template/tree/main) 
 repository. Compilation was tested with Nix version `2.25.3` and `plinth-template`
 repository commit: `4adea2ef260a99ec9d36de609579ae5208ac8c10`. 
@@ -37,12 +37,17 @@ in [CIP-57](https://cips.cardano.org/cip/CIP-57).
 
 ## Off-chain code 
 
-This branch is **work-in-progress**. Off-chain code is currently provided for validators up to 
-`week05`. The code works on Cardano `preview` network. Comments in the code link the off-chain 
-code to on-chain code and provide additional information. The code examples use two different 
-libraries: [MeshJS](https://meshjs.dev/) and 
-[Lucid Evolution](https://anastasia-labs.github.io/lucid-evolution/). Both libraries need to 
-be installed together with [Deno](https://deno.com/), a runtime environment for JavaScript/TypeScript. 
+| :information_source: | This branch is **work-in-progress**. Off-chain code is 
+currently provided for validators up to `week05`. |
+|----------------------|:-----------------------------------------------------| 
+
+The off-chain code can be found in the `off-chain` folder. The code works on Cardano 
+`preview` network. Comments in the code link the off-chain code to on-chain code and 
+provide additional information. The code examples use two different libraries: 
+[MeshJS](https://meshjs.dev/) and 
+[Lucid Evolution](https://anastasia-labs.github.io/lucid-evolution/). Both libraries 
+need to be installed together with [Deno](https://deno.com/), a runtime environment 
+for JavaScript/TypeScript. 
 
 The code was tested with Deno version `2.1.9`, MeshSDK package version `1.9.0-beta.3` 
 and Lucid Evolution package version `0.4.22`. Use [npm](https://www.npmjs.com/) to install 
