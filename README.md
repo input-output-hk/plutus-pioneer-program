@@ -14,7 +14,7 @@ the Haskell-embedded smart contract language that compiles to Plutus.
 
 This branch contains to PlutusV3 translated validator code from the 
 [4th iteration](https://github.com/input-output-hk/plutus-pioneer-program/tree/fourth-iteration) 
-of the Pioneer program. The validator code is contained in the `src` folder.  
+of the Pioneer program. The validator code is contained in the `src` folder.
 The code in this branch can be compiled with a nix shell provided by the 
 [plinth-template](https://github.com/IntersectMBO/plinth-template/tree/main) 
 repository. Compilation was tested with Nix version `2.25.3` and `plinth-template`
