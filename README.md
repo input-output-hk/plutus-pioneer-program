@@ -44,7 +44,7 @@ The off-chain code can be found in the `off-chain` folder. The code works on Car
 `preview` network. Comments in the code link the off-chain code to on-chain code and 
 provide additional information. The code examples use two different libraries: 
 [MeshJS](https://meshjs.dev/) and 
-[Lucid Evolution](https://anastasia-labs.github.io/lucid-evolution/). Both libraries 
+[Lucid Evolution](https://no-witness-labs.github.io/evolution-sdk/). Both libraries 
 need to be installed together with [Deno](https://deno.com/), a runtime environment 
 for JavaScript/TypeScript. 
 
