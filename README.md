@@ -18,7 +18,7 @@ of the Pioneer program. The validator code is contained in the `src` folder.
 The code in this branch can be compiled with a nix shell provided by the 
 [plinth-template](https://github.com/IntersectMBO/plinth-template/tree/main) 
 repository. Compilation was tested with Nix version `2.25.3` and `plinth-template`
-repository commit: `b0f813b4181521c29a71a95ba41ec355349f4bf4`. 
+repository commit: `b9460088985331bb050f1782a32e4f92c4c00e67`. 
 
 Instructions how to setup a Plinth development environment with Nix, Docker or Demeter 
 can be found at the [plinth-dev-env](https://github.com/iohkedu/plinth-dev-env/tree/main) 
