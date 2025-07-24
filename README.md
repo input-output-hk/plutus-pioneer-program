@@ -21,7 +21,7 @@ repository. Compilation was tested with Nix version `2.25.3` and `plinth-templat
 repository commit: `b9460088985331bb050f1782a32e4f92c4c00e67`. 
 
 Instructions how to setup a Plinth development environment with Nix, Docker or Demeter 
-can be found at the [plinth-dev-env](https://github.com/iohkedu/plinth-dev-env/tree/main) 
+can be found at the [plinth-template](https://github.com/IntersectMBO/plinth-template/tree/main) 
 repository. Once the environment is setup the validator code can be compiled with the 
 following commands: 
 
