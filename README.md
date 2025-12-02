@@ -11,8 +11,9 @@ to recruit and train software developers in Plutus, the native smart contract
 language for the Cardano ecosystem.
 
 This repository contains the lectures, code examples, homework, and installation
-guides for the new 4th cohort of this program. Smart contracts are written in the 
-Haskell-based Plinth language. The [aiken-fourth-iteration](https://github.com/input-output-hk/plutus-pioneer-program/tree/aiken-fourth-iteration) 
+guides for the new 4th cohort of this program. The *textbook/* folder contains a
+PDF with transcribed video lessons for this course. Smart contracts are written
+in the Haskell-based Plinth language and are based on PlutusV2. The [aiken-fourth-iteration](https://github.com/input-output-hk/plutus-pioneer-program/tree/aiken-fourth-iteration) 
 branch contains the same smart contracts translated into Aiken. 
 
 This documentation looks better in GitBook at the following link:
