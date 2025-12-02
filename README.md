@@ -1,4 +1,19 @@
-# Plutus Pioneer Program - Cohort 3
+<h1 align="center">
+  <br>
+  <a href="https://www.youtube.com/@iogacademy"><img src="https://ucarecdn.com/288e5001-d93e-4081-976b-0c6f72cc077e/iohksymbolbig.jpg" alt="IOG Academy on YouTube" width="100"></a>
+  <br>
+  Welcome to the Plutus Pioneers Program 3rd Cohort
+  <br>
+</h1>
+
+The Plutus Pioneer Program (PPP) is a course delivered by the IOG Education team
+to recruit and train software developers in Plutus, the native smart contract
+language for the Cardano ecosystem.
+
+This repository contains the lectures, code examples, homework, and installation
+guides for the new 3rd cohort of this program. The *textbook/* folder contains a
+PDF with transcribed video lessons for this course. Smart contracts are written
+in the Haskell-based Plinth language and are based on PlutusV1.
 
 ## Lectures
 
