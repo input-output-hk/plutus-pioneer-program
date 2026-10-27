@@ -1,3 +1,6 @@
+> [!WARNING]
+> # This repository is out of date. The new recommended way of getting started with Cardano is the [Cardano Developer Portal](https://developers.cardano.org/)
+
 <h1 align="center">
   <br>
   <a href="https://www.youtube.com/@iogacademy"><img src="https://ucarecdn.com/288e5001-d93e-4081-976b-0c6f72cc077e/iohksymbolbig.jpg" alt="IOG Academy on YouTube" width="100"></a>
